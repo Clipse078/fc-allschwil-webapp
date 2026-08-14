@@ -45,6 +45,28 @@ export function resolveExternalClubLogoUrl(club: LogoSource): string | null {
 }
 
 /**
+ * Resolves the crest URL to display for an external opponent on the Infoboard
+ * (Screen 1 match card).
+ *
+ * Priority: canonical ExternalClub.logoUrl (official SFV-synced crest, stored
+ * once per club and shared by all teams) → ExternalTeam.logoUrl (team-level
+ * override, may be an upload of lower visual quality) → null.
+ *
+ * Rationale: the club crest is the authoritative "club identity" asset.
+ * A team-level override is only preferred when the club has no crest at all.
+ * This prevents cases where a team override (e.g. a white-background image)
+ * takes precedence over a clean, transparent canonical crest.
+ *
+ * Does NOT perform any background-removal transformation at runtime.
+ */
+export function resolveOpponentCrestUrl(
+  team: LogoSource,
+  club: LogoSource,
+): string | null {
+  return club.logoUrl?.trim() || team.logoUrl?.trim() || null;
+}
+
+/**
  * Decides the ExternalClub.logoUrl value to persist when a provider sync
  * reports `providerLogoUrl`.
  *

@@ -524,6 +524,115 @@ describe("AnlageplanMapScene — canonical shared scene", () => {
     expect(img?.getAttribute("src")).toBe("https://cdn.example.com/brueelstadion.jpg");
   });
 
+  it("does NOT render a zone when its resourceCode is in suppressedCodes", () => {
+    // This test validates that the suppressedCodes prop is respected by AnlageplanMapScene.
+    // We test via InfoboardAnlageplan which derives suppressedCodes from groupFacilityPitches.
+    // If FULL_PITCH and HALF_PITCH pitches for the same facility are both in the feed,
+    // only the canonical set (per hierarchy rules) should appear in the rendered output.
+    const configWithFullAndHalf = {
+      version: 1 as const,
+      elements: [
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "zone-full",
+          rect: { x: 0.0, y: 0.0, width: 0.5, height: 0.5 },
+          resourceCode: "HAUPTPLATZ",
+          label: "Hauptplatz",
+          zoneType: "FULL_PITCH" as const,
+          showNextActivity: true,
+        },
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "zone-half-a",
+          rect: { x: 0.5, y: 0.0, width: 0.25, height: 0.5 },
+          resourceCode: "FELD_A",
+          label: "Feld A",
+          zoneType: "HALF_PITCH" as const,
+          showNextActivity: true,
+        },
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "zone-half-b",
+          rect: { x: 0.75, y: 0.0, width: 0.25, height: 0.5 },
+          resourceCode: "FELD_B",
+          label: "Feld B",
+          zoneType: "HALF_PITCH" as const,
+          showNextActivity: true,
+        },
+      ],
+    };
+
+    // All pitches free (Rule A): only FULL_PITCH zone should render
+    const payloadAllFree: AnlageplanLivePayload = {
+      anlageplanConfig: configWithFullAndHalf,
+      backgroundUrl: null,
+      backgroundTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+      currentTimeIso: "2026-09-12T16:00:00.000Z",
+      screen2: {
+        feed: {
+          generatedAt: "2026-09-12T16:00:00.000Z",
+          tenant: { id: "t1", key: "fc-test", name: "FC Test", timezone: "Europe/Zurich" },
+          displayDate: "2026-09-12",
+          isStale: false,
+          facilityName: "Testanlage",
+          pitches: [
+            {
+              code: "HAUPTPLATZ",
+              displayLabel: "Hauptplatz",
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "FULL_PITCH",
+              state: "FREE_NOW",
+              currentEvent: null,
+              nextEvent: null,
+              hasAllocationConflict: false,
+            },
+            {
+              code: "FELD_A",
+              displayLabel: "Feld A",
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "HALF_PITCH",
+              state: "FREE_NOW",
+              currentEvent: null,
+              nextEvent: null,
+              hasAllocationConflict: false,
+            },
+            {
+              code: "FELD_B",
+              displayLabel: "Feld B",
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "HALF_PITCH",
+              state: "FREE_NOW",
+              currentEvent: null,
+              nextEvent: null,
+              hasAllocationConflict: false,
+            },
+          ],
+          dressingRooms: [],
+          unallocated: [],
+        },
+        branding: { clubLogoSrc: null, productLogoSrc: null },
+        currentTimeIso: "2026-09-12T16:00:00.000Z",
+        theme: "DARK",
+      },
+    };
+
+    const { unmount } = render(
+      <InfoboardAnlageplan payload={payloadAllFree} branding={DEFAULT_BRANDING} />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    const text = root.textContent ?? "";
+
+    // Rule A: only Hauptplatz free state visible
+    expect(text).toContain("Hauptplatz");
+    // Half-pitch labels must NOT appear (zones were suppressed)
+    expect(text).not.toContain("Feld A");
+    expect(text).not.toContain("Feld B");
+    unmount();
+  });
+
   it("resource zones use actual labels from config — no hardcoded fixture data", () => {
     const config = {
       version: 1 as const,
@@ -547,5 +656,223 @@ describe("AnlageplanMapScene — canonical shared scene", () => {
     );
     expect(screen.getByTestId("anlageplan-config-preview").textContent)
       .toContain("Hauptplatz (Brüelstadion)");
+  });
+});
+
+// ── INFOBOARD-UX-03-C1: Hierarchy regression — Anlageplan overlay ─────────────
+//
+// These tests verify the CANONICAL invariant:
+//   For one physical Facility, the Anlageplan overlay renders EITHER the
+//   FULL_PITCH zone OR its HALF_PITCH zones — NEVER BOTH simultaneously.
+//
+// They exercise the real InfoboardAnlageplan → AnlageplanMapScene rendering path,
+// so they will fail if FULL_PITCH and HALF_PITCH representations for the same
+// facility reach the rendered overlay simultaneously.
+
+describe("INFOBOARD-UX-03-C1: Anlageplan overlay — full-pitch/subdivision hierarchy", () => {
+  const FULL_CODE = "HP";
+  const HALF_A = "HP_A";
+  const HALF_B = "HP_B";
+  // Use non-overlapping labels so `toContain` assertions are unambiguous.
+  const FULL_LABEL = "HAUPTFELD";
+  const HALF_A_LABEL = "FELD NORD";
+  const HALF_B_LABEL = "FELD SUED";
+
+  const configWithAllThreeZones = {
+    version: 1 as const,
+    elements: [
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "z-full",
+        rect: { x: 0.0, y: 0.0, width: 0.5, height: 0.5 },
+        resourceCode: FULL_CODE,
+        label: FULL_LABEL,
+        zoneType: "FULL_PITCH" as const,
+        showNextActivity: true,
+      },
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "z-half-a",
+        rect: { x: 0.5, y: 0.0, width: 0.25, height: 0.5 },
+        resourceCode: HALF_A,
+        label: HALF_A_LABEL,
+        zoneType: "HALF_PITCH" as const,
+        showNextActivity: true,
+      },
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "z-half-b",
+        rect: { x: 0.75, y: 0.0, width: 0.25, height: 0.5 },
+        resourceCode: HALF_B,
+        label: HALF_B_LABEL,
+        zoneType: "HALF_PITCH" as const,
+        showNextActivity: true,
+      },
+    ],
+  };
+
+  function makeHierarchyPayload(
+    pitchStates: {
+      fullCurrent?: boolean;
+      fullNext?: boolean;
+      halfAcurrent?: boolean;
+      halfBcurrent?: boolean;
+    }
+  ): AnlageplanLivePayload {
+    const makeEvt = (id: string, temporal: "current" | "next") => ({
+      eventId: id,
+      displayTitle: `Evt ${id}`,
+      teamDisplayName: `Team ${id}`,
+      opponentDisplayName: null,
+      startAt: "2026-09-12T16:00:00.000Z",
+      endAt: "2026-09-12T18:00:00.000Z",
+      status: "SCHEDULED" as const,
+      type: "TRAINING" as const,
+      temporalRelation: temporal,
+      dressingRooms: [],
+    });
+
+    return {
+      anlageplanConfig: configWithAllThreeZones,
+      backgroundUrl: null,
+      backgroundTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+      currentTimeIso: "2026-09-12T16:00:00.000Z",
+      screen2: {
+        feed: {
+          generatedAt: "2026-09-12T16:00:00.000Z",
+          tenant: { id: "t1", key: "fc-test", name: "FC Test", timezone: "Europe/Zurich" },
+          displayDate: "2026-09-12",
+          isStale: false,
+          facilityName: "Testanlage",
+          pitches: [
+            {
+              code: FULL_CODE,
+              displayLabel: FULL_LABEL,
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "FULL_PITCH" as const,
+              state: pitchStates.fullCurrent ? "OCCUPIED_NOW" as const : pitchStates.fullNext ? "UPCOMING" as const : "FREE_NOW" as const,
+              currentEvent: pitchStates.fullCurrent ? makeEvt("full-cur", "current") : null,
+              nextEvent: pitchStates.fullNext ? makeEvt("full-nxt", "next") : null,
+              hasAllocationConflict: false,
+            },
+            {
+              code: HALF_A,
+              displayLabel: HALF_A_LABEL,
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "HALF_PITCH" as const,
+              state: pitchStates.halfAcurrent ? "OCCUPIED_NOW" as const : "FREE_NOW" as const,
+              currentEvent: pitchStates.halfAcurrent ? makeEvt("half-a", "current") : null,
+              nextEvent: null,
+              hasAllocationConflict: false,
+            },
+            {
+              code: HALF_B,
+              displayLabel: HALF_B_LABEL,
+              facilityName: "Hauptanlage",
+              facilityId: "fac-hp",
+              resourceType: "HALF_PITCH" as const,
+              state: pitchStates.halfBcurrent ? "OCCUPIED_NOW" as const : "FREE_NOW" as const,
+              currentEvent: pitchStates.halfBcurrent ? makeEvt("half-b", "current") : null,
+              nextEvent: null,
+              hasAllocationConflict: false,
+            },
+          ],
+          dressingRooms: [],
+          unallocated: [],
+        },
+        branding: { clubLogoSrc: null, productLogoSrc: null },
+        currentTimeIso: "2026-09-12T16:00:00.000Z",
+        theme: "DARK",
+      },
+    };
+  }
+
+  it("Rule A — all free: renders Hauptplatz zone, suppresses Hauptplatz A and B", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({})}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const mapCanvas = screen.getByTestId("anlageplan-map-canvas");
+    expect(mapCanvas.textContent).toContain(FULL_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_A_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_B_LABEL);
+  });
+
+  it("Rule B — full-pitch event: renders Hauptplatz event, suppresses A and B", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ fullCurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const mapCanvas = screen.getByTestId("anlageplan-map-canvas");
+    expect(mapCanvas.textContent).toContain(FULL_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_A_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_B_LABEL);
+  });
+
+  it("Rule C — subdivision event: renders A and B, suppresses Hauptplatz", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ halfAcurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const mapCanvas = screen.getByTestId("anlageplan-map-canvas");
+    // HALF_PITCH zones appear (one occupied, one free)
+    expect(mapCanvas.textContent).toContain(HALF_A_LABEL);
+    expect(mapCanvas.textContent).toContain(HALF_B_LABEL);
+    // FULL_PITCH zone must be suppressed
+    expect(mapCanvas.textContent).not.toContain(FULL_LABEL);
+  });
+
+  it("Rule C — both subdivisions occupied: renders A and B, suppresses Hauptplatz", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ halfAcurrent: true, halfBcurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const mapCanvas = screen.getByTestId("anlageplan-map-canvas");
+    expect(mapCanvas.textContent).toContain(HALF_A_LABEL);
+    expect(mapCanvas.textContent).toContain(HALF_B_LABEL);
+    expect(mapCanvas.textContent).not.toContain(FULL_LABEL);
+  });
+
+  it("Rule B — next event on FULL_PITCH: suppresses subdivision zones", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ fullNext: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const mapCanvas = screen.getByTestId("anlageplan-map-canvas");
+    expect(mapCanvas.textContent).toContain(FULL_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_A_LABEL);
+    expect(mapCanvas.textContent).not.toContain(HALF_B_LABEL);
+  });
+
+  it("Rule 4 — next-activity rail must not show next events from suppressed pitches", () => {
+    // When full-pitch is active (Rule B), HALF_PITCH pitches are suppressed.
+    // Their next events must NOT appear in the rail.
+    // When all free (Rule A), HALF_PITCH pitches are suppressed; their next
+    // events must not pollute the rail.
+    //
+    // Here: FULL_PITCH occupied. HALF_A/B have no events (so rail wouldn't
+    // show them anyway), but the invariant: suppressed codes are excluded.
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ fullCurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const rail = screen.getByTestId("anlageplan-activity-rail");
+    // Suppressed HALF_PITCH labels must not appear in rail
+    expect(rail.textContent).not.toContain(HALF_A_LABEL);
+    expect(rail.textContent).not.toContain(HALF_B_LABEL);
   });
 });

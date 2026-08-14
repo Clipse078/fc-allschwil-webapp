@@ -36,6 +36,7 @@ import type {
   PitchEventSummary,
 } from "@/lib/publishing/event-types";
 import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
+import { deriveSuppressedCodes } from "@/lib/publishing/infoboard/facility-group";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
@@ -63,15 +64,22 @@ export function InfoboardAnlageplan({
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
 
-  // Build pitch occupancy lookup: resourceCode → PitchOccupancy
+  // INFOBOARD-UX-03: compute which resource codes should be suppressed so that
+  // FULL_PITCH and HALF_PITCH representations never appear simultaneously.
+  const suppressedCodes = deriveSuppressedCodes(screen2.feed.pitches);
+
+  // Build pitch occupancy lookup: resourceCode → PitchOccupancy.
+  // The suppressedCodes set controls which zones the map scene actually renders.
   const pitchMap = new Map<string, PitchOccupancy>(
     screen2.feed.pitches.map((p) => [p.code, p]),
   );
 
-  // Collect NEXT activities for the right rail (de-duplicate by event id)
+  // Collect NEXT activities for the right rail from canonical (non-suppressed)
+  // pitches only, so the rail obeys the same hierarchy rules as the map overlay.
   const seenIds = new Set<string>();
   const nextActivities: Array<{ event: PitchEventSummary; resourceLabel: string }> = [];
   for (const pitch of screen2.feed.pitches) {
+    if (suppressedCodes.has(pitch.code)) continue;
     const label = pitch.displayLabel ?? pitch.code;
     if (pitch.nextEvent && !seenIds.has(pitch.nextEvent.eventId)) {
       seenIds.add(pitch.nextEvent.eventId);
@@ -119,15 +127,15 @@ export function InfoboardAnlageplan({
           flex: 1,
           display: "flex",
           minHeight: 0,
-          padding: "0.8vh 1.2vw",
-          gap: "1vw",
+          padding: "0.6vh 1vw",
+          gap: "0.8vw",
         }}
       >
-        {/* ── MAP CANVAS (~78%) ─────────────────────────────────────────── */}
+        {/* ── MAP CANVAS (~73%) ─────────────────────────────────────────── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
-            flex: "1 1 78%",
+            flex: "1 1 73%",
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",
             overflow: "hidden",
@@ -142,28 +150,31 @@ export function InfoboardAnlageplan({
             bgTransform={bgTransform}
             pitchMap={pitchMap}
             timezone={tz}
+            suppressedCodes={suppressedCodes}
           />
         </div>
 
-        {/* ── ACTIVITY RAIL (~22%) ──────────────────────────────────────── */}
+        {/* ── ACTIVITY RAIL (~27%) ──────────────────────────────────────── */}
         <aside
           data-testid="anlageplan-activity-rail"
           style={{
-            flex: "0 0 22%",
-            maxWidth: "22%",
+            flex: "0 0 27%",
+            maxWidth: "27%",
             display: "flex",
             flexDirection: "column",
-            gap: "0.5vh",
+            gap: "0.8vh",
             overflow: "hidden",
           }}
         >
           <div
             style={{
-              fontSize: "clamp(7px, 0.8vh, 10px)",
-              letterSpacing: "0.20em",
-              color: "rgba(255,255,255,0.35)",
+              fontSize: "clamp(9px, 1.1vh, 14px)",
+              letterSpacing: "0.18em",
+              color: "rgba(255,255,255,0.50)",
               textTransform: "uppercase",
-              marginBottom: "0.3vh",
+              fontWeight: 600,
+              paddingBottom: "0.4vh",
+              borderBottom: "1px solid rgba(255,255,255,0.08)",
               flexShrink: 0,
             }}
           >
@@ -175,12 +186,13 @@ export function InfoboardAnlageplan({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.4vh",
+                gap: "0.7vh",
                 overflow: "hidden",
                 flex: 1,
               }}
             >
-              {nextActivities.map(({ event, resourceLabel }) => (
+              {/* Cap at 5 items — information quality over row count */}
+              {nextActivities.slice(0, 5).map(({ event, resourceLabel }) => (
                 <NextActivityRow
                   key={event.eventId}
                   event={event}
@@ -195,14 +207,14 @@ export function InfoboardAnlageplan({
                 flex: 1,
                 display: "flex",
                 alignItems: "flex-start",
-                paddingTop: "1vh",
+                paddingTop: "1.5vh",
               }}
             >
               <span
                 style={{
-                  fontSize: "clamp(7px, 0.85vh, 11px)",
+                  fontSize: "clamp(9px, 1.1vh, 14px)",
                   color: "rgba(255,255,255,0.20)",
-                  letterSpacing: "0.12em",
+                  letterSpacing: "0.10em",
                 }}
               >
                 {hasContent ? "ALLE FELDER BELEGT" : "KEINE AKTIVITÄTEN"}

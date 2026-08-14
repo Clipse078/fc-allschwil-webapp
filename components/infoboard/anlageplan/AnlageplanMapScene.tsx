@@ -56,6 +56,13 @@ export type AnlageplanMapSceneProps = {
   pitchMap?: Map<string, PitchOccupancy> | null;
   /** Tenant timezone — required for event time formatting. Defaults to "UTC". */
   timezone?: string;
+  /**
+   * Set of resourceCodes that must NOT render any card — determined by the
+   * INFOBOARD-UX-03 full-pitch/subdivision hierarchy rules.
+   * A zone whose resourceCode is in this set is silently skipped, ensuring
+   * FULL_PITCH and HALF_PITCH are never rendered simultaneously.
+   */
+  suppressedCodes?: ReadonlySet<string>;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -66,6 +73,7 @@ export function AnlageplanMapScene({
   bgTransform,
   pitchMap,
   timezone = "UTC",
+  suppressedCodes,
 }: AnlageplanMapSceneProps): ReactElement {
   const zones = config.elements.filter(isResourceZone) as ResourceZoneElement[];
   const markers = config.elements.filter(
@@ -126,7 +134,10 @@ export function AnlageplanMapScene({
         )}
 
         {/* Resource zones → PremiumResourceCard (FREI when no live occupancy) */}
+        {/* Zones whose resourceCode is in suppressedCodes are skipped entirely  */}
+        {/* (INFOBOARD-UX-03: never render FULL_PITCH + HALF_PITCH simultaneously) */}
         {zones.map((zone) => {
+          if (suppressedCodes?.has(zone.resourceCode ?? "")) return null;
           const occupancy = pitchMap?.get(zone.resourceCode ?? "") ?? null;
           return (
             <PremiumResourceCard

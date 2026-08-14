@@ -107,7 +107,7 @@ import type { PublicationEventLoader, PublicationEventLoadInput } from "../polic
 import type { Screen1SourceEvent } from "./screen1-event-mapper";
 import type { PublishingEventStatus } from "../event-types";
 import { getPitchAllocationByCode } from "@/lib/facilities/pitches";
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveOpponentCrestUrl } from "@/lib/club-directory/logo";
 
 // ── Injected policy-metadata database ──────────────────────────────────────
 
@@ -460,8 +460,11 @@ function mapMatchItem(
     // For a HOME match, the opponent is the away external team.
     // Publication policy only publishes HOME matches on Infoboard, so the
     // away side is always the external opponent from our perspective.
+    // resolveOpponentCrestUrl prefers the canonical ExternalClub logo (official
+    // SFV-synced crest) over the team-level upload, so a clean club crest is
+    // displayed even when a team-level override asset has a white background.
     opponentExternalLogoUrl: policy?.matchExternalMapping?.awayExternalTeam
-      ? resolveExternalTeamLogoUrl(
+      ? resolveOpponentCrestUrl(
           policy.matchExternalMapping.awayExternalTeam,
           policy.matchExternalMapping.awayExternalTeam.externalClub,
         )
