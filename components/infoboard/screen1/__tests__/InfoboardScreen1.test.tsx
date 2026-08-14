@@ -124,7 +124,7 @@ describe("Header — club logo", () => {
         branding={{ clubLogoSrc: null }}
       />,
     );
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("FC");
   });
 
@@ -160,7 +160,7 @@ describe("Header — club name", () => {
         feed={makeFeed({ tenant: { id: "t", key: "k", name: "FC Musterclub", timezone: "Europe/Zurich" } })}
       />,
     );
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("FC Musterclub");
   });
 });
@@ -182,7 +182,7 @@ describe("Header — no SportClubEvo logo in header", () => {
         branding={{ productLogoSrc: "/images/branding/sportclubevo_logo.png" }}
       />,
     );
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     // Product logo alt is "SportClubEvo"; it must not be inside the header
     const imgs = header.querySelectorAll("img");
     for (const img of Array.from(imgs)) {
@@ -197,7 +197,7 @@ describe("Header — no SportClubEvo logo in header", () => {
         branding={{ productLogoSrc: null }}
       />,
     );
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).not.toContain("SportClubEvo");
   });
 
@@ -257,7 +257,7 @@ describe("Header — current time", () => {
 describe("Header — date", () => {
   it("renders a date derived from feed.displayDate when no currentTimeIso", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toMatch(/12/);
   });
 
@@ -1411,7 +1411,7 @@ describe("Footer — product branding", () => {
         branding={{ productLogoSrc: "/images/branding/sportclubevo_logo.png" }}
       />,
     );
-    const header = screen.getByTestId("infoboard-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     // Product branding element must not be a descendant of the header
     const brandingInHeader = header.querySelector('[data-testid="product-branding"]');
     expect(brandingInHeader).toBeNull();
@@ -1682,9 +1682,9 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
         theme="LIGHT"
       />,
     );
-    expect(screen.getByTestId("infoboard-header")).toBeTruthy();
+    expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();
     expect(screen.getByTestId("board-title")).toBeTruthy();
-    expect(screen.getByTestId("infoboard-footer")).toBeTruthy();
+    expect(screen.getByTestId("kiosk-shell-footer")).toBeTruthy();
     expect(screen.getAllByTestId("event-row").length).toBeGreaterThan(0);
   });
 

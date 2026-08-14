@@ -24,6 +24,7 @@ import {
 import type { InfoboardListItem } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
 import { InboardMiniPreview } from "./InboardMiniPreview";
+import { AnlageplanMiniPreview } from "@/components/infoboard/anlageplan/AnlageplanMiniPreview";
 
 type InboardCardProps = {
   board: InfoboardListItem;
@@ -75,10 +76,14 @@ export function InboardCard({
     <div className="relative flex flex-col rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden transition-shadow hover:shadow-md">
       {/* ── Mini preview thumbnail ────────────────────────────────────── */}
       <div className="relative shrink-0 overflow-hidden" style={{ aspectRatio: "16 / 5" }}>
-        <InboardMiniPreview
-          theme={board.displayTheme as "DARK" | "LIGHT" | null}
-          className="absolute inset-0 w-full h-full"
-        />
+        {board.templateType === "ANLAGENUEBERSICHT" ? (
+          <AnlageplanMiniPreview className="absolute inset-0 w-full h-full" />
+        ) : (
+          <InboardMiniPreview
+            theme={board.displayTheme as "DARK" | "LIGHT" | null}
+            className="absolute inset-0 w-full h-full"
+          />
+        )}
         {/* Status badge overlay */}
         <div className="absolute top-2 right-2 z-10">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[0.68rem] font-semibold backdrop-blur-sm ${statusBadgeClass}`}>
