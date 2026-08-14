@@ -49,6 +49,7 @@ import type {
   ResourceZoneElement,
   MarkerElement,
   MarkerType,
+  MarkerSize,
   NormalizedRect,
   AnlageplanResourceOption,
 } from "@/lib/infoboard/anlageplan-types";
@@ -68,8 +69,18 @@ import {
   defaultBackgroundTransform,
   resolveBackgroundTransform,
   anlageplanResourceLabel,
+  defaultMarkerSize,
   type BackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
+
+// ── Marker size options ────────────────────────────────────────────────────────
+
+const MARKER_SIZE_OPTIONS: { value: MarkerSize; label: string; title: string }[] = [
+  { value: "S", label: "S", title: "Klein" },
+  { value: "M", label: "M", title: "Mittel (Standard)" },
+  { value: "L", label: "L", title: "Groß" },
+  { value: "XL", label: "XL", title: "Sehr groß (TV-Distanz)" },
+];
 
 // ── Marker palette — driven by canonical MARKER_ICONS (single source of truth) ─
 
@@ -143,6 +154,14 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Display name overrides — managed inside AnlageplanConfig.displayNameOverrides
+  const displayNameOverrides = config.displayNameOverrides ?? {};
+
+  function setDisplayNameOverrides(updated: Record<string, string>) {
+    setConfig((prev) => ({ ...prev, displayNameOverrides: updated }));
+    setSaved(false);
+  }
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -544,6 +563,17 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
           </div>
         </PanelSection>
 
+        {/* ── Display Name Overrides ───────────────────────────────────────── */}
+        <PanelSection label="Bezeichnungen">
+          <p className="text-[0.65rem] text-[var(--muted)] mb-2">
+            Kanonische Team-/Eventbezeichnung → öffentliche Bezeichnung auf dieser Tafel.
+          </p>
+          <DisplayNameOverridesEditor
+            overrides={displayNameOverrides}
+            onChange={setDisplayNameOverrides}
+          />
+        </PanelSection>
+
         {/* Zones */}
         <PanelSection label="Spielfelder">
           <button
@@ -900,6 +930,26 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
                     Nächste Aktivität anzeigen
                   </span>
                 </label>
+
+                {/* ── Card appearance ──────────────────────────────────── */}
+                <ColorField
+                  label="Hintergrund"
+                  value={selectedElement.backgroundColor ?? ""}
+                  onChange={(v) =>
+                    updateElement(selectedElement.id, {
+                      backgroundColor: v || null,
+                    } as Partial<ResourceZoneElement>)
+                  }
+                />
+                <ColorField
+                  label="Textfarbe"
+                  value={selectedElement.textColor ?? ""}
+                  onChange={(v) =>
+                    updateElement(selectedElement.id, {
+                      textColor: v || null,
+                    } as Partial<ResourceZoneElement>)
+                  }
+                />
               </PanelSection>
             )}
 
@@ -932,6 +982,59 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
                   }
                   placeholder="Optional"
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
+                />
+
+                {/* ── Grösse ──────────────────────────────────────────── */}
+                <label className="block text-[0.72rem] text-[var(--muted)] mt-3 mb-1.5">
+                  Grösse
+                </label>
+                <div className="flex gap-1" role="group" aria-label="Marker-Grösse">
+                  {MARKER_SIZE_OPTIONS.map(({ value, label, title }) => {
+                    const isActive = (selectedElement.markerSize ?? defaultMarkerSize()) === value;
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        title={title}
+                        onClick={() =>
+                          updateElement(selectedElement.id, {
+                            markerSize: value,
+                          } as Partial<MarkerElement>)
+                        }
+                        className={`flex-1 rounded-[var(--radius-md)] py-1 text-[0.72rem] font-semibold transition-colors border ${
+                          isActive
+                            ? "bg-[var(--sce-primary)] text-white border-[var(--sce-primary)]"
+                            : "bg-[var(--surface-3)] border-[var(--border)] text-[var(--muted)] hover:border-[var(--sce-primary)]/50 hover:text-[var(--foreground)]"
+                        }`}
+                        aria-pressed={isActive}
+                        data-size-option={value}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* ── Hintergrund ─────────────────────────────────────── */}
+                <ColorField
+                  label="Hintergrund"
+                  value={selectedElement.backgroundColor ?? ""}
+                  onChange={(v) =>
+                    updateElement(selectedElement.id, {
+                      backgroundColor: v || null,
+                    } as Partial<MarkerElement>)
+                  }
+                />
+
+                {/* ── Textfarbe ────────────────────────────────────────── */}
+                <ColorField
+                  label="Textfarbe"
+                  value={selectedElement.textColor ?? ""}
+                  onChange={(v) =>
+                    updateElement(selectedElement.id, {
+                      textColor: v || null,
+                    } as Partial<MarkerElement>)
+                  }
                 />
               </PanelSection>
             )}
@@ -1167,6 +1270,152 @@ function ElementNavigator({
           Noch keine Elemente.
         </p>
       )}
+    </div>
+  );
+}
+
+// ── ColorField ─────────────────────────────────────────────────────────────────
+
+/**
+ * Compact color picker field — matches AnnouncementWidgetPanel convention.
+ * Shows a native color picker swatch + a hex text input side-by-side.
+ * Clearing the text field removes the override (resets to canonical default).
+ */
+function ColorField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (hex: string) => void;
+}) {
+  const normalizedValue = value.startsWith("#") ? value : value ? `#${value}` : "";
+
+  return (
+    <div className="mt-3">
+      <label className="block text-[0.72rem] text-[var(--muted)] mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={normalizedValue || "#0a1828"}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-7 w-7 rounded border border-[var(--border)] cursor-pointer shrink-0 p-0.5 bg-[var(--surface)]"
+          title={label}
+        />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="leer = Standard"
+          className="flex-1 min-w-0 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[0.72rem] text-[var(--foreground)] font-mono"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={() => onChange("")}
+            className="text-[var(--muted)] hover:text-[var(--foreground)] shrink-0"
+            title="Zurücksetzen"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── DisplayNameOverridesEditor ─────────────────────────────────────────────────
+
+/**
+ * Inline key→value editor for Infoboard-scoped display name overrides.
+ *
+ * Key   = canonical team/event name from the live feed.
+ * Value = visitor-friendly display override (e.g. "F2 Training").
+ *
+ * Canonical Team.displayName is NOT modified. This is board-presentation only.
+ */
+function DisplayNameOverridesEditor({
+  overrides,
+  onChange,
+}: {
+  overrides: Record<string, string>;
+  onChange: (updated: Record<string, string>) => void;
+}) {
+  const entries = Object.entries(overrides);
+
+  function addEntry() {
+    const updated = { ...overrides, "": "" };
+    onChange(updated);
+  }
+
+  function updateKey(oldKey: string, newKey: string) {
+    const updated: Record<string, string> = {};
+    for (const [k, v] of Object.entries(overrides)) {
+      if (k === oldKey) {
+        updated[newKey] = v;
+      } else {
+        updated[k] = v;
+      }
+    }
+    onChange(updated);
+  }
+
+  function updateValue(key: string, value: string) {
+    onChange({ ...overrides, [key]: value });
+  }
+
+  function removeEntry(key: string) {
+    const updated = { ...overrides };
+    delete updated[key];
+    onChange(updated);
+  }
+
+  return (
+    <div className="space-y-2" data-testid="display-name-overrides-editor">
+      {entries.length === 0 && (
+        <p className="text-[0.65rem] text-[var(--muted)] italic py-1">
+          Keine Überschreibungen.
+        </p>
+      )}
+      {entries.map(([key, val], i) => (
+        <div key={i} className="space-y-1">
+          <input
+            type="text"
+            value={key}
+            onChange={(e) => updateKey(key, e.target.value)}
+            placeholder="Kanonischer Name"
+            className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[0.70rem] text-[var(--muted)] font-mono"
+            data-testid="override-canonical-key"
+          />
+          <div className="flex gap-1.5 items-center">
+            <input
+              type="text"
+              value={val}
+              onChange={(e) => updateValue(key, e.target.value)}
+              placeholder="Öffentliche Bezeichnung"
+              className="flex-1 min-w-0 rounded-[var(--radius-md)] border border-[var(--sce-primary)]/40 bg-[var(--surface)] px-2 py-1 text-[0.72rem] text-[var(--foreground)]"
+              data-testid="override-display-value"
+            />
+            <button
+              type="button"
+              onClick={() => removeEntry(key)}
+              className="text-[var(--muted)] hover:text-red-500 shrink-0"
+              title="Entfernen"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={addEntry}
+        className="w-full fca-button-secondary text-[0.72rem] inline-flex items-center justify-center gap-1.5 py-1"
+      >
+        <Plus className="h-3.5 w-3.5" />
+        Bezeichnung hinzufügen
+      </button>
     </div>
   );
 }

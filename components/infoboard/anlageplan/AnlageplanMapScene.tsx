@@ -56,6 +56,11 @@ export type AnlageplanMapSceneProps = {
   pitchMap?: Map<string, PitchOccupancy> | null;
   /** Tenant timezone — required for event time formatting. Defaults to "UTC". */
   timezone?: string;
+  /**
+   * Infoboard-scoped display name overrides passed through from AnlageplanConfig.
+   * Keyed by canonical teamDisplayName / displayTitle; value is the override label.
+   */
+  displayNameOverrides?: Record<string, string> | null;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -66,6 +71,7 @@ export function AnlageplanMapScene({
   bgTransform,
   pitchMap,
   timezone = "UTC",
+  displayNameOverrides,
 }: AnlageplanMapSceneProps): ReactElement {
   const zones = config.elements.filter(isResourceZone) as ResourceZoneElement[];
   const markers = config.elements.filter(
@@ -134,6 +140,7 @@ export function AnlageplanMapScene({
               zone={zone}
               occupancy={occupancy}
               tz={timezone}
+              displayNameOverrides={displayNameOverrides}
             />
           );
         })}

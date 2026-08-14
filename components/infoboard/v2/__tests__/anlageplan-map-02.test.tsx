@@ -103,7 +103,7 @@ function makeAnlageplanPayload(
     code,
     displayLabel: code,
     facilityName: "Testanlage",
-    state: (currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE") as "FREE" | "OCCUPIED_NOW" | "UPCOMING",
+    state: (currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE_NOW") as "FREE_NOW" | "OCCUPIED_NOW" | "UPCOMING",
     hasAllocationConflict: false,
     currentEvent: currentType
       ? {
@@ -491,6 +491,186 @@ describe("InfoboardAnlageplan — shared shell", () => {
     );
     const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("ANLAGENÜBERSICHT");
+  });
+});
+
+// ── Marker size control (INFOBOARD-UX-03-C2) ─────────────────────────────────
+
+describe("FacilityMarker — size control", () => {
+  it("marker without markerSize renders with default size 'M'", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    // WC marker in fixture has no markerSize → defaults to M
+    expect(markers[0].getAttribute("data-marker-size")).toBe("M");
+  });
+
+  it("marker with markerSize 'XL' renders with XL attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "marker-xl",
+              rect: { x: 0.05, y: 0.8, width: 0.06, height: 0.06 },
+              markerType: "PARKPLATZ",
+              label: "Parkplatz",
+              secondaryText: null,
+              markerSize: "XL",
+            },
+            {
+              kind: "MARKER",
+              id: "dbh-1",
+              rect: { x: 0.8, y: 0.8, width: 0.06, height: 0.06 },
+              markerType: "DU_BIST_HIER",
+              label: null,
+              secondaryText: null,
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    expect(markers[0].getAttribute("data-marker-size")).toBe("XL");
+  });
+
+  it("DuBistHierMarker with markerSize 'L' renders with L attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "dbh-1",
+              rect: { x: 0.45, y: 0.45, width: 0.08, height: 0.1 },
+              markerType: "DU_BIST_HIER",
+              label: null,
+              secondaryText: null,
+              markerSize: "L",
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    expect(screen.getByTestId("du-bist-hier-marker").getAttribute("data-marker-size")).toBe("L");
+  });
+
+  it("marker with markerSize 'S' renders with S attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "marker-s",
+              rect: { x: 0.05, y: 0.8, width: 0.04, height: 0.04 },
+              markerType: "WC",
+              label: "WC",
+              secondaryText: null,
+              markerSize: "S",
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    expect(markers[0].getAttribute("data-marker-size")).toBe("S");
+  });
+});
+
+// ── Display name override (INFOBOARD-UX-03-C2) ───────────────────────────────
+
+describe("InfoboardAnlageplan — display name override", () => {
+  it("shows canonical team name when no override configured", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload(
+          undefined,
+          [{ code: "KR2", currentType: "TRAINING" }],
+        )}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // Default canonical name from fixture: "Team KR2"
+    expect(root.textContent).toContain("Team KR2");
+  });
+
+  it("shows override display name when configured", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "F2 Training" } },
+      [{ code: "KR2", currentType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("F2 Training");
+    // Canonical name should NOT appear (replaced by override)
+    expect(root.textContent).not.toContain("Team KR2");
+  });
+
+  it("falls back to canonical name when override is empty string", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "" } },
+      [{ code: "KR2", currentType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("Team KR2");
+  });
+
+  it("override applies to next-activity rail as well", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Next Team KR2": "Junioren F2" } },
+      [{ code: "KR2", nextType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const rail = screen.getByTestId("anlageplan-activity-rail");
+    expect(rail.textContent).toContain("Junioren F2");
+    expect(rail.textContent).not.toContain("Next Team KR2");
+  });
+
+  it("override for one team does not affect another team's name", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "F2 Training" } },
+      [
+        { code: "KR2", currentType: "TRAINING" },
+        { code: "KR3", currentType: "MATCH" },
+      ],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // KR2 team overridden
+    expect(root.textContent).toContain("F2 Training");
+    // KR3 team canonical (KR3 zone has showNextActivity=false but still has current card)
+    expect(root.textContent).toContain("Team KR3");
   });
 });
 

@@ -62,6 +62,7 @@ export function InfoboardAnlageplan({
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
+  const displayNameOverrides = anlageplanConfig.displayNameOverrides ?? null;
 
   // Build pitch occupancy lookup: resourceCode → PitchOccupancy
   const pitchMap = new Map<string, PitchOccupancy>(
@@ -142,6 +143,7 @@ export function InfoboardAnlageplan({
             bgTransform={bgTransform}
             pitchMap={pitchMap}
             timezone={tz}
+            displayNameOverrides={displayNameOverrides}
           />
         </div>
 
@@ -186,6 +188,7 @@ export function InfoboardAnlageplan({
                   event={event}
                   resourceLabel={resourceLabel}
                   tz={tz}
+                  displayNameOverrides={displayNameOverrides}
                 />
               ))}
             </div>
