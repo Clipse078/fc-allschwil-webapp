@@ -32,6 +32,7 @@ vi.mock("@/lib/db/prisma", () => ({
     passwordResetToken: {
       deleteMany: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
     },
     auditLog: {
       create: vi.fn(),
@@ -66,9 +67,10 @@ const mockMembershipFindUnique = vi.mocked(prisma.tenantMembership.findUnique);
 const mockMembershipCreate = vi.mocked(prisma.tenantMembership.create);
 const mockTokenDeleteMany = vi.mocked(prisma.passwordResetToken.deleteMany);
 const mockTokenCreate = vi.mocked(prisma.passwordResetToken.create);
+const mockTokenFindFirst = vi.mocked(prisma.passwordResetToken.findFirst);
 
 const TENANT_ID = "tenant-001";
-const OTHER_TENANT_ID = "tenant-999";
+const OTHER_TENANT_ID = "tenant-999"; // different tenant for multi-tenant tests
 const PERSON_ID = "person-001";
 const USER_ID = "user-001";
 const OTHER_USER_ID = "user-002";
@@ -100,6 +102,7 @@ beforeEach(() => {
   mockMembershipCreate.mockResolvedValue({} as Awaited<ReturnType<typeof prisma.tenantMembership.create>>);
   mockTokenDeleteMany.mockResolvedValue({ count: 1 });
   mockTokenCreate.mockResolvedValue({ id: "token-001" } as Awaited<ReturnType<typeof prisma.passwordResetToken.create>>);
+  mockTokenFindFirst.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -213,21 +216,52 @@ describe("invitePersonToTenant — identity conflicts", () => {
     ).rejects.toMatchObject({ code: "USER_ALREADY_LINKED_OTHER_PERSON" });
   });
 
-  it("CONFLICT-5. throws EMAIL_TAKEN_BY_OTHER_USER when email user exists but is unlinked", async () => {
+  it("CONFLICT-5. multi-tenant: email user from another tenant triggers link-and-invite (not rejection)", async () => {
+    // User is linked to a Person in a DIFFERENT tenant — this is the multi-tenant
+    // "existing global User → invitation into another tenant" case.
+    // Expected: Person is linked to the existing User, membership + token created.
+    mockUserFindUnique.mockResolvedValue({
+      id: OTHER_USER_ID,
+      person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
+    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    // Membership does not exist for this tenant yet
+    mockMembershipFindUnique.mockResolvedValue(null);
+
+    const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+
+    expect(result.userId).toBe(OTHER_USER_ID);
+    // Person linked to existing User
+    expect(mockPersonUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { userId: OTHER_USER_ID } }),
+    );
+    // Membership created for this tenant
+    expect(mockMembershipCreate).toHaveBeenCalled();
+    // Token created
+    expect(mockTokenCreate).toHaveBeenCalled();
+  });
+
+  it("CONFLICT-6. multi-tenant: unlinked email user triggers link-and-invite (not rejection)", async () => {
+    // Global User with no Person link — link this Person and invite.
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: null,
     } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    mockMembershipFindUnique.mockResolvedValue(null);
 
-    await expect(
-      invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID),
-    ).rejects.toMatchObject({ code: "EMAIL_TAKEN_BY_OTHER_USER" });
+    const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+
+    expect(result.userId).toBe(OTHER_USER_ID);
+    expect(mockPersonUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { userId: OTHER_USER_ID } }),
+    );
+    // No new User created — existing User is reused
+    expect(mockUserCreate).not.toHaveBeenCalled();
   });
 
-  it("CONFLICT-6. no user created on email conflict", async () => {
+  it("CONFLICT-7. no user created on same-tenant email conflict", async () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
-      person: null,
+      person: { id: OTHER_PERSON_ID, tenantId: TENANT_ID },
     } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
 
     await expect(invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID)).rejects.toThrow();
@@ -367,6 +401,43 @@ describe("revokeTenantInvitation", () => {
 
     const deleteWhere = mockTokenDeleteMany.mock.calls[0][0].where;
     expect(deleteWhere).toMatchObject({ isInvitation: true });
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Already active membership
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("invitePersonToTenant — ALREADY_HAS_ACTIVE_MEMBERSHIP", () => {
+  it("ACTIVE-1. throws ALREADY_HAS_ACTIVE_MEMBERSHIP when person's linked User is fully active in this tenant", async () => {
+    // Person already linked to a User
+    mockPersonFindUnique.mockResolvedValue(
+      makePerson({ userId: USER_ID }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
+    );
+    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    // Active membership
+    mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    // No pending invitation token
+    mockTokenFindFirst.mockResolvedValue(null);
+
+    await expect(
+      invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID),
+    ).rejects.toMatchObject({ code: "ALREADY_HAS_ACTIVE_MEMBERSHIP" });
+  });
+
+  it("ACTIVE-2. resends to fully-linked User who still has pending invitation (not yet onboarded)", async () => {
+    mockPersonFindUnique.mockResolvedValue(
+      makePerson({ userId: USER_ID }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
+    );
+    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    // Active membership
+    mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    // Has a pending invitation token
+    mockTokenFindFirst.mockResolvedValue({ id: "token-pending" } as Awaited<ReturnType<typeof prisma.passwordResetToken.findFirst>>);
+
+    const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+    expect(result.userId).toBe(USER_ID);
+    expect(mockTokenCreate).toHaveBeenCalled();
   });
 });
 

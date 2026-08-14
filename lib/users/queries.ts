@@ -57,9 +57,11 @@ export async function getTenantUsersListData(tenantId: string) {
 
   return memberships.map((m) => {
     const hasLinkedPerson = m.user.person !== null;
-    const pendingInvitation =
-      m.user.lastLoginAt === null &&
-      m.user.passwordResetTokens.length > 0;
+    // Pending invitation is determined solely by the presence of an active
+    // (non-expired, non-used) invitation token — NOT by lastLoginAt.
+    // A user may have an existing global account (lastLoginAt set) and still
+    // receive a new tenant invitation (multi-tenant: same User, new tenant).
+    const pendingInvitation = m.user.passwordResetTokens.length > 0;
 
     return {
       userId: m.user.id,

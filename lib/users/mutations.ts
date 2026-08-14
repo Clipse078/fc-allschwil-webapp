@@ -205,17 +205,21 @@ export async function invitePersonToTenant(
     }
   }
 
-  // 3. Check if the Person's email is taken by a User already linked to a
-  //    different Person in this tenant.
+  // 3. Email conflict resolution — multi-tenant aware.
+  //    Rule: a Person may be linked to an existing global User even if that User
+  //    already belongs to another tenant. Only a same-tenant cross-person link
+  //    is a hard conflict.
   if (person.email) {
+    const normalizedEmail = person.email.toLowerCase().trim();
     const emailConflict = await prisma.user.findUnique({
-      where: { email: person.email.toLowerCase().trim() },
+      where: { email: normalizedEmail },
       select: {
         id: true,
         person: { select: { id: true, tenantId: true } },
       },
     });
     if (emailConflict) {
+      // Hard conflict: same-tenant Person → different User. Never silently relink.
       if (
         emailConflict.person &&
         emailConflict.person.tenantId === tenantId &&
@@ -223,15 +227,24 @@ export async function invitePersonToTenant(
       ) {
         throw new InvitationDomainError("USER_ALREADY_LINKED_OTHER_PERSON");
       }
-      if (emailConflict.person && emailConflict.person.id !== personId) {
-        // Linked to a Person in a different tenant — allow but only if this
-        // tenant has no other link. Check cross-tenant membership isolation.
-        throw new InvitationDomainError("EMAIL_TAKEN_BY_OTHER_USER");
-      }
-      // Email taken by unlinked user — block.
-      if (!emailConflict.person) {
-        throw new InvitationDomainError("EMAIL_TAKEN_BY_OTHER_USER");
-      }
+
+      // Multi-tenant case: email User exists (from another tenant or unlinked
+      // globally). Link this Person → existing User and create a new membership
+      // + invitation token for this tenant. This is the canonical
+      // "existing global User → invitation into another tenant" path.
+      //
+      // Reject only when the existing User is already linked to a DIFFERENT
+      // Person in THE SAME TENANT (handled above).
+      await prisma.person.update({
+        where: { id: personId },
+        data: { userId: emailConflict.id },
+      });
+      return _ensureMembershipAndResendInvitation(
+        tenantId,
+        emailConflict.id,
+        personId,
+        actorUserId,
+      );
     }
   }
 
@@ -470,11 +483,39 @@ async function _ensureMembershipAndResendInvitation(
   personId: string,
   actorUserId: string,
 ): Promise<InvitePersonResult> {
-  // Check if membership exists; create if not.
+  // Check if membership exists.
   const existing = await prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
     select: { isActive: true },
   });
+
+  if (existing?.isActive) {
+    // Already an active member — no invitation needed.
+    // Check if there's already a pending invitation token; if so, resend.
+    // If they're fully active (have logged in), reject to avoid confusion.
+    const hasActiveInvite = await prisma.passwordResetToken.findFirst({
+      where: { userId, isInvitation: true, usedAt: null, expiresAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    if (!hasActiveInvite) {
+      // User is active and has no pending invitation — already onboarded.
+      throw new InvitationDomainError(
+        "ALREADY_HAS_ACTIVE_MEMBERSHIP",
+        "User is already an active member of this tenant.",
+      );
+    }
+    // Has a pending invitation — resend it.
+    const rawToken = await _createInvitationToken(userId);
+    await logAction({
+      actorUserId,
+      moduleKey: "users",
+      entityType: "User",
+      entityId: userId,
+      action: "INVITATION_RESENT",
+      metadataJson: { tenantId, personId },
+    });
+    return { userId, rawToken };
+  }
 
   if (!existing) {
     await prisma.tenantMembership.create({

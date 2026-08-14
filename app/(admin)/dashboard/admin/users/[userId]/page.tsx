@@ -79,9 +79,11 @@ export default async function AdminUserDetailPage({ params }: Props) {
   const linkedPerson = user.person;
   const hasLinkedPerson = linkedPerson !== null;
 
-  // Invitation state
-  const pendingInvitation =
-    user.lastLoginAt === null && user.passwordResetTokens.length > 0;
+  // Pending invitation is determined solely by the presence of an active
+  // (non-expired, non-used) invitation token — NOT by lastLoginAt.
+  // A user with an existing global account (lastLoginAt set from another tenant)
+  // may have a pending invitation for this tenant (multi-tenant use case).
+  const pendingInvitation = user.passwordResetTokens.length > 0;
 
   // Scoped assignments mapped for the management control
   const scopedItems = scopedAssignments.map((a) => ({
