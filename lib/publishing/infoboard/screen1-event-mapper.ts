@@ -110,6 +110,18 @@ export type Screen1SourceEvent = {
   /** Explicit source-level opponent name fallback (e.g. Event.opponentName). */
   readonly opponentFallbackName?: string | null;
 
+  /**
+   * Resolved opponent club/team logo URL from the Club Directory
+   * (INFOBOARD-UX-03).
+   *
+   * For HOME matches (FCA is home team): the away external team's logo,
+   * resolved via ExternalTeam.logoUrl → ExternalClub.logoUrl.
+   * For AWAY matches (not shown on Infoboard): symmetrically the home side.
+   * Null when no Club Directory entry exists, when the external team has no
+   * logo, or when the event is not a match.
+   */
+  readonly opponentExternalLogoUrl?: string | null;
+
   // ── Organizer ─────────────────────────────────────────────────────────────
   /** Event.organizerName — passed through directly to organizerDisplayName. */
   readonly organizerName?: string | null;
@@ -291,6 +303,7 @@ export function mapScreen1Event(
     displayTitle: event.title,
     teamDisplayName,
     opponentDisplayName,
+    opponentLogoUrl: event.opponentExternalLogoUrl ?? null,
     organizerDisplayName: event.organizerName ?? null,
     competitionLabel,
     startAt: event.startAt.toISOString(),

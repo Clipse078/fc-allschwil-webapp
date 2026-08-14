@@ -64,12 +64,12 @@
   --ib2-fs-facility-name:  clamp(0.7rem, 0.9vw, 1.1rem);
 
   --ib2-fs-section-label:  clamp(0.65rem, 0.8vw, 0.95rem);
-  --ib2-fs-pitch-name:     clamp(1.3rem, 1.8vw, 2.4rem);
-  --ib2-fs-pitch-status:   clamp(0.7rem, 0.9vw, 1.1rem);
-  --ib2-fs-pitch-type:     clamp(0.65rem, 0.82vw, 1rem);
-  --ib2-fs-pitch-title:    clamp(1rem, 1.4vw, 1.9rem);
-  --ib2-fs-pitch-opponent: clamp(0.8rem, 1.1vw, 1.5rem);
-  --ib2-fs-pitch-time:     clamp(0.85rem, 1.1vw, 1.4rem);
+  --ib2-fs-pitch-name:     clamp(1.6rem, 2.4vw, 3.2rem);
+  --ib2-fs-pitch-status:   clamp(0.75rem, 1.0vw, 1.3rem);
+  --ib2-fs-pitch-type:     clamp(0.7rem, 0.95vw, 1.2rem);
+  --ib2-fs-pitch-title:    clamp(1.2rem, 1.8vw, 2.6rem);
+  --ib2-fs-pitch-opponent: clamp(0.9rem, 1.3vw, 1.8rem);
+  --ib2-fs-pitch-time:     clamp(0.9rem, 1.25vw, 1.7rem);
 
   --ib2-fs-dr-title:       clamp(0.65rem, 0.8vw, 0.95rem);
   --ib2-fs-dr-code:        clamp(0.95rem, 1.3vw, 1.7rem);
@@ -554,7 +554,7 @@
 .pitchCardTemporalLabel {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-pitch-type);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   line-height: 1;
@@ -628,11 +628,11 @@
 
 .pitchCardFreeLine {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(1.1rem, 1.6vw, 2.2rem);
-  font-weight: 700;
-  letter-spacing: 0.12em;
+  font-size: clamp(1.4rem, 2.2vw, 3.2rem);
+  font-weight: 800;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: rgba(26, 122, 74, 0.6);
+  color: rgba(26, 122, 74, 0.75);
 }
 
 /* ─── Dressing-room section ──────────────────────────────────────────────── */
@@ -856,6 +856,47 @@
   font-weight: 600;
   color: var(--ib2-text-muted);
   white-space: nowrap;
+}
+
+/* ─── Subdivision group card (INFOBOARD-UX-03 Rules C/D) ───────────────── */
+
+.subdivisionGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-2);
+  background: var(--ib2-card-bg);
+  border: 1px solid var(--ib2-border);
+  border-radius: var(--ib2-radius);
+  padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 20px);
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.subdivisionGroupName {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib2-fs-pitch-name);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ib2-text);
+  line-height: 1;
+  padding-left: 10px;
+  border-bottom: 1px solid var(--ib2-border);
+  padding-bottom: var(--ib2-sp-2);
+  margin-bottom: var(--ib2-sp-1);
+}
+
+.subdivisionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ib2-sp-2);
+  flex: 1;
+  min-height: 0;
+}
+
+.subdivisionList .pitchCard {
+  background: var(--ib2-surface);
 }
 
 /* ─── Responsive: 1280×720 ───────────────────────────────────────────────── */

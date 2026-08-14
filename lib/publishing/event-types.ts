@@ -65,6 +65,13 @@ export type InfoboardScreen1Event = {
   displayTitle: string;
   teamDisplayName: string | null;
   opponentDisplayName: string | null;
+  /**
+   * Resolved opponent club/team logo URL for match cards (INFOBOARD-UX-03).
+   * Null when the opponent has no logo in the Club Directory, or when the
+   * event is not a match. Consumers must render a neutral fallback when null.
+   * Optional for backward compatibility with existing feed consumers.
+   */
+  opponentLogoUrl?: string | null;
   /** Organizer name for external/municipal events. */
   organizerDisplayName: string | null;
   competitionLabel: string | null;
@@ -184,12 +191,25 @@ export type PitchOccupancy = {
   displayLabel: string;
   /** Display name of the parent facility. */
   facilityName: string;
+  /**
+   * Parent Facility id — used by the presentation layer to group full-pitch
+   * and half-pitch resources that share the same physical facility
+   * (INFOBOARD-UX-03 full-pitch/subdivision deduplication).
+   */
+  facilityId: string;
+  /**
+   * Whether this resource is a complete pitch or a subdivision.
+   * Used together with `facilityId` to apply the canonical display rules:
+   *   FULL_PITCH — the whole physical pitch (e.g. Hauptplatz)
+   *   HALF_PITCH  — a named subdivision (e.g. Feld A, Feld B)
+   */
+  resourceType: "FULL_PITCH" | "HALF_PITCH";
   state: PitchOccupancyState;
   currentEvent: PitchEventSummary | null;
   /**
    * Next scheduled activity within the shared Screen 1 4-hour rolling
    * operational horizon. Populated alongside `currentEvent` when both
-   * exist — Screen 2 shows "JETZT" and "DANACH" for the same resource
+   * exist — Screen 2 shows "JETZT" and "ALS NÄCHSTES" for the same resource
    * simultaneously, never only one or the other.
    */
   nextEvent: PitchEventSummary | null;

@@ -2255,3 +2255,106 @@ describe("Training aggregation — missing allocation warning remains visible", 
     expect(warnings.length).toBeGreaterThanOrEqual(2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-UX-03: Match club/opponent logo rendering ───────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("Match card — club and opponent logo rendering (INFOBOARD-UX-03)", () => {
+  const matchBase: Partial<InfoboardScreen1Event> = {
+    type: "MATCH",
+    teamDisplayName: "FC Allschwil E1",
+    opponentDisplayName: "FC Binningen E1",
+    allocation: {
+      pitchLabel: "Stadion",
+      homeDressingRoomLabel: "Kabine E1",
+      awayDressingRoomLabel: "Kabine E2",
+      refereeDressingRoomLabel: null,
+    },
+  };
+
+  it("5. Match with FCA home — renders home team logo (clubLogoSrc)", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ ...matchBase, id: "m1", opponentLogoUrl: "/logos/binningen.png" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logos/fca.png" }}
+      />,
+    );
+    const homeRow = screen.getByTestId("match-home-team-row");
+    const homeImg = homeRow.querySelector("img[data-testid='home-team-logo']");
+    expect(homeImg?.getAttribute("src")).toBe("/logos/fca.png");
+  });
+
+  it("5. Match with FCA home — renders away opponent logo when opponentLogoUrl provided", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ ...matchBase, id: "m2", opponentLogoUrl: "/logos/binningen.png" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logos/fca.png" }}
+      />,
+    );
+    const awayRow = screen.getByTestId("match-away-team-row");
+    const awayImg = awayRow.querySelector("img[data-testid='away-team-logo']");
+    expect(awayImg?.getAttribute("src")).toBe("/logos/binningen.png");
+    expect(awayRow.textContent).toContain("FC Binningen E1");
+  });
+
+  it("7. Missing opponent logo — renders neutral fallback, not a broken image", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ ...matchBase, id: "m3", opponentLogoUrl: null })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logos/fca.png" }}
+      />,
+    );
+    const awayRow = screen.getByTestId("match-away-team-row");
+    // No broken <img> — should render the fallback div instead
+    const brokenImg = awayRow.querySelector("img[data-testid='away-team-logo']");
+    const fallback = awayRow.querySelector("[data-testid='away-team-logo-fallback']");
+    expect(brokenImg).toBeNull();
+    expect(fallback).toBeTruthy();
+    // Opponent name still visible
+    expect(awayRow.textContent).toContain("FC Binningen E1");
+  });
+
+  it("7. Missing opponent logo — layout preserved (away row still rendered)", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ ...matchBase, id: "m4", opponentLogoUrl: undefined })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logos/fca.png" }}
+      />,
+    );
+    // Away team row is rendered regardless of logo availability
+    expect(screen.getByTestId("match-away-team-row")).toBeTruthy();
+    expect(screen.getByTestId("match-away-team-row").textContent).toContain("FC Binningen E1");
+  });
+
+  it("both home and away team names are visible from the match card", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ ...matchBase, id: "m5", opponentLogoUrl: "/logos/opponent.png" })],
+      isEmpty: false,
+    });
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        branding={{ clubLogoSrc: "/logos/fca.png" }}
+      />,
+    );
+    expect(screen.getByTestId("match-home-team-row").textContent).toContain("FC Allschwil E1");
+    expect(screen.getByTestId("match-away-team-row").textContent).toContain("FC Binningen E1");
+  });
+});

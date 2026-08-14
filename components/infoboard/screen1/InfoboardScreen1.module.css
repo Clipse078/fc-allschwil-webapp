@@ -448,6 +448,17 @@
   flex-shrink: 0;
 }
 
+/* Neutral placeholder shown when an opponent has no logo in the Club Directory.
+   Preserves layout alignment — identical dimensions to .teamLogo. */
+.teamLogoFallback {
+  width: clamp(28px, 2.8vh, 42px);
+  height: clamp(28px, 2.8vh, 42px);
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 .eventTeamMain {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-event-team);

@@ -714,9 +714,24 @@ function EventCard({
             </div>
             {/* VS separator */}
             <span className={styles.vsLabel} aria-hidden="true">vs.</span>
-            {/* Away team (no logo available in current data model) */}
-            {event.opponentDisplayName !== null && (
+            {/* Away team with opponent logo (INFOBOARD-UX-03) */}
+                {event.opponentDisplayName !== null && (
               <div className={styles.matchTeamRow} data-testid="match-away-team-row">
+                {event.opponentLogoUrl != null ? (
+                  <img
+                    src={event.opponentLogoUrl}
+                    alt=""
+                    className={styles.teamLogo}
+                    aria-hidden="true"
+                    data-testid="away-team-logo"
+                  />
+                ) : (
+                  <div
+                    className={styles.teamLogoFallback}
+                    aria-hidden="true"
+                    data-testid="away-team-logo-fallback"
+                  />
+                )}
                 <span className={styles.eventTeamOpponent}>
                   {event.opponentDisplayName}
                 </span>

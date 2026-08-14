@@ -61,6 +61,7 @@ export type Screen2PitchRow = Screen1FacilityResourceRow & {
   readonly sortOrder: number;
   readonly facilityName?: string | null;
   readonly facilityId?: string;
+  readonly type?: string;
 };
 
 /** Row returned by the dressing-room inventory query. */
@@ -135,6 +136,8 @@ const PITCH_SELECT = {
   code: true,
   name: true,
   sortOrder: true,
+  facilityId: true,
+  type: true,
   facility: { select: { name: true } },
 } as const;
 
@@ -204,6 +207,8 @@ export async function buildScreen2LivePayload(params: {
     code: row.code,
     name: row.name,
     facilityName: (row as any)?.facility?.name ?? resolvedFacilityName,
+    facilityId: (row as any)?.facilityId ?? "",
+    resourceType: ((row as any)?.type === "HALF_PITCH" ? "HALF_PITCH" : "FULL_PITCH") as "FULL_PITCH" | "HALF_PITCH",
   }));
 
   // ── Map dressing-room rows to ConfiguredDressingRoom ───────────────────────

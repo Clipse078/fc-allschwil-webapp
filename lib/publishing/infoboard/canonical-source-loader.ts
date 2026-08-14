@@ -107,6 +107,7 @@ import type { PublicationEventLoader, PublicationEventLoadInput } from "../polic
 import type { Screen1SourceEvent } from "./screen1-event-mapper";
 import type { PublishingEventStatus } from "../event-types";
 import { getPitchAllocationByCode } from "@/lib/facilities/pitches";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 
 // ── Injected policy-metadata database ──────────────────────────────────────
 
@@ -126,6 +127,21 @@ export type CanonicalEventPolicyRow = {
   // INFOBOARD-C1: nullable after ADMIN-DELETE-SEASON-01-C1 (Event.seasonId uses
   // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
   readonly season: { readonly key: string } | null;
+  /**
+   * INFOBOARD-UX-03: Club Directory opponent logo resolved via
+   * MatchExternalMapping → ExternalTeam → ExternalClub.
+   * Null when no SFV mapping exists or no logo has been set.
+   */
+  readonly matchExternalMapping?: {
+    readonly homeExternalTeam?: {
+      readonly logoUrl: string | null;
+      readonly externalClub: { readonly logoUrl: string | null };
+    } | null;
+    readonly awayExternalTeam?: {
+      readonly logoUrl: string | null;
+      readonly externalClub: { readonly logoUrl: string | null };
+    } | null;
+  } | null;
 };
 
 /** Publication-policy / display metadata for a canonical TRAINING (TrainingSession-backed). */
@@ -172,6 +188,22 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
   resultLabel: true,
   intermediateResultLabel: true,
   season: { select: { key: true } },
+  matchExternalMapping: {
+    select: {
+      homeExternalTeam: {
+        select: {
+          logoUrl: true,
+          externalClub: { select: { logoUrl: true } },
+        },
+      },
+      awayExternalTeam: {
+        select: {
+          logoUrl: true,
+          externalClub: { select: { logoUrl: true } },
+        },
+      },
+    },
+  },
 } as const;
 
 export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
@@ -424,6 +456,16 @@ function mapMatchItem(
     awayDressingRoom: toAllocationCandidate(item.awayDressingRoomAllocations[0]),
     awayDressingRoomCodes: item.awayDressingRoomAllocations.map((ref) => ref.code),
     refereeDressingRoom: null,
+    // INFOBOARD-UX-03: resolve opponent logo from Club Directory.
+    // For a HOME match, the opponent is the away external team.
+    // Publication policy only publishes HOME matches on Infoboard, so the
+    // away side is always the external opponent from our perspective.
+    opponentExternalLogoUrl: policy?.matchExternalMapping?.awayExternalTeam
+      ? resolveExternalTeamLogoUrl(
+          policy.matchExternalMapping.awayExternalTeam,
+          policy.matchExternalMapping.awayExternalTeam.externalClub,
+        )
+      : null,
   };
 }
 
