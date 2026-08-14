@@ -4,11 +4,13 @@ import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Suspense } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
 type AppTopNavProps = {
   firstName: string;
   lastName: string;
+  imageUrl?: string | null;
 };
 
 type PageMeta = { eyebrow: string; title: string };
@@ -40,7 +42,7 @@ function getPageMeta(pathname: string): PageMeta {
   return { eyebrow: "SportClubEvo", title: "Übersicht" };
 }
 
-export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
+export default function AppTopNav({ firstName, lastName, imageUrl }: AppTopNavProps) {
   const pathname = usePathname();
   const { eyebrow, title } = getPageMeta(pathname);
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
@@ -78,12 +80,22 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
         {/* User avatar — links to Mein Konto */}
         <Link
           href="/dashboard/account"
-          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1"
-          style={{ background: "var(--tenant-primary)" }}
+          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1 overflow-hidden"
+          style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
           title="Mein Konto"
           aria-label="Mein Konto"
         >
-          {initials}
+          {imageUrl ? (
+            <Image
+              src={imageUrl}
+              alt={`${firstName} ${lastName}`}
+              width={28}
+              height={28}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            initials
+          )}
         </Link>
       </div>
     </header>

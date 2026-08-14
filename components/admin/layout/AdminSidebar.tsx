@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -53,6 +54,7 @@ type AdminSidebarProps = {
   firstName: string;
   lastName: string;
   email: string;
+  imageUrl?: string | null;
   permissionKeys: string[];
   /** Tenant display name. Falls back to "SportClubEvo" when not provided. */
   clubName?: string;
@@ -148,6 +150,7 @@ export default function AdminSidebar({
   firstName,
   lastName,
   email,
+  imageUrl,
   permissionKeys,
   clubName,
   logoUrl,
@@ -294,11 +297,21 @@ export default function AdminSidebar({
             title="Mein Konto"
           >
             <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
-              style={{ background: "var(--tenant-primary)" }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white overflow-hidden"
+              style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
               aria-hidden="true"
             >
-              {getInitials(firstName, lastName)}
+              {imageUrl ? (
+                <Image
+                  src={imageUrl}
+                  alt={`${firstName} ${lastName}`}
+                  width={28}
+                  height={28}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                getInitials(firstName, lastName)
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-[var(--foreground)]">
@@ -314,14 +327,24 @@ export default function AdminSidebar({
             <Link
               href="/dashboard/account"
               className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white transition-opacity hover:opacity-80",
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white transition-opacity hover:opacity-80 overflow-hidden",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
               )}
-              style={{ background: "var(--tenant-primary)" }}
+              style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
               title="Mein Konto"
               aria-label="Mein Konto"
             >
-              {getInitials(firstName, lastName)}
+              {imageUrl ? (
+                <Image
+                  src={imageUrl}
+                  alt={`${firstName} ${lastName}`}
+                  width={28}
+                  height={28}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                getInitials(firstName, lastName)
+              )}
             </Link>
           </div>
         )}
