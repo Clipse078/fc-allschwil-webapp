@@ -28,7 +28,9 @@ import type {
 import {
   parseAnlageplanJson,
   emptyAnlageplanConfig,
+  resolveBackgroundTransform,
   type AnlageplanConfig,
+  type BackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
 import type { InboardRow } from "@/lib/infoboard/types";
 
@@ -41,6 +43,11 @@ export type AnlageplanLivePayload = {
   readonly anlageplanConfig: AnlageplanConfig;
   /** Blob CDN URL of the background site-plan image. null = not set. */
   readonly backgroundUrl: string | null;
+  /**
+   * Resolved background framing transform — guaranteed non-null with safe
+   * defaults. Designer and public kiosk both use this same resolved value.
+   */
+  readonly backgroundTransform: BackgroundTransform;
   /** Current moment as UTC ISO-8601. */
   readonly currentTimeIso: string;
 };
@@ -71,6 +78,9 @@ export async function buildAnlageplanLivePayload(params: {
   // Background image URL
   const backgroundUrl = board.anlageplanBackgroundUrl ?? null;
 
+  // Resolved background framing (defaults when not persisted)
+  const backgroundTransform = resolveBackgroundTransform(anlageplanConfig);
+
   // Build Screen 2 feed (pitch occupancy + dressing rooms)
   const screen2 = await buildScreen2LivePayload({
     tenant,
@@ -82,6 +92,7 @@ export async function buildAnlageplanLivePayload(params: {
     screen2,
     anlageplanConfig,
     backgroundUrl,
+    backgroundTransform,
     currentTimeIso: now.toISOString(),
   };
 }
