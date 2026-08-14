@@ -29,7 +29,7 @@
  *   - NO editor geometry: no selection outlines, no bounding boxes, no drag handles
  */
 
-import type { ReactElement } from "react";
+import type { ReactElement, CSSProperties } from "react";
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { PitchEventSummary } from "@/lib/publishing/event-types";
 import { groupFacilityPitches } from "@/lib/publishing/infoboard/facility-group";
@@ -107,7 +107,18 @@ export function InfoboardAnlageplan({
         // root. KioskShellHeader inherits this, ensuring FC ALLSCHWIL, date,
         // and subtitle render with the same typography as Screen 1.
         fontFamily: "var(--font-inter, Inter, system-ui, -apple-system, sans-serif)",
-      }}
+        // ── Design token parity with Screen 1 ──────────────────────────────
+        // LiveClockScreen1 uses CSS module classes from InfoboardScreen1.module.css
+        // that reference --ib-* custom properties. Those variables are defined on
+        // the Screen 1 .root selector and are NOT automatically inherited here.
+        // Setting the same token values on this root ensures the shared header clock
+        // renders at identical physical size on both screens.
+        "--ib-fs-header-time": "clamp(2.6rem, 3.4vw, 4rem)",
+        "--ib-fs-header-date": "clamp(0.7rem, 0.9vw, 1rem)",
+        "--ib-text": "#E8EEF4",
+        "--ib-text-muted": "#6E87A0",
+        "--ib-border-strong": "rgba(99, 135, 175, 0.32)",
+      } as CSSProperties}
     >
       {/* ── SHARED HEADER ─────────────────────────────────────────────── */}
       <KioskShellHeader
@@ -166,18 +177,19 @@ export function InfoboardAnlageplan({
             maxWidth: "22%",
             display: "flex",
             flexDirection: "column",
-            gap: "0.5vh",
+            gap: "0.6vh",
             overflow: "hidden",
           }}
         >
           <div
             style={{
-              fontSize: "clamp(7px, 0.8vh, 10px)",
-              letterSpacing: "0.20em",
-              color: "rgba(255,255,255,0.35)",
+              fontSize: "clamp(11px, 1.3vh, 16px)",
+              letterSpacing: "0.18em",
+              color: "rgba(255,255,255,0.50)",
               textTransform: "uppercase",
-              marginBottom: "0.3vh",
+              marginBottom: "0.4vh",
               flexShrink: 0,
+              fontWeight: 600,
             }}
           >
             NÄCHSTE AKTIVITÄTEN
@@ -188,7 +200,7 @@ export function InfoboardAnlageplan({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.4vh",
+                gap: "0.5vh",
                 overflow: "hidden",
                 flex: 1,
               }}
@@ -207,18 +219,23 @@ export function InfoboardAnlageplan({
               style={{
                 flex: 1,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "flex-start",
-                paddingTop: "1vh",
+                justifyContent: "flex-start",
+                paddingTop: "1.5vh",
+                gap: "0.6vh",
               }}
             >
               <span
                 style={{
-                  fontSize: "clamp(7px, 0.85vh, 11px)",
-                  color: "rgba(255,255,255,0.20)",
-                  letterSpacing: "0.12em",
+                  fontSize: "clamp(11px, 1.4vh, 18px)",
+                  color: "rgba(255,255,255,0.30)",
+                  letterSpacing: "0.08em",
+                  fontWeight: 500,
+                  lineHeight: 1.3,
                 }}
               >
-                {hasContent ? "ALLE FELDER BELEGT" : "KEINE AKTIVITÄTEN"}
+                {hasContent ? "Aktuell keine weiteren Aktivitäten" : "Keine Aktivitäten heute"}
               </span>
             </div>
           )}
