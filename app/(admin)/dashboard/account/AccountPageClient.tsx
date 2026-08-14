@@ -18,7 +18,7 @@
  */
 
 import { useState, useRef, useCallback, useTransition } from "react";
-import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Camera,
@@ -286,7 +286,7 @@ export default function AccountPageClient({
   linkedPerson,
   tenantName,
 }: AccountPageClientProps) {
-  const { update: updateSession } = useSession();
+  const router = useRouter();
 
   // Derive display name for avatar: prefer Person name, fall back to User
   const effectiveFirstName = linkedPerson?.firstName ?? user.firstName;
@@ -338,8 +338,8 @@ export default function AccountPageClient({
 
         setFormFeedback({ type: "success", message: "Profil erfolgreich gespeichert." });
 
-        // Refresh Next-Auth session so header/sidebar reflect the new name
-        await updateSession({ user: { firstName, lastName } });
+        // Refresh server components so the sidebar/topnav reflect the new name
+        router.refresh();
       } catch {
         setFormFeedback({
           type: "error",
