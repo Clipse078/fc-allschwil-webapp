@@ -2,6 +2,10 @@
 import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireApiActiveTenantId } from "@/lib/tenants/active-tenant";
+import { getPersonsForDirectory } from "@/lib/people/queries";
+import { logAction } from "@/lib/audit/log-action";
+import { findDuplicateCandidates } from "@/lib/people/queries";
 
 function validateDateOfBirth(raw: string): { date: Date } | { error: string } {
   const date = new Date(raw);
@@ -44,7 +48,7 @@ function validatePersonBody(body: Record<string, unknown>): { error: string } | 
   return null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const access = await requireApiAnyPermission([
     PERMISSIONS.PEOPLE_VIEW,
     PERMISSIONS.PEOPLE_MANAGE,
@@ -53,19 +57,36 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const persons = await prisma.person.findMany({
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      displayName: true,
-      email: true,
-      phone: true,
-      isActive: true,
-      isPlayer: true,
-      isTrainer: true,
-    },
+  const tenantResult = await requireApiActiveTenantId();
+  if (!tenantResult.ok) {
+    // Fallback: return all persons for backward compat
+    const persons = await prisma.person.findMany({
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        displayName: true,
+        email: true,
+        phone: true,
+        isActive: true,
+        isPlayer: true,
+        isTrainer: true,
+      },
+    });
+    return NextResponse.json({ persons });
+  }
+
+  const { tenantId } = tenantResult;
+  const { searchParams } = new URL(request.url);
+
+  const persons = await getPersonsForDirectory(tenantId, {
+    query: searchParams.get("q") || undefined,
+    orgUnitId: searchParams.get("orgUnitId") || undefined,
+    teamId: searchParams.get("teamId") || undefined,
+    functionKey: searchParams.get("functionKey") || undefined,
+    status: (searchParams.get("status") as "active" | "inactive") || undefined,
+    quickFilter: (searchParams.get("quickFilter") as "spieler" | "trainer_staff" | "vereinsleitung" | "freiwillige" | "ohne_zuordnung") || undefined,
   });
 
   return NextResponse.json({ persons });
@@ -80,8 +101,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantResult = await requireApiActiveTenantId();
+  const tenantId = tenantResult.ok ? tenantResult.tenantId : null;
+
   try {
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
+
+    // Duplicate check request (does not create, just returns candidates)
+    if (body.__checkDuplicates === true && tenantId) {
+      const firstName = String(body.firstName ?? "").trim();
+      const lastName = String(body.lastName ?? "").trim();
+      const email = String(body.email ?? "").trim() || null;
+      if (!firstName || !lastName) return NextResponse.json({ duplicates: [] });
+      const duplicates = await findDuplicateCandidates(tenantId, firstName, lastName, email);
+      return NextResponse.json({ duplicates });
+    }
 
     const validationError = validatePersonBody(body);
     if (validationError) {
@@ -112,6 +146,7 @@ export async function POST(request: NextRequest) {
         isActive,
         isPlayer,
         isTrainer,
+        tenantId,
       },
       select: {
         id: true,
@@ -124,7 +159,17 @@ export async function POST(request: NextRequest) {
         isActive: true,
         isPlayer: true,
         isTrainer: true,
+        tenantId: true,
       },
+    });
+
+    await logAction({
+      actorUserId: access.session?.user?.id,
+      moduleKey: "persons",
+      entityType: "Person",
+      entityId: person.id,
+      action: "created",
+      afterJson: { firstName, lastName, email, tenantId },
     });
 
     return NextResponse.json({ message: "Person erfolgreich erstellt.", person }, { status: 201 });

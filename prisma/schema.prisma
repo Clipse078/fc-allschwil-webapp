@@ -586,6 +586,9 @@ model Tenant {
   // INFOBOARD-V2: unlimited tenant-managed Infoboard displays
   infoboards        Infoboard[]
 
+  // PERSONS-01: canonical tenant-scoped person directory
+  persons           Person[]    @relation("TenantPersons")
+
   @@index([status])
   @@index([name])
 }
@@ -1031,6 +1034,17 @@ model Person {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  /// PERSONS-01: canonical tenant scoping — every Person created via the
+  /// Persons module belongs to exactly one tenant. Nullable for pre-existing
+  /// records that predate tenant-scoping; queries should always filter by
+  /// activeTenantId and fall back to including null rows as legacy compat.
+  tenantId String?
+  tenant   Tenant? @relation("TenantPersons", fields: [tenantId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  /// PERSONS-01: optional profile photo URL. Populated by image-upload flow
+  /// (future slice); null for persons without a photo.
+  imageUrl String?
+
   /// ADMIN-MASTERDATA-UX-01 — the canonical, explicit Person ↔ User link.
   /// Nullable: most Persons (e.g. players, guardians) never get an
   /// application account. Unique: at most one Person may point at a given
@@ -1090,6 +1104,9 @@ model Person {
   @@index([isPlayer])
   @@index([isTrainer])
   @@index([createdRegistrationId])
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, lastName, firstName])
 }
 
 model Team {
@@ -1150,6 +1167,9 @@ model Team {
   // a Team may participate in many tournaments, and a tournament may have
   // many Team participants (see TournamentParticipant below).
   tournamentParticipations TournamentParticipant[]
+  // PERSONS-02: back-relation for OrgUnitMembership.teamId — person assignments
+  // that reference a specific team within an OrgUnit context.
+  orgUnitMembershipAssignments OrgUnitMembership[] @relation("OrgUnitMembershipTeam")
 
   @@unique([tenantId, slug])
   @@index([category, sortOrder])
@@ -1686,6 +1706,11 @@ model OrgUnitMembership {
   // Notes field for contextual information (e.g. reason for joining, handover notes).
   seasonId  String?
   notes     String?
+  /// PERSONS-02: optional team reference for team-specific person assignments.
+  /// When set alongside personId, this membership represents a Person's role in
+  /// a specific Team within the OrgUnit context (e.g. "F2 — Trainer/in").
+  /// Null means the assignment is OrgUnit-level only (e.g. "Vereinsleitung — Vizepräsident/in").
+  teamId    String?
   createdAt DateTime                @default(now())
   updatedAt DateTime                @updatedAt
 
@@ -1693,6 +1718,7 @@ model OrgUnitMembership {
   user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   person  Person? @relation(fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   season  Season? @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  team    Team?   @relation("OrgUnitMembershipTeam", fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([orgUnitId])
   @@index([userId])
@@ -1701,6 +1727,8 @@ model OrgUnitMembership {
   @@index([orgUnitId, status])
   @@index([seasonId])
   @@index([tenantId, orgUnitId, status])
+  @@index([teamId])
+  @@index([personId, status])
 }
 
 model TargetGroup {
