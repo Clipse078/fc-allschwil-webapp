@@ -5,60 +5,55 @@
  *
  * Route: /infoboard/screen-2
  *
+ * INFOBOARD-MAP-01C: This static route must respect the stored templateType
+ * of the Infoboard record whose slug is "screen-2". If that board is
+ * configured as ANLAGENUEBERSICHT it renders InfoboardAnlageplan; for all
+ * other cases it falls back to the legacy InfoboardScreen2 renderer.
+ *
+ * Root-cause fix: this static route previously shadowed the dynamic
+ * /infoboard/[slug] route, so visiting /infoboard/screen-2 always rendered
+ * the legacy Screen-2 Feldbelegung grid regardless of the board's
+ * templateType. Now it performs the same slug-based templateType check.
+ *
  * Architecture:
  *   - Server component (no "use client").
  *   - Resolves the active tenant from the database.
+ *   - Looks up the Infoboard by slug "screen-2" (ACTIVE boards only).
+ *   - If templateType === ANLAGENUEBERSICHT → InfoboardAnlageplan.
+ *   - Otherwise → legacy InfoboardScreen2 (preserves existing kiosk behaviour).
  *   - Creates one `now` value at request time.
- *   - Calls buildScreen2LivePayload() for facility/pitch data.
- *   - Calls fetchCurrentWeather() for live weather — server-side only,
- *     cached by Next.js fetch cache (15-minute revalidation).
- *   - Renders InfoboardScreen2 with live data.
- *   - No preview fixture content is imported or used.
  *
  * Live data sources:
  *   - Tenant resolved from DB by DEFAULT_TENANT_KEY.
  *   - Pitches: all active FULL_PITCH / HALF_PITCH facility resources for tenant.
  *   - Events: eligible events per INFOBOARD_SCREEN_2 publication policy.
- *   - Weather: MeteoSwiss Open Data (SwissMetNet VQHA80, station BAS
- *     Basel/Binningen, ≈3.8 km) for Sportanlage Im Brüel, Allschwil
- *     (server-side, no API key required, 10-minute cache). Rendered
- *     compactly in the header (INFOBOARD-INTEGRATION-01C-C1).
- *
- * Sponsors:
- *   - FC Allschwil has no sponsors to display on the Infoboard. The
- *     sponsor section/right-side column has been removed from Screen 2
- *     (INFOBOARD-INTEGRATION-01C-C1) — not replaced with placeholders,
- *     no sponsor administration added.
+ *   - Weather: MeteoSwiss Open Data (server-side, no API key required,
+ *     10-minute cache). Screen2 only — Anlageplan does not show weather.
  *
  * Failure behaviour:
  *   - Tenant not found → notFound() (404).
  *   - Tenant timezone not configured → notFound().
- *   - Weather unavailable → renders "WETTER NICHT VERFÜGBAR" fallback;
- *     facility data and sponsors remain visible.
- *   - Loader/service failure → error propagates to nearest error boundary.
- *
- * Screen 2 does NOT render:
- *   - Dressing-room / cabin assignments (Screen 1 only).
- *   - Next Events panel.
- *
- * Design constraints:
- *   - No "use client", no useEffect, no browser fetch.
- *   - No preview fixture imports.
- *   - No hardcoded tenant ID or domain.
- *   - Prisma used at this composition boundary only.
+ *   - No ACTIVE board with slug "screen-2" → falls back to legacy renderer.
+ *   - Weather unavailable (Screen2 path only) → safe fallback.
  */
 
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
 import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
+import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
+import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   buildScreen2LivePayload,
   type Screen2SourceDatabase,
   type Screen2PitchRow,
 } from "@/lib/publishing/infoboard/screen2-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
+import {
+  buildAnlageplanLivePayload,
+} from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 
@@ -66,7 +61,15 @@ export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
 };
 
-// ── Prisma adapter ────────────────────────────────────────────────────────────
+// ── FCA branding constants ─────────────────────────────────────────────────────
+
+const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
+const FC_ALLSCHWIL_LOGO_SRC = "/images/logos/fc-allschwil.png";
+const PRODUCT_LOGO_SRC = "/images/branding/sportclubevo_logo.png";
+
+const SCREEN_2_SLUG = "screen-2";
+
+// ── Prisma adapters ────────────────────────────────────────────────────────────
 
 function createPrismaScreen2Db(): Screen2SourceDatabase {
   return {
@@ -95,17 +98,9 @@ function createPrismaScreen2Db(): Screen2SourceDatabase {
 
 export default async function InfoboardScreen2Page() {
   // ── Resolve tenant ─────────────────────────────────────────────────────────
-  const tenantRow = await prisma.tenant.findFirst({
-    where: { key: DEFAULT_TENANT_KEY, status: "ACTIVE" },
-    select: {
-      id: true,
-      key: true,
-      name: true,
-      timezone: true,
-      logoUrl: true,
-      infoboardDisplayTheme: true,
-    },
-  });
+  // Use resolveKioskTenant (hostname-aware) consistent with [slug]/page.tsx.
+  // Fall back to DEFAULT_TENANT_KEY lookup for the legacy direct DB path.
+  const tenantRow = await resolveKioskTenant();
 
   if (!tenantRow) {
     notFound();
@@ -114,6 +109,11 @@ export default async function InfoboardScreen2Page() {
   if (!tenantRow.timezone) {
     notFound();
   }
+
+  // ── Request time ───────────────────────────────────────────────────────────
+  const now = new Date();
+
+  const database = createPrismaScreen2Db();
 
   const tenant: Screen2TenantContext = {
     id: tenantRow.id,
@@ -124,20 +124,49 @@ export default async function InfoboardScreen2Page() {
     infoboardDisplayTheme: tenantRow.infoboardDisplayTheme,
   };
 
-  // ── Request time ───────────────────────────────────────────────────────────
-  const now = new Date();
+  // ── Look up the board by slug to honour its templateType ──────────────────
+  // Only ACTIVE boards are served. DRAFT / DISABLED fall through to legacy.
+  const board = await getInfoboardBySlug(SCREEN_2_SLUG, tenantRow.id);
 
-  // ── Build live facility payload ────────────────────────────────────────────
-  const database = createPrismaScreen2Db();
+  // ── ANLAGENUEBERSICHT branch ───────────────────────────────────────────────
+  if (board?.status === "ACTIVE" && board.templateType === "ANLAGENUEBERSICHT") {
+    const payload = await buildAnlageplanLivePayload({
+      board,
+      tenant,
+      now,
+      database: database as unknown as import("@/lib/publishing/infoboard/anlageplan-live-service").AnlageplanSourceDatabase,
+    });
+
+    const clubLogoSrc = tenantRow.logoUrl
+      ? tenantRow.logoUrl
+      : tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
+        ? FC_ALLSCHWIL_LOGO_SRC
+        : null;
+
+    return (
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={{
+          clubLogoSrc,
+          productLogoSrc: PRODUCT_LOGO_SRC,
+          clubName: tenantRow.key === FC_ALLSCHWIL_TENANT_KEY ? "FC ALLSCHWIL" : tenantRow.name,
+          facilityName:
+            tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
+              ? "SPORTANLAGE IM BRÜEL"
+              : undefined,
+        }}
+      />
+    );
+  }
+
+  // ── Legacy Screen2 / TAGESUEBERSICHT branch ────────────────────────────────
+  // Used when:
+  //   - No ACTIVE board with slug "screen-2" exists, OR
+  //   - The board's templateType is not ANLAGENUEBERSICHT.
   const payload = await buildScreen2LivePayload({ tenant, now, database });
 
-  // ── Fetch live weather (server-side, cached 15 min) ────────────────────────
-  // Failure returns WEATHER_UNAVAILABLE; the component renders a safe fallback.
-  // No production weather is hardcoded or substituted on failure.
   const weather = await fetchCurrentWeather();
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-  // No sponsor section — see file header note (INFOBOARD-INTEGRATION-01C-C1).
   return (
     <InfoboardScreen2
       feed={payload.feed}

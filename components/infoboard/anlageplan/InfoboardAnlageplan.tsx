@@ -49,6 +49,7 @@ import {
   isDuBistHier,
   MARKER_LABELS,
   MARKER_ICONS,
+  resolveBackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
 import { LiveClockAnlageplan } from "./LiveClockAnlageplan";
 
@@ -94,6 +95,7 @@ export function InfoboardAnlageplan({
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
+  const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
 
   // Build pitch occupancy lookup: resourceCode → PitchOccupancy
   const pitchMap = new Map<string, PitchOccupancy>(
@@ -202,21 +204,7 @@ export function InfoboardAnlageplan({
             border: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          {/* Background image */}
-          {backgroundUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={backgroundUrl}
-              alt="Sportanlage"
-              style={{
-                position: "absolute",
-                inset: 0,
-                width: "100%",
-                height: "100%",
-                objectFit: "contain",
-              }}
-            />
-          ) : (
+          {!backgroundUrl && (
             <div
               style={{
                 position: "absolute",
@@ -227,34 +215,65 @@ export function InfoboardAnlageplan({
                 color: "rgba(255,255,255,0.15)",
                 fontSize: "1.4vh",
                 letterSpacing: "0.15em",
+                zIndex: 0,
               }}
             >
               ANLAGEPLAN
             </div>
           )}
 
-          {/* Resource zones with activity cards */}
-          {zones.map((zone) => {
-            const occupancy = zone.resourceCode
-              ? pitchMap.get(zone.resourceCode)
-              : null;
-            return (
-              <ResourceZoneOverlay
-                key={zone.id}
-                zone={zone}
-                occupancy={occupancy ?? null}
-                tz={tz}
+          {/*
+           * Shared map scene — background image + all overlays live inside
+           * this container so that zoom/pan keeps zones visually aligned
+           * with the image. The outer div clips overflow (rounded-xl above).
+           */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              transform: `translate(${bgTransform.offsetX * 100}%, ${bgTransform.offsetY * 100}%) scale(${bgTransform.scale})`,
+              transformOrigin: "center center",
+            }}
+          >
+            {/* Background image */}
+            {backgroundUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={backgroundUrl}
+                alt="Sportanlage"
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
               />
-            );
-          })}
+            )}
 
-          {/* Facility markers */}
-          {markers.map((marker) => (
-            <FacilityMarker key={marker.id} marker={marker} />
-          ))}
+            {/* Resource zones with activity cards */}
+            {zones.map((zone) => {
+              const occupancy = zone.resourceCode
+                ? pitchMap.get(zone.resourceCode)
+                : null;
+              return (
+                <ResourceZoneOverlay
+                  key={zone.id}
+                  zone={zone}
+                  occupancy={occupancy ?? null}
+                  tz={tz}
+                />
+              );
+            })}
 
-          {/* Du bist hier */}
-          {duBistHierEl && <DuBistHierMarker marker={duBistHierEl} />}
+            {/* Facility markers */}
+            {markers.map((marker) => (
+              <FacilityMarker key={marker.id} marker={marker} />
+            ))}
+
+            {/* Du bist hier */}
+            {duBistHierEl && <DuBistHierMarker marker={duBistHierEl} />}
+          </div>
         </div>
 
         {/* ── ANLAGE INFO RAIL ─────────────────────────────────────────────── */}

@@ -103,6 +103,35 @@ export type MarkerElement = {
 /** Union of all map element types */
 export type AnlageplanElement = ResourceZoneElement | MarkerElement;
 
+// ── Background transform ───────────────────────────────────────────────────
+
+/**
+ * Framing transform for the background site-plan image.
+ *
+ * The entire map scene (background image + all resource zone overlays +
+ * all markers) is rendered inside a shared transformed container so that
+ * zones and markers always stay visually aligned with the image.
+ *
+ * Coordinate convention (CSS transform with transform-origin center):
+ *   scale  — zoom factor; 1.0 = fill/fit, >1 = zoomed in.
+ *   offsetX — horizontal translation as a fraction of the canvas width;
+ *              0 = centred, −0.5 = shifted half a canvas width left.
+ *   offsetY — vertical translation as a fraction of the canvas height;
+ *              0 = centred, −0.5 = shifted half a canvas height up.
+ *
+ * Designer and public kiosk apply the same transform so the configured
+ * framing is pixel-identical at render time.
+ */
+export type BackgroundTransform = {
+  scale: number;
+  offsetX: number;
+  offsetY: number;
+};
+
+export function defaultBackgroundTransform(): BackgroundTransform {
+  return { scale: 1, offsetX: 0, offsetY: 0 };
+}
+
 // ── Full config object ─────────────────────────────────────────────────────
 
 /**
@@ -112,6 +141,12 @@ export type AnlageplanConfig = {
   version: 1;
   /** All map elements (zones and markers). */
   elements: AnlageplanElement[];
+  /**
+   * Background framing transform — zoom/pan applied to the whole map scene
+   * (background image + overlays together). Optional: defaults to
+   * defaultBackgroundTransform() when absent.
+   */
+  backgroundTransform?: BackgroundTransform;
 };
 
 // ── Constants / display helpers ────────────────────────────────────────────
@@ -232,7 +267,20 @@ export function parseAnlageplanJson(
  * Returns a fresh empty Anlageplan config.
  */
 export function emptyAnlageplanConfig(): AnlageplanConfig {
-  return { version: 1, elements: [] };
+  return { version: 1, elements: [], backgroundTransform: defaultBackgroundTransform() };
+}
+
+/**
+ * Resolves the background transform from a config, falling back to the default.
+ */
+export function resolveBackgroundTransform(config: AnlageplanConfig): BackgroundTransform {
+  const t = config.backgroundTransform;
+  if (!t) return defaultBackgroundTransform();
+  return {
+    scale: typeof t.scale === "number" && t.scale > 0 ? t.scale : 1,
+    offsetX: typeof t.offsetX === "number" ? t.offsetX : 0,
+    offsetY: typeof t.offsetY === "number" ? t.offsetY : 0,
+  };
 }
 
 /**

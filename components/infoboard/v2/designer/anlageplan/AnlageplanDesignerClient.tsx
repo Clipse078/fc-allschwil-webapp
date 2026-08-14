@@ -38,6 +38,9 @@ import {
   AlertCircle,
   Check,
   X,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
 } from "lucide-react";
 import type { InboardRow } from "@/lib/infoboard/types";
 import type {
@@ -62,7 +65,10 @@ import {
   defaultRect,
   defaultMarkerRect,
   defaultDuBistHierRect,
+  defaultBackgroundTransform,
+  resolveBackgroundTransform,
   anlageplanResourceLabel,
+  type BackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
 
 // ── Marker palette — driven by canonical MARKER_ICONS (single source of truth) ─
@@ -127,6 +133,12 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
     board.anlageplanBackgroundUrl ?? null,
   );
 
+  // Background framing (zoom/pan)
+  const [bgTransform, setBgTransform] = useState<BackgroundTransform>(() => {
+    const parsed = parseAnlageplanJson(board.anlageplanJson);
+    return resolveBackgroundTransform(parsed ?? emptyAnlageplanConfig());
+  });
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -152,6 +164,14 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
     startY: number;
     origW: number;
     origH: number;
+  } | null>(null);
+
+  // Background pan drag state (drag on empty canvas area)
+  const panning = useRef<{
+    startX: number;
+    startY: number;
+    origOffsetX: number;
+    origOffsetY: number;
   } | null>(null);
 
   // Observe canvas size
@@ -287,6 +307,16 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
           ),
         }));
         setSaved(false);
+      } else if (panning.current) {
+        const { startX, startY, origOffsetX, origOffsetY } = panning.current;
+        const dx = (e.clientX - startX) / cw;
+        const dy = (e.clientY - startY) / ch;
+        setBgTransform((prev) => ({
+          ...prev,
+          offsetX: origOffsetX + dx,
+          offsetY: origOffsetY + dy,
+        }));
+        setSaved(false);
       }
     },
     [canvasSize, config.elements],
@@ -295,6 +325,7 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
   const onMouseUp = useCallback(() => {
     dragging.current = null;
     resizing.current = null;
+    panning.current = null;
   }, []);
 
   useEffect(() => {
@@ -309,7 +340,8 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
   // ── Save ──────────────────────────────────────────────────────────────────
 
   async function handleSave() {
-    const err = validateAnlageplanConfig(config);
+    const configToSave: AnlageplanConfig = { ...config, backgroundTransform: bgTransform };
+    const err = validateAnlageplanConfig(configToSave);
     if (err) {
       setSaveError(err);
       return;
@@ -320,7 +352,7 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
       const res = await fetch(`/api/infoboards/${board.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anlageplanJson: JSON.stringify(config) }),
+        body: JSON.stringify({ anlageplanJson: JSON.stringify(configToSave) }),
       });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
@@ -452,6 +484,48 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
           </div>
         </PanelSection>
 
+        {/* Background framing */}
+        <PanelSection label="Bildausschnitt">
+          <p className="text-[0.65rem] text-[var(--muted)] mb-2">
+            Ziehen im Canvas zum Verschieben. Zoom/Reset hier.
+          </p>
+          <div className="flex items-center gap-1 mb-1.5">
+            <button
+              onClick={() => {
+                setBgTransform((prev) => ({ ...prev, scale: Math.min(prev.scale + 0.1, 5) }));
+                setSaved(false);
+              }}
+              className="fca-button-secondary p-1.5"
+              title="Vergrößern"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setBgTransform((prev) => ({ ...prev, scale: Math.max(prev.scale - 0.1, 0.2) }));
+                setSaved(false);
+              }}
+              className="fca-button-secondary p-1.5"
+              title="Verkleinern"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <span className="text-[0.7rem] text-[var(--muted)] ml-1 tabular-nums">
+              {Math.round(bgTransform.scale * 100)}%
+            </span>
+            <button
+              onClick={() => {
+                setBgTransform(defaultBackgroundTransform());
+                setSaved(false);
+              }}
+              className="fca-button-secondary p-1.5 ml-auto"
+              title="Zurücksetzen"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </PanelSection>
+
         {/* Zones */}
         <PanelSection label="Spielfelder">
           <button
@@ -522,19 +596,22 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
           ref={canvasRef}
           className="relative w-full rounded-[var(--radius-xl)] overflow-hidden border border-[var(--border)] bg-[#0d0d0d] cursor-default select-none"
           style={{ aspectRatio: "16/9" }}
-          onMouseDown={() => setSelectedId(null)}
+          onMouseDown={(e) => {
+            setSelectedId(null);
+            // Start panning if click lands on the canvas background (not an element)
+            if (e.target === canvasRef.current) {
+              panning.current = {
+                startX: e.clientX,
+                startY: e.clientY,
+                origOffsetX: bgTransform.offsetX,
+                origOffsetY: bgTransform.offsetY,
+              };
+            }
+          }}
         >
-          {/* Background image */}
-          {backgroundUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={backgroundUrl}
-              alt="Anlageplan"
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              draggable={false}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
+          {/* Fallback when no image */}
+          {!backgroundUrl && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center text-[var(--muted)] opacity-40">
                 <ImageIcon className="h-12 w-12 mx-auto mb-2" />
                 <p className="text-sm">Kein Hintergrundbild</p>
@@ -542,6 +619,30 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
               </div>
             </div>
           )}
+
+          {/*
+           * Shared map scene — background image + overlays together.
+           * Transform keeps zones visually aligned with the image when
+           * the admin zooms/pans the background framing.
+           */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              transform: `translate(${bgTransform.offsetX * 100}%, ${bgTransform.offsetY * 100}%) scale(${bgTransform.scale})`,
+              transformOrigin: "center center",
+            }}
+          >
+            {/* Background image */}
+            {backgroundUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={backgroundUrl}
+                alt="Anlageplan"
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                draggable={false}
+              />
+            )}
 
           {/* Map elements */}
           {config.elements.map((el) => {
@@ -641,7 +742,8 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
               </div>
             );
           })}
-        </div>
+          </div>{/* end scene container */}
+        </div>{/* end canvas */}
 
         {/* Element count hint */}
         <p className="text-[0.68rem] text-[var(--muted)] shrink-0">
@@ -667,41 +769,61 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
 
             {isResourceZone(selectedElement) && (
               <PanelSection label="Ressource">
-                {/* ── Canonical resource picker ─────────────────────────── */}
+                {/* ── Canonical resource picker — filtered by zoneType ──── */}
                 <label className="block text-[0.72rem] text-[var(--muted)] mb-1">
                   Anlage / Ressource
                 </label>
                 {facilityOptions.length > 0 ? (
                   <>
-                    <select
-                      value={selectedElement.resourceCode ?? ""}
-                      onChange={(e) => {
-                        const code = e.target.value || null;
-                        const opt = code
-                          ? facilityOptions.find((o) => o.code === code)
+                    {(() => {
+                      // Filter options to match the zone's type. If the currently
+                      // selected resource is from the other type (e.g. a HALF_PITCH
+                      // code on a FULL_PITCH zone that was created before this filter
+                      // was added), include it as a stale option so the value stays
+                      // readable and the admin can re-pick intentionally.
+                      const filteredOpts = facilityOptions.filter(
+                        (o) => o.type === selectedElement.zoneType,
+                      );
+                      const currentOpt = selectedElement.resourceCode
+                        ? facilityOptions.find((o) => o.code === selectedElement.resourceCode)
+                        : null;
+                      const staleOpt =
+                        currentOpt && !filteredOpts.find((o) => o.code === currentOpt.code)
+                          ? currentOpt
                           : null;
-                        const patch: Partial<ResourceZoneElement> = { resourceCode: code };
-                        if (opt) {
-                          // Auto-sync zone type from canonical resource type
-                          patch.zoneType = opt.type;
-                          // Prefill display label if currently empty
-                          if (!selectedElement.label) {
-                            patch.label = anlageplanResourceLabel(opt);
-                          }
-                        }
-                        updateElement(selectedElement.id, patch);
-                      }}
-                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
-                    >
-                      <option value="">— Kein Bezug —</option>
-                      {facilityOptions.map((opt) => (
-                        <option key={opt.code} value={opt.code}>
-                          {anlageplanResourceLabel(opt)}
-                          {" "}
-                          ({opt.type === "FULL_PITCH" ? "Ganzes Feld" : "Halbes Feld"})
-                        </option>
-                      ))}
-                    </select>
+                      return (
+                        <select
+                          value={selectedElement.resourceCode ?? ""}
+                          onChange={(e) => {
+                            const code = e.target.value || null;
+                            const opt = code
+                              ? facilityOptions.find((o) => o.code === code)
+                              : null;
+                            const patch: Partial<ResourceZoneElement> = { resourceCode: code };
+                            if (opt) {
+                              // Prefill display label if currently empty
+                              if (!selectedElement.label) {
+                                patch.label = anlageplanResourceLabel(opt);
+                              }
+                            }
+                            updateElement(selectedElement.id, patch);
+                          }}
+                          className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
+                        >
+                          <option value="">— Kein Bezug —</option>
+                          {staleOpt && (
+                            <option key={staleOpt.code} value={staleOpt.code} disabled>
+                              {anlageplanResourceLabel(staleOpt)} (abweichend)
+                            </option>
+                          )}
+                          {filteredOpts.map((opt) => (
+                            <option key={opt.code} value={opt.code}>
+                              {anlageplanResourceLabel(opt)}
+                            </option>
+                          ))}
+                        </select>
+                      );
+                    })()}
                     {selectedElement.resourceCode && (
                       <p className="mt-1 text-[0.65rem] text-[var(--muted)] font-mono">
                         Code: {selectedElement.resourceCode}
@@ -723,6 +845,7 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
                   />
                 )}
 
+                {/* ── Anzeige section ───────────────────────────────────── */}
                 {/* ── Anzeigebezeichnung (independently editable) ──────── */}
                 <label className="block text-[0.72rem] text-[var(--muted)] mt-3 mb-1">
                   Anzeigebezeichnung
@@ -742,22 +865,7 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
                   Nur für diese Karte. Ändert keine Stammdaten.
                 </p>
 
-                {/* ── Zone type ────────────────────────────────────────── */}
-                <label className="block text-[0.72rem] text-[var(--muted)] mt-3 mb-1">
-                  Feldtyp
-                </label>
-                <select
-                  value={selectedElement.zoneType}
-                  onChange={(e) =>
-                    updateElement(selectedElement.id, {
-                      zoneType: e.target.value as "FULL_PITCH" | "HALF_PITCH",
-                    } as Partial<ResourceZoneElement>)
-                  }
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
-                >
-                  <option value="FULL_PITCH">Spielfeld (ganz)</option>
-                  <option value="HALF_PITCH">Teilfeld (Feld A/B)</option>
-                </select>
+                {/* Feldtyp removed — determined by element type from palette. */}
 
                 <label className="flex items-center gap-2 mt-3 cursor-pointer">
                   <input
