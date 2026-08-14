@@ -128,6 +128,8 @@ export async function createPersonFromRegistration(
         footballJson: fields.football ? (fields.football as unknown as import("@prisma/client").Prisma.InputJsonObject) : undefined,
         createdFromRegistration: true,
         createdRegistrationId: registration.id,
+        // PERSONS-01-C1: tenantId is required (NOT NULL) — inherit from registration
+        tenantId: registration.tenantId,
       },
       select: { id: true },
     });

@@ -102,6 +102,9 @@ async function main() {
 
     { key: "people.view", name: "View people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // PERSONS-01: canonical permanent-deletion permission. Deliberately separate from
+    // people.manage — create/edit access must never implicitly grant permanent deletion.
+    { key: "people.delete", name: "Permanently delete persons", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "events.view", name: "View events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.manage", name: "Manage events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },

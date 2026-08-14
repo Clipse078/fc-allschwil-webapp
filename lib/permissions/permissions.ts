@@ -27,6 +27,11 @@ export const PERMISSIONS = {
 
   PEOPLE_VIEW: "people.view",
   PEOPLE_MANAGE: "people.manage",
+  // PERSONS-01: canonical permanent-deletion permission for Person master
+  // data. Deliberately separate from PEOPLE_MANAGE — create/edit/archive
+  // access must never implicitly grant permanent deletion. Follows the
+  // "<module>.delete" convention established by TEAMS_DELETE (ADMIN-DELETE-01A).
+  PEOPLE_DELETE: "people.delete",
 
   EVENTS_VIEW: "events.view",
   EVENTS_MANAGE: "events.manage",
