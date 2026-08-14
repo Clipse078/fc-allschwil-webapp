@@ -108,13 +108,15 @@ WHERE  p."tenantId" IS NULL
 ALTER TABLE "Person" ALTER COLUMN "tenantId" SET NOT NULL;
 
 -- ── 4. Permission: people.delete (idempotent) ────────────────────────────────
-INSERT INTO "Permission" ("id", "key", "name", "module", "scope", "grantableByAdmin")
+INSERT INTO "Permission" ("id", "key", "name", "module", "scope", "grantableByAdmin", "createdAt", "updatedAt")
 VALUES (
   gen_random_uuid()::text,
   'people.delete',
   'Permanently delete persons',
   'PEOPLE',
   'TENANT',
-  true
+  true,
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
 )
 ON CONFLICT ("key") DO NOTHING;
