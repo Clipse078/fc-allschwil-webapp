@@ -104,6 +104,18 @@ export type ConfiguredPitch = {
   readonly name: string;
   /** Facility display name (from parent Facility). */
   readonly facilityName: string;
+  /**
+   * Parent Facility id (INFOBOARD-UX-03 full-pitch/subdivision deduplication).
+   * Used by the presentation layer to group FULL_PITCH and HALF_PITCH resources
+   * that share the same physical facility.
+   */
+  readonly facilityId: string;
+  /**
+   * Whether this resource is a complete pitch or a subdivision.
+   * FULL_PITCH = the whole physical pitch (e.g. Hauptplatz)
+   * HALF_PITCH  = a named subdivision (e.g. Feld A, Feld B)
+   */
+  readonly resourceType: "FULL_PITCH" | "HALF_PITCH";
 };
 
 /** A configured dressing room as returned by the DB (minimal fields). */
@@ -284,6 +296,8 @@ function resolvePitchOccupancy(
     code: pitch.code,
     displayLabel: pitch.name,
     facilityName: pitch.facilityName,
+    facilityId: pitch.facilityId,
+    resourceType: pitch.resourceType,
     state,
     currentEvent,
     nextEvent,

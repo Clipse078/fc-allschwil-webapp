@@ -68,6 +68,8 @@ function makePitch(overrides: Partial<PitchOccupancy> = {}): PitchOccupancy {
     code: "P-TEST",
     displayLabel: "Testplatz",
     facilityName: "Test Facility",
+    facilityId: "fac-test",
+    resourceType: "FULL_PITCH",
     state: "FREE_NOW",
     hasAllocationConflict: false,
     currentEvent: null,
@@ -171,13 +173,13 @@ describe("Theme", () => {
 describe("Header", () => {
   it("renders club name in header", () => {
     render(<InfoboardScreen2 feed={makeFeed({ tenant: { id: "t", key: "k", name: "FC Testclub", timezone: "Europe/Zurich" } })} />);
-    const header = screen.getByTestId("infoboard-screen2-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("FC Testclub");
   });
 
   it("renders facility name in header", () => {
     render(<InfoboardScreen2 feed={makeFeed({ facilityName: "Mein Stadion" })} />);
-    const header = screen.getByTestId("infoboard-screen2-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("Mein Stadion");
   });
 
@@ -188,11 +190,11 @@ describe("Header", () => {
         currentTimeIso="2026-09-12T08:30:00.000Z"
       />,
     );
-    const center = screen.getByTestId("screen2-header-center");
+    const center = screen.getByTestId("header-center");
     expect(center.textContent).toContain("10:30");
   });
 
-  it("time/date block is rendered inside the header status group, alongside weather", () => {
+  it("time/date block is rendered inside the shared header center zone, alongside weather", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed()}
@@ -200,19 +202,18 @@ describe("Header", () => {
         weather={SAMPLE_WEATHER}
       />,
     );
-    const status = screen.getByTestId("screen2-header-status");
-    expect(within(status).getByTestId("screen2-header-center")).toBeTruthy();
-    expect(within(status).getByTestId("header-weather")).toBeTruthy();
+    // Shared shell: clock in header-center, weather in alexa-safe-zone (rightContent)
+    expect(screen.getByTestId("header-center")).toBeTruthy();
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
   });
 
-  it("Alexa-safe zone exists and is empty", () => {
+  it("shared header alexa-safe-zone is rendered", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
-    const safe = screen.getByTestId("screen2-alexa-safe-zone");
+    const safe = screen.getByTestId("alexa-safe-zone");
     expect(safe).toBeTruthy();
-    expect(safe.textContent?.trim()).toBe("");
   });
 
-  it("Alexa-safe zone is a direct header child, structurally separate from the weather/time/date status group", () => {
+  it("Alexa-safe zone is structurally separate from the header center zone", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed()}
@@ -220,20 +221,16 @@ describe("Header", () => {
         weather={SAMPLE_WEATHER}
       />,
     );
-    const header = screen.getByTestId("infoboard-screen2-header");
-    const safe = screen.getByTestId("screen2-alexa-safe-zone");
-    const status = screen.getByTestId("screen2-header-status");
-
-    expect(safe.parentElement).toBe(header);
-    expect(within(status).queryByTestId("screen2-alexa-safe-zone")).toBeNull();
-    expect(within(safe).queryByTestId("header-weather")).toBeNull();
+    const safe = screen.getByTestId("alexa-safe-zone");
+    const center = screen.getByTestId("header-center");
+    // They must be siblings, not parent/child
+    expect(safe).not.toContain(center);
   });
 
-  it("Alexa-safe zone remains empty even when weather content is present", () => {
+  it("weather is rendered in the header when weather data is present", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const safe = screen.getByTestId("screen2-alexa-safe-zone");
-    expect(safe.textContent?.trim()).toBe("");
-    expect(within(safe).queryByTestId("header-weather-temperature")).toBeNull();
+    expect(screen.getByTestId("header-weather")).toBeTruthy();
+    expect(screen.getByTestId("header-weather-temperature")).toBeTruthy();
   });
 
   it("renders club logo when branding.clubLogoSrc provided", () => {
@@ -243,7 +240,7 @@ describe("Header", () => {
         branding={{ clubLogoSrc: "/logo.png" }}
       />,
     );
-    const header = screen.getByTestId("infoboard-screen2-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     const img = header.querySelector("img");
     expect(img?.getAttribute("src")).toBe("/logo.png");
   });
@@ -424,11 +421,11 @@ describe("Pitch card — event-type statuses", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Current + next together (JETZT / DANACH, INFOBOARD-INTEGRATION-01C) ─────
+// ── Current + next together (JETZT / ALS NÄCHSTES, INFOBOARD-INTEGRATION-01C) ─────
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Pitch card — current and next together", () => {
-  it("renders both JETZT and DANACH blocks when a pitch has current and next events", () => {
+  it("renders both JETZT and ALS NÄCHSTES blocks when a pitch has current and next events", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -467,12 +464,12 @@ describe("Pitch card — current and next together", () => {
       />,
     );
     expect(screen.getByTestId("pitch-card-temporal-current").textContent).toBe("JETZT");
-    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("ALS NÄCHSTES");
     expect(screen.getByText("Juniorinnen FF-14")).toBeTruthy();
     expect(screen.getByText("FC Allschwil D1")).toBeTruthy();
   });
 
-  it("renders only DANACH when a pitch has only a next event", () => {
+  it("renders only ALS NÄCHSTES when a pitch has only a next event", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -499,10 +496,10 @@ describe("Pitch card — current and next together", () => {
       />,
     );
     expect(screen.queryByTestId("pitch-card-temporal-current")).toBeNull();
-    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("ALS NÄCHSTES");
   });
 
-  it("preview fixture KR1 pitch shows both JETZT and DANACH", () => {
+  it("preview fixture KR1 pitch shows both JETZT and ALS NÄCHSTES", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
@@ -583,7 +580,7 @@ describe("Free pitch status", () => {
 describe("Header weather — available", () => {
   it("2. renders compact weather in the header when weather data is available", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const header = screen.getByTestId("infoboard-screen2-header");
+    const header = screen.getByTestId("kiosk-shell-header");
     expect(within(header).getByTestId("header-weather")).toBeTruthy();
   });
 
@@ -936,11 +933,10 @@ describe("Unallocated section", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("12. Alexa-safe zone", () => {
-  it("Alexa-safe zone is present and empty", () => {
+  it("Alexa-safe zone is present (shared KioskShellHeader)", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
-    const safe = screen.getByTestId("screen2-alexa-safe-zone");
+    const safe = screen.getByTestId("alexa-safe-zone");
     expect(safe).toBeTruthy();
-    expect(safe.textContent?.trim()).toBe("");
   });
 });
 
@@ -951,12 +947,12 @@ describe("12. Alexa-safe zone", () => {
 describe("Footer — product branding", () => {
   it("renders product-branding section", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.getByTestId("screen2-product-branding")).toBeTruthy();
+    expect(screen.getByTestId("product-branding")).toBeTruthy();
   });
 
   it("renders POWERED BY text", () => {
     render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.getByTestId("screen2-product-branding").textContent).toContain("POWERED BY");
+    expect(screen.getByTestId("product-branding").textContent).toContain("POWERED BY");
   });
 
   it("renders product logo when productLogoSrc provided", () => {
@@ -966,14 +962,14 @@ describe("Footer — product branding", () => {
         branding={{ productLogoSrc: "/images/branding/sportclubevo_logo.png" }}
       />,
     );
-    const branding = screen.getByTestId("screen2-product-branding");
+    const branding = screen.getByTestId("product-branding");
     const img = branding.querySelector("img");
     expect(img?.getAttribute("alt")).toBe("SportClubEvo");
   });
 
   it("renders SportClubEvo fallback when productLogoSrc is null", () => {
     render(<InfoboardScreen2 feed={makeFeed()} branding={{ productLogoSrc: null }} />);
-    expect(screen.getByTestId("screen2-product-branding").textContent).toContain("SportClubEvo");
+    expect(screen.getByTestId("product-branding").textContent).toContain("SportClubEvo");
   });
 });
 
