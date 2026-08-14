@@ -17,7 +17,7 @@
  *
  *   OVERVIEW MINI PREVIEWS:
  *   - InboardCard with TAGESUEBERSICHT uses InboardMiniPreview
- *   - InboardCard with ANLAGENUEBERSICHT uses AnlageplanMiniPreview
+ *   - InboardCard with ANLAGENUEBERSICHT uses AnlageplanConfigPreview (canonical)
  */
 
 import { render, screen } from "@testing-library/react";

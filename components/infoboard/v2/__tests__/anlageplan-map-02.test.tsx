@@ -23,13 +23,14 @@
  *   - next activity respects showNextActivity config
  *
  * OVERVIEW MINI PREVIEWS:
- *   - ANLAGENUEBERSICHT board shows AnlageplanMiniPreview
+ * INFOBOARD-MAP-02-C1 (updated):
+ *   - ANLAGENUEBERSICHT board shows AnlageplanConfigPreview (canonical real-config renderer)
  *   - other board type shows InboardMiniPreview
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { AnlageplanMiniPreview } from "@/components/infoboard/anlageplan/AnlageplanMiniPreview";
+import { AnlageplanConfigPreview } from "@/components/infoboard/anlageplan/AnlageplanConfigPreview";
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { InfoboardScreen2LivePayload } from "@/lib/publishing/infoboard/screen2-live-service";
@@ -171,17 +172,117 @@ const DEFAULT_BRANDING = {
   facilityName: "Testanlage",
 };
 
-// ── AnlageplanMiniPreview ─────────────────────────────────────────────────────
+// ── AnlageplanConfigPreview — canonical board-specific preview ────────────────
 
-describe("AnlageplanMiniPreview", () => {
-  it("renders anlageplan-mini-preview testid", () => {
-    render(<AnlageplanMiniPreview />);
-    expect(screen.getByTestId("anlageplan-mini-preview")).toBeTruthy();
+describe("AnlageplanConfigPreview", () => {
+  it("renders anlageplan-config-preview testid", () => {
+    render(<AnlageplanConfigPreview anlageplanJson={null} backgroundUrl={null} />);
+    expect(screen.getByTestId("anlageplan-config-preview")).toBeTruthy();
   });
 
   it("shows ANLAGENÜBERSICHT label", () => {
-    render(<AnlageplanMiniPreview />);
-    expect(screen.getByTestId("anlageplan-mini-preview").textContent).toContain("ANLAGENÜBERSICHT");
+    render(<AnlageplanConfigPreview anlageplanJson={null} backgroundUrl={null} />);
+    expect(screen.getByTestId("anlageplan-config-preview").textContent).toContain("ANLAGENÜBERSICHT");
+  });
+
+  it("uses actual configured background URL when provided", () => {
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={null}
+        backgroundUrl="https://cdn.example.com/facility.jpg"
+      />,
+    );
+    const img = screen.getByTestId("anlageplan-config-preview").querySelector("img");
+    expect(img?.getAttribute("src")).toBe("https://cdn.example.com/facility.jpg");
+  });
+
+  it("shows no background image when backgroundUrl is null", () => {
+    render(
+      <AnlageplanConfigPreview anlageplanJson={null} backgroundUrl={null} />,
+    );
+    const canvas = screen.getByTestId("anlageplan-config-preview-canvas");
+    const img = canvas.querySelector("img");
+    expect(img).toBeNull();
+  });
+
+  it("renders actual configured resource zones from anlageplanJson", () => {
+    const config = {
+      version: 1 as const,
+      elements: [
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "zone-real-1",
+          rect: { x: 0.1, y: 0.1, width: 0.3, height: 0.4 },
+          resourceCode: "KR2",
+          label: "Kunstrasen 2 — real label",
+          zoneType: "FULL_PITCH" as const,
+          showNextActivity: true,
+        },
+      ],
+    };
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={JSON.stringify(config)}
+        backgroundUrl={null}
+      />,
+    );
+    const preview = screen.getByTestId("anlageplan-config-preview");
+    // Zone renders in FREI state showing real label
+    expect(preview.textContent).toContain("Kunstrasen 2 — real label");
+  });
+
+  it("renders actual configured markers from anlageplanJson", () => {
+    const config = {
+      version: 1 as const,
+      elements: [
+        {
+          kind: "MARKER" as const,
+          id: "marker-real-1",
+          rect: { x: 0.5, y: 0.5, width: 0.06, height: 0.06 },
+          markerType: "WC" as const,
+          label: "WC Nordeingabe custom",
+          secondaryText: null,
+        },
+      ],
+    };
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={JSON.stringify(config)}
+        backgroundUrl={null}
+      />,
+    );
+    const preview = screen.getByTestId("anlageplan-config-preview");
+    expect(preview.textContent).toContain("WC Nordeingabe custom");
+  });
+
+  it("does NOT show fabricated activity data", () => {
+    const config = {
+      version: 1 as const,
+      elements: [
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "zone-1",
+          rect: { x: 0.1, y: 0.1, width: 0.3, height: 0.4 },
+          resourceCode: "KR2",
+          label: "KR2",
+          zoneType: "FULL_PITCH" as const,
+          showNextActivity: true,
+        },
+      ],
+    };
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={JSON.stringify(config)}
+        backgroundUrl={null}
+      />,
+    );
+    const preview = screen.getByTestId("anlageplan-config-preview");
+    // Must NOT contain any hardcoded fixture team names
+    expect(preview.textContent).not.toContain("F2 Junioren");
+    expect(preview.textContent).not.toContain("1. Mannschaft");
+    expect(preview.textContent).not.toContain("FF17");
+    // FREI state indicator is fine
+    expect(preview.textContent).toContain("FREI");
   });
 });
 
@@ -390,5 +491,61 @@ describe("InfoboardAnlageplan — shared shell", () => {
     );
     const header = screen.getByTestId("kiosk-shell-header");
     expect(header.textContent).toContain("ANLAGENÜBERSICHT");
+  });
+});
+
+// ── AnlageplanMapScene — identical geometry ───────────────────────────────────
+
+describe("AnlageplanMapScene — canonical shared scene", () => {
+  it("renders anlageplan-map-scene testid", () => {
+    const config = {
+      version: 1 as const,
+      elements: [],
+    };
+    const { container } = render(
+      <div style={{ position: "relative", width: 400, height: 225 }}>
+        {/* AnlageplanMapScene is not imported directly here — tested via InfoboardAnlageplan */}
+        <AnlageplanConfigPreview anlageplanJson={JSON.stringify(config)} backgroundUrl={null} />
+      </div>,
+    );
+    expect(screen.getByTestId("anlageplan-map-scene")).toBeTruthy();
+  });
+
+  it("renders background image at the actual configured URL", () => {
+    const config = { version: 1 as const, elements: [] };
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={JSON.stringify(config)}
+        backgroundUrl="https://cdn.example.com/brueelstadion.jpg"
+      />,
+    );
+    const mapScene = screen.getByTestId("anlageplan-map-scene");
+    const img = mapScene.querySelector("img");
+    expect(img?.getAttribute("src")).toBe("https://cdn.example.com/brueelstadion.jpg");
+  });
+
+  it("resource zones use actual labels from config — no hardcoded fixture data", () => {
+    const config = {
+      version: 1 as const,
+      elements: [
+        {
+          kind: "RESOURCE_ZONE" as const,
+          id: "z1",
+          rect: { x: 0.05, y: 0.1, width: 0.35, height: 0.5 },
+          resourceCode: "HP",
+          label: "Hauptplatz (Brüelstadion)",
+          zoneType: "FULL_PITCH" as const,
+          showNextActivity: true,
+        },
+      ],
+    };
+    render(
+      <AnlageplanConfigPreview
+        anlageplanJson={JSON.stringify(config)}
+        backgroundUrl={null}
+      />,
+    );
+    expect(screen.getByTestId("anlageplan-config-preview").textContent)
+      .toContain("Hauptplatz (Brüelstadion)");
   });
 });

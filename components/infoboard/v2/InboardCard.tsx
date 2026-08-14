@@ -24,7 +24,7 @@ import {
 import type { InfoboardListItem } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
 import { InboardMiniPreview } from "./InboardMiniPreview";
-import { AnlageplanMiniPreview } from "@/components/infoboard/anlageplan/AnlageplanMiniPreview";
+import { AnlageplanConfigPreview } from "@/components/infoboard/anlageplan/AnlageplanConfigPreview";
 
 type InboardCardProps = {
   board: InfoboardListItem;
@@ -77,7 +77,11 @@ export function InboardCard({
       {/* ── Mini preview thumbnail ────────────────────────────────────── */}
       <div className="relative shrink-0 overflow-hidden" style={{ aspectRatio: "16 / 5" }}>
         {board.templateType === "ANLAGENUEBERSICHT" ? (
-          <AnlageplanMiniPreview className="absolute inset-0 w-full h-full" />
+          <AnlageplanConfigPreview
+            anlageplanJson={board.anlageplanJson ?? null}
+            backgroundUrl={board.anlageplanBackgroundUrl ?? null}
+            className="absolute inset-0 w-full h-full"
+          />
         ) : (
           <InboardMiniPreview
             theme={board.displayTheme as "DARK" | "LIGHT" | null}
