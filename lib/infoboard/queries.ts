@@ -44,6 +44,8 @@ export async function listInfoboards(
       sortOrder: true,
       createdAt: true,
       updatedAt: true,
+      anlageplanJson: true,
+      anlageplanBackgroundUrl: true,
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
   }) as unknown as Promise<InfoboardListItem[]>;

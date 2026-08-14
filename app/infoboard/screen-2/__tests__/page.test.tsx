@@ -170,8 +170,8 @@ describe("InfoboardScreen2Page — /infoboard/screen-2", () => {
       const { default: Page } = await import("../page");
       const { container } = render(await Page());
 
-      // InfoboardAnlageplan has a "HERZLICH WILLKOMMEN" headline
-      expect(container.textContent).toMatch(/HERZLICH WILLKOMMEN/i);
+      // InfoboardAnlageplan shows ANLAGENÜBERSICHT as its subtitle (INFOBOARD-MAP-02)
+      expect(container.textContent).toMatch(/ANLAGENÜBER|ANLAGENUBERSICHT/i);
     });
 
     it("calls buildAnlageplanLivePayload (not buildScreen2LivePayload) for ANLAGENUEBERSICHT", async () => {

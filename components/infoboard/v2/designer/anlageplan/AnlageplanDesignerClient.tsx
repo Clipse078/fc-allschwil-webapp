@@ -433,8 +433,26 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
 
   return (
     <div className="flex gap-4 min-h-0" style={{ height: "calc(100vh - 220px)" }}>
-      {/* ── Left panel: palette ─────────────────────────────────────────────── */}
+      {/* ── Left panel: navigator + palette ────────────────────────────────── */}
       <aside className="w-52 shrink-0 overflow-y-auto space-y-4 pr-1">
+
+        {/* ── ELEMENT NAVIGATOR ──────────────────────────────────────────────
+          * Fast list of all created elements. Clicking selects the element
+          * on the canvas and opens its properties panel.
+          * Canvas click also selects the matching navigator row.
+          */}
+        {config.elements.length > 0 && (
+          <PanelSection label="Elemente">
+            <ElementNavigator
+              elements={config.elements}
+              selectedId={selectedId}
+              facilityOptions={facilityOptions}
+              onSelect={setSelectedId}
+            />
+          </PanelSection>
+        )}
+
+        {/* ── ADD: Background ────────────────────────────────────────────── */}
         {/* Background */}
         <PanelSection label="Hintergrundbild">
           <div className="space-y-2">
@@ -1017,6 +1035,138 @@ function PanelSection({
         </p>
       </div>
       <div className="p-3 space-y-1">{children}</div>
+    </div>
+  );
+}
+
+// ── ElementNavigator ───────────────────────────────────────────────────────────
+
+type ElementNavigatorProps = {
+  elements: AnlageplanElement[];
+  selectedId: string | null;
+  facilityOptions: AnlageplanResourceOption[];
+  onSelect: (id: string) => void;
+};
+
+/**
+ * Fast element list grouped by SPIELFELDER / MARKER.
+ * Clicking a row selects the element on the canvas.
+ * Canvas selection updates the active row via selectedId.
+ */
+function ElementNavigator({
+  elements,
+  selectedId,
+  facilityOptions,
+  onSelect,
+}: ElementNavigatorProps) {
+  const zones = elements.filter(isResourceZone);
+  const markers = elements.filter(isMarker);
+
+  return (
+    <div className="space-y-2" data-testid="element-navigator">
+      {zones.length > 0 && (
+        <div>
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] mb-1 px-0.5">
+            Spielfelder
+          </p>
+          <div className="space-y-0.5">
+            {zones.map((el) => {
+              const zone = el as ResourceZoneElement;
+              const isSelected = selectedId === zone.id;
+              const resourceOpt = zone.resourceCode
+                ? facilityOptions.find((o) => o.code === zone.resourceCode)
+                : null;
+              const displayName = zone.label ?? zone.resourceCode ?? "Zone";
+              const contextLine = resourceOpt
+                ? anlageplanResourceLabel(resourceOpt)
+                : zone.resourceCode ?? null;
+
+              return (
+                <button
+                  key={zone.id}
+                  data-testid="navigator-element-row"
+                  data-element-id={zone.id}
+                  onClick={() => onSelect(zone.id)}
+                  className={`w-full text-left flex items-start gap-2 rounded-[var(--radius-md)] px-2 py-1.5 transition-colors ${
+                    isSelected
+                      ? "bg-[var(--sce-primary)]/10 border border-[var(--sce-primary)]/30 text-[var(--foreground)]"
+                      : "bg-[var(--surface-3)] border border-transparent hover:border-[var(--border)] text-[var(--text-2)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  <span
+                    className={`text-xs mt-0.5 shrink-0 ${isSelected ? "text-[var(--sce-primary)]" : "text-[var(--muted)]"}`}
+                    aria-hidden="true"
+                  >
+                    ▣
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className="text-[0.73rem] font-semibold truncate leading-tight"
+                      data-testid="navigator-element-label"
+                    >
+                      {displayName}
+                    </div>
+                    {contextLine && contextLine !== displayName && (
+                      <div className="text-[0.62rem] text-[var(--muted)] truncate">
+                        {contextLine}
+                      </div>
+                    )}
+                    <div className="text-[0.60rem] text-[var(--muted)] opacity-60">
+                      {ZONE_TYPE_LABELS[zone.zoneType]}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {markers.length > 0 && (
+        <div>
+          <p className="text-[0.62rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)] mb-1 px-0.5">
+            Marker
+          </p>
+          <div className="space-y-0.5">
+            {markers.map((el) => {
+              const marker = el as MarkerElement;
+              const isSelected = selectedId === marker.id;
+              const displayName =
+                marker.label ?? MARKER_LABELS[marker.markerType];
+
+              return (
+                <button
+                  key={marker.id}
+                  data-testid="navigator-element-row"
+                  data-element-id={marker.id}
+                  onClick={() => onSelect(marker.id)}
+                  className={`w-full text-left flex items-center gap-2 rounded-[var(--radius-md)] px-2 py-1.5 transition-colors ${
+                    isSelected
+                      ? "bg-[var(--sce-primary)]/10 border border-[var(--sce-primary)]/30 text-[var(--foreground)]"
+                      : "bg-[var(--surface-3)] border border-transparent hover:border-[var(--border)] text-[var(--text-2)] hover:text-[var(--foreground)]"
+                  }`}
+                >
+                  <span className="text-sm shrink-0" aria-hidden="true">
+                    {MARKER_ICONS[marker.markerType]}
+                  </span>
+                  <div
+                    className="text-[0.73rem] font-semibold truncate"
+                    data-testid="navigator-element-label"
+                  >
+                    {displayName}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {elements.length === 0 && (
+        <p className="text-[0.68rem] text-[var(--muted)] py-1">
+          Noch keine Elemente.
+        </p>
+      )}
     </div>
   );
 }

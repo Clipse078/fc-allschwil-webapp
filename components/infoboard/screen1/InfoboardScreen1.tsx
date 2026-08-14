@@ -47,8 +47,8 @@ import {
   DEFAULT_INFOBOARD_DISPLAY_THEME,
   type InfoboardDisplayTheme,
 } from "@/lib/publishing/infoboard/display-theme";
-import { AnnouncementTicker } from "./AnnouncementTicker";
-import { LiveClockScreen1 } from "./LiveClockScreen1";
+import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
+import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -758,94 +758,6 @@ function EventCard({
   );
 }
 
-// ── Footer ────────────────────────────────────────────────────────────────────
-
-type FooterProps = {
-  announcement: InfoboardAnnouncementPresentation | undefined;
-  productLogoSrc: string | null;
-};
-
-/**
- * Dark navy footer.
- * Left: fixed announcement icon + ticker text (when announcement enabled and non-blank).
- * Right: "POWERED BY" + SportClubEvo product logo.
- *
- * The announcement text scrolls horizontally when it overflows (AnnouncementTicker).
- * Short messages that fit remain static. The icon stays fixed regardless.
- */
-function Footer({ announcement, productLogoSrc }: FooterProps): ReactElement {
-  const announcementEnabled =
-    announcement !== undefined &&
-    announcement.enabled === true &&
-    typeof announcement.text === "string" &&
-    announcement.text.trim().length > 0;
-
-  const footerStyle: React.CSSProperties = {};
-  if (announcementEnabled && announcement !== undefined) {
-    if (announcement.backgroundColor && announcement.backgroundColor.trim().length > 0) {
-      footerStyle.backgroundColor = announcement.backgroundColor;
-    }
-    if (announcement.textColor && announcement.textColor.trim().length > 0) {
-      footerStyle.color = announcement.textColor;
-    }
-  }
-
-  const hasInlineStyle = Object.keys(footerStyle).length > 0;
-
-  return (
-    <footer
-      className={styles.footer}
-      data-testid={announcementEnabled ? "announcement-bar" : "infoboard-footer"}
-      style={hasInlineStyle ? footerStyle : undefined}
-    >
-      <div className={styles.footerLeft}>
-        {announcementEnabled && announcement !== undefined && (
-          <>
-            {/* Fixed icon — never scrolls */}
-            <span
-              className={styles.footerAnnouncementIcon}
-              data-testid="announcement-icon"
-              aria-hidden="true"
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M11 5L6 9H2v6h4l5 4V5z" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-              </svg>
-            </span>
-            {/* Scrolling text — AnnouncementTicker detects overflow and animates */}
-            <AnnouncementTicker text={announcement.text!} />
-          </>
-        )}
-      </div>
-      <div className={styles.footerRight} data-testid="product-branding">
-        <span className={styles.footerPoweredBy}>POWERED BY</span>
-        {productLogoSrc !== null ? (
-          <img
-            src={productLogoSrc}
-            alt="SportClubEvo"
-            className={styles.footerProductLogo}
-            width={120}
-            height={28}
-          />
-        ) : (
-          <span className={styles.footerProductFallback}>SportClubEvo</span>
-        )}
-      </div>
-    </footer>
-  );
-}
-
 // ── Root component ────────────────────────────────────────────────────────────
 
 export function InfoboardScreen1({
@@ -895,55 +807,18 @@ export function InfoboardScreen1({
       data-testid="infoboard-screen1-root"
       data-theme={themeAttr}
     >
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className={styles.header} data-testid="infoboard-header">
-
-        {/* Left zone: club branding */}
-        <div className={styles.headerLeft} data-testid="header-left">
-          {clubLogoSrc !== null ? (
-            <img
-              src={clubLogoSrc}
-              alt={`${tenant.name} Wappen`}
-              className={styles.clubLogo}
-              width={64}
-              height={64}
-            />
-          ) : (
-            <div className={styles.clubLogoFallback} aria-hidden="true">
-              {tenant.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <span className={styles.headerClubName}>{tenant.name}</span>
-        </div>
-
-        {/* Center zone: current time + date */}
-        <div className={styles.headerCenter} data-testid="header-center">
-          {currentTimeIso != null ? (
-            <LiveClockScreen1
-              initialTimeIso={currentTimeIso}
-              timezone={timeZone}
-              showTime={showTime}
-              showDate={showDate}
-            />
-          ) : showDate ? (
-            <span className={styles.headerDateFallback}>{staticDateLine}</span>
-          ) : null}
-        </div>
-
-        {/* Right zone: Alexa-safe — intentionally empty */}
-        <div
-          className={styles.headerRight}
-          data-testid="alexa-safe-zone"
-          aria-hidden="true"
-        />
-      </header>
-
-      {/* ── Board subtitle ──────────────────────────────────────────────── */}
-      {subtitleEnabled && (
-        <div className={styles.boardTitle} data-testid="board-title">
-          <span className={styles.boardTitleText}>{subtitleText.toUpperCase()}</span>
-        </div>
-      )}
+      {/* ── Shared kiosk header (INFOBOARD-MAP-02) ──────────────────────── */}
+      <KioskShellHeader
+        clubLogoSrc={clubLogoSrc}
+        clubName={tenant.name}
+        initialTimeIso={currentTimeIso}
+        timezone={timeZone}
+        showTime={showTime}
+        showDate={showDate}
+        staticDateFallback={staticDateLine}
+        subtitle={subtitleText.toUpperCase()}
+        subtitleEnabled={subtitleEnabled}
+      />
 
       {/* ── Main: event list ─────────────────────────────────────────────── */}
       <main className={styles.main}>
@@ -1006,8 +881,11 @@ export function InfoboardScreen1({
         )}
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <Footer announcement={announcement} productLogoSrc={productLogoSrc} />
+      {/* ── Shared kiosk footer (INFOBOARD-MAP-02) ──────────────────────── */}
+      <KioskShellFooter
+        productLogoSrc={productLogoSrc}
+        announcement={announcement}
+      />
     </div>
   );
 }

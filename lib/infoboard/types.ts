@@ -56,6 +56,9 @@ export type InfoboardListItem = Pick<
   | "sortOrder"
   | "createdAt"
   | "updatedAt"
+  /** Anlageplan preview: board-specific map configuration. */
+  | "anlageplanJson"
+  | "anlageplanBackgroundUrl"
 >;
 
 /**
