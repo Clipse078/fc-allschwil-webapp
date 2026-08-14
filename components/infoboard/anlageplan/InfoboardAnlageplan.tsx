@@ -49,6 +49,7 @@ import {
   isDuBistHier,
   MARKER_LABELS,
 } from "@/lib/infoboard/anlageplan-types";
+import { LiveClockAnlageplan } from "./LiveClockAnlageplan";
 
 // ── Marker emoji map ──────────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ const MARKER_ICONS: Record<MarkerType, string> = {
   FREIER_MARKER: "📌",
 };
 
-// ── Time helpers ──────────────────────────────────────────────────────────────
+// ── Event time helper ─────────────────────────────────────────────────────────
 
 function fmtTime(isoString: string, tz: string): string {
   return new Intl.DateTimeFormat("de-CH", {
@@ -73,15 +74,6 @@ function fmtTime(isoString: string, tz: string): string {
     minute: "2-digit",
     timeZone: tz,
     hour12: false,
-  }).format(new Date(isoString));
-}
-
-function fmtDate(isoString: string, tz: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    timeZone: tz,
   }).format(new Date(isoString));
 }
 
@@ -116,9 +108,6 @@ export function InfoboardAnlageplan({
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
-
-  const currentTime = fmtTime(currentTimeIso, tz);
-  const currentDate = fmtDate(currentTimeIso, tz);
 
   // Build pitch occupancy lookup: resourceCode → PitchOccupancy
   const pitchMap = new Map<string, PitchOccupancy>(
@@ -214,18 +203,7 @@ export function InfoboardAnlageplan({
         </div>
 
         {/* Time / date */}
-        <div className="text-right shrink-0">
-          <div
-            style={{ fontSize: "3.8vh", fontWeight: 700, letterSpacing: "0.04em", lineHeight: 1 }}
-          >
-            {currentTime}
-          </div>
-          <div
-            style={{ fontSize: "1.2vh", color: "rgba(255,255,255,0.50)", marginTop: "0.2vh", letterSpacing: "0.06em" }}
-          >
-            {currentDate}
-          </div>
-        </div>
+        <LiveClockAnlageplan initialTimeIso={currentTimeIso} timezone={tz} />
       </header>
 
       {/* ── BODY: canvas + info rail ──────────────────────────────────────── */}

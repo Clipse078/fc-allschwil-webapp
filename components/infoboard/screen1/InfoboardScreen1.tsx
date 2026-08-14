@@ -48,6 +48,7 @@ import {
   type InfoboardDisplayTheme,
 } from "@/lib/publishing/infoboard/display-theme";
 import { AnnouncementTicker } from "./AnnouncementTicker";
+import { LiveClockScreen1 } from "./LiveClockScreen1";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -138,22 +139,6 @@ function formatTime(isoString: string, timeZone: string): string {
     minute: "2-digit",
     timeZone,
     hour12: false,
-  }).format(new Date(isoString));
-}
-
-function formatWeekday(isoString: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    weekday: "long",
-    timeZone,
-  }).format(new Date(isoString));
-}
-
-function formatDateLine(isoString: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone,
   }).format(new Date(isoString));
 }
 
@@ -872,7 +857,7 @@ export function InfoboardScreen1({
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
   headerConfig,
 }: InfoboardScreen1Props): ReactElement {
-  const { tenant, current, next, later } = feed;
+  const { tenant } = feed;
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
 
@@ -900,19 +885,9 @@ export function InfoboardScreen1({
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
 
-  const currentTime =
-    currentTimeIso != null ? formatTime(currentTimeIso, timeZone) : null;
-  const headerWeekday =
-    currentTimeIso != null
-      ? formatWeekday(currentTimeIso, timeZone)
-      : null;
-  const headerDateLine =
-    currentTimeIso != null
-      ? formatDateLine(currentTimeIso, timeZone)
-      : formatDisplayDate(feed.displayDate);
-
-  // Suppress unused-variable warning for later/next (used only in displayList).
-  void current; void next; void later;
+  // Static date fallback used only when currentTimeIso is absent.
+  const staticDateLine =
+    currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
 
   return (
     <div
@@ -943,30 +918,15 @@ export function InfoboardScreen1({
 
         {/* Center zone: current time + date */}
         <div className={styles.headerCenter} data-testid="header-center">
-          {showTime && currentTime !== null && headerWeekday !== null ? (
-            <>
-              <div className={styles.headerTimeBlock}>
-                {showTime && (
-                  <time
-                    className={styles.headerCurrentTime}
-                    dateTime={currentTimeIso!}
-                  >
-                    {currentTime}
-                  </time>
-                )}
-                {showTime && showDate && (
-                  <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
-                )}
-                {showDate && (
-                  <div className={styles.headerDateBlock}>
-                    <span className={styles.headerWeekday}>{headerWeekday}</span>
-                    <span className={styles.headerDateLine}>{headerDateLine}</span>
-                  </div>
-                )}
-              </div>
-            </>
+          {currentTimeIso != null ? (
+            <LiveClockScreen1
+              initialTimeIso={currentTimeIso}
+              timezone={timeZone}
+              showTime={showTime}
+              showDate={showDate}
+            />
           ) : showDate ? (
-            <span className={styles.headerDateFallback}>{headerDateLine}</span>
+            <span className={styles.headerDateFallback}>{staticDateLine}</span>
           ) : null}
         </div>
 
