@@ -64,3 +64,17 @@ export function getExternalTeamLogoKey(
   return `clubs/${tenantKey}/teams/${externalTeamId}.${ext}`;
 }
 
+// ── INFOBOARD-MAP-01: Anlageplan background paths ─────────────────────────────
+//
+// Background images are stored in the public sportclubevo-assets store under
+// the "infoboards/" namespace, scoped by tenant and board.
+//
+//   Key: infoboards/{tenantKey}/{infoboardId}/anlageplan/{infoboardId}.{ext}
+
+export function getAnlageplanBgKey(
+  tenantKey: string,
+  infoboardId: string,
+  ext: string,
+): string {
+  return `infoboards/${tenantKey}/${infoboardId}/anlageplan/${infoboardId}.${ext}`;
+}

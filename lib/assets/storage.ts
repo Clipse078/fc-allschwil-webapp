@@ -47,6 +47,7 @@ import {
   type AllowedLogoUploadMimeType,
 } from "@/lib/assets/validation";
 import {
+  getAnlageplanBgKey,
   getExternalClubLogoKey,
   getExternalTeamLogoKey,
   getTenantLogoKey,
@@ -236,6 +237,63 @@ export async function uploadExternalTeamLogo(
     buffer,
     declaredMime,
   );
+}
+
+// ── INFOBOARD-MAP-01: Anlageplan background upload ────────────────────────────
+//
+// Uses the same uploadLogoObject() core as tenant logos and club crests —
+// same token (BLOB_READ_WRITE_TOKEN), same public sportclubevo-assets store,
+// same MIME/magic-byte validation (JPEG/PNG/WebP). Max-size pre-check is the
+// caller's responsibility (10 MB for Anlageplan vs 2 MB for logos).
+//
+// Path: infoboards/{tenantKey}/{infoboardId}/anlageplan/{infoboardId}.{ext}
+
+/**
+ * Uploads an Anlageplan background image to Vercel Blob.
+ *
+ * On success returns the Vercel Blob public CDN URL.
+ * The caller must persist this URL to Infoboard.anlageplanBackgroundUrl and
+ * call deleteAnlageplanBackground() on the previous URL when re-uploading.
+ *
+ * @param tenantKey    Tenant's unique key.
+ * @param infoboardId  Infoboard record ID.
+ * @param buffer       Raw file bytes.
+ * @param declaredMime Browser-supplied Content-Type. Pre-validated by caller.
+ */
+export async function uploadAnlageplanBackground(
+  tenantKey: string,
+  infoboardId: string,
+  buffer: Uint8Array,
+  declaredMime: string,
+): Promise<UploadLogoResult> {
+  const ext = mimeToLogoExtension(declaredMime);
+  if (!isAllowedLogoUploadMimeType(declaredMime) || !ext) {
+    return { ok: false, status: 400, error: `Nicht erlaubter MIME-Typ: ${declaredMime}.` };
+  }
+
+  return uploadLogoObject(
+    getAnlageplanBgKey(tenantKey, infoboardId, ext),
+    buffer,
+    declaredMime,
+  );
+}
+
+/**
+ * Best-effort deletion of an Anlageplan background blob.
+ * Non-fatal — logs but does not throw.
+ * No-ops when url is absent or not a Vercel Blob URL.
+ */
+export async function deleteAnlageplanBackground(
+  url: string | null | undefined,
+): Promise<void> {
+  if (!url || !isVercelBlobUrl(url)) return;
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) return;
+  try {
+    await del(url, { token });
+  } catch (err) {
+    console.warn("[storage] deleteAnlageplanBackground: failed to delete blob", url, err);
+  }
 }
 
 // ── Orphaned blob cleanup ─────────────────────────────────────────────────────
