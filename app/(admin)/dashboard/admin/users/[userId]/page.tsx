@@ -2,11 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  Building2,
   Calendar,
   Mail,
   Shield,
   UserCircle2,
+  UserRound,
 } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -14,12 +14,14 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantUserDetail } from "@/lib/users/queries";
 import { getTenantRolesOverview } from "@/lib/roles/tenant-queries";
 import { getScopedAssignmentsForUser } from "@/lib/roles/scoped-mutations";
+import { getOrgUnitsForTenant } from "@/lib/people/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import MembershipAccessControl from "@/components/admin/users/MembershipAccessControl";
 import TenantRoleAssignmentControl from "@/components/admin/users/TenantRoleAssignmentControl";
-import ScopedRolesSummary from "@/components/admin/users/ScopedRolesSummary";
+import ScopedRoleManagementControl from "@/components/admin/users/ScopedRoleManagementControl";
+import InvitePersonControl from "@/components/admin/users/InvitePersonControl";
 
 type Props = {
   params: Promise<{ userId: string }>;
@@ -33,7 +35,6 @@ function formatDate(date: Date): string {
   });
 }
 
-
 export default async function AdminUserDetailPage({ params }: Props) {
   const session = await requireAnyPermission([
     PERMISSIONS.USERS_VIEW,
@@ -45,10 +46,11 @@ export default async function AdminUserDetailPage({ params }: Props) {
 
   const { userId } = await params;
 
-  const [membership, allTenantRoles, scopedAssignments] = await Promise.all([
+  const [membership, allTenantRoles, scopedAssignments, orgUnits] = await Promise.all([
     getTenantUserDetail(tenantId, userId),
     getTenantRolesOverview(tenantId),
     getScopedAssignmentsForUser(tenantId, userId),
+    getOrgUnitsForTenant(tenantId),
   ]);
   if (!membership) notFound();
 
@@ -56,14 +58,43 @@ export default async function AdminUserDetailPage({ params }: Props) {
     .filter((r) => !r.isArchived)
     .map((r) => ({ id: r.id, name: r.name, isSystem: r.isSystem }));
 
+  // Available roles for scoped assignments (exclude Club Admin — enforced server-side too)
+  const availableScopedRoles = allTenantRoles
+    .filter((r) => !r.isArchived)
+    .map((r) => ({ id: r.id, name: r.name }));
+
+  const availableOrgUnits = orgUnits.map((u) => ({ id: u.id, name: u.name }));
+
   const user = membership.user;
   const displayName = `${user.firstName} ${user.lastName}`;
 
   const canManage = hasPermission(session, PERMISSIONS.USERS_MANAGE);
+  const canInvite = hasPermission(session, PERMISSIONS.USERS_INVITE);
   const currentUserId = session.user.effectiveUserId ?? session.user.id;
   const isSelf = currentUserId === userId;
 
   const isEffectivelyActive = membership.isActive && user.isActive;
+
+  // Person linkage
+  const linkedPerson = user.person;
+  const hasLinkedPerson = linkedPerson !== null;
+
+  // Pending invitation is determined solely by the presence of an active
+  // (non-expired, non-used) invitation token — NOT by lastLoginAt.
+  // A user with an existing global account (lastLoginAt set from another tenant)
+  // may have a pending invitation for this tenant (multi-tenant use case).
+  const pendingInvitation = user.passwordResetTokens.length > 0;
+
+  // Scoped assignments mapped for the management control
+  const scopedItems = scopedAssignments.map((a) => ({
+    id: a.id,
+    roleId: a.roleId,
+    roleName: a.roleName,
+    roleKey: a.roleKey,
+    orgUnitId: a.orgUnitId,
+    orgUnitName: a.orgUnitName,
+    scopeMode: a.scopeMode,
+  }));
 
   return (
     <div className="space-y-8">
@@ -135,13 +166,31 @@ export default async function AdminUserDetailPage({ params }: Props) {
                     )}
                   </div>
 
-                  {/* Account status — read-only */}
+                  {/* Account + invitation status */}
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-[var(--muted)]">Konto:</span>
-                    {user.isActive ? (
+                    {pendingInvitation ? (
+                      <AdminStatusPill label="Einladung ausstehend" tone="warning" />
+                    ) : user.isActive ? (
                       <AdminStatusPill label="Aktiv" tone="success" />
                     ) : (
                       <AdminStatusPill label="Inaktiv" tone="muted" />
+                    )}
+                  </div>
+
+                  {/* Person linkage */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs text-[var(--muted)]">Person:</span>
+                    {hasLinkedPerson ? (
+                      <Link
+                        href={`/dashboard/persons/${linkedPerson!.id}`}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition"
+                      >
+                        <UserRound className="h-3 w-3" />
+                        {linkedPerson!.firstName} {linkedPerson!.lastName}
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-[var(--muted)]">Keine Person verknüpft</span>
                     )}
                   </div>
                 </div>
@@ -149,7 +198,7 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Rollen & Zuständigkeiten — ORG-ACCESS-02 consolidated view */}
+          {/* Rollen & Zuständigkeiten — consolidated view */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
@@ -176,12 +225,18 @@ export default async function AdminUserDetailPage({ params }: Props) {
                 />
               </div>
 
-              {/* Sub-section: Bereiche (scoped — read-only here per spec) */}
+              {/* Sub-section: Bereiche (scoped — manageable) */}
               <div>
                 <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
                   Bereiche
                 </p>
-                <ScopedRolesSummary assignments={scopedAssignments} />
+                <ScopedRoleManagementControl
+                  userId={userId}
+                  assignments={scopedItems}
+                  availableRoles={availableScopedRoles}
+                  availableOrgUnits={availableOrgUnits}
+                  canManage={canManage}
+                />
               </div>
             </div>
           </div>
@@ -211,6 +266,27 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
+          {/* Invitation management */}
+          {(pendingInvitation || (canInvite && !user.lastLoginAt)) ? (
+            <div className="sce-detail-section">
+              <div className="sce-detail-section-header">
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-[var(--muted)]" />
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                    Einladung
+                  </p>
+                </div>
+              </div>
+              <div className="sce-detail-section-body">
+                <InvitePersonControl
+                  userId={userId}
+                  canManage={canInvite}
+                  pendingInvitation={pendingInvitation}
+                />
+              </div>
+            </div>
+          ) : null}
+
           {/* Membership metadata */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
@@ -231,7 +307,11 @@ export default async function AdminUserDetailPage({ params }: Props) {
               <div className="sce-data-field">
                 <span className="sce-data-label">Gesamtstatus</span>
                 <span className="sce-data-value">
-                  {isEffectivelyActive ? "Vollständig aktiv" : "Eingeschränkt"}
+                  {pendingInvitation
+                    ? "Einladung ausstehend"
+                    : isEffectivelyActive
+                    ? "Vollständig aktiv"
+                    : "Eingeschränkt"}
                 </span>
               </div>
             </div>

@@ -665,23 +665,32 @@ model User {
 //   - tokenHash: SHA-256 hash of the raw reset token. Raw token is never stored.
 //   - token is single-use: usedAt is set on consumption, preventing replay.
 //   - expiresAt: ~60 minutes from creation; expired tokens are rejected.
+//     Invitation tokens use a longer expiry (72 h) set at the service layer.
 //   - creating a new token for a user deletes all previous tokens for that user
 //     (enforced at the service layer, not here at the DB layer).
 //   - userId: FK to User; cascade-deletes when the user is deleted.
 //   - No tenant FK: token is scoped to user only (User is tenant-scoped).
 // ---------------------------------------------------------------------------
+// USER-ADMIN-02 extension:
+//   - isInvitation: distinguishes tenant-invite tokens from password-reset
+//     tokens. True only when the token was created by the admin invite flow.
+//     Invitation tokens share the same security invariants as reset tokens
+//     but use a 72 h window and drive the "Einladung ausstehend" UI state.
+// ---------------------------------------------------------------------------
 model PasswordResetToken {
-  id        String    @id @default(cuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  id           String    @id @default(cuid())
+  userId       String
+  tokenHash    String    @unique
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime  @default(now())
+  isInvitation Boolean   @default(false)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
+  @@index([userId, isInvitation])
 }
 
 model Registration {
