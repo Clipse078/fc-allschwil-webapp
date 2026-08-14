@@ -11,12 +11,20 @@
 --    to the tenant club_admin role on each deploy via the
 --    tenantPermissionKeys loop; this INSERT ensures the Permission row
 --    is available when the seed runs after this migration.
+--
+-- RECOVERY NOTE (USER-ADMIN-02-C2):
+--   STAGE Neon ran this migration without transaction isolation (autocommit
+--   per statement). The first three statements committed before the
+--   RolePermission INSERT failed. All DDL/DML uses IF NOT EXISTS / ON
+--   CONFLICT DO NOTHING so re-application after `migrate resolve --rolled-back`
+--   is fully idempotent.
 
--- AlterTable
-ALTER TABLE "PasswordResetToken" ADD COLUMN "isInvitation" BOOLEAN NOT NULL DEFAULT false;
+-- AlterTable — idempotent: IF NOT EXISTS guards re-application on STAGE
+-- where the column was already committed before the RolePermission failure.
+ALTER TABLE "PasswordResetToken" ADD COLUMN IF NOT EXISTS "isInvitation" BOOLEAN NOT NULL DEFAULT false;
 
--- CreateIndex
-CREATE INDEX "PasswordResetToken_userId_isInvitation_idx" ON "PasswordResetToken"("userId", "isInvitation");
+-- CreateIndex — idempotent
+CREATE INDEX IF NOT EXISTS "PasswordResetToken_userId_isInvitation_idx" ON "PasswordResetToken"("userId", "isInvitation");
 
 -- Permission: users.invite (idempotent — ON CONFLICT DO NOTHING)
 -- scope = TENANT so that tenant club_admin roles receive it via the seed
@@ -37,13 +45,13 @@ ON CONFLICT ("key") DO NOTHING;
 
 -- Grant users.invite to every existing tenant club_admin role.
 -- Club Admin is identified by the canonical key pattern club_admin__<tenantKey>.
--- This INSERT is idempotent: ON CONFLICT DO NOTHING prevents duplicate grants.
-INSERT INTO "RolePermission" ("id", "roleId", "permissionId", "createdAt", "updatedAt")
+-- RolePermission schema: id, roleId, permissionId, createdAt (no updatedAt).
+-- ON CONFLICT DO NOTHING targets the @@unique([roleId, permissionId]) constraint.
+INSERT INTO "RolePermission" ("id", "roleId", "permissionId", "createdAt")
 SELECT
   gen_random_uuid()::text,
   r."id",
   p."id",
-  CURRENT_TIMESTAMP,
   CURRENT_TIMESTAMP
 FROM "Role" r
 CROSS JOIN "Permission" p
