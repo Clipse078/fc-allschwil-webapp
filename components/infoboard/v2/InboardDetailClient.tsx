@@ -35,6 +35,7 @@ import {
 } from "lucide-react";
 import type { InboardRow } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
+import type { AnlageplanResourceOption } from "@/lib/infoboard/anlageplan-types";
 import { InboardDesignerClient } from "./designer/InboardDesignerClient";
 import { AnlageplanDesignerClient } from "./designer/anlageplan/AnlageplanDesignerClient";
 
@@ -55,11 +56,13 @@ const TABS: { id: Tab; label: string }[] = [
 type InboardDetailClientProps = {
   board: InboardRow;
   tenantName: string;
+  facilityOptions?: AnlageplanResourceOption[];
 };
 
 export function InboardDetailClient({
   board: initialBoard,
   tenantName,
+  facilityOptions = [],
 }: InboardDetailClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
@@ -368,6 +371,7 @@ export function InboardDetailClient({
             {board.templateType === "ANLAGENUEBERSICHT" ? (
               <AnlageplanDesignerClient
                 board={board}
+                facilityOptions={facilityOptions}
                 onBoardChange={(updated) => {
                   setBoard(updated);
                   router.refresh();

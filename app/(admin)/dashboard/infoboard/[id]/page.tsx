@@ -16,6 +16,8 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { getInfoboard } from "@/lib/infoboard/queries";
+import { getFacilitiesForTenant } from "@/lib/facilities/queries";
+import type { AnlageplanResourceOption } from "@/lib/infoboard/anlageplan-types";
 import { InboardDetailClient } from "@/components/infoboard/v2/InboardDetailClient";
 
 type PageProps = {
@@ -29,12 +31,37 @@ export default async function InboardDetailPage({ params }: PageProps) {
   if (!tenantContext) notFound();
 
   const { id } = await params;
-  const board = await getInfoboard(id, tenantContext.id);
+
+  // Load board + facility options in parallel
+  const [board, facilities] = await Promise.all([
+    getInfoboard(id, tenantContext.id),
+    getFacilitiesForTenant(tenantContext.id),
+  ]);
+
   if (!board) notFound();
+
+  // Flatten to serialisable AnlageplanResourceOption[] (FULL_PITCH/HALF_PITCH only)
+  const facilityOptions: AnlageplanResourceOption[] = facilities.flatMap((f) =>
+    f.resources
+      .filter(
+        (r): r is typeof r & { type: "FULL_PITCH" | "HALF_PITCH" } =>
+          r.type === "FULL_PITCH" || r.type === "HALF_PITCH",
+      )
+      .map((r) => ({
+        code: r.code,
+        name: r.name,
+        type: r.type,
+        facilityName: f.name,
+      })),
+  );
 
   return (
     <div className="max-w-[1400px]">
-      <InboardDetailClient board={board} tenantName={tenantContext.name} />
+      <InboardDetailClient
+        board={board}
+        tenantName={tenantContext.name}
+        facilityOptions={facilityOptions}
+      />
     </div>
   );
 }

@@ -129,6 +129,60 @@ export const MARKER_LABELS: Record<MarkerType, string> = {
   FREIER_MARKER: "Marker",
 };
 
+/**
+ * Canonical marker icon map — single source of truth for both designer and kiosk.
+ *
+ * Uses emoji because they render identically in server (kiosk) and client
+ * (designer) contexts with no bundling overhead.
+ *
+ * INFOBOARD-MAP-01B — imported by:
+ *   - AnlageplanDesignerClient (palette + placed canvas markers)
+ *   - InfoboardAnlageplan (public kiosk FacilityMarker / DuBistHierMarker)
+ */
+export const MARKER_ICONS: Record<MarkerType, string> = {
+  DU_BIST_HIER: "📍",
+  HAUPTEINGANG: "🚪",
+  KABINE: "👕",
+  WC: "🚻",
+  BISTRO: "☕",
+  PARKPLATZ: "🅿️",
+  SEKRETARIAT: "📋",
+  SPEAKERRAUM: "🔊",
+  ERSTE_HILFE: "🏥",
+  FREIER_MARKER: "📌",
+};
+
+// ── Canonical facility option type (for Anlageplan resource picker) ──────────
+
+/**
+ * Serialisable resource entry used by the Anlageplan designer's canonical
+ * FacilityResource picker.
+ *
+ * INFOBOARD-MAP-01B — passed from the server page to AnlageplanDesignerClient.
+ */
+export type AnlageplanResourceOption = {
+  /** FacilityResource.code — stored in ResourceZoneElement.resourceCode */
+  code: string;
+  /** FacilityResource.name — e.g. "Feld A" */
+  name: string;
+  /** FacilityResourceType: "FULL_PITCH" | "HALF_PITCH" */
+  type: "FULL_PITCH" | "HALF_PITCH";
+  /** Parent Facility.name — e.g. "Kunstrasen 2" */
+  facilityName: string;
+};
+
+/**
+ * Human-readable picker label for an AnlageplanResourceOption.
+ *
+ * Examples:
+ *   Kunstrasen 2 (FULL_PITCH, resource.name === facility.name) → "Kunstrasen 2"
+ *   Kunstrasen 2 · Feld A                                       → "Kunstrasen 2 · Feld A"
+ */
+export function anlageplanResourceLabel(opt: AnlageplanResourceOption): string {
+  if (opt.name === opt.facilityName) return opt.facilityName;
+  return `${opt.facilityName} · ${opt.name}`;
+}
+
 export const ZONE_TYPE_LABELS: Record<ResourceZoneElement["zoneType"], string> = {
   FULL_PITCH: "Spielfeld (ganzes Feld)",
   HALF_PITCH: "Teilfeld (Feld A/B)",
