@@ -22,6 +22,72 @@
  *   rotation is degrees (0..360), default 0.
  */
 
+// ── Marker size preset ────────────────────────────────────────────────────
+
+/**
+ * Constrained marker size enum.
+ *   S  — compact, secondary wayfinding
+ *   M  — standard (default)
+ *   L  — prominent, primary wayfinding
+ *   XL — dominant TV-distance visibility
+ *
+ * Controls the entire marker treatment proportionally (icon, label, padding).
+ */
+export type MarkerSize = "S" | "M" | "L" | "XL";
+
+/**
+ * Scale multipliers applied to the base marker dimensions per size preset.
+ * Each value is a CSS clamp() scale factor relative to the base.
+ */
+export const MARKER_SIZE_PRESETS: Record<
+  MarkerSize,
+  {
+    iconVh: string;
+    labelVh: string;
+    paddingVh: string;
+    paddingVw: string;
+    borderRadiusVh: string;
+    gap: string;
+  }
+> = {
+  S: {
+    iconVh: "clamp(7px, 0.9vh, 13px)",
+    labelVh: "clamp(4px, 0.55vh, 8px)",
+    paddingVh: "clamp(1px, 0.2vh, 3px)",
+    paddingVw: "clamp(3px, 0.35vw, 6px)",
+    borderRadiusVh: "clamp(2px, 0.3vh, 5px)",
+    gap: "1px",
+  },
+  M: {
+    iconVh: "clamp(10px, 1.6vh, 22px)",
+    labelVh: "clamp(6px, 0.85vh, 12px)",
+    paddingVh: "clamp(3px, 0.4vh, 6px)",
+    paddingVw: "clamp(6px, 0.7vw, 12px)",
+    borderRadiusVh: "clamp(4px, 0.5vh, 9px)",
+    gap: "2px",
+  },
+  L: {
+    iconVh: "clamp(14px, 2.0vh, 28px)",
+    labelVh: "clamp(8px, 1.05vh, 15px)",
+    paddingVh: "clamp(4px, 0.55vh, 8px)",
+    paddingVw: "clamp(7px, 0.85vw, 14px)",
+    borderRadiusVh: "clamp(5px, 0.65vh, 11px)",
+    gap: "3px",
+  },
+  XL: {
+    iconVh: "clamp(20px, 2.8vh, 40px)",
+    labelVh: "clamp(11px, 1.4vh, 20px)",
+    paddingVh: "clamp(6px, 0.8vh, 12px)",
+    paddingVw: "clamp(10px, 1.2vw, 20px)",
+    borderRadiusVh: "clamp(7px, 0.9vh, 14px)",
+    gap: "4px",
+  },
+};
+
+export function defaultMarkerSize(): MarkerSize {
+  return "M";
+}
+
 // ── Normalized position / size ─────────────────────────────────────────────
 
 /**
@@ -73,6 +139,16 @@ export type ResourceZoneElement = {
    * Defaults to true.
    */
   showNextActivity: boolean;
+  /**
+   * Optional card background color override (CSS hex, e.g. "#0a1828").
+   * Falls back to canonical Infoboard dark card default when null/absent.
+   */
+  backgroundColor?: string | null;
+  /**
+   * Optional card text color override (CSS hex, e.g. "#ffffff").
+   * Falls back to canonical Infoboard white text default when null/absent.
+   */
+  textColor?: string | null;
 };
 
 /** Marker types matching the MVP palette */
@@ -98,6 +174,21 @@ export type MarkerElement = {
   label: string | null;
   /** Optional secondary helper text — e.g. "Eingang Nord" */
   secondaryText: string | null;
+  /**
+   * Constrained size preset. Controls icon + label + padding proportionally.
+   * Defaults to "M" when absent — backward-compatible with existing markers.
+   */
+  markerSize?: MarkerSize;
+  /**
+   * Optional background color override (CSS hex).
+   * Falls back to canonical dark semi-transparent default when null/absent.
+   */
+  backgroundColor?: string | null;
+  /**
+   * Optional text/icon label color override (CSS hex).
+   * Falls back to canonical rgba(255,255,255,0.75) when null/absent.
+   */
+  textColor?: string | null;
 };
 
 /** Union of all map element types */
@@ -147,6 +238,18 @@ export type AnlageplanConfig = {
    * defaultBackgroundTransform() when absent.
    */
   backgroundTransform?: BackgroundTransform;
+  /**
+   * Infoboard-scoped display name overrides for teams / events.
+   *
+   * Key  : canonical teamDisplayName or displayTitle from the live feed.
+   * Value: visitor-friendly override label shown on this Infoboard only.
+   *
+   * Empty string values are ignored (treated as "no override").
+   * Canonical Team.displayName is never mutated.
+   *
+   * Example: { "FC Allschwil Junioren F2": "F2 Training" }
+   */
+  displayNameOverrides?: Record<string, string>;
 };
 
 // ── Constants / display helpers ────────────────────────────────────────────

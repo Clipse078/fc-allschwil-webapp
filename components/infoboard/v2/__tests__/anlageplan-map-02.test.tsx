@@ -103,7 +103,7 @@ function makeAnlageplanPayload(
     code,
     displayLabel: code,
     facilityName: "Testanlage",
-    state: (currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE") as "FREE" | "OCCUPIED_NOW" | "UPCOMING",
+    state: (currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE_NOW") as "FREE_NOW" | "OCCUPIED_NOW" | "UPCOMING",
     hasAllocationConflict: false,
     currentEvent: currentType
       ? {
@@ -494,6 +494,186 @@ describe("InfoboardAnlageplan — shared shell", () => {
   });
 });
 
+// ── Marker size control (INFOBOARD-UX-03-C2) ─────────────────────────────────
+
+describe("FacilityMarker — size control", () => {
+  it("marker without markerSize renders with default size 'M'", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    // WC marker in fixture has no markerSize → defaults to M
+    expect(markers[0].getAttribute("data-marker-size")).toBe("M");
+  });
+
+  it("marker with markerSize 'XL' renders with XL attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "marker-xl",
+              rect: { x: 0.05, y: 0.8, width: 0.06, height: 0.06 },
+              markerType: "PARKPLATZ",
+              label: "Parkplatz",
+              secondaryText: null,
+              markerSize: "XL",
+            },
+            {
+              kind: "MARKER",
+              id: "dbh-1",
+              rect: { x: 0.8, y: 0.8, width: 0.06, height: 0.06 },
+              markerType: "DU_BIST_HIER",
+              label: null,
+              secondaryText: null,
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    expect(markers[0].getAttribute("data-marker-size")).toBe("XL");
+  });
+
+  it("DuBistHierMarker with markerSize 'L' renders with L attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "dbh-1",
+              rect: { x: 0.45, y: 0.45, width: 0.08, height: 0.1 },
+              markerType: "DU_BIST_HIER",
+              label: null,
+              secondaryText: null,
+              markerSize: "L",
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    expect(screen.getByTestId("du-bist-hier-marker").getAttribute("data-marker-size")).toBe("L");
+  });
+
+  it("marker with markerSize 'S' renders with S attribute", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload({
+          elements: [
+            {
+              kind: "MARKER",
+              id: "marker-s",
+              rect: { x: 0.05, y: 0.8, width: 0.04, height: 0.04 },
+              markerType: "WC",
+              label: "WC",
+              secondaryText: null,
+              markerSize: "S",
+            },
+          ],
+        })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const markers = screen.getAllByTestId("facility-marker");
+    expect(markers[0].getAttribute("data-marker-size")).toBe("S");
+  });
+});
+
+// ── Display name override (INFOBOARD-UX-03-C2) ───────────────────────────────
+
+describe("InfoboardAnlageplan — display name override", () => {
+  it("shows canonical team name when no override configured", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload(
+          undefined,
+          [{ code: "KR2", currentType: "TRAINING" }],
+        )}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // Default canonical name from fixture: "Team KR2"
+    expect(root.textContent).toContain("Team KR2");
+  });
+
+  it("shows override display name when configured", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "F2 Training" } },
+      [{ code: "KR2", currentType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("F2 Training");
+    // Canonical name should NOT appear (replaced by override)
+    expect(root.textContent).not.toContain("Team KR2");
+  });
+
+  it("falls back to canonical name when override is empty string", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "" } },
+      [{ code: "KR2", currentType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("Team KR2");
+  });
+
+  it("override applies to next-activity rail as well", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Next Team KR2": "Junioren F2" } },
+      [{ code: "KR2", nextType: "TRAINING" }],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const rail = screen.getByTestId("anlageplan-activity-rail");
+    expect(rail.textContent).toContain("Junioren F2");
+    expect(rail.textContent).not.toContain("Next Team KR2");
+  });
+
+  it("override for one team does not affect another team's name", () => {
+    const payload = makeAnlageplanPayload(
+      { displayNameOverrides: { "Team KR2": "F2 Training" } },
+      [
+        { code: "KR2", currentType: "TRAINING" },
+        { code: "KR3", currentType: "MATCH" },
+      ],
+    );
+    render(
+      <InfoboardAnlageplan
+        payload={payload}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // KR2 team overridden
+    expect(root.textContent).toContain("F2 Training");
+    // KR3 team canonical (KR3 zone has showNextActivity=false but still has current card)
+    expect(root.textContent).toContain("Team KR3");
+  });
+});
+
 // ── AnlageplanMapScene — identical geometry ───────────────────────────────────
 
 describe("AnlageplanMapScene — canonical shared scene", () => {
@@ -547,5 +727,219 @@ describe("AnlageplanMapScene — canonical shared scene", () => {
     );
     expect(screen.getByTestId("anlageplan-config-preview").textContent)
       .toContain("Hauptplatz (Brüelstadion)");
+  });
+});
+
+// ── FULL_PITCH / HALF_PITCH hierarchy suppression (rendered path) ─────────────
+//
+// These tests verify the rendered InfoboardAnlageplan output — they fail
+// immediately if parent AND child zones are rendered simultaneously.
+// The suppression is derived from live allocation state, never manual config.
+
+/**
+ * Builds a hierarchy-aware test payload with a facility that has both a
+ * FULL_PITCH zone and two HALF_PITCH zones (A + B), all on "Testanlage".
+ */
+function makeHierarchyPayload(
+  options: {
+    fullPitchCurrent?: boolean;
+    halfACurrent?: boolean;
+    halfANext?: boolean;
+    halfBCurrent?: boolean;
+  } = {},
+): AnlageplanLivePayload {
+  const { fullPitchCurrent = false, halfACurrent = false, halfANext = false, halfBCurrent = false } = options;
+
+  const config: AnlageplanConfig = {
+    version: 1,
+    elements: [
+      {
+        kind: "RESOURCE_ZONE",
+        id: "zone-hp",
+        rect: { x: 0.05, y: 0.1, width: 0.35, height: 0.5 },
+        resourceCode: "HP",
+        label: "Hauptplatz",
+        zoneType: "FULL_PITCH",
+        showNextActivity: true,
+      },
+      {
+        kind: "RESOURCE_ZONE",
+        id: "zone-hp-a",
+        rect: { x: 0.05, y: 0.65, width: 0.15, height: 0.2 },
+        resourceCode: "HP-A",
+        label: "Hauptplatz A",
+        zoneType: "HALF_PITCH",
+        showNextActivity: true,
+      },
+      {
+        kind: "RESOURCE_ZONE",
+        id: "zone-hp-b",
+        rect: { x: 0.22, y: 0.65, width: 0.15, height: 0.2 },
+        resourceCode: "HP-B",
+        label: "Hauptplatz B",
+        zoneType: "HALF_PITCH",
+        showNextActivity: true,
+      },
+    ],
+  };
+
+  const makePitchOcc = (code: string, hasCurrent: boolean, hasNext = false) => ({
+    code,
+    displayLabel: code,
+    facilityName: "Testanlage",
+    state: (hasCurrent ? "OCCUPIED_NOW" : hasNext ? "UPCOMING" : "FREE_NOW") as "FREE_NOW" | "OCCUPIED_NOW" | "UPCOMING",
+    hasAllocationConflict: false,
+    currentEvent: hasCurrent
+      ? {
+          eventId: `evt-${code}`,
+          displayTitle: `Event ${code}`,
+          teamDisplayName: `Team ${code}`,
+          opponentDisplayName: null,
+          startAt: "2026-09-12T16:00:00.000Z",
+          endAt: "2026-09-12T17:30:00.000Z",
+          status: "IN_PROGRESS" as const,
+          type: "TRAINING" as const,
+          temporalRelation: "current" as const,
+          dressingRooms: [],
+        }
+      : null,
+    nextEvent: hasNext && !hasCurrent
+      ? {
+          eventId: `next-${code}`,
+          displayTitle: `Next ${code}`,
+          teamDisplayName: `NextTeam ${code}`,
+          opponentDisplayName: null,
+          startAt: "2026-09-12T18:00:00.000Z",
+          endAt: "2026-09-12T19:00:00.000Z",
+          status: "SCHEDULED" as const,
+          type: "TRAINING" as const,
+          temporalRelation: "next" as const,
+          dressingRooms: [],
+        }
+      : null,
+  });
+
+  const screen2: InfoboardScreen2LivePayload = {
+    feed: {
+      generatedAt: "2026-09-12T16:00:00.000Z",
+      tenant: { id: "t1", key: "fc-test", name: "FC Test", timezone: "Europe/Zurich" },
+      displayDate: "2026-09-12",
+      isStale: false,
+      facilityName: "Testanlage",
+      pitches: [
+        makePitchOcc("HP", fullPitchCurrent),
+        makePitchOcc("HP-A", halfACurrent, halfANext),
+        makePitchOcc("HP-B", halfBCurrent),
+      ],
+      dressingRooms: [],
+      unallocated: [],
+    },
+    branding: { clubLogoSrc: null, productLogoSrc: null },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+    theme: "DARK",
+  };
+
+  return {
+    screen2,
+    anlageplanConfig: config,
+    backgroundUrl: null,
+    backgroundTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+  };
+}
+
+describe("InfoboardAnlageplan — FULL_PITCH / HALF_PITCH hierarchy suppression", () => {
+  it("all free → only FULL_PITCH rendered (FREI), HALF_PITCH zones suppressed", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload()}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // FULL_PITCH FREI card shown
+    expect(root.textContent).toContain("Hauptplatz");
+    // HALF_PITCH labels must NOT appear (suppressed)
+    expect(root.textContent).not.toContain("Hauptplatz A");
+    expect(root.textContent).not.toContain("Hauptplatz B");
+  });
+
+  it("FULL_PITCH occupied, halves free → only FULL_PITCH rendered with event, HALF_PITCH suppressed", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ fullPitchCurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("Hauptplatz");
+    expect(root.textContent).not.toContain("Hauptplatz A");
+    expect(root.textContent).not.toContain("Hauptplatz B");
+  });
+
+  it("half A occupied → FULL_PITCH suppressed, A (event) + B (FREI) visible", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ halfACurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // Both half-pitch labels visible
+    expect(root.textContent).toContain("Hauptplatz A");
+    expect(root.textContent).toContain("Hauptplatz B");
+    // FULL_PITCH label must NOT appear as a card (suppressed)
+    // Note: "Hauptplatz" is a prefix of "Hauptplatz A/B" — we check for the FREI/event card
+    const freeCards = screen.queryAllByTestId("resource-card-free");
+    const currentCards = screen.queryAllByTestId("resource-card-current");
+    // HP-A is current, HP-B is free — no HP (full) card
+    const allCardTexts = [...freeCards, ...currentCards].map(c => c.textContent ?? "");
+    const hasHPFull = allCardTexts.some(t => t.includes("Hauptplatz") && !t.includes("Hauptplatz A") && !t.includes("Hauptplatz B"));
+    expect(hasHPFull).toBe(false);
+  });
+
+  it("both halves occupied → FULL_PITCH suppressed, A + B both rendered with events", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ halfACurrent: true, halfBCurrent: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("Hauptplatz A");
+    expect(root.textContent).toContain("Hauptplatz B");
+    const currentCards = screen.getAllByTestId("resource-card-current");
+    // Both A and B should have current cards (2 current events)
+    expect(currentCards.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("half-pitch next-event → FULL_PITCH suppressed, halves visible", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload({ halfANext: true })}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("Hauptplatz A");
+    expect(root.textContent).toContain("Hauptplatz B");
+  });
+
+  it("FULL_PITCH + HALF_PITCH are never both rendered simultaneously (all free)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeHierarchyPayload()}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const freeCards = screen.getAllByTestId("resource-card-free");
+    const cardLabels = freeCards.map(c => c.textContent ?? "");
+    const hasFullPitch = cardLabels.some(t => t.includes("Hauptplatz") && !t.includes("Hauptplatz A") && !t.includes("Hauptplatz B"));
+    const hasHalfA = cardLabels.some(t => t.includes("Hauptplatz A"));
+    const hasHalfB = cardLabels.some(t => t.includes("Hauptplatz B"));
+    // FULL_PITCH visible, halves not
+    expect(hasFullPitch).toBe(true);
+    expect(hasHalfA).toBe(false);
+    expect(hasHalfB).toBe(false);
   });
 });

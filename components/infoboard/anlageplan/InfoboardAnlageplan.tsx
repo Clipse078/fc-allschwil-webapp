@@ -62,6 +62,7 @@ export function InfoboardAnlageplan({
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
+  const displayNameOverrides = anlageplanConfig.displayNameOverrides ?? null;
 
   // Build pitch occupancy lookup: resourceCode → PitchOccupancy
   const pitchMap = new Map<string, PitchOccupancy>(
@@ -123,11 +124,11 @@ export function InfoboardAnlageplan({
           gap: "1vw",
         }}
       >
-        {/* ── MAP CANVAS (~78%) ─────────────────────────────────────────── */}
+        {/* ── MAP CANVAS (~73%) ─────────────────────────────────────────── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
-            flex: "1 1 78%",
+            flex: "1 1 73%",
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",
             overflow: "hidden",
@@ -142,29 +143,31 @@ export function InfoboardAnlageplan({
             bgTransform={bgTransform}
             pitchMap={pitchMap}
             timezone={tz}
+            displayNameOverrides={displayNameOverrides}
           />
         </div>
 
-        {/* ── ACTIVITY RAIL (~22%) ──────────────────────────────────────── */}
+        {/* ── ACTIVITY RAIL (~27%) — readable at TV distance ────────────── */}
         <aside
           data-testid="anlageplan-activity-rail"
           style={{
-            flex: "0 0 22%",
-            maxWidth: "22%",
+            flex: "0 0 27%",
+            maxWidth: "27%",
             display: "flex",
             flexDirection: "column",
-            gap: "0.5vh",
+            gap: "0.6vh",
             overflow: "hidden",
           }}
         >
           <div
             style={{
-              fontSize: "clamp(7px, 0.8vh, 10px)",
-              letterSpacing: "0.20em",
-              color: "rgba(255,255,255,0.35)",
+              fontSize: "clamp(8px, 0.9vh, 12px)",
+              letterSpacing: "0.18em",
+              color: "rgba(255,255,255,0.40)",
               textTransform: "uppercase",
-              marginBottom: "0.3vh",
+              marginBottom: "0.4vh",
               flexShrink: 0,
+              fontWeight: 600,
             }}
           >
             NÄCHSTE AKTIVITÄTEN
@@ -175,7 +178,7 @@ export function InfoboardAnlageplan({
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: "0.4vh",
+                gap: "0.6vh",
                 overflow: "hidden",
                 flex: 1,
               }}
@@ -186,6 +189,7 @@ export function InfoboardAnlageplan({
                   event={event}
                   resourceLabel={resourceLabel}
                   tz={tz}
+                  displayNameOverrides={displayNameOverrides}
                 />
               ))}
             </div>
@@ -195,13 +199,13 @@ export function InfoboardAnlageplan({
                 flex: 1,
                 display: "flex",
                 alignItems: "flex-start",
-                paddingTop: "1vh",
+                paddingTop: "1.5vh",
               }}
             >
               <span
                 style={{
-                  fontSize: "clamp(7px, 0.85vh, 11px)",
-                  color: "rgba(255,255,255,0.20)",
+                  fontSize: "clamp(8px, 1.0vh, 13px)",
+                  color: "rgba(255,255,255,0.22)",
                   letterSpacing: "0.12em",
                 }}
               >

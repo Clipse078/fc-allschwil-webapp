@@ -25,12 +25,15 @@ import {
   isMarker,
   isDuBistHier,
   MARKER_LABELS,
+  MARKER_SIZE_PRESETS,
+  defaultMarkerSize,
   defaultRect,
   defaultMarkerRect,
   defaultDuBistHierRect,
   type AnlageplanConfig,
   type ResourceZoneElement,
   type MarkerElement,
+  type MarkerSize,
   type NormalizedRect,
 } from "../anlageplan-types";
 
@@ -405,6 +408,156 @@ describe("Tenant scoping (model level)", () => {
   it("board with corrupt anlageplanJson falls back to empty", () => {
     const result = parseAnlageplanJson("CORRUPT:JSON{{{") ?? emptyAnlageplanConfig();
     expect(result.elements).toHaveLength(0);
+  });
+});
+
+// ── Marker size presets ───────────────────────────────────────────────────────
+
+describe("MarkerSize presets", () => {
+  it("defaultMarkerSize returns 'M'", () => {
+    expect(defaultMarkerSize()).toBe("M");
+  });
+
+  it("all four sizes have defined presets", () => {
+    const sizes: MarkerSize[] = ["S", "M", "L", "XL"];
+    for (const s of sizes) {
+      expect(MARKER_SIZE_PRESETS[s]).toBeDefined();
+      expect(MARKER_SIZE_PRESETS[s].iconVh).toBeTruthy();
+      expect(MARKER_SIZE_PRESETS[s].labelVh).toBeTruthy();
+    }
+  });
+
+  it("XL preset is larger than S preset (icon clamp min)", () => {
+    const parseMin = (clamp: string) =>
+      parseFloat(clamp.replace(/clamp\(/, "").split(",")[0]);
+    expect(parseMin(MARKER_SIZE_PRESETS.XL.iconVh)).toBeGreaterThan(
+      parseMin(MARKER_SIZE_PRESETS.S.iconVh),
+    );
+  });
+
+  it("marker without markerSize defaults safely to 'M' at runtime", () => {
+    const marker = makeMarker({ markerType: "WC" });
+    // markerSize is absent → defaultMarkerSize() used at render time
+    expect(marker.markerSize).toBeUndefined();
+    expect(MARKER_SIZE_PRESETS[marker.markerSize ?? defaultMarkerSize()]).toBeDefined();
+  });
+
+  it("marker with markerSize 'XL' persists via JSON round-trip", () => {
+    const marker = makeMarker({ markerSize: "XL" });
+    const config = makeConfig([marker]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedMarker = parsed!.elements[0] as MarkerElement;
+    expect(parsedMarker.markerSize).toBe("XL");
+  });
+
+  it("marker with markerSize 'S' persists via JSON round-trip", () => {
+    const marker = makeMarker({ markerSize: "S" });
+    const config = makeConfig([marker]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedMarker = parsed!.elements[0] as MarkerElement;
+    expect(parsedMarker.markerSize).toBe("S");
+  });
+});
+
+// ── Marker + zone color controls ──────────────────────────────────────────────
+
+describe("Marker color controls", () => {
+  it("marker backgroundColor persists via JSON round-trip", () => {
+    const marker = makeMarker({ backgroundColor: "#1a2b3c" });
+    const config = makeConfig([marker]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedMarker = parsed!.elements[0] as MarkerElement;
+    expect(parsedMarker.backgroundColor).toBe("#1a2b3c");
+  });
+
+  it("marker textColor persists via JSON round-trip", () => {
+    const marker = makeMarker({ textColor: "#ffdd00" });
+    const config = makeConfig([marker]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedMarker = parsed!.elements[0] as MarkerElement;
+    expect(parsedMarker.textColor).toBe("#ffdd00");
+  });
+
+  it("marker with no color fields (legacy) parses without error", () => {
+    const marker = makeMarker();
+    expect(marker.backgroundColor).toBeUndefined();
+    expect(marker.textColor).toBeUndefined();
+    expect(validateAnlageplanConfig(makeConfig([marker]))).toBeNull();
+  });
+
+  it("zone backgroundColor persists via JSON round-trip", () => {
+    const zone = makeZone({ backgroundColor: "#0a1828" });
+    const config = makeConfig([zone]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedZone = parsed!.elements[0] as ResourceZoneElement;
+    expect(parsedZone.backgroundColor).toBe("#0a1828");
+  });
+
+  it("zone textColor persists via JSON round-trip", () => {
+    const zone = makeZone({ textColor: "#ffffff" });
+    const config = makeConfig([zone]);
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    const parsedZone = parsed!.elements[0] as ResourceZoneElement;
+    expect(parsedZone.textColor).toBe("#ffffff");
+  });
+});
+
+// ── Display name overrides ────────────────────────────────────────────────────
+
+describe("displayNameOverrides", () => {
+  it("config without displayNameOverrides is still valid", () => {
+    const config = makeConfig([makeZone()]);
+    expect(validateAnlageplanConfig(config)).toBeNull();
+    expect(config.displayNameOverrides).toBeUndefined();
+  });
+
+  it("displayNameOverrides persists via JSON round-trip", () => {
+    const overrides = { "FC Allschwil Junioren F2": "F2 Training" };
+    const config: AnlageplanConfig = { ...makeConfig([makeZone()]), displayNameOverrides: overrides };
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    expect(parsed!.displayNameOverrides).toEqual(overrides);
+  });
+
+  it("multiple overrides persist correctly", () => {
+    const overrides: Record<string, string> = {
+      "FC Allschwil Junioren F2": "F2 Training",
+      "FC Allschwil 2. Mannschaft": "Zweite",
+      "Torwart Training": "Torwarttraining",
+    };
+    const config: AnlageplanConfig = { ...makeConfig(), displayNameOverrides: overrides };
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    expect(parsed!.displayNameOverrides!["FC Allschwil Junioren F2"]).toBe("F2 Training");
+    expect(parsed!.displayNameOverrides!["FC Allschwil 2. Mannschaft"]).toBe("Zweite");
+    expect(parsed!.displayNameOverrides!["Torwart Training"]).toBe("Torwarttraining");
+  });
+
+  it("canonical team name is not mutated — only override stored in config", () => {
+    // The team's canonical name stays unchanged; only the board-level config changes
+    const canonicalName = "FC Allschwil Junioren F2";
+    const override = "F2 Training";
+    const overrides: Record<string, string> = { [canonicalName]: override };
+    const config: AnlageplanConfig = { ...makeConfig(), displayNameOverrides: overrides };
+    // Override resolves correctly
+    expect(config.displayNameOverrides![canonicalName]).toBe(override);
+    // Canonical key is preserved (not renamed)
+    expect(Object.keys(config.displayNameOverrides!)[0]).toBe(canonicalName);
+  });
+
+  it("empty string override is stored but should be treated as 'no override' by renderer", () => {
+    const overrides: Record<string, string> = { "FC Allschwil F3": "" };
+    const config: AnlageplanConfig = { ...makeConfig(), displayNameOverrides: overrides };
+    const parsed = parseAnlageplanJson(JSON.stringify(config));
+    // Empty override stored — renderer checks trim().length > 0
+    expect(parsed!.displayNameOverrides!["FC Allschwil F3"]).toBe("");
+  });
+
+  it("override scoped to this board does not affect other boards (separate configs)", () => {
+    const overridesA: Record<string, string> = { "FC Allschwil Junioren F2": "F2 Training" };
+    const overridesB: Record<string, string> = { "FC Allschwil Junioren F2": "Junioren F2" };
+    const configA: AnlageplanConfig = { ...makeConfig(), displayNameOverrides: overridesA };
+    const configB: AnlageplanConfig = { ...makeConfig(), displayNameOverrides: overridesB };
+    expect(configA.displayNameOverrides!["FC Allschwil Junioren F2"]).toBe("F2 Training");
+    expect(configB.displayNameOverrides!["FC Allschwil Junioren F2"]).toBe("Junioren F2");
   });
 });
 

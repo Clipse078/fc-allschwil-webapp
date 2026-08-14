@@ -1,15 +1,21 @@
 /**
  * components/infoboard/anlageplan/AnlageplanMapElements.tsx
  *
- * INFOBOARD-MAP-02-C1 — Shared canonical map element rendering components.
+ * INFOBOARD-MAP-02-C3 — Shared canonical map element rendering components.
  *
  * Exports:
  *   PremiumResourceCard   — activity card anchored to a resource zone
  *   NextActivityRow       — compact row for the NÄCHSTE AKTIVITÄTEN rail
- *   FacilityMarker        — compact icon+label pill for facility amenities
- *   DuBistHierMarker      — highlighted "Du bist hier" locator
+ *   FacilityMarker        — icon+label pill for facility amenities (S/M/L/XL)
+ *   DuBistHierMarker      — highlighted "Du bist hier" locator (S/M/L/XL)
  *   fmtTime               — locale time formatter
  *   activityTypeTokens    — visual token resolver for TRAINING/MATCH/TOURNAMENT
+ *
+ * Visual hierarchy on TV displays (from most to least dominant):
+ *   1. team/event name (large, high-contrast, no truncation)
+ *   2. pitch/resource label + activity-type badge
+ *   3. time
+ *   4. supporting metadata (dressing room, etc.)
  *
  * These components are used by:
  *   InfoboardAnlageplan (public kiosk, with live PitchOccupancy)
@@ -25,7 +31,7 @@
 import type { ReactElement } from "react";
 import type { PitchOccupancy, PitchEventSummary } from "@/lib/publishing/event-types";
 import type { ResourceZoneElement, MarkerElement } from "@/lib/infoboard/anlageplan-types";
-import { MARKER_ICONS } from "@/lib/infoboard/anlageplan-types";
+import { MARKER_ICONS, MARKER_SIZE_PRESETS, defaultMarkerSize } from "@/lib/infoboard/anlageplan-types";
 
 // ── Time formatting ───────────────────────────────────────────────────────────
 
@@ -54,16 +60,16 @@ export function activityTypeTokens(type: string, isCurrent: boolean): ActivityTy
       return {
         label: "SPIEL",
         accentColor: isCurrent ? "#f87171" : "#ef4444",
-        accentBg: isCurrent ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)",
-        badgeBg: "rgba(239,68,68,0.20)",
+        accentBg: isCurrent ? "rgba(239,68,68,0.18)" : "rgba(239,68,68,0.08)",
+        badgeBg: "rgba(239,68,68,0.25)",
         badgeColor: "#fca5a5",
       };
     case "TOURNAMENT":
       return {
         label: "TURNIER",
         accentColor: isCurrent ? "#fbbf24" : "#f59e0b",
-        accentBg: isCurrent ? "rgba(245,158,11,0.12)" : "rgba(245,158,11,0.06)",
-        badgeBg: "rgba(245,158,11,0.20)",
+        accentBg: isCurrent ? "rgba(245,158,11,0.18)" : "rgba(245,158,11,0.08)",
+        badgeBg: "rgba(245,158,11,0.25)",
         badgeColor: "#fde68a",
       };
     case "TRAINING":
@@ -71,28 +77,57 @@ export function activityTypeTokens(type: string, isCurrent: boolean): ActivityTy
       return {
         label: "TRAINING",
         accentColor: isCurrent ? "#60a5fa" : "#3b82f6",
-        accentBg: isCurrent ? "rgba(59,130,246,0.12)" : "rgba(59,130,246,0.06)",
-        badgeBg: "rgba(59,130,246,0.20)",
+        accentBg: isCurrent ? "rgba(59,130,246,0.18)" : "rgba(59,130,246,0.08)",
+        badgeBg: "rgba(59,130,246,0.25)",
         badgeColor: "#93c5fd",
       };
   }
 }
 
+// ── Display name resolution helper ────────────────────────────────────────────
+
+/**
+ * Resolves the visitor-facing display name for a team/event.
+ * Checks displayNameOverrides first (keyed by canonical teamDisplayName or displayTitle),
+ * falls back to canonical name when no override is configured or override is empty.
+ */
+function resolveDisplayName(
+  canonical: string,
+  displayNameOverrides?: Record<string, string> | null,
+): string {
+  if (displayNameOverrides && canonical) {
+    const override = displayNameOverrides[canonical];
+    if (override && override.trim().length > 0) return override.trim();
+  }
+  return canonical;
+}
+
 // ── PremiumResourceCard ───────────────────────────────────────────────────────
 
 /**
- * Compact dark operational card anchored to a resource zone.
- * Shows current or next activity (or FREI state when occupancy is null).
+ * Dominant operational card anchored to a resource zone.
+ *
+ * Visual priority:
+ *   1. team/event name — largest, highest contrast, no aggressive truncation
+ *   2. pitch label + activity-type badge
+ *   3. time range
+ *   4. dressing room (subtlest)
+ *
+ * Current events visually outrank free-resource cards.
+ * Supports zone.backgroundColor / zone.textColor overrides.
+ * Supports displayNameOverrides for team name presentation.
  * PUBLIC: never shows editor geometry.
  */
 export function PremiumResourceCard({
   zone,
   occupancy,
   tz,
+  displayNameOverrides,
 }: {
   zone: ResourceZoneElement;
   occupancy: PitchOccupancy | null;
   tz: string;
+  displayNameOverrides?: Record<string, string> | null;
 }): ReactElement {
   const hasCurrent = occupancy?.currentEvent != null;
   const hasNext = zone.showNextActivity && occupancy?.nextEvent != null && !hasCurrent;
@@ -100,6 +135,9 @@ export function PremiumResourceCard({
 
   const activeEvent = occupancy?.currentEvent ?? occupancy?.nextEvent;
   const isCurrent = hasCurrent;
+
+  const customBg = zone.backgroundColor?.trim() || null;
+  const customText = zone.textColor?.trim() || null;
 
   if (isFree) {
     return (
@@ -120,42 +158,44 @@ export function PremiumResourceCard({
       >
         <div
           style={{
-            background: "rgba(10,16,28,0.55)",
-            backdropFilter: "blur(4px)",
-            borderRadius: "clamp(3px, 0.4vh, 6px)",
-            padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px)",
+            background: customBg ?? "rgba(10,16,28,0.72)",
+            backdropFilter: customBg ? undefined : "blur(6px)",
+            borderRadius: "clamp(5px, 0.6vh, 10px)",
+            padding: "clamp(5px, 0.65vh, 9px) clamp(8px, 1.0vw, 16px)",
             display: "flex",
             alignItems: "center",
-            gap: "clamp(2px, 0.3vw, 5px)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            gap: "clamp(4px, 0.5vw, 8px)",
+            border: customBg ? `1px solid ${customBg}` : "1px solid rgba(74,222,128,0.18)",
           }}
         >
           <span
             style={{
-              width: "clamp(4px, 0.5vh, 6px)",
-              height: "clamp(4px, 0.5vh, 6px)",
+              width: "clamp(6px, 0.8vh, 10px)",
+              height: "clamp(6px, 0.8vh, 10px)",
               borderRadius: "50%",
-              background: "rgba(74,222,128,0.5)",
+              background: customText ?? "rgba(74,222,128,0.60)",
               flexShrink: 0,
             }}
           />
           <span
             style={{
-              fontSize: "clamp(5px, 0.65vh, 9px)",
-              fontWeight: 600,
-              letterSpacing: "0.14em",
-              color: "rgba(74,222,128,0.65)",
+              fontSize: "clamp(9px, 1.1vh, 15px)",
+              fontWeight: 700,
+              letterSpacing: "0.12em",
+              color: customText ?? "rgba(74,222,128,0.80)",
               textTransform: "uppercase",
+              whiteSpace: "nowrap",
             }}
           >
             {zone.label ?? zone.resourceCode ?? "FREI"}
           </span>
           <span
             style={{
-              fontSize: "clamp(4px, 0.55vh, 7px)",
-              letterSpacing: "0.12em",
-              color: "rgba(74,222,128,0.40)",
+              fontSize: "clamp(8px, 1.0vh, 13px)",
+              letterSpacing: "0.10em",
+              color: customText ? `${customText}99` : "rgba(74,222,128,0.50)",
               textTransform: "uppercase",
+              fontWeight: 600,
             }}
           >
             FREI
@@ -183,6 +223,9 @@ export function PremiumResourceCard({
   const primaryDr = activeEvent.dressingRooms[0];
   const resourceDisplay = zone.label ?? zone.resourceCode ?? "";
 
+  const canonicalName = activeEvent.teamDisplayName ?? activeEvent.displayTitle;
+  const teamLabel = resolveDisplayName(canonicalName, displayNameOverrides);
+
   return (
     <div
       data-testid={`resource-card-${isCurrent ? "current" : "next"}`}
@@ -191,7 +234,7 @@ export function PremiumResourceCard({
         left: `${zone.rect.x * 100}%`,
         top: `${zone.rect.y * 100}%`,
         width: `${zone.rect.width * 100}%`,
-        minWidth: "clamp(60px, 8vw, 140px)",
+        minWidth: "clamp(80px, 10vw, 200px)",
         transform: zone.rect.rotation ? `rotate(${zone.rect.rotation}deg)` : undefined,
         transformOrigin: "top left",
         pointerEvents: "none",
@@ -200,15 +243,17 @@ export function PremiumResourceCard({
     >
       <div
         style={{
-          background: "rgba(8,14,26,0.88)",
-          backdropFilter: "blur(8px)",
-          borderRadius: "clamp(4px, 0.5vh, 8px)",
-          border: `1px solid ${tokens.accentColor}40`,
-          borderLeft: `3px solid ${tokens.accentColor}`,
+          background: customBg ?? (isCurrent ? "rgba(6,12,22,0.95)" : "rgba(8,14,26,0.88)"),
+          backdropFilter: customBg ? undefined : "blur(10px)",
+          borderRadius: "clamp(6px, 0.75vh, 12px)",
+          border: customBg
+            ? `1px solid ${customBg}`
+            : `1px solid ${tokens.accentColor}50`,
+          borderLeft: `4px solid ${tokens.accentColor}`,
           overflow: "hidden",
           boxShadow: isCurrent
-            ? `0 2px 12px ${tokens.accentColor}22`
-            : "0 1px 6px rgba(0,0,0,0.4)",
+            ? `0 3px 20px ${tokens.accentColor}30`
+            : "0 2px 10px rgba(0,0,0,0.5)",
         }}
       >
         {/* Resource name + type badge */}
@@ -217,17 +262,17 @@ export function PremiumResourceCard({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "clamp(2px, 0.35vh, 5px) clamp(4px, 0.5vw, 8px)",
-            background: "rgba(255,255,255,0.04)",
-            gap: "0.4vw",
+            padding: "clamp(4px, 0.55vh, 8px) clamp(6px, 0.8vw, 12px)",
+            background: customBg ? "rgba(0,0,0,0.20)" : "rgba(255,255,255,0.05)",
+            gap: "0.5vw",
           }}
         >
           <span
             style={{
-              fontSize: "clamp(6px, 0.8vh, 11px)",
-              fontWeight: 700,
+              fontSize: "clamp(9px, 1.15vh, 16px)",
+              fontWeight: 800,
               letterSpacing: "0.10em",
-              color: "rgba(255,255,255,0.85)",
+              color: customText ?? "rgba(255,255,255,0.90)",
               textTransform: "uppercase",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -239,13 +284,13 @@ export function PremiumResourceCard({
           <span
             style={{
               flexShrink: 0,
-              fontSize: "clamp(4px, 0.6vh, 8px)",
+              fontSize: "clamp(6px, 0.78vh, 11px)",
               fontWeight: 700,
               letterSpacing: "0.10em",
               background: tokens.badgeBg,
               color: tokens.badgeColor,
-              borderRadius: "clamp(2px, 0.3vh, 4px)",
-              padding: "1px clamp(2px, 0.3vw, 5px)",
+              borderRadius: "clamp(2px, 0.3vh, 5px)",
+              padding: "2px clamp(3px, 0.4vw, 6px)",
               textTransform: "uppercase",
             }}
           >
@@ -253,47 +298,56 @@ export function PremiumResourceCard({
           </span>
         </div>
 
-        {/* Team name + time + dressing room */}
+        {/* Team name — DOMINANT */}
         <div
           style={{
-            padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px) 0",
+            padding: "clamp(5px, 0.65vh, 9px) clamp(6px, 0.8vw, 12px) 0",
           }}
         >
           <div
             style={{
-              fontSize: "clamp(7px, 0.95vh, 13px)",
-              fontWeight: isCurrent ? 700 : 500,
-              color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.70)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.02em",
+              fontSize: "clamp(11px, 1.45vh, 20px)",
+              fontWeight: isCurrent ? 800 : 600,
+              color: customText ?? (isCurrent ? "#ffffff" : "rgba(255,255,255,0.75)"),
+              overflowWrap: "break-word",
+              wordBreak: "break-word",
+              lineHeight: 1.2,
+              letterSpacing: "0.01em",
             }}
           >
-            {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
+            {teamLabel}
           </div>
+
+          {/* Time */}
           <div
             style={{
-              fontSize: "clamp(5px, 0.72vh, 10px)",
-              color: "rgba(255,255,255,0.55)",
-              marginTop: "clamp(1px, 0.15vh, 2px)",
+              fontSize: "clamp(8px, 1.05vh, 14px)",
+              color: customText ? `${customText}bb` : "rgba(255,255,255,0.65)",
+              marginTop: "clamp(2px, 0.25vh, 4px)",
               fontWeight: 600,
-              letterSpacing: "0.04em",
+              letterSpacing: "0.05em",
+              fontVariantNumeric: "tabular-nums",
             }}
           >
             {startTime}{endTime ? `–${endTime}` : ""}
           </div>
+
+          {/* Dressing room (subtlest) */}
           {primaryDr && (
             <div
               style={{
-                fontSize: "clamp(4px, 0.6vh, 8px)",
-                color: "rgba(255,255,255,0.35)",
-                marginTop: "clamp(1px, 0.12vh, 2px)",
-                paddingBottom: "clamp(2px, 0.3vh, 4px)",
+                fontSize: "clamp(6px, 0.78vh, 10px)",
+                color: customText ? `${customText}77` : "rgba(255,255,255,0.38)",
+                marginTop: "clamp(1px, 0.15vh, 3px)",
+                paddingBottom: "clamp(4px, 0.55vh, 7px)",
+                letterSpacing: "0.03em",
               }}
             >
               {primaryDr.displayLabel}
             </div>
+          )}
+          {!primaryDr && (
+            <div style={{ paddingBottom: "clamp(4px, 0.55vh, 7px)" }} />
           )}
         </div>
       </div>
@@ -303,17 +357,26 @@ export function PremiumResourceCard({
 
 // ── NextActivityRow (right-side activity rail) ────────────────────────────────
 
+/**
+ * Readable next-activity rail row — designed for 25–30% width panel.
+ * Visual priority: time → team name → pitch resource.
+ * Prefer 2–4 highly readable items over 5 tiny ones.
+ */
 export function NextActivityRow({
   event,
   resourceLabel,
   tz,
+  displayNameOverrides,
 }: {
   event: PitchEventSummary;
   resourceLabel: string;
   tz: string;
+  displayNameOverrides?: Record<string, string> | null;
 }): ReactElement {
   const tokens = activityTypeTokens(event.type, false);
   const startTime = fmtTime(event.startAt, tz);
+  const canonicalName = event.teamDisplayName ?? event.displayTitle;
+  const teamLabel = resolveDisplayName(canonicalName, displayNameOverrides);
 
   return (
     <div
@@ -321,43 +384,45 @@ export function NextActivityRow({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "clamp(1px, 0.15vh, 2px)",
-        padding: "clamp(3px, 0.4vh, 6px) clamp(4px, 0.5vw, 8px)",
-        borderRadius: "clamp(3px, 0.4vh, 6px)",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderLeft: `2px solid ${tokens.accentColor}`,
+        gap: "clamp(2px, 0.25vh, 4px)",
+        padding: "clamp(6px, 0.8vh, 11px) clamp(8px, 1.0vw, 14px)",
+        borderRadius: "clamp(5px, 0.65vh, 10px)",
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.09)",
+        borderLeft: `3px solid ${tokens.accentColor}`,
         overflow: "hidden",
         flexShrink: 0,
       }}
     >
+      {/* Time + badge row */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "0.4vw",
+          gap: "0.5vw",
         }}
       >
         <span
           style={{
-            fontSize: "clamp(7px, 0.9vh, 12px)",
-            fontWeight: 700,
+            fontSize: "clamp(10px, 1.3vh, 18px)",
+            fontWeight: 800,
             color: "#ffffff",
-            letterSpacing: "0.02em",
+            letterSpacing: "0.03em",
+            fontVariantNumeric: "tabular-nums",
           }}
         >
           {startTime}
         </span>
         <span
           style={{
-            fontSize: "clamp(4px, 0.6vh, 8px)",
+            fontSize: "clamp(6px, 0.78vh, 10px)",
             fontWeight: 700,
             letterSpacing: "0.10em",
             background: tokens.badgeBg,
             color: tokens.badgeColor,
-            borderRadius: "clamp(2px, 0.3vh, 4px)",
-            padding: "1px clamp(2px, 0.25vw, 4px)",
+            borderRadius: "clamp(2px, 0.3vh, 5px)",
+            padding: "2px clamp(3px, 0.35vw, 5px)",
             textTransform: "uppercase",
             flexShrink: 0,
           }}
@@ -365,23 +430,28 @@ export function NextActivityRow({
           {tokens.label}
         </span>
       </div>
+
+      {/* Team name — dominant */}
       <div
         style={{
-          fontSize: "clamp(7px, 0.88vh, 12px)",
-          fontWeight: 600,
-          color: "rgba(255,255,255,0.85)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          fontSize: "clamp(10px, 1.3vh, 18px)",
+          fontWeight: 700,
+          color: "rgba(255,255,255,0.95)",
+          overflowWrap: "break-word",
+          wordBreak: "break-word",
+          lineHeight: 1.2,
         }}
       >
-        {event.teamDisplayName ?? event.displayTitle}
+        {teamLabel}
       </div>
+
+      {/* Pitch resource */}
       <div
         style={{
-          fontSize: "clamp(5px, 0.65vh, 9px)",
-          color: "rgba(255,255,255,0.40)",
+          fontSize: "clamp(7px, 0.9vh, 12px)",
+          color: "rgba(255,255,255,0.50)",
           letterSpacing: "0.06em",
+          fontWeight: 500,
         }}
       >
         {resourceLabel}
@@ -393,9 +463,14 @@ export function NextActivityRow({
 // ── FacilityMarker ────────────────────────────────────────────────────────────
 
 export function FacilityMarker({ marker }: { marker: MarkerElement }): ReactElement {
+  const size = MARKER_SIZE_PRESETS[marker.markerSize ?? defaultMarkerSize()];
+  const customBg = marker.backgroundColor?.trim() || null;
+  const customText = marker.textColor?.trim() || null;
+
   return (
     <div
       data-testid="facility-marker"
+      data-marker-size={marker.markerSize ?? defaultMarkerSize()}
       style={{
         position: "absolute",
         left: `${marker.rect.x * 100}%`,
@@ -413,27 +488,29 @@ export function FacilityMarker({ marker }: { marker: MarkerElement }): ReactElem
     >
       <div
         style={{
-          background: "rgba(8,14,26,0.80)",
-          backdropFilter: "blur(6px)",
-          borderRadius: "clamp(3px, 0.4vh, 7px)",
-          padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px)",
+          background: customBg ?? "rgba(8,14,26,0.82)",
+          backdropFilter: customBg ? undefined : "blur(6px)",
+          borderRadius: size.borderRadiusVh,
+          padding: `${size.paddingVh} ${size.paddingVw}`,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          border: "1px solid rgba(255,255,255,0.10)",
-          gap: "1px",
+          border: customBg
+            ? `1px solid ${customBg}`
+            : "1px solid rgba(255,255,255,0.12)",
+          gap: size.gap,
           maxWidth: "100%",
         }}
       >
-        <span style={{ fontSize: "clamp(8px, 1.1vh, 16px)", lineHeight: 1 }}>
+        <span style={{ fontSize: size.iconVh, lineHeight: 1 }}>
           {MARKER_ICONS[marker.markerType]}
         </span>
         {marker.label && (
           <span
             style={{
-              fontSize: "clamp(5px, 0.65vh, 9px)",
-              color: "rgba(255,255,255,0.75)",
-              fontWeight: 600,
+              fontSize: size.labelVh,
+              color: customText ?? "rgba(255,255,255,0.80)",
+              fontWeight: 700,
               letterSpacing: "0.06em",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -453,9 +530,14 @@ export function FacilityMarker({ marker }: { marker: MarkerElement }): ReactElem
 // ── DuBistHierMarker ──────────────────────────────────────────────────────────
 
 export function DuBistHierMarker({ marker }: { marker: MarkerElement }): ReactElement {
+  const size = MARKER_SIZE_PRESETS[marker.markerSize ?? defaultMarkerSize()];
+  const customBg = marker.backgroundColor?.trim() || null;
+  const customText = marker.textColor?.trim() || null;
+
   return (
     <div
       data-testid="du-bist-hier-marker"
+      data-marker-size={marker.markerSize ?? defaultMarkerSize()}
       style={{
         position: "absolute",
         left: `${marker.rect.x * 100}%`,
@@ -472,23 +554,25 @@ export function DuBistHierMarker({ marker }: { marker: MarkerElement }): ReactEl
     >
       <div
         style={{
-          background: "rgba(234,179,8,0.14)",
-          borderRadius: "clamp(5px, 0.6vh, 10px)",
-          padding: "clamp(3px, 0.4vh, 6px) clamp(6px, 0.8vw, 12px)",
+          background: customBg ?? "rgba(234,179,8,0.14)",
+          borderRadius: size.borderRadiusVh,
+          padding: `${size.paddingVh} ${size.paddingVw}`,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          border: "2px solid rgba(234,179,8,0.75)",
-          gap: "2px",
+          border: customBg
+            ? `2px solid ${customBg}`
+            : "2px solid rgba(234,179,8,0.80)",
+          gap: size.gap,
         }}
       >
-        <span style={{ fontSize: "clamp(10px, 1.6vh, 22px)", lineHeight: 1 }}>📍</span>
+        <span style={{ fontSize: size.iconVh, lineHeight: 1 }}>📍</span>
         <span
           style={{
-            fontSize: "clamp(6px, 0.85vh, 11px)",
+            fontSize: size.labelVh,
             fontWeight: 800,
             letterSpacing: "0.14em",
-            color: "#eab308",
+            color: customText ?? "#eab308",
             textAlign: "center",
             whiteSpace: "nowrap",
           }}
