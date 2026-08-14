@@ -139,3 +139,45 @@ export function groupFacilityPitches(
 
   return groups;
 }
+
+// ── deriveSuppressedCodes ─────────────────────────────────────────────────────
+
+/**
+ * Returns the set of resourceCodes that should NOT be rendered by the
+ * Anlageplan overlay for the given pitch list.
+ *
+ * A code is suppressed when the canonical hierarchy rules determine that
+ * another representation of the same physical facility takes precedence:
+ *   - HALF_PITCH codes are suppressed when the facility is in "whole" mode
+ *     (Rule A — all free, or Rule B — full-pitch event).
+ *   - The FULL_PITCH code is suppressed when the facility is in "subdivisions"
+ *     mode (Rules C/D — at least one HALF_PITCH has an event).
+ *
+ * Usage (Anlageplan overlay):
+ *   const suppressedCodes = deriveSuppressedCodes(pitches);
+ *   // Skip zones whose resourceCode is in this set.
+ */
+export function deriveSuppressedCodes(
+  pitches: readonly PitchOccupancy[],
+): ReadonlySet<string> {
+  const groups = groupFacilityPitches(pitches);
+
+  const shownCodes = new Set<string>();
+  for (const g of groups) {
+    if (g.mode === "whole") {
+      shownCodes.add(g.pitch.code);
+    } else {
+      for (const item of g.items) {
+        shownCodes.add(item.code);
+      }
+    }
+  }
+
+  const suppressed = new Set<string>();
+  for (const p of pitches) {
+    if (!shownCodes.has(p.code)) {
+      suppressed.add(p.code);
+    }
+  }
+  return suppressed;
+}
