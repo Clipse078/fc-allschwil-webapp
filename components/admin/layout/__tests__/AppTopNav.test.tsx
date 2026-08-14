@@ -34,10 +34,12 @@ describe("AppTopNav", () => {
     expect(screen.queryByLabelText("Einstellungen")).not.toBeInTheDocument();
   });
 
-  it("still renders the functional user identity control", () => {
+  it("still renders the functional user identity control linking to Mein Konto", () => {
     render(<AppTopNav firstName="Michael" lastName="Duft" />);
-    expect(screen.getByLabelText("Benutzerprofil")).toBeInTheDocument();
-    expect(screen.getByLabelText("Benutzerprofil")).toHaveTextContent("MD");
+    const avatar = screen.getByLabelText("Mein Konto");
+    expect(avatar).toBeInTheDocument();
+    expect(avatar).toHaveTextContent("MD");
+    expect(avatar).toHaveAttribute("href", "/dashboard/account");
   });
 
   it("renders the German 'Start' breadcrumb for the dashboard", () => {

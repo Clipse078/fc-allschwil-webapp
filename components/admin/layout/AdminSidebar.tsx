@@ -284,7 +284,15 @@ export default function AdminSidebar({
       {/* Footer */}
       <div className="border-t border-[var(--border)] px-2 py-3 space-y-2">
         {!isCollapsed && (
-          <div className="flex items-center gap-2.5 px-2 py-1.5">
+          <Link
+            href="/dashboard/account"
+            className={cn(
+              "flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
+              "hover:bg-[var(--surface-2)]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
+            )}
+            title="Mein Konto"
+          >
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
               style={{ background: "var(--tenant-primary)" }}
@@ -298,18 +306,23 @@ export default function AdminSidebar({
               </p>
               <p className="truncate text-[0.7rem] text-[var(--muted)]">{email}</p>
             </div>
-          </div>
+          </Link>
         )}
 
         {isCollapsed && (
           <div className="flex justify-center">
-            <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white"
+            <Link
+              href="/dashboard/account"
+              className={cn(
+                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white transition-opacity hover:opacity-80",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
+              )}
               style={{ background: "var(--tenant-primary)" }}
-              title={`${firstName} ${lastName}`}
+              title="Mein Konto"
+              aria-label="Mein Konto"
             >
               {getInitials(firstName, lastName)}
-            </div>
+            </Link>
           </div>
         )}
 

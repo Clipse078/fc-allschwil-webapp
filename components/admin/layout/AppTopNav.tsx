@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Suspense } from "react";
+import Link from "next/link";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
 
 type AppTopNavProps = {
@@ -35,6 +36,7 @@ function getPageMeta(pathname: string): PageMeta {
   if (pathname.startsWith("/vereinsleitung/targets")) return { eyebrow: "Vereinsleitung", title: "Ziele" };
   if (pathname.startsWith("/vereinsleitung/templates")) return { eyebrow: "Vereinsleitung", title: "Vorlagen" };
   if (pathname.startsWith("/vereinsleitung")) return { eyebrow: "Vereinsleitung", title: "Übersicht" };
+  if (pathname.startsWith("/dashboard/account")) return { eyebrow: "Konto", title: "Mein Konto" };
   return { eyebrow: "SportClubEvo", title: "Übersicht" };
 }
 
@@ -73,15 +75,16 @@ export default function AppTopNav({ firstName, lastName }: AppTopNavProps) {
           </Suspense>
         </div>
 
-        {/* User avatar */}
-        <div
-          className="ml-1 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none"
+        {/* User avatar — links to Mein Konto */}
+        <Link
+          href="/dashboard/account"
+          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1"
           style={{ background: "var(--tenant-primary)" }}
-          title={`${firstName} ${lastName}`}
-          aria-label="Benutzerprofil"
+          title="Mein Konto"
+          aria-label="Mein Konto"
         >
           {initials}
-        </div>
+        </Link>
       </div>
     </header>
   );
