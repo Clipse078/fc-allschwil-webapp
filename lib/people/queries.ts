@@ -1,12 +1,12 @@
 /**
  * People query helpers — server-only.
  *
- * PERSONS-01/02: Extended with tenant-scoped queries, assignment data,
- * search/filter support, and duplicate awareness.
+ * PERSONS-01/02-C1: Updated to use dedicated PersonAssignment model.
+ * Person.tenantId is now NOT NULL — all queries require exact tenantId.
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { OrgUnitMembershipStatus } from "@prisma/client";
+import { PersonAssignmentStatus } from "@prisma/client";
 
 // ── Shared select shapes ──────────────────────────────────────────────────────
 
@@ -15,10 +15,8 @@ const PERSON_ASSIGNMENT_SELECT = {
   orgUnitId: true,
   teamId: true,
   seasonId: true,
-  roleKey: true,
+  functionKey: true,
   status: true,
-  startsAt: true,
-  endsAt: true,
   notes: true,
   orgUnit: { select: { id: true, name: true, key: true } },
   team: { select: { id: true, name: true, shortName: true } },
@@ -41,7 +39,7 @@ import { PERSON_FUNCTION_GROUPS } from "./functions";
 export async function getPersonsForDirectory(tenantId: string, filter: PersonListFilter = {}) {
   const { query, orgUnitId, teamId, functionKey, status, quickFilter } = filter;
 
-  // Build membership filter for quick-filter groups
+  // Build function key set for quick filters
   let functionKeys: string[] | null = null;
   if (quickFilter === "spieler") {
     functionKeys = [...PERSON_FUNCTION_GROUPS.SPIELER];
@@ -57,24 +55,17 @@ export async function getPersonsForDirectory(tenantId: string, filter: PersonLis
 
   const persons = await prisma.person.findMany({
     where: {
-      AND: [
-        {
-          OR: [
-            { tenantId },
-            { tenantId: null },
-          ],
-        },
-        ...(status === "active" ? [{ isActive: true }] : []),
-        ...(status === "inactive" ? [{ isActive: false }] : []),
-        ...(query ? [{
-          OR: [
-            { firstName: { contains: query, mode: "insensitive" as const } },
-            { lastName: { contains: query, mode: "insensitive" as const } },
-            { email: { contains: query, mode: "insensitive" as const } },
-            { displayName: { contains: query, mode: "insensitive" as const } },
-          ],
-        }] : []),
-      ],
+      tenantId, // strict tenant isolation — no null fallback
+      ...(status === "active" ? { isActive: true } : {}),
+      ...(status === "inactive" ? { isActive: false } : {}),
+      ...(query ? {
+        OR: [
+          { firstName: { contains: query, mode: "insensitive" as const } },
+          { lastName: { contains: query, mode: "insensitive" as const } },
+          { email: { contains: query, mode: "insensitive" as const } },
+          { displayName: { contains: query, mode: "insensitive" as const } },
+        ],
+      } : {}),
     },
     orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
     select: {
@@ -88,28 +79,26 @@ export async function getPersonsForDirectory(tenantId: string, filter: PersonLis
       isActive: true,
       isPlayer: true,
       isTrainer: true,
-      orgUnitMemberships: {
+      personAssignments: {
         where: {
-          personId: { not: null },
-          status: OrgUnitMembershipStatus.ACTIVE,
+          tenantId,
+          status: PersonAssignmentStatus.ACTIVE,
           ...(orgUnitId ? { orgUnitId } : {}),
           ...(teamId ? { teamId } : {}),
-          ...(functionKeys ? { roleKey: { in: functionKeys } } : {}),
+          ...(functionKeys ? { functionKey: { in: functionKeys } } : {}),
         },
         select: PERSON_ASSIGNMENT_SELECT,
       },
     },
   });
 
-  // If any of these scoped filters are active, only return persons that have
-  // at least one matching assignment. For quickFilter "ohne_zuordnung" we
-  // want persons with NO active person assignments.
+  // Post-filter: when scoped filters are active, only include persons with matching assignments
   const filtered = persons.filter((p) => {
     if (quickFilter === "ohne_zuordnung") {
-      return p.orgUnitMemberships.length === 0;
+      return p.personAssignments.length === 0;
     }
     if (orgUnitId || teamId || functionKeys) {
-      return p.orgUnitMemberships.length > 0;
+      return p.personAssignments.length > 0;
     }
     return true;
   });
@@ -125,11 +114,11 @@ export async function getPersonsForDirectory(tenantId: string, filter: PersonLis
     isActive: p.isActive,
     isPlayer: p.isPlayer,
     isTrainer: p.isTrainer,
-    assignments: p.orgUnitMemberships,
+    assignments: p.personAssignments,
   }));
 }
 
-// ── Legacy (non-tenant-scoped) ─────────────────────────────────────────────
+// ── Legacy (non-tenant-scoped, for backward compat with older code) ───────────
 
 export async function getPersons() {
   const persons = await prisma.person.findMany({
@@ -181,7 +170,7 @@ export async function getPersonById(id: string) {
       tenantId: true,
       createdAt: true,
       updatedAt: true,
-      // Address fields (from registration copy)
+      // Address fields
       street: true,
       houseNumber: true,
       postalCode: true,
@@ -204,10 +193,8 @@ export async function getPersonById(id: string) {
 // ── Assignments ───────────────────────────────────────────────────────────────
 
 export async function getPersonAssignments(personId: string) {
-  return prisma.orgUnitMembership.findMany({
-    where: {
-      personId,
-    },
+  return prisma.personAssignment.findMany({
+    where: { personId },
     orderBy: [
       { status: "asc" },
       { orgUnit: { name: "asc" } },
@@ -216,14 +203,13 @@ export async function getPersonAssignments(personId: string) {
     select: {
       ...PERSON_ASSIGNMENT_SELECT,
       tenantId: true,
-      isPrimary: true,
       createdAt: true,
       updatedAt: true,
     },
   });
 }
 
-// ── OrgUnit + Team options for assignment picker ──────────────────────────────
+// ── OrgUnit + Team + Season options for pickers ───────────────────────────────
 
 export async function getOrgUnitsForTenant(tenantId: string) {
   return prisma.orgUnit.findMany({
@@ -298,14 +284,8 @@ export async function findDuplicateCandidates(
 
   const candidates = await prisma.person.findMany({
     where: {
-      AND: [
-        {
-          OR: [{ tenantId }, { tenantId: null }],
-        },
-        {
-          OR: conditions,
-        },
-      ],
+      tenantId, // strict tenant isolation
+      OR: conditions,
     },
     select: { id: true, firstName: true, lastName: true, displayName: true, email: true },
     take: 5,
@@ -322,27 +302,19 @@ export async function findDuplicateCandidates(
 
 /**
  * DASHBOARD-SHELL-UX-01-C1 — resolves the first name of the Person canonically
- * linked to a User (Person.userId, see ADMIN-MASTERDATA-UX-01), for display
- * purposes (e.g. the dashboard greeting). Returns null when the User has no
- * linked Person, or the linked Person has no usable first name. Never derives
- * a name from email, tenant, or role data.
+ * linked to a User.
  */
 export async function getPersonFirstNameByUserId(userId: string): Promise<string | null> {
   const person = await prisma.person.findUnique({
     where: { userId },
     select: { firstName: true },
   });
-
   return person?.firstName?.trim() || null;
 }
 
 /**
- * DASHBOARD-SHELL-UX-01-C2 — resolves the full name (firstName + lastName) of
- * the Person canonically linked to a User (Person.userId, see
- * ADMIN-MASTERDATA-UX-01), for display purposes (e.g. the sidebar footer
- * identity). Returns null when the User has no linked Person, or the linked
- * Person has no usable first name. Never derives a name from email, tenant,
- * or role data.
+ * DASHBOARD-SHELL-UX-01-C2 — resolves the full name of the Person canonically
+ * linked to a User.
  */
 export async function getPersonNameByUserId(
   userId: string,
@@ -351,10 +323,8 @@ export async function getPersonNameByUserId(
     where: { userId },
     select: { firstName: true, lastName: true },
   });
-
   const firstName = person?.firstName?.trim();
   if (!firstName) return null;
-
   return { firstName, lastName: person?.lastName?.trim() || "" };
 }
 

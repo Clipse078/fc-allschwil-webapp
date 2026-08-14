@@ -3,9 +3,8 @@ import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiActiveTenantId } from "@/lib/tenants/active-tenant";
-import { getPersonsForDirectory } from "@/lib/people/queries";
+import { getPersonsForDirectory, findDuplicateCandidates } from "@/lib/people/queries";
 import { logAction } from "@/lib/audit/log-action";
-import { findDuplicateCandidates } from "@/lib/people/queries";
 
 function validateDateOfBirth(raw: string): { date: Date } | { error: string } {
   const date = new Date(raw);
@@ -59,22 +58,7 @@ export async function GET(request: NextRequest) {
 
   const tenantResult = await requireApiActiveTenantId();
   if (!tenantResult.ok) {
-    // Fallback: return all persons for backward compat
-    const persons = await prisma.person.findMany({
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        displayName: true,
-        email: true,
-        phone: true,
-        isActive: true,
-        isPlayer: true,
-        isTrainer: true,
-      },
-    });
-    return NextResponse.json({ persons });
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
   }
 
   const { tenantId } = tenantResult;
@@ -101,14 +85,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  // Person creation requires a tenant context — Person.tenantId is NOT NULL
   const tenantResult = await requireApiActiveTenantId();
-  const tenantId = tenantResult.ok ? tenantResult.tenantId : null;
+  if (!tenantResult.ok) {
+    return NextResponse.json(
+      { error: "Person kann nur im Kontext eines Vereins erstellt werden." },
+      { status: 403 },
+    );
+  }
+  const { tenantId } = tenantResult;
 
   try {
     const body = await request.json().catch(() => ({})) as Record<string, unknown>;
 
-    // Duplicate check request (does not create, just returns candidates)
-    if (body.__checkDuplicates === true && tenantId) {
+    // Duplicate check request (advisory, does not create)
+    if (body.__checkDuplicates === true) {
       const firstName = String(body.firstName ?? "").trim();
       const lastName = String(body.lastName ?? "").trim();
       const email = String(body.email ?? "").trim() || null;

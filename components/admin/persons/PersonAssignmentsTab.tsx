@@ -43,7 +43,7 @@ function AssignmentRow({
   onDelete: (a: PersonAssignment) => void;
   onEdit: (a: PersonAssignment) => void;
 }) {
-  const fn = getPersonFunctionLabel(assignment.roleKey);
+  const fn = getPersonFunctionLabel(assignment.functionKey);
 
   return (
     <div className="group flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 transition hover:bg-[var(--surface-2)]">
@@ -57,7 +57,7 @@ function AssignmentRow({
             {assignment.team?.name ?? assignment.orgUnit?.name ?? "—"}
           </span>
           <span className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--sce-primary)]">
-            {fn || assignment.roleKey || "—"}
+            {fn || assignment.functionKey || "—"}
           </span>
           <AssignmentStatusBadge status={assignment.status} />
         </div>
@@ -149,7 +149,7 @@ export default function PersonAssignmentsTab({
 
   function openEdit(a: PersonAssignment) {
     setEditTarget(a);
-    setEditFunctionKey(a.roleKey ?? "");
+    setEditFunctionKey(a.functionKey ?? "");
     setEditNotes(a.notes ?? "");
     setEditError(null);
   }

@@ -19,7 +19,7 @@ function formatDate(date: Date | string): string {
 }
 
 function AssignmentCard({ assignment }: { assignment: PersonAssignment }) {
-  const fn = getPersonFunctionLabel(assignment.roleKey);
+  const fn = getPersonFunctionLabel(assignment.functionKey);
   return (
     <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
       <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--sce-accent)] text-[var(--sce-primary)]">
@@ -35,7 +35,7 @@ function AssignmentCard({ assignment }: { assignment: PersonAssignment }) {
             {assignment.team?.name ?? assignment.orgUnit?.name ?? "—"}
           </span>
           <span className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--sce-primary)]">
-            {fn || assignment.roleKey || "—"}
+            {fn || assignment.functionKey || "—"}
           </span>
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">

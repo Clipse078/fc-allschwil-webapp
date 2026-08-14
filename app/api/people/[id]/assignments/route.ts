@@ -2,15 +2,19 @@
  * PERSONS-02: Person assignment management API.
  *
  * GET  /api/people/[id]/assignments  — list all assignments for a person
- * POST /api/people/[id]/assignments  — add a new assignment
+ * POST /api/people/[id]/assignments  — add a new PersonAssignment
  *
- * PersonAssignments are stored as OrgUnitMembership rows with personId set.
- * The roleKey field holds the PersonFunction key (e.g. "SPIELER", "TRAINER").
- * These are NOT validated against the Role table — they are organisational
- * function labels, not RPERM authorization roles.
+ * PersonAssignments use a DEDICATED PersonAssignment model — NOT OrgUnitMembership.
+ * This ensures zero structural contamination of the org-unit visibility path
+ * (loadOrgUnitIds / canAccessOrgUnit / canSeeEntity).
  *
- * CRITICAL: Creating an assignment does NOT grant any RPERM permissions.
- * "Trainer/in" assignment ≠ authorization role.
+ * CRITICAL ARCHITECTURAL INVARIANT:
+ * Creating a PersonAssignment does NOT:
+ * - create or modify UserRole
+ * - create or modify TenantMembership
+ * - grant RPERM permissions
+ * - affect loadOrgUnitIds / canAccessOrgUnit
+ * Assigning "Trainer/in" does not give the linked User any access rights.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,10 +25,20 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiActiveTenantId } from "@/lib/tenants/active-tenant";
 import { logAction } from "@/lib/audit/log-action";
 import { getPersonAssignments } from "@/lib/people/queries";
-import { OrgUnitMembershipStatus } from "@prisma/client";
+import { PersonAssignmentStatus } from "@prisma/client";
 import { isPersonFunctionKey } from "@/lib/people/functions";
 
 type RouteContext = { params: Promise<{ id: string }> };
+
+/** Resolve person + enforce strict tenant isolation. */
+async function resolveTenantPerson(personId: string, tenantId: string) {
+  const person = await prisma.person.findUnique({
+    where: { id: personId },
+    select: { id: true, tenantId: true },
+  });
+  if (!person || person.tenantId !== tenantId) return null;
+  return person;
+}
 
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiAnyPermission([
@@ -35,18 +49,14 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const { id } = await params;
-
-  const person = await prisma.person.findUnique({
-    where: { id },
-    select: { id: true, tenantId: true },
-  });
-  if (!person) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
+  const tenantResult = await requireApiActiveTenantId();
+  if (!tenantResult.ok) {
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
   }
 
-  const tenantResult = await requireApiActiveTenantId();
-  if (tenantResult.ok && person.tenantId && person.tenantId !== tenantResult.tenantId) {
+  const { id } = await params;
+  const person = await resolveTenantPerson(id, tenantResult.tenantId);
+  if (!person) {
     return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
   }
 
@@ -67,17 +77,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   const { tenantId } = tenantResult;
 
   const { id: personId } = await params;
-
-  const person = await prisma.person.findUnique({
-    where: { id: personId },
-    select: { id: true, tenantId: true },
-  });
+  const person = await resolveTenantPerson(personId, tenantId);
   if (!person) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
-  }
-
-  // Tenant isolation on person
-  if (person.tenantId && person.tenantId !== tenantId) {
     return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
   }
 
@@ -99,27 +100,27 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Ungültige Funktion." }, { status: 400 });
   }
 
-  // Verify OrgUnit belongs to this tenant
+  // Verify OrgUnit belongs to this tenant (strict)
   const orgUnit = await prisma.orgUnit.findUnique({
     where: { id: orgUnitId },
     select: { id: true, tenantId: true, name: true },
   });
-  if (!orgUnit || (orgUnit.tenantId && orgUnit.tenantId !== tenantId)) {
+  if (!orgUnit || (orgUnit.tenantId !== null && orgUnit.tenantId !== tenantId)) {
     return NextResponse.json({ error: "Organisationseinheit nicht gefunden." }, { status: 404 });
   }
 
-  // Verify Team belongs to this tenant (if provided)
+  // Verify Team belongs to this tenant (strict)
   if (teamId) {
     const team = await prisma.team.findUnique({
       where: { id: teamId },
       select: { id: true, tenantId: true },
     });
-    if (!team || (team.tenantId && team.tenantId !== tenantId)) {
+    if (!team || (team.tenantId !== null && team.tenantId !== tenantId)) {
       return NextResponse.json({ error: "Team nicht gefunden." }, { status: 404 });
     }
   }
 
-  // Verify Season exists (if provided)
+  // Verify Season exists
   if (seasonId) {
     const season = await prisma.season.findUnique({
       where: { id: seasonId },
@@ -130,15 +131,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     }
   }
 
-  // Duplicate prevention: same person + orgUnit + team + function + season
-  const existingDuplicate = await prisma.orgUnitMembership.findFirst({
+  // Exact duplicate prevention: same person + orgUnit + team + function + season + ACTIVE
+  const existingDuplicate = await prisma.personAssignment.findFirst({
     where: {
       personId,
       orgUnitId,
       teamId: teamId ?? null,
-      roleKey: functionKey,
+      functionKey,
       seasonId: seasonId ?? null,
-      status: OrgUnitMembershipStatus.ACTIVE,
+      status: PersonAssignmentStatus.ACTIVE,
     },
     select: { id: true },
   });
@@ -150,15 +151,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   }
 
   try {
-    const assignment = await prisma.orgUnitMembership.create({
+    const assignment = await prisma.personAssignment.create({
       data: {
         tenantId,
-        orgUnitId,
         personId,
+        orgUnitId,
         teamId,
         seasonId,
-        roleKey: functionKey,
-        status: OrgUnitMembershipStatus.ACTIVE,
+        functionKey,
+        status: PersonAssignmentStatus.ACTIVE,
         notes,
       },
       select: {
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         orgUnitId: true,
         teamId: true,
         seasonId: true,
-        roleKey: true,
+        functionKey: true,
         status: true,
         orgUnit: { select: { id: true, name: true, key: true } },
         team: { select: { id: true, name: true, shortName: true } },
@@ -180,7 +181,15 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       entityType: "PersonAssignment",
       entityId: assignment.id,
       action: "assignment_created",
-      afterJson: { personId, orgUnitId, teamId, functionKey, seasonId },
+      afterJson: {
+        personId,
+        orgUnitId,
+        teamId,
+        functionKey,
+        seasonId,
+        // Confirm invariant: no auth side-effect
+        authSideEffect: "none",
+      },
     });
 
     return NextResponse.json({ assignment }, { status: 201 });

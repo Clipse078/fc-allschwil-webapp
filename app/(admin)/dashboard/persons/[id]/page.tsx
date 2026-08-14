@@ -66,8 +66,8 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const activeFunctions = [
     ...new Set(
       assignments
-        .filter((a) => a.status === "ACTIVE" && a.roleKey)
-        .map((a) => getPersonFunctionLabel(a.roleKey)),
+        .filter((a) => a.status === "ACTIVE" && a.functionKey)
+        .map((a) => getPersonFunctionLabel(a.functionKey)),
     ),
   ].slice(0, 3);
 

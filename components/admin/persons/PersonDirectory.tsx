@@ -59,7 +59,7 @@ function matchesQuickFilter(person: PersonDirectoryItem, filter: QuickFilter): b
   }
   const keys = FUNCTION_GROUPS[filter] ?? [];
   return person.assignments.some(
-    (a) => a.status === "ACTIVE" && a.roleKey && keys.includes(a.roleKey),
+    (a) => a.status === "ACTIVE" && a.functionKey && keys.includes(a.functionKey),
   );
 }
 
@@ -350,8 +350,8 @@ export default function PersonDirectory({
             const functions = [
               ...new Set(
                 activeAssignments
-                  .filter((a) => a.roleKey)
-                  .map((a) => getPersonFunctionLabel(a.roleKey)),
+                  .filter((a) => a.functionKey)
+                  .map((a) => getPersonFunctionLabel(a.functionKey)),
               ),
             ];
             const teamTags = activeAssignments

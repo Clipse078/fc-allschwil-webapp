@@ -23,6 +23,17 @@ function validateDateOfBirth(raw: string): { date: Date } | { error: string } {
   return { date };
 }
 
+/** Resolve a Person by id, enforcing strict tenant isolation. */
+async function resolveTenantPerson(id: string, tenantId: string) {
+  const person = await prisma.person.findUnique({
+    where: { id },
+    select: { id: true, tenantId: true, firstName: true, lastName: true, userId: true },
+  });
+  if (!person) return null;
+  if (person.tenantId !== tenantId) return null; // strict — no null fallback
+  return person;
+}
+
 export async function GET(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiAnyPermission([
     PERMISSIONS.PEOPLE_VIEW,
@@ -32,7 +43,17 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantResult = await requireApiActiveTenantId();
+  if (!tenantResult.ok) {
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
+  }
+
   const { id } = await params;
+  const check = await resolveTenantPerson(id, tenantResult.tenantId);
+  if (!check) {
+    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
+  }
+
   const person = await prisma.person.findUnique({
     where: { id },
     select: {
@@ -56,16 +77,6 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
     },
   });
 
-  if (!person) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
-  }
-
-  // Tenant isolation: reject if person belongs to a different tenant
-  const tenantResult = await requireApiActiveTenantId();
-  if (tenantResult.ok && person.tenantId && person.tenantId !== tenantResult.tenantId) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
-  }
-
   return NextResponse.json({ person });
 }
 
@@ -75,19 +86,14 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const { id } = await params;
-
-  const existing = await prisma.person.findUnique({
-    where: { id },
-    select: { id: true, tenantId: true, firstName: true, lastName: true, email: true },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
+  const tenantResult = await requireApiActiveTenantId();
+  if (!tenantResult.ok) {
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
   }
 
-  // Tenant isolation
-  const tenantResult = await requireApiActiveTenantId();
-  if (tenantResult.ok && existing.tenantId && existing.tenantId !== tenantResult.tenantId) {
+  const { id } = await params;
+  const existing = await resolveTenantPerson(id, tenantResult.tenantId);
+  if (!existing) {
     return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
   }
 
@@ -156,7 +162,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       entityType: "Person",
       entityId: person.id,
       action: "updated",
-      beforeJson: { firstName: existing.firstName, lastName: existing.lastName, email: existing.email },
+      beforeJson: { firstName: existing.firstName, lastName: existing.lastName },
       afterJson: { firstName, lastName, email: email || null },
     });
 
@@ -170,19 +176,15 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 /**
  * PERSONS-01: Permanent deletion of a tenant Person record.
  *
- * Requires PEOPLE_DELETE permission (separate from PEOPLE_MANAGE — permanent
- * deletion must never be implicitly granted by create/edit access).
+ * Requires PEOPLE_DELETE (separate from PEOPLE_MANAGE — see ADMIN-DELETE convention).
  *
- * Cascade behaviour:
- * - OrgUnitMembership rows with personId = this person are cascade-deleted
- *   (the OrgUnitMembership.person relation uses onDelete: SetNull — so they
- *   are nulled, not deleted, which keeps history. We explicitly delete active
- *   person-function assignments here to clean up).
- * - PlayerSquadMember and TrainerTeamMember rows are handled by the DB
- *   relation's onDelete: SetNull.
- * - Linked User is NOT deleted — Person ↔ User are separate lifecycles.
- *   Deleting a Person un-links the User (Person.userId set to null via
- *   onDelete: SetNull on the unique userId FK).
+ * Cascade behavior:
+ * - PersonAssignment rows cascade-deleted via FK onDelete: Cascade
+ * - PlayerSquadMember / TrainerTeamMember: onDelete: SetNull (historical data preserved)
+ * - Linked User: NOT deleted — Person ↔ User are separate lifecycles.
+ *   Deleting Person sets Person.userId = null via FK (unique) onDelete behavior
+ *   in the schema. The User account, TenantMembership, UserRole, and all auth data
+ *   are never touched.
  */
 export async function DELETE(_req: NextRequest, { params }: RouteContext) {
   const access = await requireApiPermission(PERMISSIONS.PEOPLE_DELETE);
@@ -190,29 +192,22 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const { id } = await params;
+  const tenantResult = await requireApiActiveTenantId();
+  if (!tenantResult.ok) {
+    return NextResponse.json({ error: tenantResult.error }, { status: tenantResult.status });
+  }
 
-  const existing = await prisma.person.findUnique({
-    where: { id },
-    select: { id: true, tenantId: true, firstName: true, lastName: true, userId: true },
-  });
+  const { id } = await params;
+  const existing = await resolveTenantPerson(id, tenantResult.tenantId);
   if (!existing) {
     return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
   }
 
-  // Tenant isolation
-  const tenantResult = await requireApiActiveTenantId();
-  if (tenantResult.ok && existing.tenantId && existing.tenantId !== tenantResult.tenantId) {
-    return NextResponse.json({ error: "Person nicht gefunden." }, { status: 404 });
-  }
-
   try {
-    // Delete all person-function OrgUnitMembership assignments (personId = this person)
-    await prisma.orgUnitMembership.deleteMany({
-      where: { personId: id },
-    });
+    // PersonAssignment rows are cascade-deleted by FK (onDelete: Cascade on Person).
+    // We still call deleteMany explicitly for audit clarity + to be explicit.
+    await prisma.personAssignment.deleteMany({ where: { personId: id } });
 
-    // Permanently delete the person
     await prisma.person.delete({ where: { id } });
 
     await logAction({
@@ -225,6 +220,8 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
         firstName: existing.firstName,
         lastName: existing.lastName,
         hadLinkedUser: !!existing.userId,
+        // Confirm: no UserRole/TenantMembership/auth data was touched
+        authDataPreserved: true,
       },
     });
 

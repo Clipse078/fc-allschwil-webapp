@@ -1,9 +1,10 @@
 /**
- * PERSONS-02: Single assignment management.
+ * PERSONS-02: Single PersonAssignment management.
  *
- * GET    /api/people/[id]/assignments/[assignmentId]  — get assignment
  * PATCH  /api/people/[id]/assignments/[assignmentId]  — update assignment
  * DELETE /api/people/[id]/assignments/[assignmentId]  — remove assignment
+ *
+ * Uses dedicated PersonAssignment model — zero auth side-effects by construction.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -12,7 +13,7 @@ import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiActiveTenantId } from "@/lib/tenants/active-tenant";
 import { logAction } from "@/lib/audit/log-action";
-import { OrgUnitMembershipStatus } from "@prisma/client";
+import { PersonAssignmentStatus } from "@prisma/client";
 import { isPersonFunctionKey } from "@/lib/people/functions";
 
 type RouteContext = { params: Promise<{ id: string; assignmentId: string }> };
@@ -22,23 +23,21 @@ async function resolveAssignment(
   assignmentId: string,
   tenantId: string,
 ) {
-  const assignment = await prisma.orgUnitMembership.findFirst({
-    where: { id: assignmentId, personId },
+  const assignment = await prisma.personAssignment.findFirst({
+    where: { id: assignmentId, personId, tenantId },
     select: {
       id: true,
       personId: true,
       orgUnitId: true,
       teamId: true,
       seasonId: true,
-      roleKey: true,
+      functionKey: true,
       status: true,
       notes: true,
       tenantId: true,
     },
   });
-  if (!assignment) return null;
-  if (assignment.tenantId && assignment.tenantId !== tenantId) return null;
-  return assignment;
+  return assignment ?? null;
 }
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
@@ -67,15 +66,15 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Ungültige Funktion." }, { status: 400 });
   }
 
-  const validStatuses = Object.values(OrgUnitMembershipStatus) as string[];
+  const validStatuses = Object.values(PersonAssignmentStatus) as string[];
   const status = validStatuses.includes(statusRaw)
-    ? (statusRaw as OrgUnitMembershipStatus)
+    ? (statusRaw as PersonAssignmentStatus)
     : assignment.status;
 
-  const updated = await prisma.orgUnitMembership.update({
+  const updated = await prisma.personAssignment.update({
     where: { id: assignmentId },
     data: {
-      ...(functionKey ? { roleKey: functionKey } : {}),
+      ...(functionKey ? { functionKey } : {}),
       ...(body.notes !== undefined ? { notes } : {}),
       status,
     },
@@ -84,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       orgUnitId: true,
       teamId: true,
       seasonId: true,
-      roleKey: true,
+      functionKey: true,
       status: true,
       orgUnit: { select: { id: true, name: true, key: true } },
       team: { select: { id: true, name: true, shortName: true } },
@@ -98,7 +97,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     entityType: "PersonAssignment",
     entityId: assignmentId,
     action: "assignment_updated",
-    beforeJson: { functionKey: assignment.roleKey, status: assignment.status },
+    beforeJson: { functionKey: assignment.functionKey, status: assignment.status },
     afterJson: { functionKey, status },
   });
 
@@ -122,7 +121,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Zuordnung nicht gefunden." }, { status: 404 });
   }
 
-  await prisma.orgUnitMembership.delete({ where: { id: assignmentId } });
+  await prisma.personAssignment.delete({ where: { id: assignmentId } });
 
   await logAction({
     actorUserId: access.session?.user?.id,
@@ -134,7 +133,7 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
       personId,
       orgUnitId: assignment.orgUnitId,
       teamId: assignment.teamId,
-      functionKey: assignment.roleKey,
+      functionKey: assignment.functionKey,
     },
   });
 
