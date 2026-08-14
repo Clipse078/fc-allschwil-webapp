@@ -31,10 +31,8 @@
 
 import type { ReactElement } from "react";
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
-import type {
-  PitchOccupancy,
-  PitchEventSummary,
-} from "@/lib/publishing/event-types";
+import type { PitchEventSummary } from "@/lib/publishing/event-types";
+import { groupFacilityPitches } from "@/lib/publishing/infoboard/facility-group";
 import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
@@ -63,15 +61,23 @@ export function InfoboardAnlageplan({
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
 
-  // Build pitch occupancy lookup: resourceCode → PitchOccupancy
-  const pitchMap = new Map<string, PitchOccupancy>(
-    screen2.feed.pitches.map((p) => [p.code, p]),
-  );
+  // ── Apply canonical facility hierarchy (groupFacilityPitches) ────────────
+  // This is the SINGLE canonical call — do not apply hierarchy again in the
+  // map scene, rail, or any other rendering section. All three consume the
+  // same resolved visiblePitches / suppressedCodes.
+  //
+  // Facility hierarchy is a domain presentation invariant. Styling or Designer
+  // changes must never alter which physical resources are simultaneously shown.
+  const { visiblePitches, suppressedCodes } = groupFacilityPitches(screen2.feed.pitches);
 
-  // Collect NEXT activities for the right rail (de-duplicate by event id)
+  // Build pitch occupancy lookup from VISIBLE pitches only.
+  const pitchMap = new Map(visiblePitches.map((p) => [p.code, p]));
+
+  // Collect NEXT activities for the right rail from VISIBLE pitches only
+  // (de-duplicate by event id). Suppressed resources never appear in the rail.
   const seenIds = new Set<string>();
   const nextActivities: Array<{ event: PitchEventSummary; resourceLabel: string }> = [];
-  for (const pitch of screen2.feed.pitches) {
+  for (const pitch of visiblePitches) {
     const label = pitch.displayLabel ?? pitch.code;
     if (pitch.nextEvent && !seenIds.has(pitch.nextEvent.eventId)) {
       seenIds.add(pitch.nextEvent.eventId);
@@ -81,7 +87,7 @@ export function InfoboardAnlageplan({
   nextActivities.sort((a, b) => a.event.startAt.localeCompare(b.event.startAt));
 
   const hasContent =
-    screen2.feed.pitches.some((p) => p.currentEvent || p.nextEvent) ||
+    visiblePitches.some((p) => p.currentEvent || p.nextEvent) ||
     nextActivities.length > 0;
 
   return (
@@ -97,7 +103,10 @@ export function InfoboardAnlageplan({
         overflow: "hidden",
         background: "#060B12",
         color: "#ffffff",
-        fontFamily: "var(--font-sans, system-ui, sans-serif)",
+        // Inter as the canonical body typeface — matches Screen 1 + Screen 2
+        // root. KioskShellHeader inherits this, ensuring FC ALLSCHWIL, date,
+        // and subtitle render with the same typography as Screen 1.
+        fontFamily: "var(--font-inter, Inter, system-ui, -apple-system, sans-serif)",
       }}
     >
       {/* ── SHARED HEADER ─────────────────────────────────────────────── */}
@@ -135,12 +144,16 @@ export function InfoboardAnlageplan({
             border: "1px solid rgba(255,255,255,0.06)",
           }}
         >
-          {/* Canonical shared map scene — identical geometry to designer + preview */}
+          {/* Canonical shared map scene — identical geometry to designer + preview.
+              suppressedCodes: zones for hierarchy-suppressed resources are
+              completely omitted (not shown as FREI). This prop is absent/empty
+              in the designer path so admins can see all configured zones. */}
           <AnlageplanMapScene
             config={anlageplanConfig}
             backgroundUrl={backgroundUrl}
             bgTransform={bgTransform}
             pitchMap={pitchMap}
+            suppressedCodes={suppressedCodes}
             timezone={tz}
           />
         </div>

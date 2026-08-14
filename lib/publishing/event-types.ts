@@ -65,6 +65,12 @@ export type InfoboardScreen1Event = {
   displayTitle: string;
   teamDisplayName: string | null;
   opponentDisplayName: string | null;
+  /**
+   * Canonical opponent club crest URL resolved from ExternalTeam.logoUrl →
+   * ExternalClub.logoUrl. Null when no Club Directory crest is available.
+   * Never a white-background tile — only the clean canonical transparent PNG.
+   */
+  opponentLogoUrl: string | null;
   /** Organizer name for external/municipal events. */
   organizerDisplayName: string | null;
   competitionLabel: string | null;
@@ -184,6 +190,22 @@ export type PitchOccupancy = {
   displayLabel: string;
   /** Display name of the parent facility. */
   facilityName: string;
+  /**
+   * Canonical Facility.id — the stable DB identifier for the parent facility.
+   *
+   * Facility hierarchy is a domain presentation invariant. Styling and
+   * Designer changes must never alter which physical resources are
+   * simultaneously presented. The hierarchy resolver (groupFacilityPitches)
+   * relies on this stable identity to group siblings correctly — it MUST NOT
+   * use facilityName (display text) for grouping.
+   */
+  facilityId: string;
+  /**
+   * Canonical FacilityResourceType for this resource — FULL_PITCH or HALF_PITCH.
+   * The hierarchy resolver uses this to determine which representation mode
+   * (whole-facility vs subdivision) applies for a given facility group.
+   */
+  resourceType: "FULL_PITCH" | "HALF_PITCH";
   state: PitchOccupancyState;
   currentEvent: PitchEventSummary | null;
   /**

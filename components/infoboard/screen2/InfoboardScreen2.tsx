@@ -69,6 +69,8 @@ import {
   DEFAULT_INFOBOARD_DISPLAY_THEME,
   type InfoboardDisplayTheme,
 } from "@/lib/publishing/infoboard/display-theme";
+import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
+import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import styles from "./InfoboardScreen2.module.css";
 
 // ── Public component props ────────────────────────────────────────────────────
@@ -111,22 +113,6 @@ function formatTime(isoString: string, timeZone: string): string {
     minute: "2-digit",
     timeZone,
     hour12: false,
-  }).format(new Date(isoString));
-}
-
-function formatWeekday(isoString: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    weekday: "long",
-    timeZone,
-  }).format(new Date(isoString));
-}
-
-function formatDateLine(isoString: string, timeZone: string): string {
-  return new Intl.DateTimeFormat("de-DE", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone,
   }).format(new Date(isoString));
 }
 
@@ -483,14 +469,7 @@ export function InfoboardScreen2({
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
 
-  const currentTime =
-    currentTimeIso != null ? formatTime(currentTimeIso, timeZone) : null;
-  const headerWeekday =
-    currentTimeIso != null ? formatWeekday(currentTimeIso, timeZone) : null;
-  const headerDateLine =
-    currentTimeIso != null
-      ? formatDateLine(currentTimeIso, timeZone)
-      : formatDisplayDate(feed.displayDate);
+  const staticDateFallback = formatDisplayDate(feed.displayDate);
 
   const hasPitches = pitches.length > 0;
 
@@ -500,63 +479,20 @@ export function InfoboardScreen2({
       data-testid="infoboard-screen2-root"
       data-theme={themeAttr}
     >
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <header className={styles.header} data-testid="infoboard-screen2-header">
-
-        {/* Left: club branding */}
-        <div className={styles.headerLeft} data-testid="screen2-header-left">
-          {clubLogoSrc !== null ? (
-            <img
-              src={clubLogoSrc}
-              alt={`${tenant.name} Wappen`}
-              className={styles.clubLogo}
-              width={64}
-              height={64}
-            />
-          ) : (
-            <div className={styles.clubLogoFallback} aria-hidden="true">
-              {tenant.name.slice(0, 2).toUpperCase()}
-            </div>
-          )}
-          <div className={styles.headerBranding}>
-            <span className={styles.headerClubName}>{tenant.name}</span>
-            <span className={styles.headerFacilityName}>{feed.facilityName}</span>
-          </div>
-        </div>
-
-        {/* Reserved Alexa-integration zone — intentionally empty. Must stay
-            between branding and the weather/time/date status group; never
-            consumed by weather or any other content. */}
-        <div
-          className={styles.headerAlexaZone}
-          data-testid="screen2-alexa-safe-zone"
-          aria-hidden="true"
-        />
-
-        {/* Right: compact weather + current time + date */}
-        <div className={styles.headerStatus} data-testid="screen2-header-status">
-          <HeaderWeather weather={weather} />
-          <div className={styles.headerCenter} data-testid="screen2-header-center">
-            {currentTime !== null && headerWeekday !== null ? (
-              <div className={styles.headerTimeBlock}>
-                <time
-                  className={styles.headerCurrentTime}
-                  dateTime={currentTimeIso!}
-                >
-                  {currentTime}
-                </time>
-                <span className={styles.headerTimeSeparator} aria-hidden="true">|</span>
-                <div className={styles.headerDateBlock}>
-                  <span className={styles.headerWeekday}>{headerWeekday}</span>
-                  <span className={styles.headerDateLine}>{headerDateLine}</span>
-                </div>
-              </div>
-            ) : (
-              <span className={styles.headerDateFallback}>{headerDateLine}</span>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* ── Shared kiosk header (canonical — identical to Screen 1) ─────── */}
+      <KioskShellHeader
+        clubLogoSrc={clubLogoSrc}
+        clubName={tenant.name}
+        facilityLine={feed.facilityName ?? undefined}
+        initialTimeIso={currentTimeIso}
+        timezone={timeZone}
+        showTime={true}
+        showDate={true}
+        staticDateFallback={staticDateFallback}
+        subtitle="ANLAGENÜBERSICHT"
+        subtitleEnabled={true}
+        rightContent={<HeaderWeather weather={weather} />}
+      />
 
       {/* ── Main content: facility overview (full width) ───────────────────
           The sponsor/weather sidebar has been removed (INFOBOARD-INTEGRATION-
@@ -602,26 +538,11 @@ export function InfoboardScreen2({
         </div>
       </main>
 
-      {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className={styles.footer} data-testid="screen2-footer">
-        <div className={styles.footerLeft}>
-          <span className={styles.footerFacility}>{feed.facilityName}</span>
-        </div>
-        <div className={styles.footerRight} data-testid="screen2-product-branding">
-          <span className={styles.footerPoweredBy}>POWERED BY</span>
-          {productLogoSrc !== null ? (
-            <img
-              src={productLogoSrc}
-              alt="SportClubEvo"
-              className={styles.footerProductLogo}
-              width={120}
-              height={28}
-            />
-          ) : (
-            <span className={styles.footerProductFallback}>SportClubEvo</span>
-          )}
-        </div>
-      </footer>
+      {/* ── Shared kiosk footer (canonical — identical to Screen 1) ─────── */}
+      <KioskShellFooter
+        productLogoSrc={productLogoSrc}
+        leftLabel={feed.facilityName ?? undefined}
+      />
     </div>
   );
 }

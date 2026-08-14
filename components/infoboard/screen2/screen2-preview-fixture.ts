@@ -69,6 +69,8 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
       code: "P-STADION",
       displayLabel: "Stadion",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {
@@ -89,6 +91,8 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
       code: "P-KR1",
       displayLabel: "Kunstrasen 1",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {
@@ -120,6 +124,8 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
       code: "P-KR2",
       displayLabel: "Kunstrasen 2",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "FREE_NOW",
       hasAllocationConflict: false,
       currentEvent: null,
@@ -129,6 +135,8 @@ export const PREVIEW_FIXTURE_SCREEN2: InfoboardScreen2Feed = {
       code: "P-KR3",
       displayLabel: "Kunstrasen 3",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "UPCOMING",
       hasAllocationConflict: false,
       currentEvent: null,
@@ -233,6 +241,8 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
       code: "P-STADION",
       displayLabel: "Stadion",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {
@@ -253,6 +263,8 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
       code: "P-KR1",
       displayLabel: "Kunstrasen 1",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {
@@ -273,6 +285,8 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
       code: "P-KR2",
       displayLabel: "Kunstrasen 2",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {
@@ -293,6 +307,8 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
       code: "P-KR3",
       displayLabel: "Kunstrasen 3",
       facilityName: "Brüelstadion",
+      facilityId: "fac-brueel",
+      resourceType: "FULL_PITCH",
       state: "OCCUPIED_NOW",
       hasAllocationConflict: false,
       currentEvent: {

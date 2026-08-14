@@ -54,6 +54,15 @@ export type AnlageplanMapSceneProps = {
    * fabricated activity data is shown.
    */
   pitchMap?: Map<string, PitchOccupancy> | null;
+  /**
+   * Resource codes that the canonical hierarchy resolver has determined should
+   * NOT be rendered in the public kiosk view. Zones whose resourceCode is in
+   * this set are completely omitted — they are not shown as FREI.
+   *
+   * Populated by groupFacilityPitches() in InfoboardAnlageplan.
+   * Must be empty/absent in the designer path so admins can see all zones.
+   */
+  suppressedCodes?: ReadonlySet<string> | null;
   /** Tenant timezone — required for event time formatting. Defaults to "UTC". */
   timezone?: string;
 };
@@ -65,9 +74,17 @@ export function AnlageplanMapScene({
   backgroundUrl,
   bgTransform,
   pitchMap,
+  suppressedCodes,
   timezone = "UTC",
 }: AnlageplanMapSceneProps): ReactElement {
-  const zones = config.elements.filter(isResourceZone) as ResourceZoneElement[];
+  // Apply hierarchy suppression — zones for suppressed codes are completely
+  // omitted (not even shown as FREI) because the canonical resolver has
+  // determined they should not appear in the current hierarchy state.
+  // suppressedCodes is empty/absent in the designer path.
+  const allZones = config.elements.filter(isResourceZone) as ResourceZoneElement[];
+  const zones = suppressedCodes && suppressedCodes.size > 0
+    ? allZones.filter((z) => z.resourceCode == null || !suppressedCodes.has(z.resourceCode))
+    : allZones;
   const markers = config.elements.filter(
     (e): e is MarkerElement => isMarker(e) && !isDuBistHier(e),
   );

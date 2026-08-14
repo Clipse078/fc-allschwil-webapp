@@ -65,8 +65,10 @@ function makePitch(
   code: string,
   name: string,
   facilityName = "Teststadion",
+  facilityId = "facility-01",
+  resourceType: "FULL_PITCH" | "HALF_PITCH" = "FULL_PITCH",
 ): ConfiguredPitch {
-  return { code, name, facilityName };
+  return { code, name, facilityName, facilityId, resourceType };
 }
 
 function makeDressingRoom(code: string, name: string): ConfiguredDressingRoom {

@@ -36,6 +36,7 @@ function makeEvent(overrides: Partial<InfoboardScreen1Event>): InfoboardScreen1E
     displayTitle: "Training U14",
     teamDisplayName: "U14",
     opponentDisplayName: null,
+    opponentLogoUrl: null,
     organizerDisplayName: null,
     competitionLabel: null,
     startAt: "2026-07-24T16:00:00.000Z",

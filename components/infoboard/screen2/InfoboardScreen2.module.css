@@ -45,9 +45,7 @@
   --ib2-upcoming:       #1E5BC6;
   --ib2-warning:        #CC8B14;
 
-  /* Sizing */
-  --ib2-header-height:  clamp(72px, 8vh, 96px);
-  --ib2-footer-height:  clamp(40px, 5vh, 56px);
+  /* Sizing (kept for reference; header/footer now use KioskShellHeader/Footer inline styles) */
 
   /* Spacing */
   --ib2-sp-1: 4px;
@@ -59,10 +57,6 @@
   --ib2-sp-8: 32px;
 
   /* Typography */
-  --ib2-fs-header-time:    clamp(2.6rem, 3.4vw, 4rem);
-  --ib2-fs-club-name:      clamp(1.4rem, 1.8vw, 2.2rem);
-  --ib2-fs-facility-name:  clamp(0.7rem, 0.9vw, 1.1rem);
-
   --ib2-fs-section-label:  clamp(0.65rem, 0.8vw, 0.95rem);
   --ib2-fs-pitch-name:     clamp(1.3rem, 1.8vw, 2.4rem);
   --ib2-fs-pitch-status:   clamp(0.7rem, 0.9vw, 1.1rem);
@@ -74,9 +68,6 @@
   --ib2-fs-dr-title:       clamp(0.65rem, 0.8vw, 0.95rem);
   --ib2-fs-dr-code:        clamp(0.95rem, 1.3vw, 1.7rem);
   --ib2-fs-dr-team:        clamp(0.85rem, 1.1vw, 1.45rem);
-
-  --ib2-fs-footer:         clamp(0.75rem, 0.9vw, 1.05rem);
-  --ib2-fs-powered-by:     clamp(0.5rem, 0.6vw, 0.72rem);
 
   /* Border radius */
   --ib2-radius:            8px;
@@ -127,161 +118,15 @@
 }
 
 /* ─── Header ─────────────────────────────────────────────────────────────── */
+/* Header is now the canonical KioskShellHeader (inline styles). No
+   Screen-2-specific header CSS remains. */
 
-.header {
-  display: grid;
-  /* Left: branding | Middle: reserved Alexa zone | Right: weather + time/date */
-  grid-template-columns: 1fr 15vw auto;
-  align-items: center;
-  height: var(--ib2-header-height);
-  padding: 0 var(--ib2-sp-8);
-  background: var(--ib2-header-bg);
-  border-bottom: 2px solid var(--ib2-tournament);
-  flex-shrink: 0;
-  gap: var(--ib2-sp-4);
-}
-
-.headerLeft {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-4);
-  min-width: 0;
-}
-
-.clubLogo {
-  width: clamp(40px, 5vh, 60px);
-  height: clamp(40px, 5vh, 60px);
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-.clubLogoFallback {
-  width: clamp(40px, 5vh, 60px);
-  height: clamp(40px, 5vh, 60px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(232, 124, 36, 0.15);
-  border: 1px solid rgba(232, 124, 36, 0.4);
-  border-radius: var(--ib2-radius-sm);
-  color: var(--ib2-tournament);
-  font-size: 1.3rem;
-  font-weight: 700;
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-
-.headerBranding {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.headerClubName {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-club-name);
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--ib2-text);
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.headerFacilityName {
-  font-size: var(--ib2-fs-facility-name);
-  color: var(--ib2-text-muted);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.headerStatus {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--ib2-sp-5);
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.headerCenter {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.headerTimeBlock {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-3);
-}
-
-.headerCurrentTime {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-header-time);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ib2-text);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.headerTimeSeparator {
-  font-size: var(--ib2-fs-header-time);
-  color: var(--ib2-border-strong);
-  line-height: 1;
-}
-
-.headerDateBlock {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.headerWeekday {
-  font-size: clamp(0.7rem, 0.95vw, 1.1rem);
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ib2-text);
-  line-height: 1;
-}
-
-.headerDateLine {
-  font-size: clamp(0.65rem, 0.82vw, 0.95rem);
-  color: var(--ib2-text-muted);
-  line-height: 1;
-}
-
-.headerDateFallback {
-  font-size: clamp(0.85rem, 1.1vw, 1.3rem);
-  color: var(--ib2-text-muted);
-}
-
-.headerAlexaZone {
-  /* Intentionally empty — reserved space for the planned Alexa integration.
-     Never consumed by weather or any other header content
-     (INFOBOARD-INTEGRATION-01C-C1). */
-  height: 100%;
-}
-
-/* ─── Header weather (compact — INFOBOARD-INTEGRATION-01C-C1) ────────────── */
+/* ─── Header weather (compact — placed in KioskShellHeader rightContent slot) */
 
 .headerWeather {
   display: flex;
   align-items: center;
   gap: var(--ib2-sp-2);
-  padding-right: var(--ib2-sp-4);
-  border-right: 1px solid var(--ib2-border);
   min-width: 0;
   color: var(--ib2-text-muted);
 }
@@ -800,63 +645,8 @@
 }
 
 /* ─── Footer ─────────────────────────────────────────────────────────────── */
-
-.footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: var(--ib2-footer-height);
-  padding: 0 var(--ib2-sp-8);
-  background: var(--ib2-header-bg);
-  border-top: 1px solid var(--ib2-border);
-  flex-shrink: 0;
-  gap: var(--ib2-sp-4);
-}
-
-.footerLeft {
-  flex: 1;
-  min-width: 0;
-}
-
-.footerFacility {
-  font-size: var(--ib2-fs-footer);
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--ib2-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.footerRight {
-  display: flex;
-  align-items: center;
-  gap: var(--ib2-sp-2);
-  flex-shrink: 0;
-}
-
-.footerPoweredBy {
-  font-size: var(--ib2-fs-powered-by);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ib2-text-dim);
-}
-
-.footerProductLogo {
-  height: clamp(18px, 2.2vh, 28px);
-  width: auto;
-  object-fit: contain;
-  opacity: 0.7;
-}
-
-.footerProductFallback {
-  font-size: clamp(0.7rem, 0.9vw, 1.05rem);
-  font-weight: 600;
-  color: var(--ib2-text-muted);
-  white-space: nowrap;
-}
+/* Footer is now the canonical KioskShellFooter (inline styles). No
+   Screen-2-specific footer CSS remains. */
 
 /* ─── Responsive: 1280×720 ───────────────────────────────────────────────── */
 
@@ -869,8 +659,8 @@
     padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 18px);
   }
 
-  /* Keep the header weather indicator compact at reduced widths — drop the
-     attribution line first, the condition text next if space is still tight. */
+  /* At reduced widths, drop the MeteoSwiss attribution line and narrow the
+     condition text in the compact weather block in the header right slot. */
   .headerWeatherAttribution {
     display: none;
   }

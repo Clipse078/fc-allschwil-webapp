@@ -37,6 +37,7 @@ import type { InfoboardScreen2LivePayload } from "@/lib/publishing/infoboard/scr
 import type {
   AnlageplanConfig,
 } from "@/lib/infoboard/anlageplan-types";
+import type { PitchOccupancy } from "@/lib/publishing/event-types";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
@@ -99,11 +100,15 @@ function makeAnlageplanPayload(
     ...configOverride,
   };
 
-  const makePitch = (code: string, currentType?: string, nextType?: string) => ({
+  const makePitch = (code: string, currentType?: string, nextType?: string): PitchOccupancy => {
+    const state = currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE_NOW";
+    return {
     code,
     displayLabel: code,
     facilityName: "Testanlage",
-    state: (currentType ? "OCCUPIED_NOW" : nextType ? "UPCOMING" : "FREE") as "FREE" | "OCCUPIED_NOW" | "UPCOMING",
+    facilityId: "fac-test",
+    resourceType: "FULL_PITCH",
+    state: state as PitchOccupancy["state"],
     hasAllocationConflict: false,
     currentEvent: currentType
       ? {
@@ -113,7 +118,7 @@ function makeAnlageplanPayload(
           opponentDisplayName: null,
           startAt: "2026-09-12T16:00:00.000Z",
           endAt: "2026-09-12T17:30:00.000Z",
-          status: "IN_PROGRESS" as const,
+          status: "LIVE" as const,
           type: currentType as "TRAINING" | "MATCH" | "TOURNAMENT",
           temporalRelation: "current" as const,
           dressingRooms: [],
@@ -132,8 +137,8 @@ function makeAnlageplanPayload(
           temporalRelation: "next" as const,
           dressingRooms: [],
         }
-      : null,
-  });
+        : null,
+  };};
 
   const pitches = [
     makePitch("KR2", pitchOverrides.find(p => p.code === "KR2")?.currentType, pitchOverrides.find(p => p.code === "KR2")?.nextType),

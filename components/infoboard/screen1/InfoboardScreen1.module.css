@@ -448,6 +448,15 @@
   flex-shrink: 0;
 }
 
+/* Invisible size-preserving placeholder — keeps away-team row aligned with
+   home-team row when no opponent crest is available. Same dimensions as
+   .teamLogo so the text column aligns vertically regardless. */
+.teamLogoPlaceholder {
+  width: clamp(28px, 2.8vh, 42px);
+  height: clamp(28px, 2.8vh, 42px);
+  flex-shrink: 0;
+}
+
 .eventTeamMain {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-event-team);

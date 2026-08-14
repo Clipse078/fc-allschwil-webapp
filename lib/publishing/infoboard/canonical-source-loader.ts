@@ -96,6 +96,7 @@ import { WEEKPLANNER_DEFAULT_TIMEZONE, zonedDateKey, parseDayKey } from "@/lib/w
 import { resolveTrainingDayWindow, resolveTrainingWeekWindow } from "@/lib/training/date-range";
 import { getWeekplannerDay } from "@/lib/weekplanner/queries";
 import { getOperationalWeekplannerPlan } from "@/lib/weekplanner/plan-service";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import type {
   WeekplannerItem,
   WeekplannerMatchItem,
@@ -126,6 +127,20 @@ export type CanonicalEventPolicyRow = {
   // INFOBOARD-C1: nullable after ADMIN-DELETE-SEASON-01-C1 (Event.seasonId uses
   // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
   readonly season: { readonly key: string } | null;
+  /**
+   * Away-side ExternalTeam → ExternalClub logo chain for opponent crest
+   * rendering on Infoboard Screen 1. Null when the match has no external
+   * mapping, or no awayExternalTeam has been linked yet by Club Directory
+   * discovery.
+   */
+  readonly matchExternalMapping?: {
+    readonly awayExternalTeam: {
+      readonly logoUrl: string | null;
+      readonly externalClub: {
+        readonly logoUrl: string | null;
+      };
+    } | null;
+  } | null;
 };
 
 /** Publication-policy / display metadata for a canonical TRAINING (TrainingSession-backed). */
@@ -172,6 +187,18 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
   resultLabel: true,
   intermediateResultLabel: true,
   season: { select: { key: true } },
+  matchExternalMapping: {
+    select: {
+      awayExternalTeam: {
+        select: {
+          logoUrl: true,
+          externalClub: {
+            select: { logoUrl: true },
+          },
+        },
+      },
+    },
+  },
 } as const;
 
 export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
@@ -388,6 +415,15 @@ function mapMatchItem(
   item: WeekplannerMatchItem,
   policy: CanonicalEventPolicyRow | undefined,
 ): Screen1SourceEvent {
+  // Resolve the canonical opponent club crest from the ExternalTeam →
+  // ExternalClub logo chain. Priority: ExternalTeam.logoUrl (per-team
+  // override, rare) → ExternalClub.logoUrl (canonical club crest). Falls
+  // back to null when no MatchExternalMapping / awayExternalTeam is linked.
+  const awayExternalTeam = policy?.matchExternalMapping?.awayExternalTeam ?? null;
+  const opponentLogoUrl = awayExternalTeam
+    ? resolveExternalTeamLogoUrl(awayExternalTeam, awayExternalTeam.externalClub)
+    : null;
+
   return {
     tenantId: item.tenantId,
     type: "MATCH",
@@ -412,6 +448,7 @@ function mapMatchItem(
     team: { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: item.opponentName,
+    opponentLogoUrl,
     organizerName: policy?.organizerName ?? null,
     competitionLabel: policy?.competitionLabel ?? null,
     meetingTime: policy?.meetingTime ?? null,

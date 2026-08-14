@@ -104,6 +104,14 @@ export type ConfiguredPitch = {
   readonly name: string;
   /** Facility display name (from parent Facility). */
   readonly facilityName: string;
+  /**
+   * Canonical Facility.id — stable DB identifier for the parent facility.
+   * Used by groupFacilityPitches() for hierarchy grouping. Must NOT be
+   * derived from facilityName (display text) — use the real DB id.
+   */
+  readonly facilityId: string;
+  /** Whether this resource is a whole pitch or a half/section. */
+  readonly resourceType: "FULL_PITCH" | "HALF_PITCH";
 };
 
 /** A configured dressing room as returned by the DB (minimal fields). */
@@ -284,6 +292,8 @@ function resolvePitchOccupancy(
     code: pitch.code,
     displayLabel: pitch.name,
     facilityName: pitch.facilityName,
+    facilityId: pitch.facilityId,
+    resourceType: pitch.resourceType,
     state,
     currentEvent,
     nextEvent,
