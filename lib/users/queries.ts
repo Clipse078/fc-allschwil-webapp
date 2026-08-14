@@ -2,7 +2,8 @@
 
 /**
  * Returns all TenantMembership records for the given tenant, enriched with
- * user account data and the user's tenant-scoped role assignments.
+ * user account data, tenant-scoped role assignments, linked Person, and
+ * invitation state.
  *
  * Tenant isolation: `tenantId` MUST originate from the authenticated session
  * (`session.user.activeTenantId`), never from client input.
@@ -10,6 +11,8 @@
  * Security: passwordHash, reset tokens, and session data are never selected.
  */
 export async function getTenantUsersListData(tenantId: string) {
+  const now = new Date();
+
   const memberships = await prisma.tenantMembership.findMany({
     where: { tenantId },
     orderBy: [{ isActive: "desc" }, { user: { lastName: "asc" } }],
@@ -25,37 +28,93 @@ export async function getTenantUsersListData(tenantId: string) {
           isActive: true,
           lastLoginAt: true,
           userRoles: {
-            where: { tenantId },
+            where: { tenantId, orgUnitId: null },
             select: {
               role: {
                 select: { id: true, name: true, key: true },
               },
             },
           },
+          // Person linkage
+          person: {
+            where: { tenantId },
+            select: { id: true, firstName: true, lastName: true },
+          },
+          // Active invitation token (isInvitation=true, not yet used, not expired)
+          passwordResetTokens: {
+            where: {
+              isInvitation: true,
+              usedAt: null,
+              expiresAt: { gt: now },
+            },
+            select: { id: true, expiresAt: true },
+            take: 1,
+          },
         },
       },
     },
   });
 
-  return memberships.map((m) => ({
-    userId: m.user.id,
-    firstName: m.user.firstName,
-    lastName: m.user.lastName,
-    name: `${m.user.firstName} ${m.user.lastName}`,
-    email: m.user.email,
-    userIsActive: m.user.isActive,
-    membershipIsActive: m.isActive,
-    joinedAt: m.joinedAt,
-    lastLoginAt: m.user.lastLoginAt ?? null,
-    roles: m.user.userRoles.map((ur) => ({
-      id: ur.role.id,
-      name: ur.role.name,
-      key: ur.role.key,
-    })),
-  }));
+  return memberships.map((m) => {
+    const hasLinkedPerson = m.user.person !== null;
+    const pendingInvitation =
+      m.user.lastLoginAt === null &&
+      m.user.passwordResetTokens.length > 0;
+
+    return {
+      userId: m.user.id,
+      firstName: m.user.firstName,
+      lastName: m.user.lastName,
+      name: `${m.user.firstName} ${m.user.lastName}`,
+      email: m.user.email,
+      userIsActive: m.user.isActive,
+      membershipIsActive: m.isActive,
+      joinedAt: m.joinedAt,
+      lastLoginAt: m.user.lastLoginAt ?? null,
+      roles: m.user.userRoles.map((ur) => ({
+        id: ur.role.id,
+        name: ur.role.name,
+        key: ur.role.key,
+      })),
+      linkedPersonId: hasLinkedPerson ? (m.user.person as { id: string }).id : null,
+      linkedPersonName: hasLinkedPerson
+        ? `${(m.user.person as { firstName: string; lastName: string }).firstName} ${(m.user.person as { firstName: string; lastName: string }).lastName}`
+        : null,
+      pendingInvitation,
+    };
+  });
 }
 
 export type TenantUserItem = Awaited<ReturnType<typeof getTenantUsersListData>>[number];
+
+/**
+ * Returns all Persons in the given tenant that have no linked User account.
+ * These are the "Person only / no account" entries shown in the admin list.
+ *
+ * Tenant isolation: `tenantId` MUST originate from the authenticated session.
+ */
+export async function getTenantPersonsWithoutUser(tenantId: string) {
+  const persons = await prisma.person.findMany({
+    where: { tenantId, userId: null, isActive: true },
+    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+    },
+  });
+
+  return persons.map((p) => ({
+    personId: p.id,
+    firstName: p.firstName,
+    lastName: p.lastName,
+    name: `${p.firstName} ${p.lastName}`,
+    email: p.email ?? null,
+  }));
+}
+
+export type TenantPersonWithoutUser = Awaited<ReturnType<typeof getTenantPersonsWithoutUser>>[number];
 
 export async function getUsersListData() {
   const users = await prisma.user.findMany({
@@ -135,7 +194,8 @@ export async function getUserDetailData(userId: string) {
  * prisma/seed.ts) are, and those are TENANT-scoped anyway.
  */
 /**
- * Returns the TenantMembership + User data for a single user within a tenant.
+ * Returns the TenantMembership + User data for a single user within a tenant,
+ * including linked Person and invitation state.
  *
  * Tenant isolation: `tenantId` MUST originate from the authenticated session
  * (`session.user.activeTenantId`), never from client input.
@@ -143,9 +203,11 @@ export async function getUserDetailData(userId: string) {
  * Returns `null` when the user is not a member of the given tenant — callers
  * must treat `null` as a 404/notFound, not as a permission error.
  *
- * Security: passwordHash, reset tokens, and session data are never selected.
+ * Security: passwordHash, reset tokens content, and session data are never selected.
  */
 export async function getTenantUserDetail(tenantId: string, userId: string) {
+  const now = new Date();
+
   return prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
     select: {
@@ -161,12 +223,32 @@ export async function getTenantUserDetail(tenantId: string, userId: string) {
           isActive: true,
           lastLoginAt: true,
           userRoles: {
-            where: { tenantId },
+            where: { tenantId, orgUnitId: null },
             select: {
               role: {
                 select: { id: true, name: true, key: true },
               },
             },
+          },
+          // Person linkage
+          person: {
+            where: { tenantId },
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+          // Invitation state (active token only)
+          passwordResetTokens: {
+            where: {
+              isInvitation: true,
+              usedAt: null,
+              expiresAt: { gt: now },
+            },
+            select: { id: true, expiresAt: true },
+            take: 1,
           },
         },
       },
