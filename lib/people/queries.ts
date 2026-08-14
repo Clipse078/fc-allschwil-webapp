@@ -328,6 +328,26 @@ export async function getPersonNameByUserId(
   return { firstName, lastName: person?.lastName?.trim() || "" };
 }
 
+/**
+ * Returns the linked Person's name AND imageUrl for a given userId.
+ * Used by the admin shell layout to display the correct avatar everywhere.
+ */
+export async function getPersonProfileByUserId(
+  userId: string,
+): Promise<{ firstName: string; lastName: string; imageUrl: string | null } | null> {
+  const person = await prisma.person.findUnique({
+    where: { userId },
+    select: { firstName: true, lastName: true, imageUrl: true },
+  });
+  const firstName = person?.firstName?.trim();
+  if (!firstName) return null;
+  return {
+    firstName,
+    lastName: person?.lastName?.trim() || "",
+    imageUrl: person?.imageUrl ?? null,
+  };
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
 export type PersonDirectoryItem = Awaited<ReturnType<typeof getPersonsForDirectory>>[number];

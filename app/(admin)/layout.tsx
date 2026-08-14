@@ -8,7 +8,7 @@ import AppTopNav from "@/components/admin/layout/AppTopNav";
 import StopImpersonationButton from "@/components/admin/layout/StopImpersonationButton";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
-import { getPersonNameByUserId } from "@/lib/people/queries";
+import { getPersonProfileByUserId } from "@/lib/people/queries";
 import { resolveAccountIdentityName } from "@/lib/people/identity";
 
 type AdminLayoutProps = {
@@ -38,13 +38,14 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   // (Person.userId, ADMIN-MASTERDATA-UX-01), same relationship already used
   // for the dashboard greeting. See lib/people/identity.ts for the fallback
   // rule.
-  const linkedPersonName = await getPersonNameByUserId(session.user.id);
-  const sidebarIdentity = resolveAccountIdentityName({
-    linkedPerson: linkedPersonName,
+  const linkedPersonProfile = await getPersonProfileByUserId(session.user.id);
+  const shellIdentity = resolveAccountIdentityName({
+    linkedPerson: linkedPersonProfile,
     sessionFirstName: session.user.firstName,
     sessionLastName: session.user.lastName,
     tenantName: ctx?.name,
   });
+  const shellImageUrl = linkedPersonProfile?.imageUrl ?? null;
 
   return (
     <div
@@ -54,9 +55,10 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       {/* Fixed sidebar */}
       <Suspense fallback={null}>
         <AdminSidebar
-          firstName={sidebarIdentity.firstName}
-          lastName={sidebarIdentity.lastName}
+          firstName={shellIdentity.firstName}
+          lastName={shellIdentity.lastName}
           email={session.user.email}
+          imageUrl={shellImageUrl}
           permissionKeys={session.user.permissionKeys}
           clubName={ctx?.name}
           logoUrl={ctx?.logoUrl}
@@ -90,8 +92,9 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Sticky top navigation */}
         <AppTopNav
-          firstName={session.user.firstName}
-          lastName={session.user.lastName}
+          firstName={shellIdentity.firstName}
+          lastName={shellIdentity.lastName}
+          imageUrl={shellImageUrl}
         />
 
         {/* Page content */}
