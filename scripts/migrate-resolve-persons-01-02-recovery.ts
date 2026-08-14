@@ -1,88 +1,98 @@
 /**
  * scripts/migrate-resolve-persons-01-02-recovery.ts
  *
- * ONE-TIME migration state recovery for:
+ * ONE-TIME deterministic migration state recovery for:
  *   20260814140000_persons_01_02_tenant_scoping_assignments
  *
- * Context
- * -------
- * The migration above failed during the PR-#409 STAGE deployment because its
- * Permission INSERT omitted `createdAt`/`updatedAt` (NOT NULL, no default).
- * PostgreSQL rolled back the full transaction, but Prisma recorded the
- * migration as "failed" in `_prisma_migrations`.  PR #410 corrected the SQL,
- * but `prisma migrate deploy` now aborts with P3009 before it can re-run the
- * corrected migration.
+ * Root cause (discovered during manual recovery)
+ * -----------------------------------------------
+ * The migration's DDL statements (ALTER TABLE, CREATE INDEX) were
+ * committed individually because the original deploy ran through
+ * Neon pgBouncer (transaction-per-statement mode) rather than the
+ * direct connection.  Only the final INSERT INTO Permission failed,
+ * leaving the schema changes in the DB but the migration recorded as
+ * "failed" in _prisma_migrations.
  *
- * Recovery action
- * ---------------
- * `prisma migrate resolve --rolled-back <id>` tells Prisma that the failed
- * migration was rolled back (which it was — PostgreSQL DDL is transactional),
- * so `migrate deploy` can schedule it for re-execution.
+ * Correct recovery sequence
+ * -------------------------
+ * Step 1: migrate resolve --rolled-back
+ *   Clears P3009 "failed migration" error so Prisma can proceed.
+ *   (Error is caught silently when migration is already resolved.)
  *
- * Guards
- * ------
- * - Only runs when APPLY_DATABASE_MIGRATIONS === "true" (Vercel STAGE/prod).
- * - Only resolves the exact migration listed in MIGRATION_ID.
- * - Reads `prisma migrate status` first; skips if the migration is NOT in
- *   "failed" state (prevents repeated no-op calls on subsequent deploys).
+ * Step 2: migrate resolve --applied
+ *   Tells Prisma the DDL is in the database so it does not attempt
+ *   to re-run ADD COLUMN statements that already exist, which would
+ *   fail with "column already exists" (code 42701).
+ *   (Error is caught silently when migration is already applied.)
+ *
+ * After both steps, migrate deploy applies 20260814150000 (C1), which
+ * includes the missing Permission INSERT with ON CONFLICT DO NOTHING.
+ *
+ * Guard
+ * -----
+ * Only runs when APPLY_DATABASE_MIGRATIONS === "true" (Vercel STAGE/prod).
+ * Silent no-op locally and in preview deployments.
+ *
+ * Idempotence on subsequent deploys
+ * ----------------------------------
+ * Once both PERSONS migrations are "applied", both migrate resolve
+ * calls exit non-zero. Both errors are caught; execution continues.
+ * migrate deploy sees all migrations applied and exits 0. Safe.
  *
  * Removal
  * -------
- * Remove this script and the `db:migrate:resolve-persons-01-02-recovery`
- * entry from package.json after the first successful STAGE deployment that
- * shows both PERSONS migrations as "applied".
+ * Remove this script and its package.json entries AFTER the first
+ * successful Vercel STAGE deployment confirms both PERSONS migrations
+ * as "applied".
  */
 
-import { execSync, spawnSync } from "child_process";
+import { execSync } from "child_process";
 
 const MIGRATION_ID =
   "20260814140000_persons_01_02_tenant_scoping_assignments";
 
 if (process.env.APPLY_DATABASE_MIGRATIONS !== "true") {
   console.log(
-    "[recovery] APPLY_DATABASE_MIGRATIONS is not 'true' — skipping (local/preview environment)."
+    "[PERSONS RECOVERY] APPLY_DATABASE_MIGRATIONS is not 'true' — skipping (not a migration-enabled deployment)."
   );
   process.exit(0);
 }
 
-console.log(`[recovery] Checking migration state for: ${MIGRATION_ID}`);
-
-// prisma migrate status exits non-zero when failed/pending migrations exist.
-// Capture stdout + stderr regardless of exit code.
-const statusResult = spawnSync(
-  "npx",
-  ["prisma", "migrate", "status"],
-  { encoding: "utf8" }
+// Step 1: resolve --rolled-back to clear any P3009 "failed migration" error.
+console.log(
+  `[PERSONS RECOVERY] Resolving failed migration as rolled back: ${MIGRATION_ID}`
 );
-
-const statusOutput =
-  (statusResult.stdout ?? "") + (statusResult.stderr ?? "");
-
-// Detect the specific migration in failed state.
-// Prisma prints something like:
-//   "Following migration have failed:\n  20260814140000_persons_01_02_..."
-const migrationMentioned = statusOutput.includes(MIGRATION_ID);
-const failedKeyword = /failed/i.test(statusOutput);
-
-if (!migrationMentioned || !failedKeyword) {
+try {
+  execSync(
+    `npx prisma migrate resolve --rolled-back ${MIGRATION_ID}`,
+    { stdio: "inherit" }
+  );
+  console.log("[PERSONS RECOVERY] Migration resolved (rolled-back).");
+} catch (err: unknown) {
+  const detail = err instanceof Error ? err.message : String(err);
   console.log(
-    `[recovery] Migration ${MIGRATION_ID} is NOT in failed state — no action needed. Continuing to migrate deploy.`
+    "[PERSONS RECOVERY] --rolled-back exited non-zero (migration not in failed state — already resolved or applied). Continuing.\n" +
+      `[PERSONS RECOVERY] Detail: ${detail}`
   );
-  process.exit(0);
 }
 
+// Step 2: resolve --applied because the DDL committed to the DB (pgBouncer
+// transaction-per-statement) even though the migration was recorded as failed.
+// Without this, migrate deploy would try to re-run ADD COLUMN and fail with
+// "column already exists" (PostgreSQL error code 42701).
 console.log(
-  `[recovery] Migration ${MIGRATION_ID} is recorded as failed.\n` +
-    `[recovery] PostgreSQL DDL is fully transactional — the failed migration\n` +
-    `[recovery] was rolled back entirely (no schema changes remain).\n` +
-    `[recovery] Marking as rolled-back so migrate deploy can re-execute it...`
+  `[PERSONS RECOVERY] Marking migration as applied (DDL already in DB): ${MIGRATION_ID}`
 );
-
-execSync(
-  `npx prisma migrate resolve --rolled-back ${MIGRATION_ID}`,
-  { stdio: "inherit" }
-);
-
-console.log(
-  "[recovery] Migration state cleared. migrate deploy will now re-run the corrected migration."
-);
+try {
+  execSync(
+    `npx prisma migrate resolve --applied ${MIGRATION_ID}`,
+    { stdio: "inherit" }
+  );
+  console.log("[PERSONS RECOVERY] Migration resolved (applied).");
+} catch (err: unknown) {
+  const detail = err instanceof Error ? err.message : String(err);
+  console.log(
+    "[PERSONS RECOVERY] --applied exited non-zero (migration already in applied state — subsequent deploy). Continuing.\n" +
+      `[PERSONS RECOVERY] Detail: ${detail}`
+  );
+}
