@@ -102,6 +102,7 @@ export function PremiumResourceCard({
   const isCurrent = hasCurrent;
 
   if (isFree) {
+    const freeLabel = zone.label ?? zone.resourceCode ?? null;
     return (
       <div
         data-testid="resource-card-free"
@@ -120,46 +121,61 @@ export function PremiumResourceCard({
       >
         <div
           style={{
-            background: "rgba(10,16,28,0.55)",
-            backdropFilter: "blur(4px)",
-            borderRadius: "clamp(3px, 0.4vh, 6px)",
-            padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px)",
+            background: "rgba(10,16,28,0.75)",
+            backdropFilter: "blur(6px)",
+            borderRadius: "clamp(4px, 0.5vh, 8px)",
+            padding: "clamp(4px, 0.55vh, 8px) clamp(6px, 0.75vw, 12px)",
             display: "flex",
-            alignItems: "center",
-            gap: "clamp(2px, 0.3vw, 5px)",
-            border: "1px solid rgba(255,255,255,0.06)",
+            flexDirection: "column",
+            alignItems: "flex-start",
+            gap: "clamp(2px, 0.25vh, 4px)",
+            border: "1px solid rgba(74,222,128,0.20)",
+            borderLeft: "3px solid rgba(74,222,128,0.70)",
           }}
         >
-          <span
+          {freeLabel !== null && (
+            <span
+              style={{
+                fontSize: "clamp(8px, 1.05vh, 14px)",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                color: "rgba(255,255,255,0.85)",
+                textTransform: "uppercase",
+                lineHeight: 1,
+              }}
+            >
+              {freeLabel}
+            </span>
+          )}
+          <div
             style={{
-              width: "clamp(4px, 0.5vh, 6px)",
-              height: "clamp(4px, 0.5vh, 6px)",
-              borderRadius: "50%",
-              background: "rgba(74,222,128,0.5)",
-              flexShrink: 0,
-            }}
-          />
-          <span
-            style={{
-              fontSize: "clamp(5px, 0.65vh, 9px)",
-              fontWeight: 600,
-              letterSpacing: "0.14em",
-              color: "rgba(74,222,128,0.65)",
-              textTransform: "uppercase",
-            }}
-          >
-            {zone.label ?? zone.resourceCode ?? "FREI"}
-          </span>
-          <span
-            style={{
-              fontSize: "clamp(4px, 0.55vh, 7px)",
-              letterSpacing: "0.12em",
-              color: "rgba(74,222,128,0.40)",
-              textTransform: "uppercase",
+              display: "flex",
+              alignItems: "center",
+              gap: "clamp(3px, 0.4vw, 6px)",
             }}
           >
-            FREI
-          </span>
+            <span
+              style={{
+                width: "clamp(6px, 0.7vh, 9px)",
+                height: "clamp(6px, 0.7vh, 9px)",
+                borderRadius: "50%",
+                background: "rgba(74,222,128,0.7)",
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontSize: "clamp(9px, 1.2vh, 16px)",
+                fontWeight: 700,
+                letterSpacing: "0.18em",
+                color: "rgba(74,222,128,0.90)",
+                textTransform: "uppercase",
+                lineHeight: 1,
+              }}
+            >
+              FREI
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -191,7 +207,7 @@ export function PremiumResourceCard({
         left: `${zone.rect.x * 100}%`,
         top: `${zone.rect.y * 100}%`,
         width: `${zone.rect.width * 100}%`,
-        minWidth: "clamp(60px, 8vw, 140px)",
+        minWidth: "clamp(80px, 10vw, 180px)",
         transform: zone.rect.rotation ? `rotate(${zone.rect.rotation}deg)` : undefined,
         transformOrigin: "top left",
         pointerEvents: "none",
@@ -200,15 +216,15 @@ export function PremiumResourceCard({
     >
       <div
         style={{
-          background: "rgba(8,14,26,0.88)",
+          background: "rgba(8,14,26,0.90)",
           backdropFilter: "blur(8px)",
-          borderRadius: "clamp(4px, 0.5vh, 8px)",
+          borderRadius: "clamp(5px, 0.65vh, 10px)",
           border: `1px solid ${tokens.accentColor}40`,
-          borderLeft: `3px solid ${tokens.accentColor}`,
+          borderLeft: `4px solid ${tokens.accentColor}`,
           overflow: "hidden",
           boxShadow: isCurrent
-            ? `0 2px 12px ${tokens.accentColor}22`
-            : "0 1px 6px rgba(0,0,0,0.4)",
+            ? `0 3px 16px ${tokens.accentColor}28`
+            : "0 2px 8px rgba(0,0,0,0.5)",
         }}
       >
         {/* Resource name + type badge */}
@@ -217,17 +233,17 @@ export function PremiumResourceCard({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "clamp(2px, 0.35vh, 5px) clamp(4px, 0.5vw, 8px)",
-            background: "rgba(255,255,255,0.04)",
-            gap: "0.4vw",
+            padding: "clamp(3px, 0.45vh, 7px) clamp(5px, 0.65vw, 10px)",
+            background: "rgba(255,255,255,0.05)",
+            gap: "0.5vw",
           }}
         >
           <span
             style={{
-              fontSize: "clamp(6px, 0.8vh, 11px)",
+              fontSize: "clamp(8px, 1.05vh, 14px)",
               fontWeight: 700,
               letterSpacing: "0.10em",
-              color: "rgba(255,255,255,0.85)",
+              color: "rgba(255,255,255,0.90)",
               textTransform: "uppercase",
               whiteSpace: "nowrap",
               overflow: "hidden",
@@ -239,13 +255,13 @@ export function PremiumResourceCard({
           <span
             style={{
               flexShrink: 0,
-              fontSize: "clamp(4px, 0.6vh, 8px)",
+              fontSize: "clamp(6px, 0.75vh, 10px)",
               fontWeight: 700,
               letterSpacing: "0.10em",
               background: tokens.badgeBg,
               color: tokens.badgeColor,
-              borderRadius: "clamp(2px, 0.3vh, 4px)",
-              padding: "1px clamp(2px, 0.3vw, 5px)",
+              borderRadius: "clamp(2px, 0.3vh, 5px)",
+              padding: "clamp(1px, 0.12vh, 2px) clamp(3px, 0.35vw, 6px)",
               textTransform: "uppercase",
             }}
           >
@@ -256,14 +272,14 @@ export function PremiumResourceCard({
         {/* Team name + time + dressing room */}
         <div
           style={{
-            padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px) 0",
+            padding: "clamp(3px, 0.4vh, 6px) clamp(5px, 0.65vw, 10px) clamp(2px, 0.3vh, 4px)",
           }}
         >
           <div
             style={{
-              fontSize: "clamp(7px, 0.95vh, 13px)",
+              fontSize: "clamp(10px, 1.3vh, 18px)",
               fontWeight: isCurrent ? 700 : 500,
-              color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.70)",
+              color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.72)",
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
@@ -274,9 +290,9 @@ export function PremiumResourceCard({
           </div>
           <div
             style={{
-              fontSize: "clamp(5px, 0.72vh, 10px)",
-              color: "rgba(255,255,255,0.55)",
-              marginTop: "clamp(1px, 0.15vh, 2px)",
+              fontSize: "clamp(7px, 0.95vh, 13px)",
+              color: "rgba(255,255,255,0.60)",
+              marginTop: "clamp(1px, 0.18vh, 3px)",
               fontWeight: 600,
               letterSpacing: "0.04em",
             }}
@@ -286,10 +302,10 @@ export function PremiumResourceCard({
           {primaryDr && (
             <div
               style={{
-                fontSize: "clamp(4px, 0.6vh, 8px)",
-                color: "rgba(255,255,255,0.35)",
+                fontSize: "clamp(5px, 0.7vh, 9px)",
+                color: "rgba(255,255,255,0.38)",
                 marginTop: "clamp(1px, 0.12vh, 2px)",
-                paddingBottom: "clamp(2px, 0.3vh, 4px)",
+                paddingBottom: "clamp(2px, 0.25vh, 3px)",
               }}
             >
               {primaryDr.displayLabel}
@@ -321,12 +337,12 @@ export function NextActivityRow({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "clamp(1px, 0.15vh, 2px)",
-        padding: "clamp(3px, 0.4vh, 6px) clamp(4px, 0.5vw, 8px)",
-        borderRadius: "clamp(3px, 0.4vh, 6px)",
-        background: "rgba(255,255,255,0.03)",
-        border: "1px solid rgba(255,255,255,0.06)",
-        borderLeft: `2px solid ${tokens.accentColor}`,
+        gap: "clamp(2px, 0.22vh, 3px)",
+        padding: "clamp(5px, 0.65vh, 9px) clamp(6px, 0.75vw, 11px)",
+        borderRadius: "clamp(4px, 0.5vh, 7px)",
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderLeft: `3px solid ${tokens.accentColor}`,
         overflow: "hidden",
         flexShrink: 0,
       }}
@@ -336,12 +352,12 @@ export function NextActivityRow({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "0.4vw",
+          gap: "0.5vw",
         }}
       >
         <span
           style={{
-            fontSize: "clamp(7px, 0.9vh, 12px)",
+            fontSize: "clamp(11px, 1.4vh, 18px)",
             fontWeight: 700,
             color: "#ffffff",
             letterSpacing: "0.02em",
@@ -351,13 +367,13 @@ export function NextActivityRow({
         </span>
         <span
           style={{
-            fontSize: "clamp(4px, 0.6vh, 8px)",
+            fontSize: "clamp(6px, 0.75vh, 10px)",
             fontWeight: 700,
             letterSpacing: "0.10em",
             background: tokens.badgeBg,
             color: tokens.badgeColor,
-            borderRadius: "clamp(2px, 0.3vh, 4px)",
-            padding: "1px clamp(2px, 0.25vw, 4px)",
+            borderRadius: "clamp(2px, 0.3vh, 5px)",
+            padding: "clamp(1px, 0.12vh, 2px) clamp(3px, 0.3vw, 5px)",
             textTransform: "uppercase",
             flexShrink: 0,
           }}
@@ -367,9 +383,9 @@ export function NextActivityRow({
       </div>
       <div
         style={{
-          fontSize: "clamp(7px, 0.88vh, 12px)",
+          fontSize: "clamp(11px, 1.4vh, 18px)",
           fontWeight: 600,
-          color: "rgba(255,255,255,0.85)",
+          color: "rgba(255,255,255,0.88)",
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
@@ -379,8 +395,8 @@ export function NextActivityRow({
       </div>
       <div
         style={{
-          fontSize: "clamp(5px, 0.65vh, 9px)",
-          color: "rgba(255,255,255,0.40)",
+          fontSize: "clamp(8px, 1.0vh, 13px)",
+          color: "rgba(255,255,255,0.45)",
           letterSpacing: "0.06em",
         }}
       >
@@ -413,26 +429,26 @@ export function FacilityMarker({ marker }: { marker: MarkerElement }): ReactElem
     >
       <div
         style={{
-          background: "rgba(8,14,26,0.80)",
+          background: "rgba(8,14,26,0.85)",
           backdropFilter: "blur(6px)",
-          borderRadius: "clamp(3px, 0.4vh, 7px)",
-          padding: "clamp(2px, 0.3vh, 4px) clamp(4px, 0.5vw, 8px)",
+          borderRadius: "clamp(4px, 0.5vh, 8px)",
+          padding: "clamp(3px, 0.4vh, 6px) clamp(5px, 0.65vw, 10px)",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          border: "1px solid rgba(255,255,255,0.10)",
-          gap: "1px",
+          border: "1px solid rgba(255,255,255,0.14)",
+          gap: "clamp(1px, 0.15vh, 2px)",
           maxWidth: "100%",
         }}
       >
-        <span style={{ fontSize: "clamp(8px, 1.1vh, 16px)", lineHeight: 1 }}>
+        <span style={{ fontSize: "clamp(12px, 1.6vh, 22px)", lineHeight: 1 }}>
           {MARKER_ICONS[marker.markerType]}
         </span>
         {marker.label && (
           <span
             style={{
-              fontSize: "clamp(5px, 0.65vh, 9px)",
-              color: "rgba(255,255,255,0.75)",
+              fontSize: "clamp(7px, 0.9vh, 12px)",
+              color: "rgba(255,255,255,0.80)",
               fontWeight: 600,
               letterSpacing: "0.06em",
               whiteSpace: "nowrap",

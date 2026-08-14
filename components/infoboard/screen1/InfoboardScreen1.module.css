@@ -441,22 +441,6 @@
   gap: var(--ib-sp-3);
 }
 
-.teamLogo {
-  width: clamp(28px, 2.8vh, 42px);
-  height: clamp(28px, 2.8vh, 42px);
-  object-fit: contain;
-  flex-shrink: 0;
-}
-
-/* Invisible size-preserving placeholder — keeps away-team row aligned with
-   home-team row when no opponent crest is available. Same dimensions as
-   .teamLogo so the text column aligns vertically regardless. */
-.teamLogoPlaceholder {
-  width: clamp(28px, 2.8vh, 42px);
-  height: clamp(28px, 2.8vh, 42px);
-  flex-shrink: 0;
-}
-
 .eventTeamMain {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-event-team);
@@ -465,9 +449,12 @@
   text-transform: uppercase;
   color: var(--ib-text);
   line-height: 1.1;
-  white-space: nowrap;
+  /* Allow 2-line wrapping — do not ellipsize until truly necessary */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .eventTeamOpponent {
@@ -478,9 +465,12 @@
   text-transform: uppercase;
   color: var(--ib-text-secondary);
   line-height: 1.1;
-  white-space: nowrap;
+  /* Allow 2-line wrapping — do not ellipsize until truly necessary */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-word;
 }
 
 .vsLabel {
@@ -488,7 +478,6 @@
   font-weight: 600;
   letter-spacing: 0.1em;
   color: var(--ib-text-dim);
-  padding-left: clamp(28px, 2.8vh, 42px); /* indent to align with team names past logo */
   text-transform: uppercase;
 }
 

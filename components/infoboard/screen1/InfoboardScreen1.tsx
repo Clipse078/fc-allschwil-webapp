@@ -645,7 +645,11 @@ function EventCard({
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
-  const endTime = event.endAt !== null ? formatTime(event.endAt, timeZone) : null;
+  const rawEndTime = event.endAt !== null ? formatTime(event.endAt, timeZone) : null;
+  // Do not show a fake/meaningless duration: suppress endTime when it equals
+  // startTime (e.g. endAt was set to startAt in the source) or when no explicit
+  // end is recorded. Training sessions with genuine endAt pass this guard.
+  const endTime = rawEndTime !== null && rawEndTime !== startTime ? rawEndTime : null;
   const isMatch = event.type === "MATCH";
   const isTournament = event.type === "TOURNAMENT";
 
@@ -697,41 +701,17 @@ function EventCard({
 
         {isMatch ? (
           <div className={styles.matchIdentity}>
-            {/* Home team with logo */}
+            {/* Home team — text-first, no logo */}
             <div className={styles.matchTeamRow} data-testid="match-home-team-row">
-              {clubLogoSrc !== null && (
-                <img
-                  src={clubLogoSrc}
-                  alt=""
-                  className={styles.teamLogo}
-                  aria-hidden="true"
-                  data-testid="home-team-logo"
-                />
-              )}
               <span className={styles.eventTeamMain}>
                 {event.teamDisplayName}
               </span>
             </div>
             {/* VS separator */}
             <span className={styles.vsLabel} aria-hidden="true">vs.</span>
-            {/* Away team — canonical ExternalClub transparent PNG crest when available */}
+            {/* Away team — text-first, no logo */}
             {event.opponentDisplayName !== null && (
               <div className={styles.matchTeamRow} data-testid="match-away-team-row">
-                {event.opponentLogoUrl !== null ? (
-                  <img
-                    src={event.opponentLogoUrl}
-                    alt=""
-                    className={styles.teamLogo}
-                    aria-hidden="true"
-                    data-testid="away-team-logo"
-                  />
-                ) : (
-                  <div
-                    className={styles.teamLogoPlaceholder}
-                    aria-hidden="true"
-                    data-testid="away-team-logo-placeholder"
-                  />
-                )}
                 <span className={styles.eventTeamOpponent}>
                   {event.opponentDisplayName}
                 </span>
