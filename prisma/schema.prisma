@@ -597,6 +597,8 @@ model Tenant {
   persons           Person[]    @relation("TenantPersons")
   // PERSONS-02: canonical tenant-scoped person assignments
   personAssignments PersonAssignment[] @relation("TenantPersonAssignments")
+  // INVITE-01: tenant-scoped user invitations
+  invitations       Invitation[] @relation("TenantInvitations")
 
   @@index([status])
   @@index([name])
@@ -650,9 +652,12 @@ model User {
   updatedWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentUpdatedBy")
   createdWorkspaceDocumentVersions WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersionCreatedBy")
 
-  /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
-  /// every User that isn't the linked application account of a Person.
-  person Person?
+  /// ADMIN-MASTERDATA-UX-01 / INVITE-01 — opposite side of Person.userId (per-tenant unique).
+  /// A User may be the linked account of at most one Person per tenant; across
+  /// all tenants a User may accumulate multiple Person records (one per tenant
+  /// they participate in). Named "persons" because the global 1:1 assumption
+  /// is explicitly rejected per INVITE-01.
+  persons Person[] @relation("PersonUser")
 
   @@index([isActive])
   @@index([tenantId])
@@ -863,6 +868,49 @@ model TenantMembership {
   @@index([tenantId, isActive])
 }
 
+// ---------------------------------------------------------------------------
+// Invitation — INVITE-01: tenant-scoped user invitations targeting a Person.
+//
+// Lifecycle:
+//   PENDING  → admin created; token sent to email; awaiting acceptance.
+//   ACCEPTED → invitee clicked link, created/found User, linked to Person.
+//   REVOKED  → admin cancelled before acceptance.
+//
+// Invariants:
+//   - personId must belong to the same tenantId (checked at service layer).
+//   - tokenHash is SHA-256 of the raw one-time token (never stored raw).
+//   - A Person may have at most one PENDING invitation at a time (enforced at
+//     service layer by revoking/expiring the prior one before creating a new).
+//   - Accepting an invitation NEVER creates a second Person row.
+//   - Revoking an invitation NEVER deletes or modifies the Person row.
+//   - Deleting a Person cascades to Invitation rows (onDelete: Cascade on
+//     personId) — person lifecycle and user-access lifecycle are separate, but
+//     an invitation without a target person is meaningless.
+// ---------------------------------------------------------------------------
+model Invitation {
+  id        String    @id @default(cuid())
+  tenantId  String
+  personId  String
+  email     String
+
+  tokenHash String    @unique
+  expiresAt DateTime
+
+  acceptedAt DateTime?
+  revokedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation("TenantInvitations", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person Person @relation("PersonInvitations", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tokenHash])
+  @@index([personId])
+  @@index([tenantId, acceptedAt, revokedAt])
+}
+
 model RoleWorkflowRule {
   id                 String         @id @default(cuid())
   roleId             String
@@ -1056,16 +1104,18 @@ model Person {
   /// (future slice); null for persons without a photo.
   imageUrl String?
 
-  /// ADMIN-MASTERDATA-UX-01 — the canonical, explicit Person ↔ User link.
-  /// Nullable: most Persons (e.g. players, guardians) never get an
-  /// application account. Unique: at most one Person may point at a given
-  /// User (a 1:1 relation), so tenant-role-assignment UX can resolve
-  /// unambiguously from a Person to "the" User it represents. Deliberately
-  /// NOT derived from email-string matching — this FK is the sole
-  /// canonical source. onDelete: SetNull — deleting the User un-links the
+  /// ADMIN-MASTERDATA-UX-01 / INVITE-01 — the canonical, explicit Person ↔ User link.
+  /// Nullable: most Persons (e.g. players, volunteers) never get an
+  /// application account. Per-tenant unique (@@unique([tenantId, userId])): at
+  /// most one Person per User per tenant, enforcing the canonical rule
+  /// "every invited User must have exactly one Person in that tenant."
+  /// A User may participate in multiple tenants and will have a separate Person
+  /// record in each — the global 1:1 assumption is explicitly rejected.
+  /// Deliberately NOT derived from email-string matching — this FK is the
+  /// sole canonical source. onDelete: SetNull — deleting the User un-links the
   /// Person but never deletes Person master data.
-  userId String? @unique
-  user   User?   @relation(fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  userId String?
+  user   User?   @relation("PersonUser", fields: [userId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   // REGISTRATION-01F — Goal 3: fields copied verbatim from a registration
   // when a Person is created through the "Create Person" workflow action.
@@ -1104,6 +1154,8 @@ model Person {
   orgUnitMemberships   OrgUnitMembership[]
   // PERSONS-02: canonical person assignments (dedicated model, separate from OrgUnitMembership)
   personAssignments    PersonAssignment[]
+  // INVITE-01: invitations targeting this person
+  invitations          Invitation[]        @relation("PersonInvitations")
   authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
   authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
   // Registrations currently linked to this Person (Goal 2/3 — may include
@@ -1111,6 +1163,13 @@ model Person {
   // one that created this Person; see createdRegistrationId above).
   linkedRegistrations  Registration[]      @relation("RegistrationPerson")
 
+  // INVITE-01: per-tenant Person↔User uniqueness — one User may link to at
+  // most one Person within a given tenant; a User in multiple tenants gets a
+  // separate Person record in each. NULL userId values are excluded from this
+  // constraint (PostgreSQL UNIQUE ignores NULLs). Combined with Person being
+  // tenant-scoped, this enforces the canonical "person max one user" rule
+  // without assuming global 1:1.
+  @@unique([tenantId, userId])
   @@index([lastName, firstName])
   @@index([email])
   @@index([isActive])
@@ -1120,6 +1179,7 @@ model Person {
   @@index([tenantId])
   @@index([tenantId, isActive])
   @@index([tenantId, lastName, firstName])
+  @@index([userId])
 }
 model Team {
   id               String       @id @default(cuid())

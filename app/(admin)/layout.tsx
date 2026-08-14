@@ -38,7 +38,12 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
   // (Person.userId, ADMIN-MASTERDATA-UX-01), same relationship already used
   // for the dashboard greeting. See lib/people/identity.ts for the fallback
   // rule.
-  const linkedPersonName = await getPersonNameByUserId(session.user.id);
+  // INVITE-01: pass activeTenantId so lookup is scoped to the current tenant
+  // (Person.userId is now per-tenant unique, not globally unique).
+  const linkedPersonName = await getPersonNameByUserId(
+    session.user.id,
+    session.user.activeTenantId ?? undefined,
+  );
   const sidebarIdentity = resolveAccountIdentityName({
     linkedPerson: linkedPersonName,
     sessionFirstName: session.user.firstName,

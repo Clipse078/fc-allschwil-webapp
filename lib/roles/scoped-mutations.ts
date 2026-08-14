@@ -153,7 +153,8 @@ export async function getScopedAssignmentsForOrgUnit(
           firstName: true,
           lastName: true,
           email: true,
-          person: { select: { id: true } },
+          // INVITE-01: User.persons is now an array (per-tenant unique).
+          persons: { select: { id: true }, take: 1 },
         },
       },
     },
@@ -173,7 +174,7 @@ export async function getScopedAssignmentsForOrgUnit(
       firstName: r.user.firstName,
       lastName: r.user.lastName,
       email: r.user.email,
-      hasLinkedPerson: r.user.person !== null,
+      hasLinkedPerson: r.user.persons.length > 0,
       createdAt: r.createdAt,
     }));
 }
@@ -208,7 +209,8 @@ export async function getScopedAssignmentsForUser(
           firstName: true,
           lastName: true,
           email: true,
-          person: { select: { id: true } },
+          // INVITE-01: User.persons is now an array (per-tenant unique).
+          persons: { select: { id: true }, take: 1 },
         },
       },
     },
@@ -228,7 +230,7 @@ export async function getScopedAssignmentsForUser(
       firstName: r.user.firstName,
       lastName: r.user.lastName,
       email: r.user.email,
-      hasLinkedPerson: r.user.person !== null,
+      hasLinkedPerson: r.user.persons.length > 0,
       createdAt: r.createdAt,
     }));
 }

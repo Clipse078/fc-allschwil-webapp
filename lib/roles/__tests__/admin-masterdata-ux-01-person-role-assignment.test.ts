@@ -67,11 +67,13 @@ describe("ADMIN-MASTERDATA-UX-01 — Person <-> tenant-role assignment (live DB)
     const user = await createTestUser(`${label}-${suffix}`);
     createdUserIds.push(user.id);
 
+    // INVITE-01: Person.tenantId is NOT NULL; always supply tenantId.
     const person = await prisma.person.create({
       data: {
         firstName: "Test",
         lastName: `Person-${label}-${suffix}`,
         userId: user.id,
+        tenantId: tenantA.id,
       },
       select: { id: true },
     });
@@ -82,8 +84,9 @@ describe("ADMIN-MASTERDATA-UX-01 — Person <-> tenant-role assignment (live DB)
 
   it("7. Person without a linked User resolves user: null (no-account state)", async () => {
     const suffix = uniqueSuffix();
+    // INVITE-01: Person.tenantId is NOT NULL
     const person = await prisma.person.create({
-      data: { firstName: "Ohne", lastName: `Konto-${suffix}` },
+      data: { firstName: "Ohne", lastName: `Konto-${suffix}`, tenantId: tenantA.id },
       select: { id: true },
     });
     createdPersonIds.push(person.id);

@@ -303,10 +303,18 @@ export async function findDuplicateCandidates(
 /**
  * DASHBOARD-SHELL-UX-01-C1 — resolves the first name of the Person canonically
  * linked to a User.
+ *
+ * INVITE-01: Person.userId is now per-tenant unique. When tenantId is provided
+ * the lookup is scoped to that tenant; otherwise it returns the first match
+ * across all tenants (safe for single-tenant users, correct for multi-tenant
+ * users when tenantId is passed from session.user.activeTenantId).
  */
-export async function getPersonFirstNameByUserId(userId: string): Promise<string | null> {
-  const person = await prisma.person.findUnique({
-    where: { userId },
+export async function getPersonFirstNameByUserId(
+  userId: string,
+  tenantId?: string,
+): Promise<string | null> {
+  const person = await prisma.person.findFirst({
+    where: tenantId ? { userId, tenantId } : { userId },
     select: { firstName: true },
   });
   return person?.firstName?.trim() || null;
@@ -315,12 +323,18 @@ export async function getPersonFirstNameByUserId(userId: string): Promise<string
 /**
  * DASHBOARD-SHELL-UX-01-C2 — resolves the full name of the Person canonically
  * linked to a User.
+ *
+ * INVITE-01: Person.userId is now per-tenant unique. When tenantId is provided
+ * the lookup is scoped to that tenant; otherwise it returns the first match
+ * across all tenants (safe for single-tenant users, correct for multi-tenant
+ * users when tenantId is passed from session.user.activeTenantId).
  */
 export async function getPersonNameByUserId(
   userId: string,
+  tenantId?: string,
 ): Promise<{ firstName: string; lastName: string } | null> {
-  const person = await prisma.person.findUnique({
-    where: { userId },
+  const person = await prisma.person.findFirst({
+    where: tenantId ? { userId, tenantId } : { userId },
     select: { firstName: true, lastName: true },
   });
   const firstName = person?.firstName?.trim();
