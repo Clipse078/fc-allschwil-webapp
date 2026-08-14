@@ -21,6 +21,11 @@ import {
   deleteInfoboard,
 } from "@/lib/infoboard/queries";
 import type { UpdateInfoboardInput, InfoboardStatusValue } from "@/lib/infoboard/types";
+import {
+  parseAnlageplanJson,
+  isResourceZone,
+} from "@/lib/infoboard/anlageplan-types";
+import { getActiveFacilityResourcesByCodesForTenant } from "@/lib/facilities/queries";
 
 const REQUIRED_PERMISSIONS = [PERMISSIONS.INFOBOARD_MANAGE];
 const VALID_STATUSES: InfoboardStatusValue[] = ["ACTIVE", "DISABLED", "DRAFT"];
@@ -187,6 +192,36 @@ export async function PATCH(
         { status: 422 },
       );
     }
+
+    // INFOBOARD-MAP-01B — server-side cross-tenant resource code validation:
+    // Reject resource codes that do not belong to the active tenant's active
+    // FacilityResource set, preventing forged/cross-tenant associations.
+    if (typeof body.anlageplanJson === "string") {
+      const parsed = parseAnlageplanJson(body.anlageplanJson);
+      if (parsed) {
+        const submittedCodes = parsed.elements
+          .filter(isResourceZone)
+          .map((z) => z.resourceCode)
+          .filter((c): c is string => typeof c === "string" && c.length > 0);
+
+        if (submittedCodes.length > 0) {
+          const validMap = await getActiveFacilityResourcesByCodesForTenant(
+            submittedCodes,
+            tenantId,
+          );
+          const invalidCodes = submittedCodes.filter((c) => !validMap.has(c));
+          if (invalidCodes.length > 0) {
+            return NextResponse.json(
+              {
+                error: `Unbekannte oder ungültige Ressource-Codes: ${invalidCodes.join(", ")}`,
+              },
+              { status: 422 },
+            );
+          }
+        }
+      }
+    }
+
     input.anlageplanJson = body.anlageplanJson as string | null;
   }
 

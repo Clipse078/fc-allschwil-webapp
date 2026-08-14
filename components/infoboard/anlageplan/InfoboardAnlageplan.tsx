@@ -48,23 +48,9 @@ import {
   isMarker,
   isDuBistHier,
   MARKER_LABELS,
+  MARKER_ICONS,
 } from "@/lib/infoboard/anlageplan-types";
 import { LiveClockAnlageplan } from "./LiveClockAnlageplan";
-
-// ── Marker emoji map ──────────────────────────────────────────────────────────
-
-const MARKER_ICONS: Record<MarkerType, string> = {
-  DU_BIST_HIER: "📍",
-  HAUPTEINGANG: "🚪",
-  KABINE: "👕",
-  WC: "🚻",
-  BISTRO: "☕",
-  PARKPLATZ: "🅿️",
-  SEKRETARIAT: "📋",
-  SPEAKERRAUM: "🔊",
-  ERSTE_HILFE: "🏥",
-  FREIER_MARKER: "📌",
-};
 
 // ── Event time helper ─────────────────────────────────────────────────────────
 

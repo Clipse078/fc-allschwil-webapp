@@ -47,6 +47,7 @@ import type {
   MarkerElement,
   MarkerType,
   NormalizedRect,
+  AnlageplanResourceOption,
 } from "@/lib/infoboard/anlageplan-types";
 import {
   parseAnlageplanJson,
@@ -56,25 +57,27 @@ import {
   isDuBistHier,
   validateAnlageplanConfig,
   MARKER_LABELS,
+  MARKER_ICONS,
   ZONE_TYPE_LABELS,
   defaultRect,
   defaultMarkerRect,
   defaultDuBistHierRect,
+  anlageplanResourceLabel,
 } from "@/lib/infoboard/anlageplan-types";
 
-// ── Marker palette ─────────────────────────────────────────────────────────────
+// ── Marker palette — driven by canonical MARKER_ICONS (single source of truth) ─
 
-const MARKER_PALETTE: { type: MarkerType; icon: string }[] = [
-  { type: "DU_BIST_HIER", icon: "📍" },
-  { type: "HAUPTEINGANG", icon: "🚪" },
-  { type: "KABINE", icon: "👕" },
-  { type: "WC", icon: "🚻" },
-  { type: "BISTRO", icon: "☕" },
-  { type: "PARKPLATZ", icon: "🅿️" },
-  { type: "SEKRETARIAT", icon: "📋" },
-  { type: "SPEAKERRAUM", icon: "🔊" },
-  { type: "ERSTE_HILFE", icon: "🏥" },
-  { type: "FREIER_MARKER", icon: "📌" },
+const MARKER_PALETTE: { type: MarkerType }[] = [
+  { type: "DU_BIST_HIER" },
+  { type: "HAUPTEINGANG" },
+  { type: "KABINE" },
+  { type: "WC" },
+  { type: "BISTRO" },
+  { type: "PARKPLATZ" },
+  { type: "SEKRETARIAT" },
+  { type: "SPEAKERRAUM" },
+  { type: "ERSTE_HILFE" },
+  { type: "FREIER_MARKER" },
 ];
 
 // ── Canvas helpers ─────────────────────────────────────────────────────────────
@@ -103,11 +106,17 @@ function clamp(v: number, lo: number, hi: number): number {
 type Props = {
   board: InboardRow;
   onBoardChange?: (updated: InboardRow) => void;
+  /**
+   * INFOBOARD-MAP-01B — canonical active FacilityResource options for the
+   * resource picker. Passed from the server page (tenant-scoped, non-archived,
+   * FULL_PITCH/HALF_PITCH types only).
+   */
+  facilityOptions?: AnlageplanResourceOption[];
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function AnlageplanDesignerClient({ board, onBoardChange }: Props) {
+export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions = [] }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 450 });
 
@@ -464,13 +473,13 @@ export function AnlageplanDesignerClient({ board, onBoardChange }: Props) {
         {/* Markers */}
         <PanelSection label="Marker">
           <div className="space-y-1">
-            {MARKER_PALETTE.map(({ type, icon }) => (
+            {MARKER_PALETTE.map(({ type }) => (
               <button
                 key={type}
                 onClick={() => addMarker(type)}
                 className="w-full text-left fca-button-secondary text-[0.72rem] py-1 px-2 inline-flex items-center gap-1.5"
               >
-                <span className="text-sm">{icon}</span>
+                <span className="text-sm">{MARKER_ICONS[type]}</span>
                 {MARKER_LABELS[type]}
               </button>
             ))}
@@ -576,17 +585,41 @@ export function AnlageplanDesignerClient({ board, onBoardChange }: Props) {
                 }}
                 onMouseDown={(e) => onMouseDownElement(e, el.id)}
               >
-                {/* Element label */}
-                <span
-                  className="text-white text-center leading-tight font-semibold pointer-events-none"
-                  style={{ fontSize: Math.max(9, Math.min(14, px.w / 8)) }}
-                >
-                  {isZone
-                    ? ((el as ResourceZoneElement).label ?? (el as ResourceZoneElement).resourceCode ?? "Zone")
-                    : isDubist
-                      ? "📍 DU BIST HIER"
-                      : ((el as MarkerElement).label ?? MARKER_LABELS[(el as MarkerElement).markerType])}
-                </span>
+                {/* Element label — icon + text, matching kiosk treatment */}
+                {isZone ? (
+                  <span
+                    className="text-white text-center leading-tight font-semibold pointer-events-none"
+                    style={{ fontSize: Math.max(9, Math.min(14, px.w / 8)) }}
+                  >
+                    {(el as ResourceZoneElement).label ?? (el as ResourceZoneElement).resourceCode ?? "Zone"}
+                  </span>
+                ) : isDubist ? (
+                  <div
+                    className="flex flex-col items-center gap-0.5 pointer-events-none"
+                    style={{ fontSize: Math.max(8, Math.min(13, px.w / 7)) }}
+                  >
+                    <span style={{ fontSize: Math.max(10, Math.min(18, px.h * 0.38)) }}>
+                      {MARKER_ICONS.DU_BIST_HIER}
+                    </span>
+                    <span className="text-amber-400 font-bold leading-none whitespace-nowrap" style={{ fontSize: Math.max(7, Math.min(11, px.w / 9)) }}>
+                      DU BIST HIER
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    className="flex flex-col items-center gap-0.5 pointer-events-none"
+                  >
+                    <span style={{ fontSize: Math.max(10, Math.min(18, px.h * 0.42)) }}>
+                      {MARKER_ICONS[(el as MarkerElement).markerType]}
+                    </span>
+                    <span
+                      className="text-white text-center leading-tight font-medium whitespace-nowrap overflow-hidden text-ellipsis"
+                      style={{ fontSize: Math.max(7, Math.min(11, px.w / 9)), maxWidth: px.w - 4 }}
+                    >
+                      {(el as MarkerElement).label ?? MARKER_LABELS[(el as MarkerElement).markerType]}
+                    </span>
+                  </div>
+                )}
 
                 {/* Resize handle (bottom-right) */}
                 {isSelected && (
@@ -634,24 +667,63 @@ export function AnlageplanDesignerClient({ board, onBoardChange }: Props) {
 
             {isResourceZone(selectedElement) && (
               <PanelSection label="Ressource">
+                {/* ── Canonical resource picker ─────────────────────────── */}
                 <label className="block text-[0.72rem] text-[var(--muted)] mb-1">
-                  Ressource-Code
+                  Anlage / Ressource
                 </label>
-                <input
-                  type="text"
-                  value={selectedElement.resourceCode ?? ""}
-                  onChange={(e) =>
-                    updateElement(selectedElement.id, {
-                      resourceCode: e.target.value || null,
-                    } as Partial<ResourceZoneElement>)
-                  }
-                  placeholder="z.B. KR2, KR2-A"
-                  className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)] font-mono"
-                />
-                <p className="mt-1 text-[0.68rem] text-[var(--muted)]">
-                  Muss mit dem FacilityResource.code übereinstimmen.
-                </p>
+                {facilityOptions.length > 0 ? (
+                  <>
+                    <select
+                      value={selectedElement.resourceCode ?? ""}
+                      onChange={(e) => {
+                        const code = e.target.value || null;
+                        const opt = code
+                          ? facilityOptions.find((o) => o.code === code)
+                          : null;
+                        const patch: Partial<ResourceZoneElement> = { resourceCode: code };
+                        if (opt) {
+                          // Auto-sync zone type from canonical resource type
+                          patch.zoneType = opt.type;
+                          // Prefill display label if currently empty
+                          if (!selectedElement.label) {
+                            patch.label = anlageplanResourceLabel(opt);
+                          }
+                        }
+                        updateElement(selectedElement.id, patch);
+                      }}
+                      className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
+                    >
+                      <option value="">— Kein Bezug —</option>
+                      {facilityOptions.map((opt) => (
+                        <option key={opt.code} value={opt.code}>
+                          {anlageplanResourceLabel(opt)}
+                          {" "}
+                          ({opt.type === "FULL_PITCH" ? "Ganzes Feld" : "Halbes Feld"})
+                        </option>
+                      ))}
+                    </select>
+                    {selectedElement.resourceCode && (
+                      <p className="mt-1 text-[0.65rem] text-[var(--muted)] font-mono">
+                        Code: {selectedElement.resourceCode}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  /* Fallback: no facilityOptions passed — should not happen in normal use */
+                  <input
+                    type="text"
+                    value={selectedElement.resourceCode ?? ""}
+                    onChange={(e) =>
+                      updateElement(selectedElement.id, {
+                        resourceCode: e.target.value || null,
+                      } as Partial<ResourceZoneElement>)
+                    }
+                    placeholder="z.B. KR2, KR2-A"
+                    className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)] font-mono"
+                  />
+                )}
 
+                {/* ── Anzeigebezeichnung (independently editable) ──────── */}
                 <label className="block text-[0.72rem] text-[var(--muted)] mt-3 mb-1">
                   Anzeigebezeichnung
                 </label>
@@ -666,7 +738,11 @@ export function AnlageplanDesignerClient({ board, onBoardChange }: Props) {
                   placeholder="z.B. Kunstrasen 2"
                   className="w-full rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[0.78rem] text-[var(--foreground)]"
                 />
+                <p className="mt-1 text-[0.65rem] text-[var(--muted)]">
+                  Nur für diese Karte. Ändert keine Stammdaten.
+                </p>
 
+                {/* ── Zone type ────────────────────────────────────────── */}
                 <label className="block text-[0.72rem] text-[var(--muted)] mt-3 mb-1">
                   Feldtyp
                 </label>
