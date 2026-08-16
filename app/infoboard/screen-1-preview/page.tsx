@@ -7,7 +7,11 @@ import {
 } from "@/components/infoboard/screen1/screen1-preview-fixture";
 
 export default function InfoboardScreen1PreviewPage() {
-  if (process.env.NODE_ENV !== "development") {
+  const previewAllowed =
+    process.env.NODE_ENV === "development" ||
+    process.env.VERCEL_GIT_COMMIT_REF === "STAGE";
+
+  if (!previewAllowed) {
     notFound();
   }
 

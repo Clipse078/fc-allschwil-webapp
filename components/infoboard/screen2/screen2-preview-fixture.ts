@@ -369,3 +369,166 @@ export const PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED: InfoboardScreen2Feed = {
   ],
   unallocated: [],
 };
+
+/**
+ * Physical-TV regression fixture.
+ *
+ * Exercises the canonical FULL_PITCH / HALF_PITCH hierarchy:
+ *
+ *   Stadion -> MATCH on FULL_PITCH
+ *
+ *   KR2
+ *     FULL resource exists but is free
+ *     A = TRAINING on HALF_PITCH
+ *     B = free HALF_PITCH
+ *
+ *   KR3
+ *     FULL resource exists but is free
+ *     A = free HALF_PITCH
+ *     B = TOURNAMENT on HALF_PITCH
+ *
+ * groupFacilityPitches() must therefore:
+ *   - show Stadion FULL
+ *   - suppress KR2 FULL and show A/B halves
+ *   - suppress KR3 FULL and show A/B halves
+ *
+ * PREVIEW ONLY.
+ */
+export const PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV: InfoboardScreen2Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT_S2,
+  displayDate: "2026-09-12",
+  isStale: false,
+  facilityName: "Sportanlage Im Brüel",
+
+  pitches: [
+    // -------------------------------------------------------
+    // STADION — FULL PITCH MATCH
+    // -------------------------------------------------------
+    {
+      code: "P-STADION",
+      displayLabel: "Stadion",
+      facilityName: "Stadion",
+      facilityId: "physical-stadion",
+      resourceType: "FULL_PITCH",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "tv-match-stadion",
+        displayTitle: "FC Allschwil E1 – FC Binningen E1",
+        teamDisplayName: "FC Allschwil E1",
+        opponentDisplayName: "FC Binningen E1",
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T16:45:00.000Z",
+        status: "LIVE",
+        type: "MATCH",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+
+    // -------------------------------------------------------
+    // KR2 — FULL + TWO HALVES
+    // A occupied by Training.
+    // Canonical hierarchy must suppress the FULL representation.
+    // -------------------------------------------------------
+    {
+      code: "P-KR2",
+      displayLabel: "KR2",
+      facilityName: "Kunstrasen 2",
+      facilityId: "physical-kr2",
+      resourceType: "FULL_PITCH",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: null,
+    },
+    {
+      code: "P-KR2-A",
+      displayLabel: "KR2 A",
+      facilityName: "Kunstrasen 2",
+      facilityId: "physical-kr2",
+      resourceType: "HALF_PITCH",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "tv-training-kr2-a",
+        displayTitle: "FC Allschwil F2",
+        teamDisplayName: "FC Allschwil F2",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T16:30:00.000Z",
+        status: "LIVE",
+        type: "TRAINING",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+    {
+      code: "P-KR2-B",
+      displayLabel: "KR2 B",
+      facilityName: "Kunstrasen 2",
+      facilityId: "physical-kr2",
+      resourceType: "HALF_PITCH",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: null,
+    },
+
+    // -------------------------------------------------------
+    // KR3 — FULL + TWO HALVES
+    // B occupied by Tournament.
+    // Canonical hierarchy must suppress the FULL representation.
+    // -------------------------------------------------------
+    {
+      code: "P-KR3",
+      displayLabel: "KR3",
+      facilityName: "Kunstrasen 3",
+      facilityId: "physical-kr3",
+      resourceType: "FULL_PITCH",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: null,
+    },
+    {
+      code: "P-KR3-A",
+      displayLabel: "KR3 A",
+      facilityName: "Kunstrasen 3",
+      facilityId: "physical-kr3",
+      resourceType: "HALF_PITCH",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      nextEvent: null,
+    },
+    {
+      code: "P-KR3-B",
+      displayLabel: "KR3 B",
+      facilityName: "Kunstrasen 3",
+      facilityId: "physical-kr3",
+      resourceType: "HALF_PITCH",
+      state: "OCCUPIED_NOW",
+      hasAllocationConflict: false,
+      currentEvent: {
+        eventId: "tv-tournament-kr3-b",
+        displayTitle: "Junioren F Play More Football",
+        teamDisplayName: "FC Allschwil Junioren F",
+        opponentDisplayName: null,
+        startAt: "2026-09-12T15:00:00.000Z",
+        endAt: "2026-09-12T17:00:00.000Z",
+        status: "LIVE",
+        type: "TOURNAMENT",
+        temporalRelation: "current",
+        dressingRooms: [],
+      },
+      nextEvent: null,
+    },
+  ],
+
+  dressingRooms: [],
+  unallocated: [],
+};
