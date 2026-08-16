@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { Screen2PhysicalTvPreview } from "@/components/infoboard/screen2/Screen2PhysicalTvPreview";
 import {
   PREVIEW_CURRENT_TIME_ISO_S2,
   PREVIEW_WEATHER,
@@ -478,9 +479,10 @@ export default async function InfoboardScreen2PreviewPage() {
   };
 
   return (
-    <InfoboardAnlageplan
-      payload={payload}
-      weather={PREVIEW_WEATHER}
+    <>
+      <InfoboardAnlageplan
+        payload={payload}
+        weather={PREVIEW_WEATHER}
       branding={{
         clubLogoSrc:
           tenant.logoUrl ??
@@ -492,6 +494,27 @@ export default async function InfoboardScreen2PreviewPage() {
         facilityName:
           "SPORTANLAGE IM BRÜEL",
       }}
-    />
+      />
+
+      <section
+        style={{
+          minHeight: "100vh",
+          background: "#060b12",
+          padding: "32px",
+          color: "#fff",
+        }}
+      >
+        <h1
+          style={{
+            margin: "0 0 24px",
+            fontSize: "28px",
+          }}
+        >
+          SCREEN 2 — EVENT DETAIL UX TEST
+        </h1>
+
+        <Screen2PhysicalTvPreview payload={payload} />
+      </section>
+    </>
   );
 }
