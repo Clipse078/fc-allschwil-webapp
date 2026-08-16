@@ -66,6 +66,13 @@ export type InfoboardScreen1Event = {
   teamDisplayName: string | null;
   opponentDisplayName: string | null;
   /**
+   * Optional tournament participant display names.
+   *
+   * Additive presentation metadata only. Production publishers may leave this
+   * undefined when canonical participant data is unavailable.
+   */
+  participantTeamNames?: readonly string[];
+  /**
    * Canonical opponent club crest URL resolved from ExternalTeam.logoUrl →
    * ExternalClub.logoUrl. Null when no Club Directory crest is available.
    * Never a white-background tile — only the clean canonical transparent PNG.
@@ -171,6 +178,13 @@ export type PitchEventSummary = {
   displayTitle: string;
   teamDisplayName: string | null;
   opponentDisplayName: string | null;
+  /**
+   * Optional tournament participant display names.
+   *
+   * Additive presentation metadata only. Production publishers may leave this
+   * undefined when canonical participant data is unavailable.
+   */
+  participantTeamNames?: readonly string[];
   /** UTC ISO-8601. */
   startAt: string;
   /** UTC ISO-8601 or null. */

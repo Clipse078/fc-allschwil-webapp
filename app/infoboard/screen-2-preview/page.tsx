@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
-import { Screen2PhysicalTvPreview } from "@/components/infoboard/screen2/Screen2PhysicalTvPreview";
 import {
   PREVIEW_CURRENT_TIME_ISO_S2,
   PREVIEW_WEATHER,
@@ -26,6 +25,59 @@ import type {
 
 const SCREEN_2_SLUG = "screen-2";
 
+function enrichApprovedPreviewDetails(
+  feed: InfoboardScreen2Feed,
+): InfoboardScreen2Feed {
+  return {
+    ...feed,
+    pitches: feed.pitches.map((pitch) => ({
+      ...pitch,
+      currentEvent: pitch.currentEvent
+        ? {
+            ...pitch.currentEvent,
+            ...(pitch.currentEvent.type === "MATCH"
+              ? {
+                  displayTitle:
+                    "FC Allschwil Junioren C2 vs. FC Therwil C Gelb",
+                  teamDisplayName: "FC Allschwil Junioren C2",
+                  opponentDisplayName: "FC Therwil C Gelb",
+                }
+              : pitch.currentEvent.type === "TOURNAMENT"
+                ? {
+                    displayTitle: "PlayMore Turnier",
+                    teamDisplayName: "PlayMore Turnier",
+                    participantTeamNames: [
+                      "FC Allschwil E2",
+                      "FC Binningen E3",
+                      "FC Oberwil E2",
+                      "FC Therwil E3",
+                      "FC Aesch E2",
+                      "SC Dornach E3",
+                    ],
+                  }
+                : {
+                    teamDisplayName: "Junioren F2",
+                  }),
+          }
+        : null,
+      nextEvent: pitch.nextEvent
+        ? {
+            ...pitch.nextEvent,
+            ...(pitch.nextEvent.type === "MATCH"
+              ? {
+                  teamDisplayName:
+                    pitch.nextEvent.teamDisplayName ??
+                    "FC Allschwil Junioren C2",
+                  opponentDisplayName:
+                    pitch.nextEvent.opponentDisplayName ??
+                    "FC Therwil C Gelb",
+                }
+              : {}),
+          }
+        : null,
+    })),
+  };
+}
 function previewAllowed(): boolean {
   return (
     process.env.NODE_ENV === "development" ||
@@ -472,17 +524,17 @@ export default async function InfoboardScreen2PreviewPage() {
     ...configuredPayload,
     screen2: {
       ...configuredPayload.screen2,
-      feed: previewFeed,
+      feed: enrichApprovedPreviewDetails(previewFeed),
       currentTimeIso: PREVIEW_CURRENT_TIME_ISO_S2,
     },
     currentTimeIso: PREVIEW_CURRENT_TIME_ISO_S2,
   };
 
   return (
-    <>
-      <InfoboardAnlageplan
+    <InfoboardAnlageplan
         payload={payload}
         weather={PREVIEW_WEATHER}
+        richEventCards
       branding={{
         clubLogoSrc:
           tenant.logoUrl ??
@@ -495,26 +547,5 @@ export default async function InfoboardScreen2PreviewPage() {
           "SPORTANLAGE IM BRÜEL",
       }}
       />
-
-      <section
-        style={{
-          minHeight: "100vh",
-          background: "#060b12",
-          padding: "32px",
-          color: "#fff",
-        }}
-      >
-        <h1
-          style={{
-            margin: "0 0 24px",
-            fontSize: "28px",
-          }}
-        >
-          SCREEN 2 — EVENT DETAIL UX TEST
-        </h1>
-
-        <Screen2PhysicalTvPreview payload={payload} />
-      </section>
-    </>
   );
 }

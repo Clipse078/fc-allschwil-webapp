@@ -45,6 +45,7 @@ import { NextActivityRow } from "./AnlageplanMapElements";
 export type InfoboardAnlageplanProps = {
   payload: AnlageplanLivePayload;
   weather?: WeatherResult | null;
+  richEventCards?: boolean;
   branding: {
     clubLogoSrc?: string | null;
     productLogoSrc?: string | null;
@@ -58,6 +59,7 @@ export type InfoboardAnlageplanProps = {
 export function InfoboardAnlageplan({
   payload,
   weather,
+  richEventCards = false,
   branding,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
@@ -170,6 +172,7 @@ export function InfoboardAnlageplan({
             pitchMap={pitchMap}
             suppressedCodes={suppressedCodes}
             timezone={tz}
+            richEventCards={richEventCards}
           />
         </div>
 

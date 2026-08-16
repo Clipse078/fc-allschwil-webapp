@@ -89,10 +89,12 @@ export function PremiumResourceCard({
   zone,
   occupancy,
   tz,
+  richEventCards = false,
 }: {
   zone: ResourceZoneElement;
   occupancy: PitchOccupancy | null;
   tz: string;
+  richEventCards?: boolean;
 }): ReactElement {
   const hasCurrent = occupancy?.currentEvent != null;
   const hasNext = zone.showNextActivity && occupancy?.nextEvent != null && !hasCurrent;
@@ -198,6 +200,10 @@ export function PremiumResourceCard({
   const endTime = activeEvent.endAt ? fmtTime(activeEvent.endAt, tz) : null;
   const primaryDr = activeEvent.dressingRooms[0];
   const resourceDisplay = zone.label ?? zone.resourceCode ?? "";
+  const richTournamentTeams =
+    activeEvent.type === "TOURNAMENT"
+      ? (activeEvent.participantTeamNames ?? [])
+      : [];
 
   return (
     <div
@@ -269,49 +275,207 @@ export function PremiumResourceCard({
           </span>
         </div>
 
-        {/* Team name + time + dressing room */}
-        <div
-          style={{
-            padding: "clamp(3px, 0.4vh, 6px) clamp(5px, 0.65vw, 10px) clamp(2px, 0.3vh, 4px)",
-          }}
-        >
+        {richEventCards ? (
           <div
+            data-testid="resource-card-rich-body"
             style={{
-              fontSize: "clamp(10px, 1.3vh, 18px)",
-              fontWeight: isCurrent ? 700 : 500,
-              color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.72)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              letterSpacing: "0.02em",
+              padding:
+                "clamp(7px, 0.85vh, 12px) clamp(8px, 0.85vw, 14px) clamp(8px, 0.9vh, 13px)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "clamp(3px, 0.4vh, 6px)",
             }}
           >
-            {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
-          </div>
-          <div
-            style={{
-              fontSize: "clamp(7px, 0.95vh, 13px)",
-              color: "rgba(255,255,255,0.60)",
-              marginTop: "clamp(1px, 0.18vh, 3px)",
-              fontWeight: 600,
-              letterSpacing: "0.04em",
-            }}
-          >
-            {startTime}{endTime ? `–${endTime}` : ""}
-          </div>
-          {primaryDr && (
+            {activeEvent.type === "MATCH" ? (
+              <>
+                <div
+                  style={{
+                    fontSize: "clamp(7px, 0.85vh, 11px)",
+                    fontWeight: 800,
+                    letterSpacing: "0.11em",
+                    color: tokens.badgeColor,
+                    textTransform: "uppercase",
+                    marginBottom: "clamp(1px, 0.15vh, 2px)",
+                  }}
+                >
+                  MEISTERSCHAFT
+                </div>
+
+                <div
+                  style={{
+                    fontSize: "clamp(11px, 1.45vh, 20px)",
+                    fontWeight: 800,
+                    lineHeight: 1.08,
+                    color: "#ffffff",
+                  }}
+                >
+                  {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
+                </div>
+
+                {activeEvent.opponentDisplayName && (
+                  <>
+                    <div
+                      style={{
+                        fontSize: "clamp(8px, 0.9vh, 12px)",
+                        fontWeight: 700,
+                        color: "rgba(255,255,255,0.48)",
+                        lineHeight: 1,
+                      }}
+                    >
+                      vs.
+                    </div>
+
+                    <div
+                      style={{
+                        fontSize: "clamp(11px, 1.45vh, 20px)",
+                        fontWeight: 800,
+                        lineHeight: 1.08,
+                        color: "#ffffff",
+                      }}
+                    >
+                      {activeEvent.opponentDisplayName}
+                    </div>
+                  </>
+                )}
+              </>
+            ) : activeEvent.type === "TOURNAMENT" ? (
+              <>
+                <div
+                  style={{
+                    fontSize: "clamp(11px, 1.45vh, 20px)",
+                    fontWeight: 800,
+                    lineHeight: 1.08,
+                    color: "#ffffff",
+                  }}
+                >
+                  {activeEvent.displayTitle}
+                </div>
+
+                {richTournamentTeams.length > 0 && (
+                  <div
+                    style={{
+                      marginTop: "clamp(2px, 0.28vh, 4px)",
+                      paddingTop: "clamp(3px, 0.35vh, 5px)",
+                      borderTop: "1px solid rgba(255,255,255,0.12)",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "clamp(1px, 0.14vh, 2px)",
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: "clamp(6px, 0.72vh, 10px)",
+                        color: tokens.badgeColor,
+                        fontWeight: 800,
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        marginBottom: "clamp(1px, 0.16vh, 2px)",
+                      }}
+                    >
+                      TEILNEHMENDE TEAMS
+                    </div>
+
+                    {richTournamentTeams.map((team) => (
+                      <div
+                        key={team}
+                        style={{
+                          fontSize: "clamp(8px, 0.95vh, 13px)",
+                          lineHeight: 1.18,
+                          fontWeight: 600,
+                          color: "rgba(255,255,255,0.82)",
+                          overflowWrap: "anywhere",
+                        }}
+                      >
+                        • {team}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                style={{
+                  fontSize: "clamp(11px, 1.5vh, 21px)",
+                  fontWeight: 800,
+                  lineHeight: 1.08,
+                  color: "#ffffff",
+                }}
+              >
+                {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
+              </div>
+            )}
+
             <div
               style={{
-                fontSize: "clamp(5px, 0.7vh, 9px)",
-                color: "rgba(255,255,255,0.38)",
-                marginTop: "clamp(1px, 0.12vh, 2px)",
-                paddingBottom: "clamp(2px, 0.25vh, 3px)",
+                fontSize: "clamp(9px, 1.05vh, 14px)",
+                color: "rgba(255,255,255,0.68)",
+                marginTop: "clamp(2px, 0.3vh, 4px)",
+                fontWeight: 700,
+                letterSpacing: "0.03em",
               }}
             >
-              {primaryDr.displayLabel}
+              {startTime}{endTime ? `–${endTime}` : ""}
             </div>
-          )}
-        </div>
+
+            {primaryDr && (
+              <div
+                style={{
+                  fontSize: "clamp(7px, 0.85vh, 11px)",
+                  color: "rgba(255,255,255,0.48)",
+                  fontWeight: 600,
+                }}
+              >
+                {primaryDr.displayLabel}
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            {/* Canonical existing compact body */}
+            <div
+              style={{
+                padding: "clamp(3px, 0.4vh, 6px) clamp(5px, 0.65vw, 10px) clamp(2px, 0.3vh, 4px)",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "clamp(10px, 1.3vh, 18px)",
+                  fontWeight: isCurrent ? 700 : 500,
+                  color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.72)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  letterSpacing: "0.02em",
+                }}
+              >
+                {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
+              </div>
+              <div
+                style={{
+                  fontSize: "clamp(7px, 0.95vh, 13px)",
+                  color: "rgba(255,255,255,0.60)",
+                  marginTop: "clamp(1px, 0.18vh, 3px)",
+                  fontWeight: 600,
+                  letterSpacing: "0.04em",
+                }}
+              >
+                {startTime}{endTime ? `–${endTime}` : ""}
+              </div>
+              {primaryDr && (
+                <div
+                  style={{
+                    fontSize: "clamp(5px, 0.7vh, 9px)",
+                    color: "rgba(255,255,255,0.38)",
+                    marginTop: "clamp(1px, 0.12vh, 2px)",
+                    paddingBottom: "clamp(2px, 0.25vh, 3px)",
+                  }}
+                >
+                  {primaryDr.displayLabel}
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

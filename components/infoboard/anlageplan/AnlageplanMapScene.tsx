@@ -65,6 +65,8 @@ export type AnlageplanMapSceneProps = {
   suppressedCodes?: ReadonlySet<string> | null;
   /** Tenant timezone — required for event time formatting. Defaults to "UTC". */
   timezone?: string;
+  /** Optional richer public-kiosk card body. Default false preserves canonical compact rendering. */
+  richEventCards?: boolean;
 };
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ export function AnlageplanMapScene({
   pitchMap,
   suppressedCodes,
   timezone = "UTC",
+  richEventCards = false,
 }: AnlageplanMapSceneProps): ReactElement {
   // Apply hierarchy suppression — zones for suppressed codes are completely
   // omitted (not even shown as FREI) because the canonical resolver has
@@ -151,6 +154,7 @@ export function AnlageplanMapScene({
               zone={zone}
               occupancy={occupancy}
               tz={timezone}
+              richEventCards={richEventCards}
             />
           );
         })}
