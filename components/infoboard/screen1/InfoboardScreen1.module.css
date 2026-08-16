@@ -97,8 +97,9 @@
 
   /* Card zone proportions */
   --ib-zone-time:       15%;
-  --ib-zone-event:      46%;
-  --ib-zone-dest:       39%;
+  --ib-zone-event:      43%;
+  --ib-zone-room:       24%;
+  --ib-zone-pitch:      18%;
 
   /* Border radius */
   --ib-radius:          8px;
@@ -333,7 +334,7 @@
 
 .eventCard {
   display: grid;
-  grid-template-columns: var(--ib-zone-time) var(--ib-zone-event) var(--ib-zone-dest);
+  grid-template-columns: var(--ib-zone-time) var(--ib-zone-event) var(--ib-zone-room) var(--ib-zone-pitch);
   align-items: stretch;
   background: var(--ib-card-bg);
   border: 1px solid var(--ib-border);
@@ -492,6 +493,42 @@
 
 /* ─── RIGHT ZONE: Destination ───────────────────────────────────────────── */
 
+.cardDressingRoomZone,
+.cardPitchZone {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--ib-sp-3);
+  padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
+  min-width: 0;
+}
+
+.cardDressingRoomZone {
+  border-left: 1px solid var(--ib-border);
+}
+
+.cardPitchZone {
+  border-left: 1px solid var(--ib-border);
+}
+
+.cardPitchZone .destPitchValue {
+  font-size: var(--ib-fs-dest-pitch);
+}
+
+.cardDressingRoomZone .matchAllocation,
+.cardDressingRoomZone .participantAllocationBlock {
+  min-width: 0;
+}
+
+.cardDressingRoomZone .matchAllocRow,
+.cardDressingRoomZone .participantAllocationRow {
+  min-width: 0;
+}
+
+.cardDressingRoomZone .matchAllocTeam,
+.cardDressingRoomZone .participantTeamName {
+  min-width: 0;
+}
 .destinationZone {
   display: flex;
   flex-direction: column;
@@ -855,13 +892,14 @@
 @media (max-width: 1366px) {
   .root {
     --ib-zone-time:   16%;
-    --ib-zone-event:  46%;
-    --ib-zone-dest:   38%;
+    --ib-zone-event:  42%;
+    --ib-zone-room:   24%;
+    --ib-zone-pitch:  18%;
     --ib-card-gap:    4px;
   }
 
   .eventCard {
-    grid-template-columns: var(--ib-zone-time) var(--ib-zone-event) var(--ib-zone-dest);
+    grid-template-columns: var(--ib-zone-time) var(--ib-zone-event) var(--ib-zone-room) var(--ib-zone-pitch);
   }
 
   .eventList[data-count="5"] {

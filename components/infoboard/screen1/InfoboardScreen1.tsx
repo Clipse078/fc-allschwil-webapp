@@ -316,22 +316,62 @@ type MatchDestinationProps = {
   event: InfoboardScreen1Event;
 };
 
-/**
- * Renders pitch + home/away dressing-room pairings in the destination zone.
- * No logos here — logos are in the event identity (CENTER) zone.
- */
 function MatchDestination({ event }: MatchDestinationProps): ReactElement {
-  const { homeDressingRoomLabel, awayDressingRoomLabel, pitchLabel } = event.allocation;
-  const hasHome = homeDressingRoomLabel !== null && event.teamDisplayName !== null;
-  const hasAway = awayDressingRoomLabel !== null && event.opponentDisplayName !== null;
+  const {
+    homeDressingRoomLabel,
+    awayDressingRoomLabel,
+    pitchLabel,
+  } = event.allocation;
+
+  const hasHome = homeDressingRoomLabel !== null;
+  const hasAway = awayDressingRoomLabel !== null;
 
   return (
-    <div className={styles.destinationZone}>
-      {/* Pitch */}
-      <div className={styles.destPitchRow}>
+    <>
+      <div
+        className={styles.cardDressingRoomZone}
+        data-testid="match-allocation"
+      >
+        <span className={styles.destLabel}>KABINE</span>
+
+        {hasHome || hasAway ? (
+          <div className={styles.matchAllocation}>
+            {hasHome && (
+              <div className={styles.matchAllocRow}>
+                <span className={styles.matchAllocRoom}>
+                  {homeDressingRoomLabel}
+                </span>
+                <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
+              </div>
+            )}
+
+            {hasAway && (
+              <div className={styles.matchAllocRow}>
+                <span className={styles.matchAllocRoom}>
+                  {awayDressingRoomLabel}
+                </span>
+                <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <span
+            className={styles.dressingRoomMissing}
+            data-testid="dressing-room-unassigned-warning"
+          >
+            NOCH NICHT ZUGETEILT
+          </span>
+        )}
+      </div>
+
+      <div className={styles.cardPitchZone}>
         <span className={styles.destLabel}>PLATZ</span>
+
         {pitchLabel !== null ? (
-          <span className={styles.destPitchValue} data-testid="pitch-value">
+          <span
+            className={styles.destPitchValue}
+            data-testid="pitch-value"
+          >
             {pitchLabel}
           </span>
         ) : (
@@ -343,44 +383,9 @@ function MatchDestination({ event }: MatchDestinationProps): ReactElement {
           </span>
         )}
       </div>
-
-      {/* Dressing rooms */}
-      {(hasHome || hasAway) ? (
-        <div
-          className={styles.matchAllocation}
-          data-testid="match-allocation"
-        >
-          <span className={styles.destLabel}>KABINE</span>
-          {hasHome && (
-            <div className={styles.matchAllocRow}>
-              <span className={styles.matchAllocRoom}>{homeDressingRoomLabel}</span>
-              <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
-            </div>
-          )}
-          {hasAway && (
-            <div className={styles.matchAllocRow}>
-              <span className={styles.matchAllocRoom}>{awayDressingRoomLabel}</span>
-              <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div
-          className={styles.matchAllocation}
-          data-testid="match-allocation"
-        >
-          <span
-            className={styles.dressingRoomMissing}
-            data-testid="dressing-room-unassigned-warning"
-          >
-            NOCH NICHT ZUGETEILT
-          </span>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
-
 // ── Training destination block (RIGHT zone) ──────────────────────────────────
 
 type TrainingDestinationProps = {
@@ -388,33 +393,19 @@ type TrainingDestinationProps = {
 };
 
 function TrainingDestination({ event }: TrainingDestinationProps): ReactElement {
-  const { homeDressingRoomLabel, pitchLabel } = event.allocation;
+  const {
+    homeDressingRoomLabel,
+    pitchLabel,
+  } = event.allocation;
 
   return (
-    <div
-      className={styles.destinationZone}
-      data-testid="training-allocation"
-    >
-      {/* Pitch */}
-      <div className={styles.destPitchRow}>
-        <span className={styles.destLabel}>PLATZ</span>
-        {pitchLabel !== null ? (
-          <span className={styles.destPitchValue} data-testid="pitch-value">
-            {pitchLabel}
-          </span>
-        ) : (
-          <span
-            className={styles.pitchMissing}
-            data-testid="pitch-unassigned-warning"
-          >
-            NOCH NICHT ZUGETEILT
-          </span>
-        )}
-      </div>
-
-      {/* Dressing room */}
-      <div className={styles.destRoomRow}>
+    <>
+      <div
+        className={styles.cardDressingRoomZone}
+        data-testid="training-allocation"
+      >
         <span className={styles.destLabel}>KABINE</span>
+
         {homeDressingRoomLabel !== null ? (
           <span className={styles.destRoomValue}>
             {homeDressingRoomLabel}
@@ -428,10 +419,29 @@ function TrainingDestination({ event }: TrainingDestinationProps): ReactElement 
           </span>
         )}
       </div>
-    </div>
+
+      <div className={styles.cardPitchZone}>
+        <span className={styles.destLabel}>PLATZ</span>
+
+        {pitchLabel !== null ? (
+          <span
+            className={styles.destPitchValue}
+            data-testid="pitch-value"
+          >
+            {pitchLabel}
+          </span>
+        ) : (
+          <span
+            className={styles.pitchMissing}
+            data-testid="pitch-unassigned-warning"
+          >
+            NOCH NICHT ZUGETEILT
+          </span>
+        )}
+      </div>
+    </>
   );
 }
-
 // ── Tournament destination block (RIGHT zone) ────────────────────────────────
 
 type TournamentDestinationProps = {
@@ -446,12 +456,31 @@ function TournamentDestination({
   const { pitchLabel } = event.allocation;
 
   return (
-    <div className={styles.destinationZone}>
-      {/* Pitch */}
-      <div className={styles.destPitchRow}>
+    <>
+      <div className={styles.cardDressingRoomZone}>
+        <span className={styles.destLabel}>KABINE</span>
+
+        {participantAllocations !== undefined &&
+        participantAllocations.length >= 3 ? (
+          <ParticipantAllocationBlock allocations={participantAllocations} />
+        ) : (
+          <span
+            className={styles.dressingRoomMissing}
+            data-testid="dressing-room-unassigned-warning"
+          >
+            NOCH NICHT ZUGETEILT
+          </span>
+        )}
+      </div>
+
+      <div className={styles.cardPitchZone}>
         <span className={styles.destLabel}>PLATZ</span>
+
         {pitchLabel !== null ? (
-          <span className={styles.destPitchValue} data-testid="pitch-value">
+          <span
+            className={styles.destPitchValue}
+            data-testid="pitch-value"
+          >
             {pitchLabel}
           </span>
         ) : (
@@ -463,15 +492,9 @@ function TournamentDestination({
           </span>
         )}
       </div>
-
-      {/* Multi-team allocation */}
-      {participantAllocations !== undefined && participantAllocations.length >= 3 && (
-        <ParticipantAllocationBlock allocations={participantAllocations} />
-      )}
-    </div>
+    </>
   );
 }
-
 // ── Training group card ───────────────────────────────────────────────────────
 
 type TrainingGroupCardProps = {
