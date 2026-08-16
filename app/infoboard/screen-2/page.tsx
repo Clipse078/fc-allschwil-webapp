@@ -112,6 +112,7 @@ export default async function InfoboardScreen2Page() {
 
   // ── Request time ───────────────────────────────────────────────────────────
   const now = new Date();
+  const weather = await fetchCurrentWeather();
 
   const database = createPrismaScreen2Db();
 
@@ -144,7 +145,7 @@ export default async function InfoboardScreen2Page() {
         : null;
 
     return (
-      <InfoboardAnlageplan
+      <InfoboardAnlageplan weather={weather}
         payload={payload}
         branding={{
           clubLogoSrc,
@@ -165,7 +166,6 @@ export default async function InfoboardScreen2Page() {
   //   - The board's templateType is not ANLAGENUEBERSICHT.
   const payload = await buildScreen2LivePayload({ tenant, now, database });
 
-  const weather = await fetchCurrentWeather();
 
   return (
     <InfoboardScreen2

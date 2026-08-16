@@ -35,6 +35,7 @@ import type { PitchEventSummary } from "@/lib/publishing/event-types";
 import { groupFacilityPitches } from "@/lib/publishing/infoboard/facility-group";
 import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
+import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
 import { NextActivityRow } from "./AnlageplanMapElements";
@@ -43,6 +44,7 @@ import { NextActivityRow } from "./AnlageplanMapElements";
 
 export type InfoboardAnlageplanProps = {
   payload: AnlageplanLivePayload;
+  weather?: WeatherResult | null;
   branding: {
     clubLogoSrc?: string | null;
     productLogoSrc?: string | null;
@@ -55,6 +57,7 @@ export type InfoboardAnlageplanProps = {
 
 export function InfoboardAnlageplan({
   payload,
+  weather,
   branding,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
@@ -129,6 +132,7 @@ export function InfoboardAnlageplan({
         subtitleEnabled
         initialTimeIso={currentTimeIso}
         timezone={tz}
+        weather={weather}
         showTime
         showDate
       />

@@ -32,6 +32,7 @@ export type LiveClockScreen1Props = {
   timezone: string;
   showTime: boolean;
   showDate: boolean;
+  mode?: "combined" | "time" | "date";
 };
 
 export function LiveClockScreen1({
@@ -39,12 +40,34 @@ export function LiveClockScreen1({
   timezone,
   showTime,
   showDate,
+  mode = "combined",
 }: LiveClockScreen1Props): ReactElement | null {
   const timeIso = useKioskClock(initialTimeIso);
 
   const currentTime = formatKioskTime(timeIso, timezone);
   const weekday = formatKioskWeekday(timeIso, timezone);
   const dateLine = formatKioskDateLine(timeIso, timezone);
+
+  if (mode === "time") {
+    if (!showTime) return null;
+
+    return (
+      <time className={styles.headerCurrentTime} dateTime={timeIso}>
+        {currentTime}
+      </time>
+    );
+  }
+
+  if (mode === "date") {
+    if (!showDate) return null;
+
+    return (
+      <div className={styles.headerDateBlock}>
+        <span className={styles.headerWeekday}>{weekday}</span>
+        <span className={styles.headerDateLine}>{dateLine}</span>
+      </div>
+    );
+  }
 
   if (showTime) {
     return (

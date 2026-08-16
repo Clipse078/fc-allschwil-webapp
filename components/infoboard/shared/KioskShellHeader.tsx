@@ -1,68 +1,142 @@
 /**
  * components/infoboard/shared/KioskShellHeader.tsx
  *
- * INFOBOARD-MAP-02 — Canonical shared kiosk header.
+ * Canonical shared kiosk header for all public Infoboards.
  *
- * Used by BOTH InfoboardScreen1 and InfoboardAnlageplan — the source of truth
- * for the kiosk shell top bar.
+ * Physical-TV information architecture:
  *
- * Structure (matches Screen 1 layout):
- *   ┌─────────────────────────────────────────────────────────┐
- *   │ LEFT (logo + name) │ CENTER (clock/date) │ RIGHT (slot) │
- *   ├─────────────────────────────────────────────────────────┤
- *   │ [optional subtitle bar]                                 │
- *   └─────────────────────────────────────────────────────────┘
+ *   CLUB | CLOCK / DATE | WEATHER | ALEXA SAFE ZONE
  *
- * Data-testid parity with InfoboardScreen1 (backward-compatible):
- *   kiosk-shell-header  — the <header> element (new canonical id)
- *   kiosk-header-left   — left branding zone
- *   header-center       — center clock zone (matches Screen1 tests)
- *   alexa-safe-zone     — right zone / Alexa reserved area
- *   board-title         — subtitle bar (matches Screen1 tests)
+ * The final Alexa zone is permanently empty and reserves approximately
+ * 10% of the viewport for the external Fully Kiosk / Alexa overlay.
+ *
+ * Weather is supporting information and never occupies the Alexa zone.
  *
  * Invariants:
- *   - Pure server component (no "use client", no effects, no fetch)
- *   - Inline styles — no CSS module coupling
- *   - LiveClockScreen1 (PR #405 canonical clock) always used
- *   - No new Date() without argument; no implicit timezone
- *   - null / undefined never rendered as strings
+ *   - Pure presentational component: no fetch, DB or implicit time.
+ *   - Existing header height is preserved.
+ *   - LiveClockScreen1 remains the canonical kiosk clock.
+ *   - Weather is provider-neutral WeatherResult data.
+ *   - Unavailable weather is silently omitted.
+ *   - MeteoSwiss attribution is rendered whenever weather is shown.
  */
 
 import type { ReactElement, ReactNode } from "react";
-import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
+import { Cloud, CloudRain, CloudSun, Sun } from "lucide-react";
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
+import type { WeatherResult } from "@/lib/weather/weather-types";
 
 export type KioskShellHeaderProps = {
   clubLogoSrc?: string | null;
   clubName: string;
-  /** Optional small text rendered below the club name (facility / location). */
   facilityLine?: string | null;
-  /** Subtitle bar text shown below the main header row. */
   subtitle?: string | null;
   subtitleEnabled?: boolean;
-  /** Current moment as UTC ISO-8601. When absent the clock is omitted. */
   initialTimeIso?: string | null;
   timezone: string;
   showTime?: boolean;
   showDate?: boolean;
-  /** Static date fallback used when initialTimeIso is null. */
   staticDateFallback?: string | null;
+
   /**
-   * Optional content placed in the RIGHT zone (Alexa-reserved zone by default).
-   * When null/undefined the zone renders empty — preserving the Alexa safe area.
+   * Canonical weather input for every Infoboard.
+   * Unavailable weather renders no placeholder.
+   */
+  weather?: WeatherResult | null;
+
+  /**
+   * Backward-compatible weather/right presentation slot.
+   *
+   * IMPORTANT:
+   * This is rendered in the WEATHER zone, never the Alexa safe zone.
+   * New callers should prefer the `weather` prop.
    */
   rightContent?: ReactNode;
 };
-
-// ── Shared constants ──────────────────────────────────────────────────────────
 
 const HEADER_BG = "#0A1828";
 const HEADER_BORDER = "3px solid #e87722";
 const SUBTITLE_BORDER = "1px solid rgba(99, 135, 175, 0.16)";
 const MUTED_TEXT = "#6E87A0";
 
-// ── Component ─────────────────────────────────────────────────────────────────
+function SharedWeather({
+  weather,
+}: {
+  weather: WeatherResult;
+}): ReactElement | null {
+  if (weather.isAvailable !== true) {
+    return null;
+  }
+
+  const code = weather.conditionCode;
+
+  const Icon =
+    code === 0
+      ? Sun
+      : code >= 51
+        ? CloudRain
+        : code >= 1 && code <= 3
+          ? CloudSun
+          : Cloud;
+
+  const temperature = Math.round(weather.temperatureC);
+
+  return (
+    <div
+      data-testid="header-weather"
+      aria-label="Wetter"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "auto auto minmax(0, 1fr)",
+        alignItems: "center",
+        columnGap: "clamp(8px, 0.75vw, 14px)",
+        minWidth: "max-content",
+        width: "auto",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Icon
+        aria-hidden="true"
+        size={34}
+        strokeWidth={1.6}
+        style={{
+          color: "#F5B642",
+          flexShrink: 0,
+        }}
+      />
+
+      <span
+        data-testid="header-weather-temperature"
+        style={{
+          fontSize: "clamp(1.5rem, 2.1vw, 2.5rem)",
+          fontWeight: 800,
+          color: "#ffffff",
+          lineHeight: 1,
+          letterSpacing: "0.01em",
+        }}
+      >
+        {temperature}°
+      </span>
+
+      <span
+        data-testid="header-weather-condition"
+        style={{
+          fontSize: "clamp(0.68rem, 0.82vw, 0.95rem)",
+          fontWeight: 500,
+          color: "rgba(255,255,255,0.74)",
+          lineHeight: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+          minWidth: 0,
+        }}
+      >
+        {weather.conditionLabel}
+      </span>
+    </div>
+  );
+}
 
 export function KioskShellHeader({
   clubLogoSrc,
@@ -75,34 +149,51 @@ export function KioskShellHeader({
   showTime = true,
   showDate = true,
   staticDateFallback,
+  weather,
   rightContent,
 }: KioskShellHeaderProps): ReactElement {
-  const showSubtitle = subtitleEnabled === true && subtitle != null && subtitle.length > 0;
+  const showSubtitle =
+    subtitleEnabled === true &&
+    subtitle != null &&
+    subtitle.length > 0;
+
+  const weatherContent =
+    weather != null
+      ? <SharedWeather weather={weather} />
+      : rightContent ?? null;
 
   return (
     <div data-testid="kiosk-shell-header" style={{ flexShrink: 0 }}>
-      {/* ── Main header row ─────────────────────────────────────────────── */}
       <header
         style={{
-          display: "flex",
+          display: "grid",
+          gridTemplateColumns:
+            "minmax(0, 1fr) auto auto clamp(220px, 22vw, 360px) 10vw",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: "clamp(8px, 1.5vw, 24px)",
-          padding: "0 clamp(12px, 2vw, 32px)",
+
+          paddingLeft: "clamp(12px, 2vw, 32px)",
+          paddingRight: 0,
           background: HEADER_BG,
           borderBottom: HEADER_BORDER,
+
+          /*
+           * Physical-TV contract:
+           * keep the existing header height exactly.
+           */
           height: "clamp(60px, 7.5vh, 90px)",
           flexShrink: 0,
+          overflow: "hidden",
         }}
       >
-        {/* LEFT: club identity */}
+        {/* CLUB */}
         <div
           data-testid="kiosk-header-left"
           style={{
             display: "flex",
             alignItems: "center",
             gap: "clamp(8px, 1vw, 16px)",
-            flexShrink: 0,
+            minWidth: 0,
+            overflow: "hidden",
           }}
         >
           {clubLogoSrc ? (
@@ -114,6 +205,7 @@ export function KioskShellHeader({
                 height: "clamp(36px, 5.5vh, 64px)",
                 width: "auto",
                 objectFit: "contain",
+                flexShrink: 0,
               }}
             />
           ) : (
@@ -136,7 +228,15 @@ export function KioskShellHeader({
               {clubName.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "2px",
+              minWidth: 0,
+            }}
+          >
             <span
               data-testid="kiosk-header-club-name"
               style={{
@@ -146,10 +246,14 @@ export function KioskShellHeader({
                 color: "#ffffff",
                 lineHeight: 1,
                 textTransform: "uppercase",
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
               }}
             >
               {clubName}
             </span>
+
             {facilityLine && (
               <span
                 style={{
@@ -157,6 +261,9 @@ export function KioskShellHeader({
                   letterSpacing: "0.18em",
                   color: "rgba(255,255,255,0.45)",
                   textTransform: "uppercase",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
                 {facilityLine}
@@ -165,23 +272,52 @@ export function KioskShellHeader({
           </div>
         </div>
 
-        {/* CENTER: live clock (canonical — LiveClockScreen1) */}
+        {/* TIME */}
         <div
-          data-testid="header-center"
+          data-testid="header-time-zone"
           style={{
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            flexShrink: 0,
+            alignSelf: "center",
+            height: "72%",
+            paddingLeft: "clamp(18px, 1.5vw, 28px)",
+            paddingRight: "clamp(18px, 1.5vw, 28px)",
+            borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
           }}
         >
-          {initialTimeIso != null ? (
+          {initialTimeIso != null && showTime ? (
             <LiveClockScreen1
               initialTimeIso={initialTimeIso}
               timezone={timezone}
-              showTime={showTime}
-              showDate={showDate}
+              showTime={true}
+              showDate={false}
+              mode="time"
+            />
+          ) : null}
+        </div>
+
+        {/* DATE */}
+        <div
+          data-testid="header-date-zone"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            alignSelf: "center",
+            height: "72%",
+            paddingLeft: "clamp(18px, 1.5vw, 28px)",
+            paddingRight: "clamp(18px, 1.5vw, 28px)",
+            borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
+          }}
+        >
+          {initialTimeIso != null && showDate ? (
+            <LiveClockScreen1
+              initialTimeIso={initialTimeIso}
+              timezone={timezone}
+              showTime={false}
+              showDate={true}
+              mode="date"
             />
           ) : staticDateFallback != null && showDate ? (
             <span
@@ -189,30 +325,47 @@ export function KioskShellHeader({
                 fontSize: "clamp(0.7rem, 0.9vw, 1rem)",
                 letterSpacing: "0.06em",
                 color: "rgba(255,255,255,0.55)",
+                whiteSpace: "nowrap",
               }}
             >
               {staticDateFallback}
             </span>
           ) : null}
         </div>
-
-        {/* RIGHT: optional content or empty Alexa-safe zone */}
+        {/* WEATHER — never overlaps Alexa */}
         <div
-          data-testid="alexa-safe-zone"
-          aria-hidden={rightContent == null ? "true" : undefined}
+          data-testid="weather-zone"
           style={{
             display: "flex",
             alignItems: "center",
-            justifyContent: "flex-end",
-            flexShrink: 0,
-            minWidth: "clamp(60px, 6vw, 120px)",
+            justifyContent: "flex-start",
+            minWidth: "clamp(220px, 22vw, 360px)",
+            width: "100%",
+            alignSelf: "center",
+            height: "72%",
+            paddingLeft: "clamp(18px, 1.5vw, 28px)",
+            paddingRight: "clamp(18px, 1.5vw, 28px)",
+            borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
+            overflow: "visible",
           }}
         >
-          {rightContent ?? null}
+          {weatherContent}
         </div>
+
+        {/* ALEXA / FULLY KIOSK — permanently empty ~10% safe zone */}
+        <div
+          data-testid="alexa-safe-zone"
+          aria-hidden="true"
+          style={{
+            width: "10vw",
+            minWidth: "10vw",
+            height: "100%",
+            flexShrink: 0,
+            pointerEvents: "none",
+          }}
+        />
       </header>
 
-      {/* ── Subtitle bar (optional — like Screen 1's boardTitle) ──────── */}
       {showSubtitle && (
         <div
           data-testid="board-title"
@@ -229,7 +382,7 @@ export function KioskShellHeader({
           <span
             data-testid="board-title-text"
             style={{
-              fontSize: "clamp(0.78rem, 1.0vw, 1.2rem)",
+              fontSize: "clamp(0.78rem, 1vw, 1.2rem)",
               fontWeight: 600,
               letterSpacing: "0.16em",
               textTransform: "uppercase",

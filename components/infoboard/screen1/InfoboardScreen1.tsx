@@ -48,6 +48,7 @@ import {
   type InfoboardDisplayTheme,
 } from "@/lib/publishing/infoboard/display-theme";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
+import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import styles from "./InfoboardScreen1.module.css";
 
@@ -75,6 +76,8 @@ export type InfoboardScreen1Props = {
    * feed.displayDate. Never call new Date() without an argument.
    */
   currentTimeIso?: string | null;
+  /** Shared kiosk-header weather. */
+  weather?: WeatherResult | null;
   /**
    * Display theme (INFOBOARD-INTEGRATION-01B). Defaults to "DARK" — the
    * existing premium stadium theme — when omitted, so every existing caller
@@ -140,6 +143,10 @@ function formatTime(isoString: string, timeZone: string): string {
     timeZone,
     hour12: false,
   }).format(new Date(isoString));
+}
+
+function formatDressingRoomLabel(label: string): string {
+  return label.replace(/^kabine\s+/i, "").trim();
 }
 
 function formatDisplayDate(dateKey: string): string {
@@ -262,10 +269,8 @@ function stripClubPrefix(teamName: string, clubName: string): string {
   return teamName;
 }
 
-/** Accent color key for card left stripe and current-event tint. */
-function stripeKey(temporal: TemporalBucket, type: PublishingEventType): string {
-  if (temporal === "current") return "red";
-  if (temporal === "next") return "blue";
+/** Event-family accent key for the card left stripe. */
+function stripeKey(type: PublishingEventType): string {
   if (type === "MATCH") return "red";
   if (type === "TOURNAMENT") return "orange";
   return "blue";
@@ -299,7 +304,9 @@ function ParticipantAllocationBlock({
           }
         >
           <span className={styles.participantRoomValue}>
-            {alloc.dressingRoomLabel !== null ? alloc.dressingRoomLabel : "—"}
+            {alloc.dressingRoomLabel !== null
+              ? formatDressingRoomLabel(alloc.dressingRoomLabel)
+              : "—"}
           </span>
           <span className={styles.participantTeamName}>
             {alloc.teamDisplayName}
@@ -339,7 +346,7 @@ function MatchDestination({ event }: MatchDestinationProps): ReactElement {
             {hasHome && (
               <div className={styles.matchAllocRow}>
                 <span className={styles.matchAllocRoom}>
-                  {homeDressingRoomLabel}
+                  {formatDressingRoomLabel(homeDressingRoomLabel)}
                 </span>
                 <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
               </div>
@@ -348,7 +355,7 @@ function MatchDestination({ event }: MatchDestinationProps): ReactElement {
             {hasAway && (
               <div className={styles.matchAllocRow}>
                 <span className={styles.matchAllocRoom}>
-                  {awayDressingRoomLabel}
+                  {formatDressingRoomLabel(awayDressingRoomLabel)}
                 </span>
                 <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
               </div>
@@ -408,7 +415,7 @@ function TrainingDestination({ event }: TrainingDestinationProps): ReactElement 
 
         {homeDressingRoomLabel !== null ? (
           <span className={styles.destRoomValue}>
-            {homeDressingRoomLabel}
+            {formatDressingRoomLabel(homeDressingRoomLabel)}
           </span>
         ) : (
           <span
@@ -458,7 +465,11 @@ function TournamentDestination({
   return (
     <>
       <div className={styles.cardDressingRoomZone}>
-        <span className={styles.destLabel}>KABINE</span>
+        <span
+          className={styles.destLabel}
+        >
+          KABINE
+        </span>
 
         {participantAllocations !== undefined &&
         participantAllocations.length >= 3 ? (
@@ -474,7 +485,11 @@ function TournamentDestination({
       </div>
 
       <div className={styles.cardPitchZone}>
-        <span className={styles.destLabel}>PLATZ</span>
+        <span
+          className={styles.destLabel}
+        >
+          PLATZ
+        </span>
 
         {pitchLabel !== null ? (
           <span
@@ -531,10 +546,10 @@ function TrainingGroupCard({
   const startAt = first.event.startAt;
   const startTime = formatTime(startAt, timeZone);
   const label = statusLabel(temporal);
-  const stripe = stripeKey(temporal, "TRAINING");
+  const stripe = stripeKey("TRAINING");
 
-  // Shared end time: display once in the LEFT ZONE when all trainings share
-  // the same endAt.  When end times differ, show per-row in the BODY ZONE.
+  // Shared end time is displayed once in the TIME zone when all grouped
+  // trainings end together. Differing end times remain visible per team row.
   const firstEndAt = first.event.endAt;
   const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
   const commonEndTime =
@@ -548,8 +563,9 @@ function TrainingGroupCard({
       data-temporal={temporal}
       data-stripe={stripe}
       data-event-count={cardCount}
+      data-training-count={items.length}
     >
-      {/* ── LEFT ZONE: Status + Time ─────────────────────────────────── */}
+      {/* TIME */}
       <div className={styles.cardTimeZone}>
         {label !== null && (
           <span
@@ -560,9 +576,11 @@ function TrainingGroupCard({
             {label}
           </span>
         )}
+
         <time className={styles.eventTime} dateTime={startAt}>
           {startTime}
         </time>
+
         {commonEndTime !== null && (
           <span className={styles.eventEndTime} aria-label="Bis">
             bis {commonEndTime}
@@ -570,85 +588,120 @@ function TrainingGroupCard({
         )}
       </div>
 
-      {/* ── BODY ZONE: group header + per-team rows ───────────────────── */}
-      <div className={styles.trainingGroupBody} data-testid="training-group">
-        {/* Column headers */}
-        <div className={styles.trainingGroupColHeaders} aria-hidden="true">
-          <span
-            className={styles.trainingGroupTypeBadge}
-            data-event-type="TRAINING"
-          >
-            TRAINING
-          </span>
-          <span className={styles.trainingGroupColLabel}>PLATZ</span>
-          <span className={styles.trainingGroupColLabel}>KABINE</span>
-        </div>
+      {/* EVENT */}
+      <div
+        className={`${styles.cardEventZone} ${styles.trainingGroupZone}`}
+        data-testid="training-group"
+      >
+        <span
+          className={styles.eventTypeLabel}
+          data-event-type="TRAINING"
+        >
+          TRAINING
+        </span>
 
-        {/* One row per team */}
-        {items.map((it) => {
-          const { pitchLabel, homeDressingRoomLabel } = it.event.allocation;
-          const rowEndAt = it.event.endAt;
-          const rowEndTime =
-            !allSameEnd && rowEndAt !== null
-              ? formatTime(rowEndAt, timeZone)
-              : null;
-          return (
-            <div
-              key={it.event.id}
-              className={styles.trainingGroupTeamRow}
-              data-testid="training-group-row"
-            >
-              {/* TEAM — club prefix stripped for readability */}
-              <span className={styles.trainingGroupTeamName}>
-                {stripClubPrefix(
-                  it.event.teamDisplayName ?? it.event.displayTitle,
-                  clubName,
-                )}
-                {rowEndTime !== null && (
-                  <span className={styles.trainingGroupRowEndTime} aria-label="Bis">
-                    {" "}bis {rowEndTime}
+        <div className={styles.trainingGroupRows}>
+          {items.map((it) => {
+            const rowEndAt = it.event.endAt;
+            const rowEndTime =
+              !allSameEnd && rowEndAt !== null
+                ? formatTime(rowEndAt, timeZone)
+                : null;
+
+            return (
+              <div
+                key={it.event.id}
+                className={styles.trainingGroupAlignedRow}
+                data-testid="training-group-row"
+              >
+                <span className={styles.trainingGroupTeamName}>
+                  {stripClubPrefix(
+                    it.event.teamDisplayName ?? it.event.displayTitle,
+                    clubName,
+                  )}
+
+                  {rowEndTime !== null && (
+                    <span
+                      className={styles.trainingGroupRowEndTime}
+                      aria-label="Bis"
+                    >
+                      {" "}bis {rowEndTime}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* KABINE */}
+      <div className={`${styles.cardDressingRoomZone} ${styles.trainingGroupZone}`}>
+        <span className={styles.destLabel}>KABINE</span>
+
+        <div className={styles.trainingGroupRows}>
+          {items.map((it) => {
+            const { homeDressingRoomLabel } = it.event.allocation;
+
+            return (
+              <div
+                key={it.event.id}
+                className={styles.trainingGroupAlignedRow}
+              >
+                {homeDressingRoomLabel !== null ? (
+                  <span className={styles.trainingGroupRoomValue}>
+                    {formatDressingRoomLabel(homeDressingRoomLabel)}
+                  </span>
+                ) : (
+                  <span
+                    className={styles.dressingRoomMissing}
+                    data-testid="dressing-room-unassigned-warning"
+                  >
+                    NICHT ZUGETEILT
                   </span>
                 )}
-              </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
-              {/* PLATZ */}
-              {pitchLabel !== null ? (
-                <span
-                  className={styles.trainingGroupPitchValue}
-                  data-testid="pitch-value"
-                >
-                  {pitchLabel}
-                </span>
-              ) : (
-                <span
-                  className={styles.dressingRoomMissing}
-                  data-testid="pitch-unassigned-warning"
-                >
-                  NICHT ZUGETEILT
-                </span>
-              )}
+      {/* PLATZ */}
+      <div className={`${styles.cardPitchZone} ${styles.trainingGroupZone}`}>
+        <span className={styles.destLabel}>PLATZ</span>
 
-              {/* KABINE */}
-              {homeDressingRoomLabel !== null ? (
-                <span className={styles.trainingGroupRoomValue}>
-                  {homeDressingRoomLabel}
-                </span>
-              ) : (
-                <span
-                  className={styles.dressingRoomMissing}
-                  data-testid="dressing-room-unassigned-warning"
-                >
-                  NICHT ZUGETEILT
-                </span>
-              )}
-            </div>
-          );
-        })}
+        <div className={styles.trainingGroupRows}>
+          {items.map((it) => {
+            const { pitchLabel } = it.event.allocation;
+
+            return (
+              <div
+                key={it.event.id}
+                className={styles.trainingGroupAlignedRow}
+              >
+                {pitchLabel !== null ? (
+                  <span
+                    className={styles.trainingGroupPitchValue}
+                    data-testid="pitch-value"
+                  >
+                    {pitchLabel}
+                  </span>
+                ) : (
+                  <span
+                    className={styles.pitchMissing}
+                    data-testid="pitch-unassigned-warning"
+                  >
+                    NICHT ZUGETEILT
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
     </li>
   );
 }
-
 // ── Event card ────────────────────────────────────────────────────────────────
 
 type EventCardProps = {
@@ -677,7 +730,7 @@ function EventCard({
   const isTournament = event.type === "TOURNAMENT";
 
   const label = statusLabel(temporal);
-  const stripe = stripeKey(temporal, event.type);
+  const stripe = stripeKey(event.type);
 
   const typeDisplayLabel = isMatch
     ? (event.competitionLabel ?? EVENT_TYPE_LABELS["MATCH"])
@@ -742,7 +795,25 @@ function EventCard({
             )}
           </div>
         ) : isTournament ? (
-          <span className={styles.eventTeamMain}>{event.displayTitle}</span>
+          <div className={styles.tournamentIdentity}>
+            <span className={styles.eventTeamMain}>{event.displayTitle}</span>
+
+            {participantAllocations !== undefined && (
+              <div
+                className={styles.tournamentParticipants}
+                data-testid="tournament-participants"
+              >
+                {participantAllocations.map((participant) => (
+                  <span
+                    key={participant.id}
+                    className={styles.tournamentParticipantName}
+                  >
+                    {participant.teamDisplayName}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         ) : (
           <>
             {event.teamDisplayName !== null ? (
@@ -761,7 +832,7 @@ function EventCard({
         )}
       </div>
 
-      {/* ── RIGHT ZONE: Destination (Pitch + Dressing rooms) ─────────── */}
+      {/* ── KABINE + PLATZ ─────────────────────────────────────────── */}
       {isMatch ? (
         <MatchDestination event={event} />
       ) : isTournament ? (
@@ -784,6 +855,7 @@ export function InfoboardScreen1({
   announcement,
   eventPresentation,
   currentTimeIso,
+  weather,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
   headerConfig,
 }: InfoboardScreen1Props): ReactElement {
@@ -831,6 +903,7 @@ export function InfoboardScreen1({
         clubName={tenant.name}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
+        weather={weather}
         showTime={showTime}
         showDate={showDate}
         staticDateFallback={staticDateLine}

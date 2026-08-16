@@ -34,6 +34,7 @@ import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
@@ -104,6 +105,7 @@ export default async function InfoboardScreen1Page() {
   const db = createPrismaDb();
   const loader = createCanonicalInfoboardSourceLoader(db);
   const payload = await buildScreen1LivePayload({ tenant, now, loader, boardConfig });
+  const weather = await fetchCurrentWeather();
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -111,6 +113,7 @@ export default async function InfoboardScreen1Page() {
       feed={payload.feed}
       branding={payload.branding}
       currentTimeIso={payload.currentTimeIso}
+      weather={weather}
       announcement={payload.announcement ?? undefined}
       eventPresentation={payload.eventPresentation}
       theme={payload.theme}

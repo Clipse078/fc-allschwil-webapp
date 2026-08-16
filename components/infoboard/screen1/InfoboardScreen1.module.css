@@ -418,12 +418,13 @@
 
 .eventTypeLabel {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-event-type);
+  font-size: var(--ib-fs-dest-label);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   line-height: 1;
   color: var(--ib-text-muted);
+  margin: 0 0 2px;
 }
 
 .eventTypeLabel[data-event-type="MATCH"]      { color: var(--ib-match-soft); }
@@ -434,6 +435,34 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.tournamentIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(10px, 1.3vh, 18px);
+  min-width: 0;
+}
+
+.tournamentParticipants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: clamp(18px, 2vw, 34px);
+  row-gap: clamp(3px, 0.45vh, 7px);
+  max-width: 100%;
+}
+
+.tournamentParticipantName {
+  min-width: 0;
+  font-size: clamp(0.9rem, 1.12vw, 1.3rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ib-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .matchTeamRow {
@@ -512,7 +541,11 @@
 }
 
 .cardPitchZone .destPitchValue {
-  font-size: var(--ib-fs-dest-pitch);
+  font-size: clamp(1.8rem, 3vw, var(--ib-fs-dest-pitch));
+  line-height: 0.95;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .cardDressingRoomZone .matchAllocation,
@@ -540,14 +573,27 @@
 
 .destLabel {
   display: block;
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-dest-label);
   font-weight: 700;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ib-text-dim);
   line-height: 1;
-  margin-bottom: 2px;
+  margin: 0 0 2px;
 }
+.eventCard[data-type="TRAINING"] .destLabel {
+  color: var(--ib-training-soft);
+}
+
+.eventCard[data-type="MATCH"] .destLabel {
+  color: var(--ib-match-soft);
+}
+
+.eventCard[data-type="TOURNAMENT"] .destLabel {
+  color: var(--ib-tournament-soft);
+}
+
 
 .destPitchRow {
   display: flex;
@@ -639,9 +685,10 @@
 }
 
 .participantAllocationRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: clamp(34px, 3vw, 52px) minmax(0, 1fr);
   align-items: baseline;
-  gap: var(--ib-sp-2);
+  column-gap: clamp(8px, 0.8vw, 14px);
 }
 
 .participantAllocationRow.homeTeamEmphasis .participantTeamName {
@@ -650,26 +697,25 @@
 
 .participantRoomValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-participant-room);
+  font-size: clamp(1.2rem, 1.6vw, 1.9rem);
   font-weight: 700;
   text-transform: uppercase;
   color: var(--ib-text);
   white-space: nowrap;
-  flex-shrink: 0;
-  min-width: clamp(48px, 5vw, 70px);
   letter-spacing: 0.02em;
-  line-height: 1.1;
+  line-height: 1;
 }
 
 .participantTeamName {
-  font-size: var(--ib-fs-participant);
-  color: var(--ib-text-muted);
+  font-size: clamp(0.9rem, 1.12vw, 1.3rem);
+  font-weight: 600;
+  color: var(--ib-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.1;
+  letter-spacing: 0.03em;
+  line-height: 1.15;
 }
 
 /* ─── Empty state ────────────────────────────────────────────────────────── */
@@ -912,72 +958,78 @@
   }
 }
 
-/* ─── Training group card body ────────────────────────────────────────────── */
-
-/*
- * The body zone spans grid columns 2 and 3 of the parent .eventCard grid,
- * replacing the separate center + destination zones used by EventCard.
- * Column proportions inside the body: TEAM (1fr) | PLATZ (30%) | KABINE (20%).
- * The proportions are intentionally generous for PLATZ to accommodate long
- * pitch names (e.g. "KUNSTRASEN 2_B").
+/* ─── Training group — canonical four-zone alignment ───────────────────────
+ *
+ * Training uses the same outer EventCard grid as Match and Tournament:
+ *
+ *   TIME | EVENT | KABINE | PLATZ
+ *
+ * The three content zones share the same row rhythm so grouped team,
+ * dressing-room and pitch values remain horizontally associated.
  */
-.trainingGroupBody {
-  grid-column: 2 / -1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
-  border-left: 1px solid var(--ib-border);
+
+.trainingGroupZone {
   min-width: 0;
-  gap: 0;
+}
+/*
+ * Dense simultaneous-training groups need more vertical capacity.
+ *
+ * Keep canonical primary typography intact; instead allocate more of the
+ * available board height to the Training card and tighten only internal
+ * vertical spacing. Match/Tournament retain normal proportions.
+ */
+.eventCard[data-type="TRAINING"][data-training-count="5"] {
+  flex-grow: 1.22;
 }
 
-/* Shared 3-column grid used by both the header row and every team row */
-.trainingGroupColHeaders,
-.trainingGroupTeamRow {
+.eventCard[data-type="TRAINING"][data-training-count="6"] {
+  flex-grow: 1.38;
+}
+
+.eventCard[data-type="TRAINING"][data-training-count="5"] .cardTimeZone,
+.eventCard[data-type="TRAINING"][data-training-count="5"] .cardEventZone,
+.eventCard[data-type="TRAINING"][data-training-count="5"] .cardDressingRoomZone,
+.eventCard[data-type="TRAINING"][data-training-count="5"] .cardPitchZone,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .cardTimeZone,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .cardEventZone,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .cardDressingRoomZone,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .cardPitchZone {
+  padding-top: clamp(6px, 0.7vh, 10px);
+  padding-bottom: clamp(6px, 0.7vh, 10px);
+}
+
+.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupRows,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(27px, 3vh, 38px), auto);
+}
+
+.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupAlignedRow,
+.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupAlignedRow {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.trainingGroupRows {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(70px, 30%, 260px) clamp(50px, 20%, 180px);
-  gap: var(--ib-sp-3);
+  grid-auto-rows: minmax(clamp(24px, 3.2vh, 44px), auto);
+  align-items: stretch;
+  min-width: 0;
+}
+
+.trainingGroupAlignedRow {
+  display: flex;
   align-items: center;
-}
-
-/* ── Header row ───────────────────────────────────────────────────────────── */
-
-.trainingGroupColHeaders {
-  padding-bottom: var(--ib-sp-1);
-  margin-bottom: var(--ib-sp-1);
-  border-bottom: 1px solid var(--ib-border-strong);
-}
-
-.trainingGroupTypeBadge {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-event-type);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  line-height: 1;
-  color: var(--ib-training-soft);
-}
-
-.trainingGroupColLabel {
-  font-size: var(--ib-fs-dest-label);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ib-text-dim);
-  line-height: 1;
-}
-
-/* ── Team row ─────────────────────────────────────────────────────────────── */
-
-.trainingGroupTeamRow {
+  min-width: 0;
   padding: clamp(2px, 0.35vh, 6px) 0;
+}
+
+.trainingGroupAlignedRow + .trainingGroupAlignedRow {
   border-top: 1px solid rgba(99, 135, 175, 0.08);
 }
 
 .trainingGroupTeamName {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.9rem, 1.2vw, 1.7rem);
+  font-size: var(--ib-fs-event-team);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1001,7 +1053,7 @@
 
 .trainingGroupPitchValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.85rem, 1.1vw, 1.55rem);
+  font-size: var(--ib-fs-dest-pitch);
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -1014,7 +1066,7 @@
 
 .trainingGroupRoomValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.85rem, 1.1vw, 1.55rem);
+  font-size: var(--ib-fs-dest-room);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1025,8 +1077,55 @@
   text-overflow: ellipsis;
 }
 
-/* Light theme: row separators use the light palette */
-.root[data-theme="light"] .trainingGroupTeamRow {
-  border-top-color: rgba(60, 48, 32, 0.06);
+/* Training owns its semantic destination accents. */
+.eventCard[data-type="TRAINING"] .destLabel {
+  color: var(--ib-training-soft);
 }
 
+/* Light theme row separators. */
+.root[data-theme="light"] .trainingGroupAlignedRow + .trainingGroupAlignedRow {
+  border-top-color: rgba(60, 48, 32, 0.06);
+}
+/* Canonical grouped-training section architecture.
+ *
+ * TRAINING / KABINE / PLATZ are one semantic label row.
+ * Every zone therefore uses the same two-row geometry:
+ *
+ *   LABEL
+ *   CONTENT
+ *
+ * Do not vertically centre the complete zone independently,
+ * otherwise differing value typography shifts the labels.
+ */
+.eventCard[data-type="TRAINING"] .trainingGroupZone {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  justify-content: stretch;
+  row-gap: clamp(5px, 0.55vh, 8px);
+}
+
+/* TRAINING / KABINE / PLATZ — exact peer typography. */
+.eventCard[data-type="TRAINING"] .trainingGroupZone > .eventTypeLabel,
+.eventCard[data-type="TRAINING"] .trainingGroupZone > .destLabel {
+  display: block;
+  align-self: start;
+  justify-self: start;
+  margin: 0;
+  padding: 0;
+
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-dest-label);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* All value grids begin at the identical second-row origin. */
+.eventCard[data-type="TRAINING"] .trainingGroupZone > .trainingGroupRows {
+  align-self: stretch;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+}
