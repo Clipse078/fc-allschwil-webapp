@@ -10,6 +10,8 @@ import {
   ChevronRight,
   Building2,
   MapPin,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import type { FacilityType, FacilityResourceType, FacilityStatus } from "@prisma/client";
 
@@ -38,6 +40,7 @@ type FacilityRow = {
 type Props = {
   initialFacilities: FacilityRow[];
   canManage: boolean;
+  canDelete: boolean;
   tenantId: string;
 };
 
@@ -309,23 +312,85 @@ function CreateResourceForm({
 
 // ── Resource row ──────────────────────────────────────────────────────────────
 
+type ResourceImpact = {
+  trainingAllocations: number;
+  trainingSessionAllocations: number;
+  tournamentResourceAllocations: number;
+  tournamentParticipantAllocations: number;
+  weekplannerPlanAllocations: number;
+};
+
 function ResourceItem({
   facilityId,
   resource,
   canManage,
+  canDelete,
   onUpdate,
   onRefresh,
+  onDeleted,
 }: {
   facilityId: string;
   resource: ResourceRow;
   canManage: boolean;
+  canDelete: boolean;
   onUpdate: (updated: ResourceRow) => void;
   onRefresh: () => void;
+  onDeleted: (resourceId: string) => void;
 }) {
   const [editingName, setEditingName] = useState(false);
   const [, startTransition] = useTransition();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<ResourceImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isArchived = resource.status === "ARCHIVED";
+
+  async function openDeleteDialog() {
+    setShowDeleteDialog(true);
+    setDeleteImpact(null);
+    setDeleteError(null);
+    setLoadingImpact(true);
+    try {
+      const res = await fetch(
+        `/api/facilities/${facilityId}/resources/${resource.id}/permanent`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Vorschau nicht verfügbar.");
+      setDeleteImpact(data?.impact ?? null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setLoadingImpact(false);
+    }
+  }
+
+  async function confirmDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(
+        `/api/facilities/${facilityId}/resources/${resource.id}/permanent?confirm=true`,
+        { method: "DELETE" },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setDeleteError(data?.error ?? "Fehler."); return; }
+      setShowDeleteDialog(false);
+      onDeleted(resource.id);
+      onRefresh();
+    } catch { setDeleteError("Netzwerkfehler."); }
+    finally { setDeleting(false); }
+  }
+
+  const totalAllocations = deleteImpact
+    ? deleteImpact.trainingAllocations +
+      deleteImpact.trainingSessionAllocations +
+      deleteImpact.tournamentResourceAllocations +
+      deleteImpact.tournamentParticipantAllocations +
+      deleteImpact.weekplannerPlanAllocations
+    : 0;
 
   async function patchResource(data: Record<string, unknown>) {
     const res = await fetch(`/api/facilities/${facilityId}/resources/${resource.id}`, {
@@ -376,54 +441,155 @@ function ResourceItem({
         </div>
       </div>
 
-      {canManage && !editingName ? (
+      {(canManage || canDelete) && !editingName ? (
         <div className="flex shrink-0 items-center gap-1">
-          <button
-            onClick={() => setEditingName(true)}
-            disabled={isArchived}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none"
-            title="Name bearbeiten"
-          >
-            <Pencil className="h-3.5 w-3.5" />
-          </button>
-          <button
-            onClick={() =>
-              startTransition(async () => {
-                await patchResource({
-                  status: isArchived ? "ACTIVE" : "ARCHIVED",
-                });
-              })
-            }
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            title={isArchived ? "Wiederherstellen" : "Archivieren"}
-          >
-            <Archive className="h-3.5 w-3.5" />
-          </button>
+          {canManage && (
+            <>
+              <button
+                onClick={() => setEditingName(true)}
+                disabled={isArchived}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none"
+                title="Name bearbeiten"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                onClick={() =>
+                  startTransition(async () => {
+                    await patchResource({
+                      status: isArchived ? "ACTIVE" : "ARCHIVED",
+                    });
+                  })
+                }
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                title={isArchived ? "Wiederherstellen" : "Archivieren"}
+              >
+                <Archive className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+          {canDelete && (
+            <button
+              onClick={openDeleteDialog}
+              className="rounded-lg p-1.5 text-red-400 hover:bg-red-50 hover:text-red-600"
+              title="Ressource endgültig löschen"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ) : null}
+
+      {/* Delete confirmation dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-base font-semibold text-slate-900">
+              Ressource endgültig löschen
+            </h3>
+            <p className="mb-4 text-sm text-slate-500">
+          &bdquo;{resource.name}&ldquo; ({resource.code}) dauerhaft entfernen.
+        </p>
+            {loadingImpact && (
+              <p className="mb-4 text-sm text-slate-400">Auswirkungen werden geprüft…</p>
+            )}
+            {deleteImpact && (
+              <div className="mb-4 space-y-3 text-sm">
+                <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                  <p className="text-amber-800">
+                    {totalAllocations > 0
+                      ? `${totalAllocations} Planungs-Zuweisung${totalAllocations !== 1 ? "en" : ""} werden entfernt. Trainings, Spiele und Turniere bleiben erhalten.`
+                      : "Keine aktiven Planungszuweisungen. Sicher zu löschen."}
+                  </p>
+                </div>
+              </div>
+            )}
+            {deleteError && <p className="mb-3 text-sm text-red-600">{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting || loadingImpact || !!deleteError}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Löschen…" : "Endgültig löschen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ── Facility card ─────────────────────────────────────────────────────────────
 
+type FacilityImpact = { resources: number; totalAllocationRefs: number };
+
 function FacilityCard({
   facility,
   canManage,
+  canDelete,
   onUpdate,
   onRefresh,
+  onDeleted,
 }: {
   facility: FacilityRow;
   canManage: boolean;
+  canDelete: boolean;
   onUpdate: (updated: FacilityRow) => void;
   onRefresh: () => void;
+  onDeleted: (facilityId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [editingName, setEditingName] = useState(false);
   const [addingResource, setAddingResource] = useState(false);
   const [, startTransition] = useTransition();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteImpact, setDeleteImpact] = useState<FacilityImpact | null>(null);
+  const [loadingImpact, setLoadingImpact] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const isArchived = facility.status === "ARCHIVED";
+
+  async function openDeleteDialog() {
+    setShowDeleteDialog(true);
+    setDeleteImpact(null);
+    setDeleteError(null);
+    setLoadingImpact(true);
+    try {
+      const res = await fetch(`/api/facilities/${facility.id}/permanent`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Vorschau nicht verfügbar.");
+      setDeleteImpact(data?.impact ?? null);
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Fehler.");
+    } finally {
+      setLoadingImpact(false);
+    }
+  }
+
+  async function confirmFacilityDelete() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/facilities/${facility.id}/permanent?confirm=true`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { setDeleteError(data?.error ?? "Fehler."); return; }
+      setShowDeleteDialog(false);
+      onDeleted(facility.id);
+      onRefresh();
+    } catch { setDeleteError("Netzwerkfehler."); }
+    finally { setDeleting(false); }
+  }
 
   async function patchFacility(data: Record<string, unknown>) {
     const res = await fetch(`/api/facilities/${facility.id}`, {
@@ -498,29 +664,42 @@ function FacilityCard({
           )}
         </div>
 
-        {canManage && !editingName ? (
+        {(canManage || canDelete) && !editingName ? (
           <div className="flex shrink-0 items-center gap-1">
-            <button
-              onClick={() => setEditingName(true)}
-              disabled={isArchived}
-              className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none"
-              title="Name bearbeiten"
-            >
-              <Pencil className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() =>
-                startTransition(async () => {
-                  await patchFacility({
-                    status: isArchived ? "ACTIVE" : "ARCHIVED",
-                  });
-                })
-              }
-              className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              title={isArchived ? "Wiederherstellen" : "Archivieren"}
-            >
-              <Archive className="h-4 w-4" />
-            </button>
+            {canManage && (
+              <>
+                <button
+                  onClick={() => setEditingName(true)}
+                  disabled={isArchived}
+                  className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:pointer-events-none"
+                  title="Name bearbeiten"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() =>
+                    startTransition(async () => {
+                      await patchFacility({
+                        status: isArchived ? "ACTIVE" : "ARCHIVED",
+                      });
+                    })
+                  }
+                  className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                  title={isArchived ? "Wiederherstellen" : "Archivieren"}
+                >
+                  <Archive className="h-4 w-4" />
+                </button>
+              </>
+            )}
+            {canDelete && (
+              <button
+                onClick={openDeleteDialog}
+                className="rounded-xl p-2 text-red-400 hover:bg-red-50 hover:text-red-600"
+                title="Anlage endgültig löschen"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
           </div>
         ) : null}
       </div>
@@ -538,8 +717,15 @@ function FacilityCard({
                   facilityId={facility.id}
                   resource={resource}
                   canManage={canManage}
+                  canDelete={canDelete}
                   onUpdate={updateResource}
                   onRefresh={onRefresh}
+                  onDeleted={(rid) => {
+                    onUpdate({
+                      ...facility,
+                      resources: facility.resources.filter((r) => r.id !== rid),
+                    });
+                  }}
                 />
               ))
             )}
@@ -568,6 +754,55 @@ function FacilityCard({
           ) : null}
         </div>
       ) : null}
+
+      {/* Facility delete dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="mb-1 text-base font-semibold text-slate-900">
+              Anlage endgültig löschen
+            </h3>
+            <p className="mb-4 text-sm text-slate-500">
+              &bdquo;{facility.name}&ldquo; und alle Ressourcen dauerhaft entfernen.
+            </p>
+            {loadingImpact && <p className="mb-4 text-sm text-slate-400">Auswirkungen werden geprüft…</p>}
+            {deleteImpact && (
+              <div className="mb-4 space-y-3 text-sm">
+                <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                  <div className="text-red-800">
+                    <p className="font-medium">Wird gelöscht:</p>
+                    <ul className="mt-1 ml-3 list-disc space-y-0.5">
+                      <li>Anlage &bdquo;{facility.name}&ldquo;</li>
+                      {deleteImpact.resources > 0 && <li>{deleteImpact.resources} Ressource{deleteImpact.resources !== 1 ? "n" : ""}</li>}
+                      {deleteImpact.totalAllocationRefs > 0 && (
+                        <li>{deleteImpact.totalAllocationRefs} Planungs-Zuweisung{deleteImpact.totalAllocationRefs !== 1 ? "en" : ""} (Trainings/Spiele bleiben erhalten)</li>
+                      )}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+            {deleteError && <p className="mb-3 text-sm text-red-600">{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                disabled={deleting}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={confirmFacilityDelete}
+                disabled={deleting || loadingImpact || !!deleteError}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? "Löschen…" : "Endgültig löschen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -577,6 +812,7 @@ function FacilityCard({
 export default function FacilitiesAdminPanel({
   initialFacilities,
   canManage,
+  canDelete,
 }: Props) {
   const router = useRouter();
   const [facilities, setFacilities] = useState<FacilityRow[]>(initialFacilities);
@@ -638,8 +874,10 @@ export default function FacilitiesAdminPanel({
               key={facility.id}
               facility={facility}
               canManage={canManage}
+              canDelete={canDelete}
               onUpdate={updateFacility}
               onRefresh={handleRefresh}
+              onDeleted={(fid) => setFacilities((prev) => prev.filter((f) => f.id !== fid))}
             />
           ))}
         </div>

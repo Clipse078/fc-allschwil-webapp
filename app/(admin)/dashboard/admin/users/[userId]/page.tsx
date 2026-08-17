@@ -258,10 +258,14 @@ export default async function AdminUserDetailPage({ params }: Props) {
             <div className="sce-detail-section-body">
               <MembershipAccessControl
                 userId={userId}
+                userName={displayName}
+                userEmail={user.email}
                 membershipIsActive={membership.isActive}
                 userIsActive={user.isActive}
                 canManage={canManage}
                 isSelf={isSelf}
+                linkedPersonName={linkedPerson ? `${linkedPerson.firstName} ${linkedPerson.lastName}` : null}
+                tenantRoleNames={user.userRoles.map((ur) => ur.role.name)}
               />
             </div>
           </div>

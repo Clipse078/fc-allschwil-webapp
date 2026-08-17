@@ -2,40 +2,38 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Trash2, User } from "lucide-react";
+import { AlertTriangle, Trash2 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 
-type PersonDeletionImpact = {
-  squadMemberships: number;
-  trainerMemberships: number;
-  personAssignments: number;
+type OrgUnitImpact = {
+  childOrgUnits: number;
+  teamSeasonLinks: number;
   orgUnitMemberships: number;
-  linkedRegistrations: number;
-  linkedUserId: string | null;
-  linkedUserEmail: string | null;
+  personAssignments: number;
+  scopedUserRoles: number;
+  legacyTeamLinks: number;
 };
 
-type PersonDeleteButtonProps = {
-  personId: string;
-  personName: string;
+type Props = {
+  orgUnitId: string;
+  orgUnitName: string;
 };
 
 /**
- * PersonDeleteButton — permanent-delete action for a Person (ADMIN-DELETE-PERSONS-01).
+ * OrgUnitDeleteButton — permanent-delete action for an OrgUnit.
  *
- * Flow: clicking "Löschen" opens the confirmation dialog and fetches the
- * current impact from DELETE /api/people/[id]/permanent (preview mode).
- * Clicking "Endgültig löschen" sends DELETE ?confirm=true to permanently
- * remove the Person. Global User account is explicitly shown as preserved.
+ * ADMIN-DELETE-ORG-01: Two-step preview/confirm flow using
+ * DELETE /api/org-units/[id]/permanent (preview) and ?confirm=true (perform).
+ * Persons, Teams, TeamSeasons, and non-scoped UserRoles are preserved.
  */
-export default function PersonDeleteButton({ personId, personName }: PersonDeleteButtonProps) {
+export default function OrgUnitDeleteButton({ orgUnitId, orgUnitName }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [impact, setImpact] = useState<PersonDeletionImpact | null>(null);
+  const [impact, setImpact] = useState<OrgUnitImpact | null>(null);
 
   async function openConfirmation() {
     setOpen(true);
@@ -44,15 +42,11 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
     setLoadingImpact(true);
 
     try {
-      const response = await fetch(`/api/people/${encodeURIComponent(personId)}/permanent`, {
+      const response = await fetch(`/api/org-units/${encodeURIComponent(orgUnitId)}/permanent`, {
         method: "DELETE",
       });
       const data = await response.json().catch(() => null);
-
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Vorschau nicht verfügbar.");
-      }
-
+      if (!response.ok) throw new Error(data?.error ?? "Vorschau nicht verfügbar.");
       setImpact(data?.impact ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
@@ -64,21 +58,18 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
   async function handleConfirmDelete() {
     setDeleting(true);
     setError(null);
-
     try {
       const response = await fetch(
-        `/api/people/${encodeURIComponent(personId)}/permanent?confirm=true`,
+        `/api/org-units/${encodeURIComponent(orgUnitId)}/permanent?confirm=true`,
         { method: "DELETE" },
       );
       const data = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        setError(data?.error ?? "Person konnte nicht gelöscht werden.");
+        setError(data?.error ?? "Organisationseinheit konnte nicht gelöscht werden.");
         return;
       }
-
       setOpen(false);
-      router.push("/dashboard/persons");
+      router.push("/dashboard/org-units");
       router.refresh();
     } catch {
       setError("Netzwerkfehler. Bitte erneut versuchen.");
@@ -86,9 +77,6 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
       setDeleting(false);
     }
   }
-
-  const totalMemberships =
-    (impact?.squadMemberships ?? 0) + (impact?.trainerMemberships ?? 0);
 
   return (
     <>
@@ -104,13 +92,11 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
       <Dialog
         open={open}
         onClose={() => !deleting && setOpen(false)}
-        title="Person endgültig löschen"
-        description={`„${personName}" dauerhaft und unwiderruflich aus dem System entfernen.`}
+        title="Organisationseinheit endgültig löschen"
+        description={`„${orgUnitName}" dauerhaft und unwiderruflich aus dem System entfernen.`}
         footer={
           <div className="flex flex-col gap-2">
-            {error ? (
-              <p className="text-sm text-red-600">{error}</p>
-            ) : null}
+            {error ? <p className="text-sm text-red-600">{error}</p> : null}
             <div className="flex items-center justify-end gap-3">
               <Button
                 variant="secondary"
@@ -148,41 +134,36 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
               <div>
                 <p className="mb-2 font-medium text-[var(--foreground)]">Wird gelöscht:</p>
                 <ul className="ml-4 list-disc space-y-1">
-                  <li>Personendatensatz von &bdquo;{personName}&ldquo;</li>
-                  {impact.personAssignments > 0 && (
-                    <li>{impact.personAssignments} Organisationszuordnung{impact.personAssignments !== 1 ? "en" : ""}</li>
+                  <li>Organisationseinheit &bdquo;{orgUnitName}&ldquo;</li>
+                  {impact.orgUnitMemberships > 0 && (
+                    <li>{impact.orgUnitMemberships} OE-Mitgliedschaft{impact.orgUnitMemberships !== 1 ? "en" : ""}</li>
                   )}
-                  {totalMemberships > 0 && (
-                    <li>
-                      {totalMemberships} Kader-/Trainermitgliedschaft{totalMemberships !== 1 ? "en" : ""} (squad history)
-                    </li>
+                  {impact.personAssignments > 0 && (
+                    <li>{impact.personAssignments} Personenzuordnung{impact.personAssignments !== 1 ? "en" : ""}</li>
+                  )}
+                  {impact.teamSeasonLinks > 0 && (
+                    <li>{impact.teamSeasonLinks} Saison-Zuordnung{impact.teamSeasonLinks !== 1 ? "en" : ""} (Teams bleiben erhalten)</li>
+                  )}
+                  {impact.scopedUserRoles > 0 && (
+                    <li>{impact.scopedUserRoles} OE-spezifische Rollenzuweisung{impact.scopedUserRoles !== 1 ? "en" : ""}</li>
                   )}
                 </ul>
               </div>
 
-              {(impact.orgUnitMemberships > 0 || impact.linkedRegistrations > 0 || impact.linkedUserId) ? (
-                <div>
-                  <p className="mb-2 font-medium text-[var(--foreground)]">Bleibt erhalten:</p>
-                  <ul className="ml-4 list-disc space-y-1">
-                    {impact.linkedUserId && (
-                      <li className="flex items-center gap-1.5">
-                        <User className="h-3.5 w-3.5 text-[var(--muted)]" />
-                        Benutzerkonto ({impact.linkedUserEmail}) — Zugang und Authentifizierungsdaten bleiben unverändert
-                      </li>
-                    )}
-                    {impact.orgUnitMemberships > 0 && (
-                      <li>
-                        {impact.orgUnitMemberships} OE-Mitgliedschaft{impact.orgUnitMemberships !== 1 ? "en" : ""} — Personen-Link wird entfernt, Mitgliedschaft bleibt bestehen
-                      </li>
-                    )}
-                    {impact.linkedRegistrations > 0 && (
-                      <li>
-                        {impact.linkedRegistrations} verknüpfte Anmeldung{impact.linkedRegistrations !== 1 ? "en" : ""} — Verlinkung wird getrennt
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              ) : null}
+              <div>
+                <p className="mb-2 font-medium text-[var(--foreground)]">Bleibt erhalten:</p>
+                <ul className="ml-4 list-disc space-y-1">
+                  {impact.childOrgUnits > 0 && (
+                    <li>{impact.childOrgUnits} Untereinheit{impact.childOrgUnits !== 1 ? "en" : ""} — werden zu Haupteinheiten (parentId → null)</li>
+                  )}
+                  {impact.legacyTeamLinks > 0 && (
+                    <li>{impact.legacyTeamLinks} Team{impact.legacyTeamLinks !== 1 ? "s" : ""} — OE-Link wird entfernt, Team bleibt bestehen</li>
+                  )}
+                  <li>Personen — Personendatensätze werden nicht gelöscht</li>
+                  <li>Teams & TeamSeasons — bleiben vollständig erhalten</li>
+                  <li>Benutzerkonten — globale User und andere Rollen unberührt</li>
+                </ul>
+              </div>
             </>
           ) : null}
         </div>

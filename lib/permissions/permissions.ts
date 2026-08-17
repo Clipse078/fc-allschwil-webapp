@@ -95,9 +95,24 @@ export const PERMISSIONS = {
 
   ORG_VIEW: "org.view",
   ORG_MANAGE: "org.manage",
+  // ADMIN-DELETE-ORG-01: canonical permanent-deletion permission for OrgUnit
+  // records. Deliberately separate from ORG_MANAGE — create/edit/archive
+  // must never implicitly grant permanent deletion. Follows the "<module>.delete"
+  // convention established by TEAMS_DELETE (ADMIN-DELETE-01A).
+  ORG_DELETE: "org.delete",
 
   FACILITIES_VIEW: "facilities.view",
   FACILITIES_MANAGE: "facilities.manage",
+  // ADMIN-DELETE-FACILITIES-01: canonical permanent-deletion permission for
+  // Facility and FacilityResource records. Deliberately separate from
+  // FACILITIES_MANAGE. Follows the "<module>.delete" convention.
+  FACILITIES_DELETE: "facilities.delete",
+
+  // ADMIN-DELETE-TENANT-01: SCE Super Admin only. Tenant permanent deletion is
+  // the highest-impact operation in the platform. Separate from TENANTS_MANAGE
+  // to require explicit, elevated authority. Tenant-local Club Admins do NOT
+  // hold this permission — only the platform super_admin role carries it.
+  TENANTS_DELETE: "tenants.delete",
 
   WORKSPACE_VIEW: "workspace.view",
   WORKSPACE_MANAGE: "workspace.manage",

@@ -27,6 +27,7 @@ import type { ActorContext } from "./actor-context";
 const ORG_PERM = {
   VIEW: "org.view",
   MANAGE: "org.manage",
+  DELETE: "org.delete",
 } as const;
 
 /**
@@ -58,6 +59,14 @@ export function canAccessOrgUnit(orgUnitId: string, actor: ActorContext): boolea
  */
 export function canManageOrgUnit(actor: ActorContext): boolean {
   return actor.permissionKeys.includes(ORG_PERM.MANAGE);
+}
+
+/**
+ * Returns true if the actor can permanently delete an OrgUnit.
+ * Requires ORG_DELETE — deliberately separate from ORG_MANAGE.
+ */
+export function canDeleteOrgUnit(actor: ActorContext): boolean {
+  return actor.permissionKeys.includes(ORG_PERM.DELETE);
 }
 
 /**

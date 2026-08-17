@@ -16,7 +16,7 @@ import { getOrgUnitById } from "@/lib/org/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
-import { canAccessOrgUnit, canManageOrgUnit } from "@/lib/visibility/org-unit-access";
+import { canAccessOrgUnit, canManageOrgUnit, canDeleteOrgUnit } from "@/lib/visibility/org-unit-access";
 import { getEligibleTenantMembers } from "@/lib/roles/tenant-queries";
 import {
   getScopedAssignmentsForOrgUnit,
@@ -26,6 +26,7 @@ import OrgMembershipManagementCard from "@/components/admin/org/OrgMembershipMan
 import OrgUnitSortControls from "@/components/admin/org/OrgUnitSortControls";
 import OrgUnitArchiveButton from "@/components/admin/org/OrgUnitArchiveButton";
 import OrgUnitRestoreButton from "@/components/admin/org/OrgUnitRestoreButton";
+import OrgUnitDeleteButton from "@/components/admin/org/OrgUnitDeleteButton";
 import ScopedResponsibilitiesCard from "@/components/admin/shared/ScopedResponsibilitiesCard";
 import { PageShell, SectionCard } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
@@ -166,6 +167,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
   const childCount = unit.children.length;
   // Write access requires ORG_MANAGE — membership-based access is read-only.
   const canManage = canManageOrgUnit(actor);
+  const canDelete = canDeleteOrgUnit(actor);
   const canArchive = canManage && unit.status !== "ARCHIVED" && childCount === 0;
   const canRestore = canManage && unit.status === "ARCHIVED";
 
@@ -291,17 +293,25 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
               ]}
             />
 
-            {/* Danger zone — archive action */}
-            {canArchive ? (
+            {/* Danger zone — archive + permanent delete */}
+            {(canArchive || canDelete) ? (
               <Card variant="warning">
-                <div className="px-5 py-4">
-                  <p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sce-warning)]">
+                <div className="px-5 py-4 space-y-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--sce-warning)]">
                     Gefahrenzone
                   </p>
-                  <OrgUnitArchiveButton
-                    orgUnitId={unit.id}
-                    orgUnitName={unit.name}
-                  />
+                  {canArchive ? (
+                    <OrgUnitArchiveButton
+                      orgUnitId={unit.id}
+                      orgUnitName={unit.name}
+                    />
+                  ) : null}
+                  {canDelete ? (
+                    <OrgUnitDeleteButton
+                      orgUnitId={unit.id}
+                      orgUnitName={unit.name}
+                    />
+                  ) : null}
                 </div>
               </Card>
             ) : null}
