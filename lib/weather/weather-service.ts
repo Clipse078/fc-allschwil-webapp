@@ -1,65 +1,56 @@
 /**
- * lib/weather/weather-service.ts
+ * Canonical provider-neutral weather service for all Infoboards.
  *
- * Provider-neutral weather service for Infoboard Screen 2.
+ * MeteoSwiss-only architecture:
  *
- * Active provider:  MeteoSwiss Open Data (SwissMetNet VQHA80)
- * Dormant fallback: Open-Meteo (commercial, requires WEATHER_API_KEY)
- *
- * Design constraints:
- *   – Screen 2 calls fetchCurrentWeather() from this module.
- *   – The component does NOT know which provider is active.
- *   – MeteoSwiss is the default active Swiss provider — no secrets required.
- *   – Open-Meteo is preserved as a dormant implementation; it cannot
- *     activate without explicit configuration (WEATHER_API_KEY) AND an
- *     explicit change to ACTIVE_PROVIDER in this file.
- *   – No tenant-facing provider selector.
- *   – No Prisma changes.
- *   – No database configuration.
- *
- * To switch providers (future):
- *   Change ACTIVE_PROVIDER from "meteoswiss" to "open-meteo".
- *   Open-Meteo also requires WEATHER_API_KEY to be set.
+ * 1. VQHA80 / BAS provides measured temperature, wind and timestamp.
+ * 2. E4 local forecast / Allschwil enriches semantic weather condition.
+ * 3. If E4 is unavailable or the symbol is unsupported, the existing
+ *    VQHA80-derived condition remains unchanged.
  */
 
-import { fetchMeteoSwissWeather } from "./providers/meteoswiss-weather-provider";
-import { type WeatherResult } from "./weather-types";
+import {
+  fetchMeteoSwissE4Condition,
+} from "./providers/meteoswiss-e4-weather-provider";
 
-// ── Active provider ───────────────────────────────────────────────────────────
+import {
+  fetchMeteoSwissWeather,
+} from "./providers/meteoswiss-weather-provider";
 
-/**
- * Active provider identifier.
- * "meteoswiss" — MeteoSwiss Open Data (SwissMetNet), no key required.
- * "open-meteo" — Open-Meteo commercial API, requires WEATHER_API_KEY.
- */
-const ACTIVE_PROVIDER = "meteoswiss" as const;
+import type {
+  WeatherResult,
+} from "./weather-types";
 
-// ── fetchCurrentWeather ───────────────────────────────────────────────────────
-
-/**
- * Fetches current weather for Sportanlage Im Brüel, Allschwil.
- *
- * Returns a WeatherResult from the active provider, or WEATHER_UNAVAILABLE
- * on any failure. The caller does not need to know which provider is active.
- *
- * @param fetchFn - Optional injected fetch function for testability.
- *   Type is `unknown` to accept both the MeteoSwiss and Open-Meteo fetch
- *   signatures without leaking provider-specific types to callers.
- */
 export async function fetchCurrentWeather(
   fetchFn?: unknown,
 ): Promise<WeatherResult> {
-  if (ACTIVE_PROVIDER === "meteoswiss") {
-    return fetchMeteoSwissWeather(
-      fetchFn as Parameters<typeof fetchMeteoSwissWeather>[0],
+  const meteoswiss =
+    await fetchMeteoSwissWeather(
+      fetchFn as Parameters<
+        typeof fetchMeteoSwissWeather
+      >[0],
     );
+
+  if (!meteoswiss.isAvailable) {
+    return meteoswiss;
   }
-  // open-meteo branch preserved for future use — not reachable with current config.
-  // To activate: change ACTIVE_PROVIDER above and ensure WEATHER_API_KEY is set.
-  const { fetchOpenMeteoWeather } = await import(
-    "./providers/open-meteo-weather-provider"
-  );
-  return fetchOpenMeteoWeather(
-    fetchFn as Parameters<typeof fetchOpenMeteoWeather>[0],
-  );
+
+  const e4 =
+    await fetchMeteoSwissE4Condition(
+      fetchFn as Parameters<
+        typeof fetchMeteoSwissE4Condition
+      >[0],
+    );
+
+  if (!e4.isAvailable) {
+    return meteoswiss;
+  }
+
+  return {
+    ...meteoswiss,
+    conditionCode:
+      e4.value.conditionCode,
+    conditionLabel:
+      e4.value.conditionLabel,
+  };
 }

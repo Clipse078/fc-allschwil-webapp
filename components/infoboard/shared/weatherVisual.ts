@@ -2,7 +2,10 @@ export type WeatherIconFamily =
   | "sun"
   | "cloud-sun"
   | "cloud"
-  | "cloud-rain";
+  | "cloud-rain"
+  | "snow"
+  | "fog"
+  | "storm";
 
 export type WeatherVisual = {
   iconFamily: WeatherIconFamily;
@@ -19,7 +22,10 @@ export function resolveWeatherVisual(
     };
   }
 
-  if (conditionCode >= 1 && conditionCode <= 2) {
+  if (
+    conditionCode >= 1 &&
+    conditionCode <= 2
+  ) {
     return {
       iconFamily: "cloud-sun",
       color: "#E8C56A",
@@ -33,10 +39,43 @@ export function resolveWeatherVisual(
     };
   }
 
-  if (conditionCode >= 51) {
+  if (
+    conditionCode === 45 ||
+    conditionCode === 48
+  ) {
+    return {
+      iconFamily: "fog",
+      color: "#A7B0BA",
+    };
+  }
+
+  if (
+    conditionCode >= 51 &&
+    conditionCode <= 69
+  ) {
     return {
       iconFamily: "cloud-rain",
       color: "#6FB7E9",
+    };
+  }
+
+  if (
+    conditionCode >= 71 &&
+    conditionCode <= 86
+  ) {
+    return {
+      iconFamily: "snow",
+      color: "#B8DDF5",
+    };
+  }
+
+  if (
+    conditionCode >= 95 &&
+    conditionCode <= 99
+  ) {
+    return {
+      iconFamily: "storm",
+      color: "#A78BFA",
     };
   }
 

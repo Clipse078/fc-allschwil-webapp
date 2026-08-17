@@ -1,143 +1,142 @@
-/**
- * lib/weather/__tests__/weather-service.test.ts
- *
- * Tests for the provider-neutral weather service.
- *
- * Covers:
- *   C1.  MeteoSwiss is the active provider by default
- *   C2.  No Open-Meteo request occurs (no customer-api.open-meteo.com call)
- *   C3.  No WEATHER_API_KEY required for the active provider
- *   C4.  Returns WEATHER_UNAVAILABLE safely on failure
- *   C5.  Successful response returns isAvailable: true
- *   C6.  Network failure returns WEATHER_UNAVAILABLE (not an exception)
- */
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 
-import { describe, it, expect, vi } from "vitest";
-import { fetchCurrentWeather } from "../weather-service";
-import { WEATHER_UNAVAILABLE } from "../weather-types";
+vi.mock(
+  "../providers/meteoswiss-weather-provider",
+  () => ({
+    fetchMeteoSwissWeather: vi.fn(),
+  }),
+);
 
-// ── VQHA80 fixture ────────────────────────────────────────────────────────────
+vi.mock(
+  "../providers/meteoswiss-e4-weather-provider",
+  () => ({
+    fetchMeteoSwissE4Condition: vi.fn(),
+  }),
+);
 
-const VQHA80_HEADER =
-  "Station/Location;Date;tre200s0;rre150z0;sre000z0;gre000z0;ure200s0;tde200s0;dkl010z0;fu3010z0;fu3010z1;prestas0;pp0qffs0;pp0qnhs0;ppz850s0;ppz700s0;dv1towz0;fu3towz0;fu3towz1;ta1tows0;uretows0;tdetows0";
+import {
+  fetchMeteoSwissE4Condition,
+} from "../providers/meteoswiss-e4-weather-provider";
 
-function makeFreshTimestamp(): string {
-  const d = new Date(Date.now() - 5 * 60 * 1_000); // 5 minutes ago
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return (
-    d.getUTCFullYear().toString() +
-    pad(d.getUTCMonth() + 1) +
-    pad(d.getUTCDate()) +
-    pad(d.getUTCHours()) +
-    pad(d.getUTCMinutes())
-  );
-}
+import {
+  fetchMeteoSwissWeather,
+} from "../providers/meteoswiss-weather-provider";
 
-function makeMinimalVqha80(temp = "20.0", wind = "5.0"): string {
-  const ts = makeFreshTimestamp();
-  return (
-    `${VQHA80_HEADER}\n` +
-    `BAS;${ts};${temp};0.00;0.00;0.00;50.00;10.00;200.00;${wind};8.00;970.00;1006.00;1008.00;-;-;-;-;-;-;-;-\n`
-  );
-}
+import {
+  fetchCurrentWeather,
+} from "../weather-service";
 
-function makeFetchText(body: string) {
-  return vi.fn().mockResolvedValue({
-    ok: true,
-    status: 200,
-    text: () => Promise.resolve(body),
-  });
-}
+const measuredMock =
+  vi.mocked(fetchMeteoSwissWeather);
 
-function makeFetchError(err: Error) {
-  return vi.fn().mockRejectedValue(err);
-}
+const e4Mock =
+  vi.mocked(fetchMeteoSwissE4Condition);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── C1. MeteoSwiss is the active provider ─────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+const MEASURED = {
+  isAvailable: true as const,
+  temperatureC: 19,
+  conditionCode: 3,
+  conditionLabel: "Aktuelle Messwerte",
+  windKmh: 8,
+  precipitationProbability: null,
+  observedAt:
+    "2026-08-17T10:20:00.000Z",
+};
 
-describe("fetchCurrentWeather — active provider is MeteoSwiss", () => {
-  it("C1. calls the FSDI data.geo.admin.ch endpoint (MeteoSwiss VQHA80)", async () => {
-    const csv = makeMinimalVqha80();
-    const mockFetch = makeFetchText(csv);
-    await fetchCurrentWeather(mockFetch);
-    expect(mockFetch).toHaveBeenCalledOnce();
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).toContain("data.geo.admin.ch");
-    expect(calledUrl).toContain("VQHA80.csv");
-  });
-
-  it("C1. returns isAvailable: true from MeteoSwiss data", async () => {
-    const csv = makeMinimalVqha80("22.3", "7.2");
-    const result = await fetchCurrentWeather(makeFetchText(csv));
-    expect(result.isAvailable).toBe(true);
-  });
+afterEach(() => {
+  vi.clearAllMocks();
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── C2. No Open-Meteo request ─────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+describe("fetchCurrentWeather — MeteoSwiss only", () => {
+  it("keeps measured VQHA80 values authoritative", async () => {
+    measuredMock.mockResolvedValue(MEASURED);
 
-describe("fetchCurrentWeather — no Open-Meteo call", () => {
-  it("C2. does NOT call customer-api.open-meteo.com", async () => {
-    const csv = makeMinimalVqha80();
-    const mockFetch = makeFetchText(csv);
-    await fetchCurrentWeather(mockFetch);
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).not.toContain("open-meteo.com");
+    e4Mock.mockResolvedValue({
+      isAvailable: true,
+      value: {
+        symbolCode: 6,
+        forecastAt:
+          "2026-08-17T10:00:00.000Z",
+        conditionCode: 3,
+        conditionLabel: "Bewölkt",
+      },
+    });
+
+    const result =
+      await fetchCurrentWeather();
+
+    expect(result).toEqual({
+      ...MEASURED,
+      conditionCode: 3,
+      conditionLabel: "Bewölkt",
+    });
   });
 
-  it("C2. does NOT call api.open-meteo.com", async () => {
-    const csv = makeMinimalVqha80();
-    const mockFetch = makeFetchText(csv);
-    await fetchCurrentWeather(mockFetch);
-    const calledUrl = mockFetch.mock.calls[0][0] as string;
-    expect(calledUrl).not.toMatch(/api\.open-meteo\.com/);
-  });
-});
+  it("uses E4 only for semantic condition enrichment", async () => {
+    measuredMock.mockResolvedValue(MEASURED);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── C3. No API key required ───────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+    e4Mock.mockResolvedValue({
+      isAvailable: true,
+      value: {
+        symbolCode: 1,
+        forecastAt:
+          "2026-08-17T10:00:00.000Z",
+        conditionCode: 0,
+        conditionLabel: "Sonnig",
+      },
+    });
 
-describe("fetchCurrentWeather — no API key required", () => {
-  it("C3. works without WEATHER_API_KEY env var", async () => {
-    const saved = process.env["WEATHER_API_KEY"];
-    delete process.env["WEATHER_API_KEY"];
+    const result =
+      await fetchCurrentWeather();
 
-    const csv = makeMinimalVqha80();
-    const result = await fetchCurrentWeather(makeFetchText(csv));
     expect(result.isAvailable).toBe(true);
 
-    if (saved !== undefined) process.env["WEATHER_API_KEY"] = saved;
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── C4 & C6. Safe unavailable state ──────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe("fetchCurrentWeather — safe failure handling", () => {
-  it("C4. returns WEATHER_UNAVAILABLE (not an exception) on network failure", async () => {
-    const result = await fetchCurrentWeather(
-      makeFetchError(new Error("network error")),
-    );
-    expect(result).toEqual(WEATHER_UNAVAILABLE);
-  });
-
-  it("C6. returns WEATHER_UNAVAILABLE on empty CSV body", async () => {
-    const result = await fetchCurrentWeather(makeFetchText(""));
-    expect(result).toEqual(WEATHER_UNAVAILABLE);
-  });
-
-  it("C4. facility data unaffected — service never throws", async () => {
-    let threw = false;
-    try {
-      await fetchCurrentWeather(makeFetchError(new Error("test")));
-    } catch {
-      threw = true;
+    if (!result.isAvailable) {
+      throw new Error("expected weather");
     }
-    expect(threw).toBe(false);
+
+    expect(result.temperatureC).toBe(19);
+    expect(result.windKmh).toBe(8);
+    expect(result.observedAt).toBe(
+      "2026-08-17T10:20:00.000Z",
+    );
+    expect(result.conditionCode).toBe(0);
+    expect(result.conditionLabel).toBe(
+      "Sonnig",
+    );
+  });
+
+  it("falls back to VQHA80-derived condition if E4 is unavailable", async () => {
+    measuredMock.mockResolvedValue(MEASURED);
+
+    e4Mock.mockResolvedValue({
+      isAvailable: false,
+    });
+
+    const result =
+      await fetchCurrentWeather();
+
+    expect(result).toEqual(MEASURED);
+  });
+
+  it("does not request E4 if VQHA80 itself is unavailable", async () => {
+    measuredMock.mockResolvedValue({
+      isAvailable: false,
+    });
+
+    const result =
+      await fetchCurrentWeather();
+
+    expect(result).toEqual({
+      isAvailable: false,
+    });
+
+    expect(e4Mock).not.toHaveBeenCalled();
   });
 });

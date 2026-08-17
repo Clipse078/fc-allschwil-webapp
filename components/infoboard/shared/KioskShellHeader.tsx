@@ -22,7 +22,7 @@
  */
 
 import type { ReactElement, ReactNode } from "react";
-import { Cloud, CloudRain, CloudSun, Sun } from "lucide-react";
+import { Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun } from "lucide-react";
 import { resolveWeatherVisual } from "@/components/infoboard/shared/weatherVisual";
 
 import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
@@ -81,7 +81,13 @@ function SharedWeather({
         ? CloudSun
         : weatherVisual.iconFamily === "cloud-rain"
           ? CloudRain
-          : Cloud;
+          : weatherVisual.iconFamily === "snow"
+            ? CloudSnow
+            : weatherVisual.iconFamily === "fog"
+              ? CloudFog
+              : weatherVisual.iconFamily === "storm"
+                ? CloudLightning
+                : Cloud;
 
   const iconColor = weatherVisual.color;
   const temperature = Math.round(weather.temperatureC);
