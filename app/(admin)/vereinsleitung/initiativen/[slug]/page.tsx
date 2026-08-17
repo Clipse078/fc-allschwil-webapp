@@ -4,7 +4,11 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getInitiativeBySlug } from "@/lib/initiatives/queries";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 import InitiativeGovernanceBanner from "@/components/admin/initiatives/InitiativeGovernanceBanner";
+import InitiativeDeleteButton from "@/components/admin/initiatives/InitiativeDeleteButton";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import { ShieldCheck } from "lucide-react";
 import { PageShell, SectionCard, EmptyState } from "@/components/ui/page";
@@ -58,6 +62,18 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
   // The "not in DB" fallback card renders identically — no 403 leakage.
   const dbInitiative = await getInitiativeBySlug(slug, actor);
 
+  // Resolve permanent-delete authority for delete button visibility
+  const tenantId = session.user?.activeTenantId;
+  let canDelete = false;
+  if (dbInitiative && tenantId) {
+    const resolver = createEffectivePermissionResolver(prisma);
+    canDelete = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.INITIATIVES_DELETE,
+      tenantId,
+    });
+  }
+
   const pageTitle = dbInitiative?.title ?? slug;
   const statusLabel = dbInitiative?.status
     ? (STATUS_LABELS[dbInitiative.status] ?? dbInitiative.status)
@@ -84,13 +100,21 @@ export default async function InitiativeDetailPage({ params }: PageProps) {
           { label: pageTitle },
         ]}
         headerActions={
-          <Link
-            href="/vereinsleitung/initiativen"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-transparent px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Zurück
-          </Link>
+          <div className="flex items-center gap-2">
+            {canDelete && dbInitiative ? (
+              <InitiativeDeleteButton
+                initiativeId={dbInitiative.id}
+                initiativeTitle={dbInitiative.title}
+              />
+            ) : null}
+            <Link
+              href="/vereinsleitung/initiativen"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-transparent px-3.5 py-2 text-sm font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Zurück
+            </Link>
+          </div>
         }
         summary={
           dbInitiative ? (

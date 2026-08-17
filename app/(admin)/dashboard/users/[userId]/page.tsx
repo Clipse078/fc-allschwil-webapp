@@ -14,10 +14,13 @@ import UserForm from "@/components/admin/users/UserForm";
 import UserRolesForm from "@/components/admin/users/UserRolesForm";
 import ResetPasswordForm from "@/components/admin/users/ResetPasswordForm";
 import DeleteUserButton from "@/components/admin/users/DeleteUserButton";
+import GlobalUserDeleteButton from "@/components/admin/users/GlobalUserDeleteButton";
 import ImpersonateButton from "@/components/admin/users/ImpersonateButton";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
 import { getPlatformRolesListData, getUserDetailData } from "@/lib/users/queries";
 
 type UserDetailPageProps = {
@@ -54,6 +57,13 @@ export default async function UserDetailPage({
 }: UserDetailPageProps) {
   const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
   const canImpersonate = hasPermission(session, PERMISSIONS.USERS_IMPERSONATE);
+
+  // Resolve platform-level global delete authority (SCE Super Admin only)
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canGlobalDelete = await resolver.hasPermission({
+    userId: session.user.id,
+    permission: PERMISSIONS.USERS_DELETE,
+  });
 
   const { userId } = await params;
   const user = await getUserDetailData(userId);
@@ -175,7 +185,16 @@ export default async function UserDetailPage({
                   Kontoinformationen
                 </p>
               </div>
-              <DeleteUserButton userId={user.id} isActive={user.isActive} />
+              <div className="flex items-center gap-2">
+                <DeleteUserButton userId={user.id} isActive={user.isActive} />
+                {canGlobalDelete && user.id !== session.user.id ? (
+                  <GlobalUserDeleteButton
+                    userId={user.id}
+                    userName={displayName}
+                    userEmail={user.email}
+                  />
+                ) : null}
+              </div>
             </div>
             <div className="sce-detail-section-body">
               <UserForm

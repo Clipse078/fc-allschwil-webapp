@@ -137,6 +137,24 @@ export const PERMISSIONS = {
   ROLES_VIEW: "roles.view",
   ROLES_MANAGE: "roles.manage",
   ROLES_ASSIGN: "roles.assign",
+  // ADMIN-HARD-DELETE-UI — permanent deletion of non-system tenant roles.
+  // Deliberately separate from ROLES_MANAGE — archiving/editing a role must
+  // never implicitly grant permanent deletion. Follows the "<module>.delete"
+  // convention established by TEAMS_DELETE (ADMIN-DELETE-01A).
+  ROLES_DELETE: "roles.delete",
+
+  // ADMIN-HARD-DELETE-UI — permanent deletion of Meetings, Initiatives, and Targets.
+  // These are cross-cutting Vereinsleitung entities (no tenant FK). Permanent
+  // deletion requires a dedicated permission separate from *.manage so that
+  // routine editorial access never implies destructive authority.
+  MEETINGS_DELETE: "meetings.delete",
+  INITIATIVES_DELETE: "initiatives.delete",
+  TARGETS_DELETE: "targets.delete",
+
+  // ADMIN-HARD-DELETE-UI — platform-level global User account deletion.
+  // scope=PLATFORM — only the SCE super_admin role carries this permission.
+  // Never grantable by club admins. Deliberately separate from USERS_MANAGE.
+  USERS_DELETE: "users.delete",
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
