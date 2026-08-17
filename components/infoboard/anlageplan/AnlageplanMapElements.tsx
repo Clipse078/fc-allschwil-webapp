@@ -213,7 +213,13 @@ export function PremiumResourceCard({
         left: `${zone.rect.x * 100}%`,
         top: `${zone.rect.y * 100}%`,
         width: `${zone.rect.width * 100}%`,
-        minWidth: "clamp(80px, 10vw, 180px)",
+        minWidth: richEventCards
+          ? activeEvent.type === "TOURNAMENT"
+            ? "clamp(300px, 24vw, 460px)"
+            : activeEvent.type === "MATCH"
+              ? "clamp(250px, 20vw, 390px)"
+              : "clamp(170px, 12vw, 230px)"
+          : "clamp(80px, 10vw, 180px)",
         transform: zone.rect.rotation ? `rotate(${zone.rect.rotation}deg)` : undefined,
         transformOrigin: "top left",
         pointerEvents: "none",
@@ -246,14 +252,17 @@ export function PremiumResourceCard({
         >
           <span
             style={{
-              fontSize: "clamp(8px, 1.05vh, 14px)",
+              fontSize: richEventCards
+                ? "clamp(10px, 1.25vh, 17px)"
+                : "clamp(8px, 1.05vh, 14px)",
               fontWeight: 700,
               letterSpacing: "0.10em",
               color: "rgba(255,255,255,0.90)",
               textTransform: "uppercase",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
+              whiteSpace: richEventCards ? "normal" : "nowrap",
+              overflow: richEventCards ? "visible" : "hidden",
+              textOverflow: richEventCards ? "clip" : "ellipsis",
+              overflowWrap: richEventCards ? "anywhere" : undefined,
             }}
           >
             {resourceDisplay}
@@ -261,7 +270,9 @@ export function PremiumResourceCard({
           <span
             style={{
               flexShrink: 0,
-              fontSize: "clamp(6px, 0.75vh, 10px)",
+              fontSize: richEventCards
+                ? "clamp(8px, 0.95vh, 12px)"
+                : "clamp(6px, 0.75vh, 10px)",
               fontWeight: 700,
               letterSpacing: "0.10em",
               background: tokens.badgeBg,
@@ -280,7 +291,7 @@ export function PremiumResourceCard({
             data-testid="resource-card-rich-body"
             style={{
               padding:
-                "clamp(7px, 0.85vh, 12px) clamp(8px, 0.85vw, 14px) clamp(8px, 0.9vh, 13px)",
+                "clamp(8px, 0.95vh, 14px) clamp(9px, 0.95vw, 16px) clamp(9px, 1vh, 14px)",
               display: "flex",
               flexDirection: "column",
               gap: "clamp(3px, 0.4vh, 6px)",
@@ -290,7 +301,7 @@ export function PremiumResourceCard({
               <>
                 <div
                   style={{
-                    fontSize: "clamp(7px, 0.85vh, 11px)",
+                    fontSize: "clamp(9px, 1.02vh, 14px)",
                     fontWeight: 800,
                     letterSpacing: "0.11em",
                     color: tokens.badgeColor,
@@ -303,7 +314,7 @@ export function PremiumResourceCard({
 
                 <div
                   style={{
-                    fontSize: "clamp(11px, 1.45vh, 20px)",
+                    fontSize: "clamp(13px, 1.78vh, 25px)",
                     fontWeight: 800,
                     lineHeight: 1.08,
                     color: "#ffffff",
@@ -327,7 +338,7 @@ export function PremiumResourceCard({
 
                     <div
                       style={{
-                        fontSize: "clamp(11px, 1.45vh, 20px)",
+                        fontSize: "clamp(13px, 1.78vh, 25px)",
                         fontWeight: 800,
                         lineHeight: 1.08,
                         color: "#ffffff",
@@ -342,7 +353,7 @@ export function PremiumResourceCard({
               <>
                 <div
                   style={{
-                    fontSize: "clamp(11px, 1.45vh, 20px)",
+                    fontSize: "clamp(13px, 1.78vh, 25px)",
                     fontWeight: 800,
                     lineHeight: 1.08,
                     color: "#ffffff",
@@ -357,9 +368,10 @@ export function PremiumResourceCard({
                       marginTop: "clamp(2px, 0.28vh, 4px)",
                       paddingTop: "clamp(3px, 0.35vh, 5px)",
                       borderTop: "1px solid rgba(255,255,255,0.12)",
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: "clamp(1px, 0.14vh, 2px)",
+                      display: "grid",
+                      gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+                      columnGap: "clamp(10px, 0.8vw, 16px)",
+                      rowGap: "clamp(2px, 0.22vh, 4px)",
                     }}
                   >
                     <div
@@ -379,14 +391,14 @@ export function PremiumResourceCard({
                       <div
                         key={team}
                         style={{
-                          fontSize: "clamp(8px, 0.95vh, 13px)",
+                          fontSize: "clamp(10px, 1.15vh, 16px)",
                           lineHeight: 1.18,
                           fontWeight: 600,
                           color: "rgba(255,255,255,0.82)",
                           overflowWrap: "anywhere",
                         }}
                       >
-                        • {team}
+                        {team}
                       </div>
                     ))}
                   </div>
@@ -395,7 +407,7 @@ export function PremiumResourceCard({
             ) : (
               <div
                 style={{
-                  fontSize: "clamp(11px, 1.5vh, 21px)",
+                  fontSize: "clamp(13px, 1.72vh, 24px)",
                   fontWeight: 800,
                   lineHeight: 1.08,
                   color: "#ffffff",
@@ -407,7 +419,7 @@ export function PremiumResourceCard({
 
             <div
               style={{
-                fontSize: "clamp(9px, 1.05vh, 14px)",
+                fontSize: "clamp(11px, 1.27vh, 17px)",
                 color: "rgba(255,255,255,0.68)",
                 marginTop: "clamp(2px, 0.3vh, 4px)",
                 fontWeight: 700,
@@ -417,17 +429,7 @@ export function PremiumResourceCard({
               {startTime}{endTime ? `–${endTime}` : ""}
             </div>
 
-            {primaryDr && (
-              <div
-                style={{
-                  fontSize: "clamp(7px, 0.85vh, 11px)",
-                  color: "rgba(255,255,255,0.48)",
-                  fontWeight: 600,
-                }}
-              >
-                {primaryDr.displayLabel}
-              </div>
-            )}
+
           </div>
         ) : (
           <>

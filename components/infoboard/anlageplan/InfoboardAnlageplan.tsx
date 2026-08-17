@@ -145,15 +145,15 @@ export function InfoboardAnlageplan({
           flex: 1,
           display: "flex",
           minHeight: 0,
-          padding: "0.8vh 1.2vw",
-          gap: "1vw",
+          padding: "0.6vh 0.9vw",
+          gap: "0.8vw",
         }}
       >
         {/* ── MAP CANVAS (~78%) ─────────────────────────────────────────── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
-            flex: "1 1 78%",
+            flex: "1 1 80%",
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",
             overflow: "hidden",
@@ -180,8 +180,8 @@ export function InfoboardAnlageplan({
         <aside
           data-testid="anlageplan-activity-rail"
           style={{
-            flex: "0 0 22%",
-            maxWidth: "22%",
+            flex: "0 0 20%",
+            maxWidth: "20%",
             display: "flex",
             flexDirection: "column",
             gap: "0.6vh",
@@ -190,7 +190,7 @@ export function InfoboardAnlageplan({
         >
           <div
             style={{
-              fontSize: "clamp(11px, 1.3vh, 16px)",
+              fontSize: "clamp(13px, 1.5vh, 19px)",
               letterSpacing: "0.18em",
               color: "rgba(255,255,255,0.50)",
               textTransform: "uppercase",

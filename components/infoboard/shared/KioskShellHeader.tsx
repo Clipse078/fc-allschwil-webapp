@@ -23,6 +23,7 @@
 
 import type { ReactElement, ReactNode } from "react";
 import { Cloud, CloudRain, CloudSun, Sun } from "lucide-react";
+import { resolveWeatherVisual } from "@/components/infoboard/shared/weatherVisual";
 
 import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
 import type { WeatherResult } from "@/lib/weather/weather-types";
@@ -71,15 +72,18 @@ function SharedWeather({
 
   const code = weather.conditionCode;
 
+  const weatherVisual = resolveWeatherVisual(code);
+
   const Icon =
-    code === 0
+    weatherVisual.iconFamily === "sun"
       ? Sun
-      : code >= 51
-        ? CloudRain
-        : code >= 1 && code <= 3
-          ? CloudSun
+      : weatherVisual.iconFamily === "cloud-sun"
+        ? CloudSun
+        : weatherVisual.iconFamily === "cloud-rain"
+          ? CloudRain
           : Cloud;
 
+  const iconColor = weatherVisual.color;
   const temperature = Math.round(weather.temperatureC);
 
   return (
@@ -101,7 +105,7 @@ function SharedWeather({
         size={34}
         strokeWidth={1.6}
         style={{
-          color: "#F5B642",
+          color: iconColor,
           flexShrink: 0,
         }}
       />

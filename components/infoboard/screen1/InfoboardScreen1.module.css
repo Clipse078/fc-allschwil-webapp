@@ -1129,3 +1129,81 @@
   margin: 0;
   padding: 0;
 }
+/* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT structural TV alignment
+ *
+ * Match and Tournament use one identical two-row zone architecture:
+ *
+ *   LABEL
+ *   CONTENT
+ *
+ * This guarantees that MEISTERSCHAFT/TURNIER, KABINE and PLATZ start
+ * on the exact same physical baseline regardless of content height.
+ */
+.eventCard[data-type="MATCH"] .cardEventZone,
+.eventCard[data-type="MATCH"] .cardDressingRoomZone,
+.eventCard[data-type="MATCH"] .cardPitchZone,
+.eventCard[data-type="TOURNAMENT"] .cardEventZone,
+.eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone,
+.eventCard[data-type="TOURNAMENT"] .cardPitchZone {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: stretch;
+  justify-content: stretch;
+  row-gap: clamp(6px, 0.65vh, 10px);
+}
+
+.eventCard[data-type="MATCH"] .cardEventZone > .eventTypeLabel,
+.eventCard[data-type="MATCH"] .cardDressingRoomZone > .destLabel,
+.eventCard[data-type="MATCH"] .cardPitchZone > .destLabel,
+.eventCard[data-type="TOURNAMENT"] .cardEventZone > .eventTypeLabel,
+.eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone > .destLabel,
+.eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destLabel {
+  align-self: start;
+  justify-self: start;
+  margin: 0;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Values begin from one common second-row origin. */
+.eventCard[data-type="MATCH"] .matchIdentity,
+.eventCard[data-type="MATCH"] .matchAllocation,
+.eventCard[data-type="MATCH"] .cardPitchZone > .destPitchValue,
+.eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
+.eventCard[data-type="TOURNAMENT"] .participantAllocationBlock,
+.eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destPitchValue {
+  align-self: start;
+  min-width: 0;
+}
+
+/* Use Kabine width for the team identity instead of truncating early. */
+.eventCard[data-type="MATCH"] .matchAllocTeam,
+.eventCard[data-type="TOURNAMENT"] .participantTeamName,
+.eventCard[data-type="TOURNAMENT"] .tournamentParticipantName {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.15;
+}
+
+/* Keep room number and team visually associated when the team wraps. */
+.eventCard[data-type="MATCH"] .matchAllocRow {
+  align-items: flex-start;
+}
+
+/* Tournament needs slightly more of the available list height so participant
+ * and allocation content cannot be clipped at the card bottom.
+ */
+.eventCard[data-type="TOURNAMENT"] {
+  flex-grow: 1.16;
+}
+
+/* Tournament identity may use its full content height inside the enlarged card. */
+.eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
+.eventCard[data-type="TOURNAMENT"] .tournamentParticipants,
+.eventCard[data-type="TOURNAMENT"] .participantAllocationBlock {
+  min-height: 0;
+  max-height: none;
+}
