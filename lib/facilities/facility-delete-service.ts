@@ -90,9 +90,10 @@ export type FacilityResourceDeletionResult = {
 /**
  * Permanently deletes a FacilityResource within the given tenant.
  *
- * Allocation references are set to null automatically by the DB engine
- * (onDelete: SetNull on the nullable facilityResourceId FK columns).
- * Trainings, Matches, Tournaments, and Events are preserved.
+ * Allocation link rows (TrainingAllocation, TrainingSessionAllocation, etc.)
+ * cascade-delete automatically via onDelete: Cascade on facilityResourceId.
+ * The canonical planning records (TrainingSeries, TrainingSession, Event,
+ * Tournament, WeekplannerPlan) are never deleted — only the allocation links.
  *
  * Returns null when the resource does not exist in the tenant.
  */
@@ -138,9 +139,9 @@ export async function deleteFacilityResourcePermanently(
 // ── Facility permanent delete ─────────────────────────────────────────────────
 
 export type FacilityDeletionImpact = {
-  /** Direct child FacilityResource rows (will be cascade-deleted). */
+  /** Direct child FacilityResource rows (cascade-deleted with the Facility). */
   resources: number;
-  /** Aggregated allocation refs across all child resources (will be nulled). */
+  /** Aggregated allocation link rows across all child resources (cascade-deleted). */
   totalAllocationRefs: number;
 };
 
