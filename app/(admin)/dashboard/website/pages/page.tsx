@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import WebsitePageList from "@/components/admin/pages/WebsitePageList";
 import {
   PageShell,
@@ -11,7 +14,15 @@ import {
 } from "@/components/ui/page";
 
 export default async function WebsitePagesAdminPage() {
-  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const tenantId = await requireActiveTenantId();
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canDelete = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.WEBSITE_DELETE,
+    tenantId,
+  });
 
   return (
     <PageShell fullWidth>
@@ -36,7 +47,7 @@ export default async function WebsitePagesAdminPage() {
           </Link>
         </PageActions>
       </div>
-      <WebsitePageList />
+      <WebsitePageList canDelete={canDelete} />
     </PageShell>
   );
 }

@@ -20,6 +20,7 @@ type PersonsPageClientProps = {
   orgUnits: OrgUnitOption[];
   teams: TeamOption[];
   activeSeason: SeasonOption | null;
+  canDelete?: boolean;
   /** When true, only render the CTA button (for headerActions slot). */
   ctaOnly?: boolean;
 };
@@ -29,6 +30,7 @@ export default function PersonsPageClient({
   orgUnits,
   teams,
   activeSeason,
+  canDelete = false,
   ctaOnly = false,
 }: PersonsPageClientProps) {
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -61,6 +63,7 @@ export default function PersonsPageClient({
         persons={persons}
         orgUnits={orgUnits}
         teams={teams}
+        canDelete={canDelete}
         onAddPerson={() => setSheetOpen(true)}
       />
       <PersonCreateSheet

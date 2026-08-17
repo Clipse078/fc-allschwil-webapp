@@ -7,12 +7,14 @@ import {
   getTeamsForTenant,
   getActiveSeasonForTenant,
 } from "@/lib/people/queries";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
 import PersonsPageClient from "@/components/admin/persons/PersonsPageClient";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
 
 export default async function PersonsPage() {
-  await requirePermission(PERMISSIONS.PEOPLE_VIEW);
+  const session = await requirePermission(PERMISSIONS.PEOPLE_VIEW);
 
   const tenantId = await getActiveTenantId();
 
@@ -34,6 +36,16 @@ export default async function PersonsPage() {
     ].filter(Boolean),
   }));
 
+  let canDelete = false;
+  if (tenantId) {
+    const resolver = createEffectivePermissionResolver(prisma);
+    canDelete = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.PEOPLE_DELETE,
+      tenantId,
+    });
+  }
+
   return (
     <PageShell fullWidth>
       <ListPagePattern
@@ -50,6 +62,7 @@ export default async function PersonsPage() {
             orgUnits={orgUnitOptions}
             teams={teamOptions}
             activeSeason={activeSeason}
+            canDelete={canDelete}
             ctaOnly
           />
         }
@@ -59,6 +72,7 @@ export default async function PersonsPage() {
           orgUnits={orgUnitOptions}
           teams={teamOptions}
           activeSeason={activeSeason}
+          canDelete={canDelete}
         />
       </ListPagePattern>
     </PageShell>

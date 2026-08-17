@@ -23,6 +23,7 @@ type InboardOverviewProps = {
   activeCount: number;
   draftCount: number;
   disabledCount: number;
+  canDelete?: boolean;
 };
 
 export function InboardOverview({
@@ -31,6 +32,7 @@ export function InboardOverview({
   activeCount,
   draftCount,
   disabledCount,
+  canDelete = false,
 }: InboardOverviewProps) {
   const router = useRouter();
   const [boards, setBoards] = useState(initialBoards);
@@ -154,7 +156,7 @@ export function InboardOverview({
                   key={board.id}
                   board={board}
                   onDuplicate={handleDuplicate}
-                  onDelete={(id, name) => setDeleteTarget({ id, name })}
+                  onDelete={canDelete ? (id, name) => setDeleteTarget({ id, name }) : undefined}
                   onToggleStatus={handleToggleStatus}
                 />
               ))}

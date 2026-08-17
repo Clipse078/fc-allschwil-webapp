@@ -47,6 +47,10 @@ import type { NavItemTree } from "@/lib/navigation/admin-queries";
 // Types
 // ---------------------------------------------------------------------------
 
+type NavigationManagerProps = {
+  canDelete?: boolean;
+};
+
 type GroupedAreas = Record<NavArea, NavItemTree[]>;
 
 type ApiResponse = {
@@ -362,6 +366,7 @@ type NavItemRowProps = {
   onDelete: (item: NavItemTree) => void;
   onAddChild: (parentId: string, area: NavArea) => void;
   isLoading: boolean;
+  canDelete: boolean;
 };
 
 function NavItemRow({
@@ -376,6 +381,7 @@ function NavItemRow({
   onDelete,
   onAddChild,
   isLoading,
+  canDelete,
 }: NavItemRowProps) {
   const indent = depth > 0 ? "pl-8" : "";
   const isChild = depth > 0;
@@ -471,14 +477,16 @@ function NavItemRow({
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
-          <button
-            title="Löschen"
-            onClick={() => onDelete(item)}
-            disabled={isLoading}
-            className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
+          {canDelete && (
+            <button
+              title="Endgültig löschen"
+              onClick={() => onDelete(item)}
+              disabled={isLoading}
+              className="flex h-7 w-7 items-center justify-center rounded text-red-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -498,6 +506,7 @@ function NavItemRow({
             onDelete={onDelete}
             onAddChild={onAddChild}
             isLoading={isLoading}
+            canDelete={canDelete}
           />
         ))}
     </>
@@ -518,6 +527,7 @@ type AreaSectionProps = {
   onEdit: (item: NavItemTree) => void;
   onDelete: (item: NavItemTree) => void;
   isLoading: boolean;
+  canDelete: boolean;
 };
 
 function AreaSection({
@@ -530,6 +540,7 @@ function AreaSection({
   onEdit,
   onDelete,
   isLoading,
+  canDelete,
 }: AreaSectionProps) {
   const colors = AREA_COLORS[area];
   const label = NAV_AREA_LABEL[area];
@@ -594,6 +605,7 @@ function AreaSection({
               onDelete={onDelete}
               onAddChild={(parentId, a) => onAdd(a, parentId)}
               isLoading={isLoading}
+              canDelete={canDelete}
             />
           ))}
         </div>
@@ -606,7 +618,7 @@ function AreaSection({
 // Main NavigationManager component
 // ---------------------------------------------------------------------------
 
-export default function NavigationManager() {
+export default function NavigationManager({ canDelete = false }: NavigationManagerProps) {
   const [data, setData] = useState<ApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -998,6 +1010,7 @@ export default function NavigationManager() {
               onEdit={openEdit}
               onDelete={startDelete}
               isLoading={isLoading}
+              canDelete={canDelete}
             />
           ))}
         </>

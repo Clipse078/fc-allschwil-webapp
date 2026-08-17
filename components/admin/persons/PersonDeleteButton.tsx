@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2, User } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
+import type { ReactNode } from "react";
 
 type PersonDeletionImpact = {
   squadMemberships: number;
@@ -19,6 +20,13 @@ type PersonDeletionImpact = {
 type PersonDeleteButtonProps = {
   personId: string;
   personName: string;
+  /** Called after successful deletion. If omitted, navigates to /dashboard/persons. */
+  onSuccess?: () => void;
+  /**
+   * Custom trigger renderer. When provided, replaces the default red-bordered button.
+   * Call the supplied `onClick` to open the confirmation dialog.
+   */
+  renderTrigger?: (props: { onClick: () => void }) => ReactNode;
 };
 
 /**
@@ -29,7 +37,7 @@ type PersonDeleteButtonProps = {
  * Clicking "Endgültig löschen" sends DELETE ?confirm=true to permanently
  * remove the Person. Global User account is explicitly shown as preserved.
  */
-export default function PersonDeleteButton({ personId, personName }: PersonDeleteButtonProps) {
+export default function PersonDeleteButton({ personId, personName, onSuccess, renderTrigger }: PersonDeleteButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
@@ -78,8 +86,12 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
       }
 
       setOpen(false);
-      router.push("/dashboard/persons");
-      router.refresh();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        router.push("/dashboard/persons");
+        router.refresh();
+      }
     } catch {
       setError("Netzwerkfehler. Bitte erneut versuchen.");
     } finally {
@@ -92,14 +104,18 @@ export default function PersonDeleteButton({ personId, personName }: PersonDelet
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openConfirmation}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-transparent px-3.5 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-      >
-        <Trash2 className="h-3.5 w-3.5" />
-        Endgültig löschen
-      </button>
+      {renderTrigger ? (
+        renderTrigger({ onClick: openConfirmation })
+      ) : (
+        <button
+          type="button"
+          onClick={openConfirmation}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-transparent px-3.5 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Endgültig löschen
+        </button>
+      )}
 
       <Dialog
         open={open}

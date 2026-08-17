@@ -15,19 +15,28 @@
 import { notFound } from "next/navigation";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { listInfoboards, countInfoboards } from "@/lib/infoboard/queries";
 import { InboardOverview } from "@/components/infoboard/v2/InboardOverview";
 
 export default async function InfoboardAdminPage() {
-  await requireAnyPermission([
+  const session = await requireAnyPermission([
     PERMISSIONS.INFOBOARD_MANAGE,
     PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
   ]);
 
   const tenantContext = await getActiveTenant();
   if (!tenantContext) notFound();
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canDelete = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.INFOBOARD_DELETE,
+    tenantId: tenantContext.id,
+  });
 
   const [boards, counts] = await Promise.all([
     listInfoboards(tenantContext.id),
@@ -48,6 +57,7 @@ export default async function InfoboardAdminPage() {
         activeCount={counts.active}
         draftCount={counts.draft}
         disabledCount={counts.disabled}
+        canDelete={canDelete}
       />
     </div>
   );

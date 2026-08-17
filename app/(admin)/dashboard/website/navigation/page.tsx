@@ -2,6 +2,9 @@ import { Menu } from "lucide-react";
 import Link from "next/link";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import { CMS_ROUTES } from "@/lib/cms/routes";
 import NavigationManager from "@/components/admin/navigation/NavigationManager";
 import {
@@ -11,7 +14,15 @@ import {
 } from "@/components/ui/page";
 
 export default async function NavigationManagementPage() {
-  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
+  const tenantId = await requireActiveTenantId();
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canDelete = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.WEBSITE_DELETE,
+    tenantId,
+  });
 
   return (
     <PageShell fullWidth>
@@ -75,7 +86,7 @@ export default async function NavigationManagementPage() {
         </Link>
       </div>
 
-      <NavigationManager />
+      <NavigationManager canDelete={canDelete} />
     </PageShell>
   );
 }

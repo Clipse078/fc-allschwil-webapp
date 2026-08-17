@@ -2,12 +2,23 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import NewsArticleList from "@/components/admin/news/NewsArticleList";
 import { PageShell } from "@/components/ui/page";
 import { ListPagePattern } from "@/components/ui/patterns";
 
 export default async function NewsAdminPage() {
-  await requireAnyPermission([PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE]);
+  const tenantId = await requireActiveTenantId();
+
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canDelete = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.NEWS_DELETE,
+    tenantId,
+  });
 
   return (
     <PageShell fullWidth>
@@ -27,7 +38,7 @@ export default async function NewsAdminPage() {
           </Link>
         }
       >
-        <NewsArticleList />
+        <NewsArticleList canDelete={canDelete} />
       </ListPagePattern>
     </PageShell>
   );

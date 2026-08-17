@@ -29,7 +29,7 @@ import { AnlageplanConfigPreview } from "@/components/infoboard/anlageplan/Anlag
 type InboardCardProps = {
   board: InfoboardListItem;
   onDuplicate: (id: string) => Promise<void>;
-  onDelete: (id: string, name: string) => void;
+  onDelete?: (id: string, name: string) => void;
   onToggleStatus: (id: string, currentStatus: string) => Promise<void>;
 };
 
@@ -206,17 +206,21 @@ export function InboardCard({
                       </>
                     )}
                   </button>
-                  <div className="my-1 border-t border-[var(--border)]" />
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      onDelete(board.id, board.name);
-                    }}
-                    className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[0.8rem] text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    Löschen
-                  </button>
+                  {onDelete && (
+                    <>
+                      <div className="my-1 border-t border-[var(--border)]" />
+                      <button
+                        onClick={() => {
+                          setMenuOpen(false);
+                          onDelete(board.id, board.name);
+                        }}
+                        className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[0.8rem] text-red-600 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Endgültig löschen
+                      </button>
+                    </>
+                  )}
                 </div>
               </>
             )}
