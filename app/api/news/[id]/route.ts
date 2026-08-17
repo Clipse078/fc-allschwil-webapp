@@ -138,7 +138,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 // ── DELETE /api/news/[id] ─────────────────────────────────────────────────────
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const access = await requireApiPermission(PERMISSIONS.NEWS_MANAGE);
+  // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion requires news.delete,
+  // not news.manage. Manage permission is preserved for all other operations.
+  const access = await requireApiPermission(PERMISSIONS.NEWS_DELETE);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

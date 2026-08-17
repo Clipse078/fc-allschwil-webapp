@@ -24,6 +24,10 @@ export const PERMISSIONS = {
 
   COMPETITIONS_VIEW: "competitions.view",
   COMPETITIONS_MANAGE: "competitions.manage",
+  // ADMIN-HARD-DELETE-UI-UPLIFT: canonical permanent-deletion permission for Competitions.
+  // Deliberately separate from COMPETITIONS_MANAGE — archive/edit access must never imply
+  // permanent deletion. Follows the "<module>.delete" convention.
+  COMPETITIONS_DELETE: "competitions.delete",
 
   PEOPLE_VIEW: "people.view",
   PEOPLE_MANAGE: "people.manage",
@@ -63,8 +67,18 @@ export const PERMISSIONS = {
 
   WOCHENPLAN_MANAGE: "wochenplan.manage",
   NEWS_MANAGE: "news.manage",
+  // ADMIN-HARD-DELETE-UI-UPLIFT: canonical permanent-deletion permission for News articles.
+  // Deliberately separate from NEWS_MANAGE — create/edit/archive access must never imply
+  // permanent deletion. Follows the "<module>.delete" convention.
+  NEWS_DELETE: "news.delete",
   WEBSITE_MANAGE: "website.manage",
+  // ADMIN-HARD-DELETE-UI-UPLIFT: canonical permanent-deletion permission for Website content
+  // (pages, nav items, and media assets). Deliberately separate from WEBSITE_MANAGE.
+  WEBSITE_DELETE: "website.delete",
   INFOBOARD_MANAGE: "infoboard.manage",
+  // ADMIN-HARD-DELETE-UI-UPLIFT: canonical permanent-deletion permission for Infoboard records.
+  // Deliberately separate from INFOBOARD_MANAGE. Follows the "<module>.delete" convention.
+  INFOBOARD_DELETE: "infoboard.delete",
   FUNCTIONS_MANAGE: "functions.manage",
 
   // Strategic modules — all three now DB-backed via PermissionModule enum

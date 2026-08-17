@@ -44,6 +44,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { prisma } from "@/lib/db/prisma";
+import { logAction } from "@/lib/audit/log-action";
 import {
   getSfvConfigForTenant,
   upsertSfvConfigForTenant,
@@ -147,4 +149,86 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     console.error("[sfv/config] POST: Unexpected error from upsertSfvConfigForTenant:", e);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
+}
+
+/**
+ * DELETE /api/admin/integrations/sfv/config
+ *
+ * Permanently removes the TenantSfvConfig row for the active tenant.
+ *
+ * ADMIN-HARD-DELETE-UI: Uses TENANTS_MANAGE (PLATFORM scope, SCE admins only).
+ * This is a deliberate exception to the *.delete convention: TenantSfvConfig
+ * has no dedicated permission module. TENANTS_MANAGE is the existing guard
+ * for all SFV config operations and is appropriately restrictive (PLATFORM-
+ * scoped — Club Admins never hold it).
+ *
+ * Two-step flow (confirm query param):
+ *   DELETE .../config              → PREVIEW: returns impact + requiresConfirmation: true
+ *   DELETE .../config?confirm=true → PERFORM: deletes TenantSfvConfig row
+ *
+ * What is NOT deleted:
+ *   - Competitions, TeamExternalMappings, Events, Teams, TeamSeasons
+ *     are NOT automatically removed. These are canonical domain data
+ *     imported from SFV and remain valid independently of the config.
+ *   - The config can be re-created through POST .../config at any time.
+ */
+export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const tenantId = access.session.user?.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json(
+      { error: "Kein Mandant in der Sitzung." },
+      { status: 403 },
+    );
+  }
+
+  const existing = await getSfvConfigForTenant(tenantId);
+
+  if (request.nextUrl.searchParams.get("confirm") !== "true") {
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Keine SFV-Konfiguration vorhanden." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({
+      impact: {
+        clubId: existing.clubId,
+        defaultSeasonId: existing.defaultSeasonId,
+        enabled: existing.enabled,
+        importedDataPreserved: true,
+      },
+      requiresConfirmation: true,
+    });
+  }
+
+  const deleted = await prisma.tenantSfvConfig.findUnique({
+    where: { tenantId },
+    select: { id: true, clubId: true, defaultSeasonId: true },
+  });
+
+  if (!deleted) {
+    return NextResponse.json(
+      { error: "Keine SFV-Konfiguration vorhanden." },
+      { status: 404 },
+    );
+  }
+
+  await prisma.tenantSfvConfig.delete({ where: { tenantId } });
+
+  void logAction({
+    actorUserId: access.session.user?.effectiveUserId ?? access.session.user?.id ?? null,
+    moduleKey: "integrations",
+    entityType: "TenantSfvConfig",
+    entityId: deleted.id,
+    action: "DELETE",
+    beforeJson: { tenantId, clubId: deleted.clubId, defaultSeasonId: deleted.defaultSeasonId },
+  });
+
+  return NextResponse.json({ message: "SFV-Konfiguration wurde endgültig entfernt." });
 }

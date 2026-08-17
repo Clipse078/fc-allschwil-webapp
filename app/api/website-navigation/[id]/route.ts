@@ -68,7 +68,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 // ── DELETE /api/website-navigation/[id] ──────────────────────────────────────
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
-  const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
+  // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion requires website.delete,
+  // not website.manage. Manage permission is preserved for all other operations.
+  const access = await requireApiPermission(PERMISSIONS.WEBSITE_DELETE);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

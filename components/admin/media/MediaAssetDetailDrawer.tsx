@@ -15,6 +15,8 @@ import {
   Info,
   Link2,
   CheckCircle2,
+  AlertTriangle,
+  Trash2,
 } from "lucide-react";
 import type { MediaAssetDetail, MediaTagItem, MediaFolderItem, MediaAssetUsageItem } from "@/lib/media/types";
 
@@ -26,6 +28,7 @@ type MediaAssetDetailDrawerProps = {
   onUpdated: (asset: MediaAssetDetail) => void;
   onArchived: (id: string) => void;
   onRestored: (asset: MediaAssetDetail) => void;
+  onPermanentlyDeleted?: (id: string) => void;
 };
 
 function formatBytes(bytes: number): string {
@@ -42,6 +45,7 @@ export default function MediaAssetDetailDrawer({
   onUpdated,
   onArchived,
   onRestored,
+  onPermanentlyDeleted,
 }: MediaAssetDetailDrawerProps) {
   const [form, setForm] = useState({
     altText: "",
@@ -55,6 +59,15 @@ export default function MediaAssetDetailDrawer({
   const [saving, setSaving] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [permanentDeleteOpen, setPermanentDeleteOpen] = useState(false);
+  const [permanentDeleting, setPermanentDeleting] = useState(false);
+  const [permanentDeleteError, setPermanentDeleteError] = useState<string | null>(null);
+  const [permanentDeleteImpact, setPermanentDeleteImpact] = useState<{
+    newsArticleHeroRefs: number;
+    newsArticleMediaRefs: number;
+    usageRefs: number;
+    blobWillBeDeleted: boolean;
+  } | null>(null);
   const [copied, setCopied] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [usages, setUsages] = useState<MediaAssetUsageItem[]>([]);
@@ -146,6 +159,42 @@ export default function MediaAssetDetailDrawer({
       }
     } finally {
       setRestoring(false);
+    }
+  }
+
+  async function openPermanentDelete() {
+    if (!asset) return;
+    setPermanentDeleteOpen(true);
+    setPermanentDeleteError(null);
+    setPermanentDeleteImpact(null);
+    try {
+      const res = await fetch(`/api/media/${asset.id}/permanent`, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(data?.error ?? "Vorschau nicht verfügbar.");
+      setPermanentDeleteImpact(data?.impact ?? null);
+    } catch (err) {
+      setPermanentDeleteError(err instanceof Error ? err.message : "Fehler.");
+    }
+  }
+
+  async function handlePermanentDelete() {
+    if (!asset) return;
+    setPermanentDeleting(true);
+    setPermanentDeleteError(null);
+    try {
+      const res = await fetch(`/api/media/${asset.id}/permanent?confirm=true`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setPermanentDeleteError(data?.error ?? "Fehler beim Löschen.");
+        return;
+      }
+      setPermanentDeleteOpen(false);
+      onClose();
+      onPermanentlyDeleted?.(asset.id);
+    } catch {
+      setPermanentDeleteError("Netzwerkfehler.");
+    } finally {
+      setPermanentDeleting(false);
     }
   }
 
@@ -507,6 +556,81 @@ export default function MediaAssetDetailDrawer({
             Archivieren
           </button>
         )}
+
+        {/* Permanent delete — only for archived assets */}
+        {isArchived ? (
+          <button
+            type="button"
+            onClick={openPermanentDelete}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-transparent px-3 py-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
+          >
+            <Trash2 className="h-3 w-3" />
+            Endgültig löschen
+          </button>
+        ) : null}
+
+        {/* Permanent delete confirmation dialog */}
+        {permanentDeleteOpen ? (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div className="w-full max-w-sm rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-xl">
+              <div className="p-5">
+                <h3 className="text-sm font-semibold text-[var(--foreground)]">
+                  Datei endgültig löschen
+                </h3>
+                <p className="mt-1 text-xs text-[var(--muted)]">
+                  &bdquo;{asset?.filename}&ldquo; dauerhaft entfernen.
+                </p>
+                <div className="mt-4 space-y-3 text-xs text-[var(--text-2)]">
+                  {!permanentDeleteImpact && !permanentDeleteError ? (
+                    <p className="text-[var(--muted)]">Auswirkungen werden geprüft…</p>
+                  ) : permanentDeleteError ? (
+                    <p className="text-red-600">{permanentDeleteError}</p>
+                  ) : permanentDeleteImpact ? (
+                    <>
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                        <p className="text-red-800">Dauerhaft — kann nicht rückgängig gemacht werden.</p>
+                      </div>
+                      <ul className="ml-3 list-disc space-y-0.5">
+                        <li>Datei &bdquo;{asset?.filename}&ldquo;</li>
+                        <li>Blob aus Speicher gelöscht</li>
+                        {permanentDeleteImpact.newsArticleMediaRefs > 0 && (
+                          <li>{permanentDeleteImpact.newsArticleMediaRefs} Artikel-Einbindung{permanentDeleteImpact.newsArticleMediaRefs !== 1 ? "en" : ""}</li>
+                        )}
+                        {permanentDeleteImpact.newsArticleHeroRefs > 0 && (
+                          <li className="text-[var(--muted)]">{permanentDeleteImpact.newsArticleHeroRefs} Artikel-Headerbild-Verlinkung wird getrennt</li>
+                        )}
+                      </ul>
+                    </>
+                  ) : null}
+                  {permanentDeleteError ? null : (
+                    <p className="text-[var(--muted)]">
+                      Zuerst archivieren, dann endgültig löschen.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[var(--border)] px-5 py-3">
+                <button
+                  type="button"
+                  onClick={() => setPermanentDeleteOpen(false)}
+                  disabled={permanentDeleting}
+                  className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-medium hover:bg-[var(--surface-2)]"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePermanentDelete}
+                  disabled={permanentDeleting || !permanentDeleteImpact || !!permanentDeleteError}
+                  className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"
+                >
+                  {permanentDeleting ? "Löschen…" : "Endgültig löschen"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

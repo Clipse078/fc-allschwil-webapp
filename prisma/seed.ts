@@ -110,6 +110,13 @@ async function main() {
     // held (directly or delegated via a custom tenant role) on its own.
     { key: "teams.delete", name: "Permanently delete teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
+    // Competition permissions — view/manage already exist in DB; delete added by ADMIN-HARD-DELETE-UI-UPLIFT.
+    { key: "competitions.view", name: "View competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "competitions.manage", name: "Manage competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of Competition records.
+    // TeamSeasonCompetition rows cleaned in a transaction; Competition row then deleted.
+    { key: "competitions.delete", name: "Permanently delete competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
     { key: "people.view", name: "View people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     // PERSONS-01: canonical permanent-deletion permission. Deliberately separate from
@@ -142,8 +149,14 @@ async function main() {
 
     { key: "wochenplan.manage", name: "Manage Wochenplan", module: PermissionModule.WOCHENPLAN, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "news.manage", name: "Manage news", module: PermissionModule.NEWS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of news articles.
+    { key: "news.delete", name: "Permanently delete news articles", module: PermissionModule.NEWS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of website content (pages, nav, media).
+    { key: "website.delete", name: "Permanently delete website content", module: PermissionModule.WEBSITE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of Infoboard records.
+    { key: "infoboard.delete", name: "Permanently delete infoboards", module: PermissionModule.INFOBOARD, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },

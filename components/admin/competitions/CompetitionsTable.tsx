@@ -16,6 +16,7 @@ import type { CompetitionListItem } from "@/lib/competitions/dto";
 import { SectionCard } from "@/components/ui/page";
 import { Badge } from "@/components/ui/Badge";
 import CompetitionEditDialog from "./CompetitionEditDialog";
+import CompetitionDeleteButton from "./CompetitionDeleteButton";
 
 // ── Label helpers ─────────────────────────────────────────────────────────────
 
@@ -46,9 +47,10 @@ function formatDate(iso: string | null | undefined): string {
 type Props = {
   competitions: CompetitionListItem[];
   canManage?: boolean;
+  canDelete?: boolean;
 };
 
-export default function CompetitionsTable({ competitions, canManage = false }: Props) {
+export default function CompetitionsTable({ competitions, canManage = false, canDelete = false }: Props) {
   const router = useRouter();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [editTarget, setEditTarget] = useState<CompetitionListItem | null>(null);
@@ -220,15 +222,23 @@ export default function CompetitionsTable({ competitions, canManage = false }: P
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
                       {competition.isArchived ? (
-                        <button
-                          type="button"
-                          title="Wiederherstellen"
-                          disabled={actionLoading === competition.id}
-                          onClick={() => handleRestore(competition.id)}
-                          className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-40"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" />
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            title="Wiederherstellen"
+                            disabled={actionLoading === competition.id}
+                            onClick={() => handleRestore(competition.id)}
+                            className="rounded p-1 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-40"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </button>
+                          {canDelete ? (
+                            <CompetitionDeleteButton
+                              competitionId={competition.id}
+                              competitionName={competition.officialName}
+                            />
+                          ) : null}
+                        </>
                       ) : (
                         <button
                           type="button"
