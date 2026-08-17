@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { FileText, PenLine, Blocks, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
+import { FileText, PenLine, Blocks, Plus, Eye, EyeOff, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
 import WebsitePageStatusBadge from "@/components/admin/pages/WebsitePageStatusBadge";
 import type { PageStatus, WebsitePageAdminListItem } from "@/lib/pages/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+
+type WebsitePageListProps = {
+  canDelete?: boolean;
+};
 
 type FilterStatus = "ALL" | PageStatus;
 
@@ -27,13 +33,16 @@ const FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Archiviert", value: "ARCHIVED" },
 ];
 
-export default function WebsitePageList() {
+export default function WebsitePageList({ canDelete = false }: WebsitePageListProps) {
   const [pages, setPages] = useState<WebsitePageAdminListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,17 +85,28 @@ export default function WebsitePageList() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Seite wirklich löschen?")) return;
-    setActionPending(id);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
-      const res = await fetch(`/api/website-pages/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/website-pages/${deleteTarget.id}`, { method: "DELETE" });
       if (res.ok || res.status === 204) {
-        setPages((prev) => prev.filter((p) => p.id !== id));
+        setPages((prev) => prev.filter((p) => p.id !== deleteTarget.id));
         setTotal((t) => Math.max(0, t - 1));
+        setDeleteTarget(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(
+          res.status === 403
+            ? "Keine Berechtigung zum Löschen dieser Seite."
+            : (data?.error ?? "Seite konnte nicht gelöscht werden."),
+        );
       }
+    } catch {
+      setDeleteError("Netzwerkfehler. Bitte erneut versuchen.");
     } finally {
-      setActionPending(null);
+      setDeleting(false);
     }
   }
 
@@ -230,15 +250,17 @@ export default function WebsitePageList() {
                           )}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(page.id)}
-                        disabled={actionPending === page.id}
-                        className="sce-icon-button text-rose-500 hover:text-rose-700"
-                        title="Löschen"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ id: page.id, title: page.title })}
+                          disabled={actionPending === page.id}
+                          className="sce-icon-button text-rose-500 hover:text-rose-700"
+                          title="Endgültig löschen"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -256,6 +278,38 @@ export default function WebsitePageList() {
           </p>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteError(null); } }}
+        title="Seite endgültig löschen"
+        description={deleteTarget ? `„${deleteTarget.title}" dauerhaft und unwiderruflich entfernen.` : ""}
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            {deleteError && (
+              <p className="mr-auto text-sm text-red-600">{deleteError}</p>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+              disabled={deleting}
+            >
+              Abbrechen
+            </Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleting}>
+              Endgültig löschen
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <p className="font-medium text-red-800">
+            Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.
+          </p>
+        </div>
+      </Dialog>
     </SectionCard>
   );
 }

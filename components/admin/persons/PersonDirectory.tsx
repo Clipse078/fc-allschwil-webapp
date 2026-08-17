@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Search,
   Users,
@@ -9,7 +10,8 @@ import {
   Filter,
   X,
   Building2,
-  Users2,
+  MoreHorizontal,
+  Trash2,
   UserX,
 } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
@@ -17,6 +19,7 @@ import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { EmptyState } from "@/components/ui/page";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
 import type { PersonDirectoryItem } from "@/lib/people/queries";
+import PersonDeleteButton from "./PersonDeleteButton";
 
 type OrgUnitOption = { id: string; name: string };
 type TeamOption = { id: string; name: string; shortName?: string | null };
@@ -25,6 +28,7 @@ type PersonDirectoryProps = {
   persons: PersonDirectoryItem[];
   orgUnits: OrgUnitOption[];
   teams: TeamOption[];
+  canDelete?: boolean;
   onAddPerson?: () => void;
 };
 
@@ -89,14 +93,18 @@ export default function PersonDirectory({
   persons,
   orgUnits,
   teams,
+  canDelete = false,
   onAddPerson,
 }: PersonDirectoryProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("alle");
   const [filterOrgUnitId, setFilterOrgUnitId] = useState<string>("");
   const [filterTeamId, setFilterTeamId] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<"" | "active" | "inactive">("");
   const [showFilters, setShowFilters] = useState(false);
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   const hasActiveFilters =
     filterOrgUnitId !== "" || filterTeamId !== "" || filterStatus !== "";
@@ -105,6 +113,7 @@ export default function PersonDirectory({
     const q = query.trim().toLowerCase();
 
     return persons.filter((p) => {
+      if (deletedIds.has(p.id)) return false;
       // Text search
       if (q) {
         const fullName = p.name.toLowerCase();
@@ -135,7 +144,7 @@ export default function PersonDirectory({
 
       return true;
     });
-  }, [persons, query, quickFilter, filterOrgUnitId, filterTeamId, filterStatus]);
+  }, [persons, query, quickFilter, filterOrgUnitId, filterTeamId, filterStatus, deletedIds]);
 
   const clearFilters = useCallback(() => {
     setFilterOrgUnitId("");
@@ -366,67 +375,120 @@ export default function PersonDirectory({
             ].slice(0, 2);
 
             return (
-              <Link
+              <div
                 key={person.id}
-                href={`/dashboard/persons/${person.id}`}
                 className={`group flex items-center gap-4 px-5 py-4 transition hover:bg-[var(--surface-2)] ${
                   !isLast ? "border-b border-[var(--border)]" : ""
                 }`}
               >
-                {/* Avatar */}
-                <AdminAvatar
-                  name={person.name}
-                  imageSrc={person.imageUrl}
-                  size="sm"
-                />
+                {/* Clickable row area (navigates to detail) */}
+                <Link
+                  href={`/dashboard/persons/${person.id}`}
+                  className="flex min-w-0 flex-1 items-center gap-4"
+                >
+                  {/* Avatar */}
+                  <AdminAvatar
+                    name={person.name}
+                    imageSrc={person.imageUrl}
+                    size="sm"
+                  />
 
-                {/* Name + functions + teams */}
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                      {person.name}
-                    </span>
-                    {functions.length > 0 ? (
-                      functions.slice(0, 2).map((fn) => (
-                        <PersonFunctionChip key={fn} label={fn} />
-                      ))
-                    ) : (
-                      <span className="text-xs text-[var(--muted)]">
-                        Keine Zuordnung
+                  {/* Name + functions + teams */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                        {person.name}
                       </span>
-                    )}
+                      {functions.length > 0 ? (
+                        functions.slice(0, 2).map((fn) => (
+                          <PersonFunctionChip key={fn} label={fn} />
+                        ))
+                      ) : (
+                        <span className="text-xs text-[var(--muted)]">
+                          Keine Zuordnung
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Team tags + org names */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {teamTags.map((a) => (
+                        <AssignmentTag key={a.id} assignment={a} />
+                      ))}
+                      {orgNames.map((n) => (
+                        <span
+                          key={n}
+                          className="inline-flex items-center gap-1 text-[10px] text-[var(--muted)]"
+                        >
+                          <Building2 className="h-3 w-3" />
+                          {n}
+                        </span>
+                      ))}
+                      {person.email && !teamTags.length && !orgNames.length ? (
+                        <span className="truncate text-[10px] text-[var(--muted)]">
+                          {person.email}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
+                </Link>
 
-                  {/* Team tags + org names */}
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    {teamTags.map((a) => (
-                      <AssignmentTag key={a.id} assignment={a} />
-                    ))}
-                    {orgNames.map((n) => (
-                      <span
-                        key={n}
-                        className="inline-flex items-center gap-1 text-[10px] text-[var(--muted)]"
-                      >
-                        <Building2 className="h-3 w-3" />
-                        {n}
-                      </span>
-                    ))}
-                    {person.email && !teamTags.length && !orgNames.length ? (
-                      <span className="truncate text-[10px] text-[var(--muted)]">
-                        {person.email}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Right: status + chevron */}
-                <div className="flex flex-shrink-0 items-center gap-3">
+                {/* Right: status + chevron + optional ••• menu */}
+                <div className="flex flex-shrink-0 items-center gap-2">
                   {!person.isActive ? (
                     <AdminStatusPill label="Inaktiv" tone="muted" />
                   ) : null}
                   <ChevronRight className="h-4 w-4 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
+                  {canDelete && (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === person.id ? null : person.id);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded text-[var(--muted)] hover:bg-[var(--surface-3)] hover:text-[var(--foreground)]"
+                        aria-label="Mehr Optionen"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+                      {openMenuId === person.id && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setOpenMenuId(null)}
+                          />
+                          <div className="absolute right-0 top-8 z-20 min-w-[190px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg">
+                            <PersonDeleteButton
+                              personId={person.id}
+                              personName={person.name}
+                              onSuccess={() => {
+                                setOpenMenuId(null);
+                                setDeletedIds((prev) => new Set([...prev, person.id]));
+                                router.refresh();
+                              }}
+                              renderTrigger={({ onClick }) => (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuId(null);
+                                    onClick();
+                                  }}
+                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[0.8rem] text-red-600 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                  Endgültig löschen
+                                </button>
+                              )}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

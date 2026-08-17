@@ -2,10 +2,16 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Newspaper, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw } from "lucide-react";
+import { Newspaper, PenLine, Plus, Eye, EyeOff, Trash2, RefreshCw, AlertTriangle } from "lucide-react";
 import NewsStatusBadge from "@/components/admin/news/NewsStatusBadge";
 import type { ArticleStatus, NewsArticleAdminListItem } from "@/lib/news/admin-queries";
 import { SectionCard, EmptyState } from "@/components/ui/page";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+
+type NewsArticleListProps = {
+  canDelete?: boolean;
+};
 
 type FilterStatus = "ALL" | ArticleStatus;
 
@@ -27,13 +33,16 @@ const FILTERS: { label: string; value: FilterStatus }[] = [
   { label: "Archiviert", value: "ARCHIVED" },
 ];
 
-export default function NewsArticleList() {
+export default function NewsArticleList({ canDelete = false }: NewsArticleListProps) {
   const [articles, setArticles] = useState<NewsArticleAdminListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState<FilterStatus>("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionPending, setActionPending] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; title: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,17 +85,28 @@ export default function NewsArticleList() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Artikel wirklich löschen?")) return;
-    setActionPending(id);
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    setDeleteError(null);
     try {
-      const res = await fetch(`/api/news/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/news/${deleteTarget.id}`, { method: "DELETE" });
       if (res.ok || res.status === 204) {
-        setArticles((prev) => prev.filter((a) => a.id !== id));
+        setArticles((prev) => prev.filter((a) => a.id !== deleteTarget.id));
         setTotal((t) => Math.max(0, t - 1));
+        setDeleteTarget(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setDeleteError(
+          res.status === 403
+            ? "Keine Berechtigung zum Löschen dieses Artikels."
+            : (data?.error ?? "Artikel konnte nicht gelöscht werden."),
+        );
       }
+    } catch {
+      setDeleteError("Netzwerkfehler. Bitte erneut versuchen.");
     } finally {
-      setActionPending(null);
+      setDeleting(false);
     }
   }
 
@@ -225,15 +245,17 @@ export default function NewsArticleList() {
                           )}
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(article.id)}
-                        disabled={actionPending === article.id}
-                        className="sce-icon-button text-rose-500 hover:text-rose-700"
-                        title="Löschen"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget({ id: article.id, title: article.title })}
+                          disabled={actionPending === article.id}
+                          className="sce-icon-button text-rose-500 hover:text-rose-700"
+                          title="Endgültig löschen"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -251,6 +273,38 @@ export default function NewsArticleList() {
           </p>
         </div>
       )}
+
+      {/* Delete confirmation dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onClose={() => { if (!deleting) { setDeleteTarget(null); setDeleteError(null); } }}
+        title="Artikel endgültig löschen"
+        description={deleteTarget ? `„${deleteTarget.title}" dauerhaft und unwiderruflich entfernen.` : ""}
+        footer={
+          <div className="flex items-center justify-end gap-3">
+            {deleteError && (
+              <p className="mr-auto text-sm text-red-600">{deleteError}</p>
+            )}
+            <Button
+              variant="secondary"
+              onClick={() => { setDeleteTarget(null); setDeleteError(null); }}
+              disabled={deleting}
+            >
+              Abbrechen
+            </Button>
+            <Button variant="danger" onClick={confirmDelete} loading={deleting}>
+              Endgültig löschen
+            </Button>
+          </div>
+        }
+      >
+        <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+          <p className="font-medium text-red-800">
+            Diese Aktion ist dauerhaft und kann nicht rückgängig gemacht werden.
+          </p>
+        </div>
+      </Dialog>
     </SectionCard>
   );
 }

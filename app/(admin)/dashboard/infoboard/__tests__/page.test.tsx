@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   listInfoboards: vi.fn(),
   countInfoboards: vi.fn(),
   notFound: vi.fn(),
+  hasTenantDeletionAuthority: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/permissions/require-any-permission", () => ({
@@ -41,6 +42,14 @@ vi.mock("@/lib/infoboard/queries", () => ({
   listInfoboards: mocks.listInfoboards,
   countInfoboards: mocks.countInfoboards,
 }));
+
+vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
+  createEffectivePermissionResolver: () => ({
+    hasTenantDeletionAuthority: mocks.hasTenantDeletionAuthority,
+  }),
+}));
+
+vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
@@ -92,7 +101,7 @@ beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
 
-  mocks.requireAnyPermission.mockResolvedValue(undefined);
+  mocks.requireAnyPermission.mockResolvedValue({ user: { id: "user-test" } });
   mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
   mocks.listInfoboards.mockResolvedValue([]);
   mocks.countInfoboards.mockResolvedValue({ total: 0, active: 0, draft: 0, disabled: 0 });
@@ -137,7 +146,7 @@ describe("InfoboardAdminPage V2 — with boards", () => {
   beforeEach(async () => {
     vi.resetModules();
     vi.clearAllMocks();
-    mocks.requireAnyPermission.mockResolvedValue(undefined);
+    mocks.requireAnyPermission.mockResolvedValue({ user: { id: "user-test" } });
     mocks.getActiveTenant.mockResolvedValue(ACTIVE_TENANT);
     mocks.listInfoboards.mockResolvedValue([SAMPLE_BOARD]);
     mocks.countInfoboards.mockResolvedValue({ total: 1, active: 1, draft: 0, disabled: 0 });
