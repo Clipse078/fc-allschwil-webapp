@@ -11,6 +11,7 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TenantForm from "@/components/admin/tenants/TenantForm";
 import TenantConfigForm from "@/components/admin/tenants/TenantConfigForm";
 import BrandingPreviewCard from "@/components/admin/branding/BrandingPreviewCard";
+import TenantDeleteButton from "@/components/admin/tenants/TenantDeleteButton";
 
 type PageProps = { params: Promise<{ tenantSlug: string }> };
 
@@ -38,6 +39,7 @@ export default async function TenantDetailPage({ params }: PageProps) {
     PERMISSIONS.TENANTS_MANAGE,
   ]);
   const canManage = hasPermission(session, PERMISSIONS.TENANTS_MANAGE);
+  const canDelete = hasPermission(session, PERMISSIONS.TENANTS_DELETE);
 
   const { tenantSlug } = await params;
   const [tenant, ctx] = await Promise.all([
@@ -282,6 +284,19 @@ export default async function TenantDetailPage({ params }: PageProps) {
           </div>
         )}
       </div>
+
+      {/* Danger zone — SCE Super Admin only */}
+      {canDelete ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.1em] text-red-700">
+            Gefahrenzone — SCE Super Admin
+          </p>
+          <p className="mb-3 text-sm text-red-700">
+            Löscht den Tenant und alle zugehörigen Daten dauerhaft. Globale Benutzerkonten bleiben erhalten.
+          </p>
+          <TenantDeleteButton tenantSlug={tenant.key} tenantName={tenant.name} />
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -16,6 +16,7 @@ export default async function FacilitiesPage() {
   if (!tenantId) notFound();
 
   const canManage = hasPermission(session, PERMISSIONS.FACILITIES_MANAGE);
+  const canDelete = hasPermission(session, PERMISSIONS.FACILITIES_DELETE);
 
   let facilities: Awaited<ReturnType<typeof getFacilitiesForTenant>> = [];
   try {
@@ -34,6 +35,7 @@ export default async function FacilitiesPage() {
       <FacilitiesAdminPanel
         initialFacilities={facilities}
         canManage={canManage}
+        canDelete={canDelete}
         tenantId={tenantId}
       />
     </div>

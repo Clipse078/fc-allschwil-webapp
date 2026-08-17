@@ -14,6 +14,22 @@
  *   - Last Club Admin: cannot deactivate the tenant's last effective Club Admin.
  *   - Scoped update: only TenantMembership.isActive is modified.
  *
+ * ---
+ *
+ * DELETE /api/admin/users/[userId]/membership
+ *
+ * Permanently removes the target user's TenantMembership and all their
+ * scoped UserRole rows for the caller's active tenant.
+ *
+ * Authorization: requires users.manage (tenant-scoped).
+ *
+ * Safety invariants delegated to removeTenantMembership():
+ *   - Self-removal: actor cannot remove their own membership.
+ *   - Last Club Admin: cannot remove the tenant's last effective Club Admin.
+ *   - Scoped removal: only THIS tenant's membership + roles are removed.
+ *   - Global User is NEVER deleted. Other tenant memberships are unaffected.
+ *   - Person records (linked via Person.userId) are NOT deleted.
+ *
  * HTTP status:
  *   200  — { success: true }
  *   400  — invalid request body / domain error
@@ -30,6 +46,8 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   setTenantMembershipActive,
   MembershipDomainError,
+  removeTenantMembership,
+  RemoveMembershipDomainError,
 } from "@/lib/users/mutations";
 
 type RouteContext = {
@@ -100,6 +118,62 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           {
             error:
               "Der letzte Club Admin kann nicht gesperrt werden. Weise zuerst einem anderen Benutzer die Club-Admin-Rolle zu.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+    return NextResponse.json(
+      { error: "Interner Serverfehler." },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(_request: NextRequest, context: RouteContext) {
+  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
+  }
+
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json(
+      { error: "Kein Tenant-Kontext in der Sitzung vorhanden." },
+      { status: 403 },
+    );
+  }
+
+  const { userId } = await context.params;
+  if (!userId?.trim()) {
+    return NextResponse.json({ error: "Ungültige Benutzer-ID." }, { status: 400 });
+  }
+
+  const actorUserId =
+    access.session.user.effectiveUserId ?? access.session.user.id ?? null;
+
+  try {
+    await removeTenantMembership(tenantId, userId, actorUserId);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    if (error instanceof RemoveMembershipDomainError) {
+      if (error.code === "MEMBERSHIP_NOT_FOUND") {
+        return NextResponse.json(
+          { error: "Benutzer ist kein Mitglied dieses Clubs." },
+          { status: 404 },
+        );
+      }
+      if (error.code === "SELF_REMOVAL") {
+        return NextResponse.json(
+          { error: "Du kannst deinen eigenen Club-Zugriff nicht entfernen." },
+          { status: 400 },
+        );
+      }
+      if (error.code === "LAST_CLUB_ADMIN") {
+        return NextResponse.json(
+          {
+            error:
+              "Der letzte Club Admin kann nicht entfernt werden. Weise zuerst einem anderen Benutzer die Club-Admin-Rolle zu.",
           },
           { status: 400 },
         );

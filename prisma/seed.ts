@@ -74,6 +74,9 @@ async function main() {
     { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     { key: "tenants.view", name: "View tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
+    // ADMIN-DELETE-TENANT-01: SCE Super Admin only. Highest-impact platform operation.
+    // Deliberately NOT grantable by club admins — only platform super_admin holds it.
+    { key: "tenants.delete", name: "Permanently delete tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
 
     // ── RPERM-02: new user-management keys ────────────────────────────────
     { key: "users.view", name: "View users", module: PermissionModule.USERS, scope: PermissionScope.TENANT, grantableByAdmin: true },
@@ -157,9 +160,16 @@ async function main() {
 
     { key: "org.view", name: "View organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "org.manage", name: "Manage organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-ORG-01: canonical permanent-deletion permission for OrgUnit records.
+    // Deliberately separate from org.manage — archive/edit access must never
+    // implicitly grant permanent deletion. Follows the "<module>.delete" convention.
+    { key: "org.delete", name: "Permanently delete organisations", module: PermissionModule.ORG, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "facilities.view", name: "View facilities & resources", module: PermissionModule.FACILITIES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "facilities.manage", name: "Manage facilities & resources", module: PermissionModule.FACILITIES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-DELETE-FACILITIES-01: canonical permanent-deletion permission for
+    // Facility and FacilityResource records. Deliberately separate from facilities.manage.
+    { key: "facilities.delete", name: "Permanently delete facilities & resources", module: PermissionModule.FACILITIES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "trainings.view", name: "View training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "trainings.manage", name: "Manage training allocations", module: PermissionModule.TRAININGS, scope: PermissionScope.TENANT, grantableByAdmin: true },

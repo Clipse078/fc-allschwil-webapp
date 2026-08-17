@@ -138,6 +138,123 @@ export async function setTenantMembershipActive(
   });
 }
 
+// ── Remove tenant membership (permanent) ─────────────────────────────────────
+
+export type RemoveMembershipErrorCode =
+  | "MEMBERSHIP_NOT_FOUND"
+  | "SELF_REMOVAL"
+  | "LAST_CLUB_ADMIN";
+
+export class RemoveMembershipDomainError extends Error {
+  constructor(public readonly code: RemoveMembershipErrorCode) {
+    super(code);
+    this.name = "RemoveMembershipDomainError";
+  }
+}
+
+/**
+ * USER-ADMIN-REMOVE: Permanently remove a User's TenantMembership and all
+ * their scoped UserRole rows for the given tenant.
+ *
+ * Invariants enforced:
+ *   1. Self-removal: an actor may never remove their own membership.
+ *   2. Last Club Admin: the tenant's last effective Club Admin cannot be removed.
+ *   3. Scoped removal only: only rows for THIS tenant are touched.
+ *      Other tenant memberships, global User, sessions, and auth data are untouched.
+ *
+ * What is removed:
+ *   - TenantMembership row for (tenantId, userId)
+ *   - All UserRole rows where tenantId = this tenant and userId = target
+ *     (scoped role assignments within this tenant)
+ *
+ * What is preserved:
+ *   - Global User record
+ *   - Other tenant memberships
+ *   - Non-scoped/platform UserRole rows (those have tenantId = null)
+ *   - Person records (Person.userId link survives — Person is NOT deleted)
+ *   - Sessions and authentication tokens
+ *
+ * @param tenantId    - Must come from `session.user.activeTenantId`.
+ * @param userId      - Target user's ID.
+ * @param actorUserId - Calling user's effective ID (for self-check + audit).
+ */
+export async function removeTenantMembership(
+  tenantId: string,
+  userId: string,
+  actorUserId: string | null,
+): Promise<void> {
+  // Safety 1: self-removal guard
+  if (actorUserId != null && actorUserId === userId) {
+    throw new RemoveMembershipDomainError("SELF_REMOVAL");
+  }
+
+  const existing = await prisma.tenantMembership.findUnique({
+    where: { tenantId_userId: { tenantId, userId } },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new RemoveMembershipDomainError("MEMBERSHIP_NOT_FOUND");
+  }
+
+  // Safety 2: last Club Admin guard
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { key: true },
+  });
+
+  if (tenant) {
+    const clubAdminRoleKey = getTenantClubAdminRoleKey(tenant.key);
+
+    const targetIsClubAdmin =
+      (await prisma.userRole.count({
+        where: { userId, tenantId, role: { key: clubAdminRoleKey } },
+      })) > 0;
+
+    if (targetIsClubAdmin) {
+      const otherActiveClubAdmins = await prisma.userRole.count({
+        where: {
+          tenantId,
+          userId: { not: userId },
+          role: { key: clubAdminRoleKey },
+          user: {
+            tenantMemberships: {
+              some: { tenantId, isActive: true },
+            },
+          },
+        },
+      });
+
+      if (otherActiveClubAdmins === 0) {
+        throw new RemoveMembershipDomainError("LAST_CLUB_ADMIN");
+      }
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Remove all scoped UserRole rows for this user in this tenant.
+    await tx.userRole.deleteMany({ where: { userId, tenantId } });
+
+    // Remove the TenantMembership row.
+    await tx.tenantMembership.delete({
+      where: { tenantId_userId: { tenantId, userId } },
+    });
+  });
+
+  await logAction({
+    actorUserId,
+    moduleKey: "users",
+    entityType: "TenantMembership",
+    entityId: existing.id,
+    action: "MEMBERSHIP_REMOVED",
+    beforeJson: { tenantId, targetUserId: userId },
+    metadataJson: {
+      globalUserPreserved: true,
+      scopedRolesRemoved: true,
+      otherTenantMembershipsUnaffected: true,
+    },
+  });
+}
+
 // ── Invitation: invite existing Person ───────────────────────────────────────
 
 export type InvitePersonResult = {
