@@ -12,6 +12,8 @@
 import { Trophy } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
 import { listCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { PageShell, SectionCard } from "@/components/ui/page";
@@ -70,6 +72,13 @@ export default async function CompetitionsPage({ searchParams }: CompetitionsPag
 
   const canManage = session.user.permissionKeys?.includes(PERMISSIONS.COMPETITIONS_MANAGE);
 
+  const resolver = createEffectivePermissionResolver(prisma);
+  const canDelete = await resolver.hasTenantDeletionAuthority({
+    userId: session.user.id,
+    permission: PERMISSIONS.COMPETITIONS_DELETE,
+    tenantId,
+  });
+
   return (
     <PageShell fullWidth>
       <ListPagePattern
@@ -121,7 +130,7 @@ export default async function CompetitionsPage({ searchParams }: CompetitionsPag
             : "Noch keine Wettkämpfe vorhanden. Erstellen Sie manuell einen Wettkampf oder starten Sie eine SFV-Synchronisation."
         }
       >
-        <CompetitionsTable competitions={competitions} canManage={canManage} />
+        <CompetitionsTable competitions={competitions} canManage={canManage} canDelete={canDelete} />
       </ListPagePattern>
     </PageShell>
   );

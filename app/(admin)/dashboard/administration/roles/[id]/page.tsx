@@ -5,8 +5,12 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import { TENANT_ROLES_VIEW } from "@/lib/roles/access";
 import { getTenantPermissionCatalog, getTenantRoleDetail } from "@/lib/roles/tenant-queries";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { prisma } from "@/lib/db/prisma";
 import RoleScopeBadge from "@/components/admin/roles/RoleScopeBadge";
 import ProtectedRoleBadge from "@/components/admin/roles/ProtectedRoleBadge";
+import RoleDeleteButton from "@/components/admin/roles/RoleDeleteButton";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import TenantRoleDetailsForm from "@/components/admin/roles/TenantRoleDetailsForm";
 import TenantRolePermissionEditor from "@/components/admin/roles/TenantRolePermissionEditor";
@@ -15,7 +19,7 @@ type PageProps = { params: Promise<{ id: string }> };
 
 export default async function TenantRoleDetailPage({ params }: PageProps) {
   const tenantId = await requireActiveTenantId();
-  await requireAnyPermission(TENANT_ROLES_VIEW, tenantId);
+  const session = await requireAnyPermission(TENANT_ROLES_VIEW, tenantId);
 
   const { id } = await params;
   const [role, moduleGroups] = await Promise.all([
@@ -24,6 +28,17 @@ export default async function TenantRoleDetailPage({ params }: PageProps) {
   ]);
 
   if (!role) notFound();
+
+  // Resolve permanent-delete authority (only for non-system roles)
+  let canDelete = false;
+  if (!role.isSystem) {
+    const resolver = createEffectivePermissionResolver(prisma);
+    canDelete = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.ROLES_DELETE,
+      tenantId,
+    });
+  }
 
   return (
     <div className="space-y-8">
@@ -54,6 +69,13 @@ export default async function TenantRoleDetailPage({ params }: PageProps) {
             ) : (
               <AdminStatusPill label="Aktiv" tone="success" />
             )}
+            {canDelete ? (
+              <RoleDeleteButton
+                roleId={role.id}
+                roleName={role.name}
+                roleKey={role.key}
+              />
+            ) : null}
           </div>
         </div>
       </div>

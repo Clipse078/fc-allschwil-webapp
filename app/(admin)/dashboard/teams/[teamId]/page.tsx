@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
 import TeamLifecycleCard from "@/components/admin/teams/TeamLifecycleCard";
+import TeamSeasonDeleteButton from "@/components/admin/teams/TeamSeasonDeleteButton";
 import ScopedResponsibilitiesCard from "@/components/admin/shared/ScopedResponsibilitiesCard";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
@@ -243,6 +244,31 @@ export default async function TeamDetailPage({ params }: Props) {
                 </span>
               </div>
             </SectionCard>
+
+            {canDelete && team.teamSeasons.length > 0 ? (
+              <SectionCard title="Saisonen verwalten">
+                <div className="space-y-2">
+                  {team.teamSeasons.map((ts) => (
+                    <div
+                      key={ts.id}
+                      className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-medium text-[var(--foreground)]">
+                          {ts.displayName}
+                        </p>
+                        <p className="text-[0.7rem] text-[var(--muted)]">{ts.season.name}</p>
+                      </div>
+                      <TeamSeasonDeleteButton
+                        teamId={team.id}
+                        teamSeasonId={ts.id}
+                        teamSeasonName={ts.displayName}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+            ) : null}
             <TimelinePlaceholder />
           </>
         }

@@ -264,7 +264,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
-  const access = await requireApiAnyPermission(REQUIRED_PERMISSIONS);
+  // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion requires infoboard.delete,
+  // not infoboard.manage. Manage permission is preserved for all other operations.
+  const access = await requireApiAnyPermission([PERMISSIONS.INFOBOARD_DELETE]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

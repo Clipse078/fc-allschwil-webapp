@@ -72,6 +72,10 @@ async function main() {
     // ── PLATFORM-scoped permissions (not grantable by club admins) ─────────
     { key: "users.manage", name: "Manage users", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     { key: "users.impersonate", name: "Impersonate users", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
+    // ADMIN-HARD-DELETE-UI: platform-level global User account permanent deletion.
+    // scope=PLATFORM, grantableByAdmin=false — only SCE super_admin may destroy global
+    // User accounts. A tenant Club Admin must never hold this permission.
+    { key: "users.delete", name: "Permanently delete global user accounts", module: PermissionModule.USERS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     { key: "tenants.view", name: "View tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     { key: "tenants.manage", name: "Manage tenants", module: PermissionModule.TENANTS, scope: PermissionScope.PLATFORM, grantableByAdmin: false },
     // ADMIN-DELETE-TENANT-01: SCE Super Admin only. Highest-impact platform operation.
@@ -87,6 +91,9 @@ async function main() {
     { key: "roles.view", name: "View roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "roles.manage", name: "Manage roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "roles.assign", name: "Assign roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI: canonical permanent-deletion permission for non-system tenant roles.
+    // Deliberately separate from roles.manage. System roles (isSystem=true) are never deletable.
+    { key: "roles.delete", name: "Permanently delete roles", module: PermissionModule.ROLES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     // ── TENANT-scoped permissions ─────────────────────────────────────────
     { key: "seasons.view", name: "View seasons", module: PermissionModule.SEASONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
@@ -102,6 +109,13 @@ async function main() {
     // never implicitly granted by create/edit/archive access — it must be
     // held (directly or delegated via a custom tenant role) on its own.
     { key: "teams.delete", name: "Permanently delete teams", module: PermissionModule.TEAMS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
+    // Competition permissions — view/manage already exist in DB; delete added by ADMIN-HARD-DELETE-UI-UPLIFT.
+    { key: "competitions.view", name: "View competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "competitions.manage", name: "Manage competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of Competition records.
+    // TeamSeasonCompetition rows cleaned in a transaction; Competition row then deleted.
+    { key: "competitions.delete", name: "Permanently delete competitions", module: PermissionModule.COMPETITIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "people.view", name: "View people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.manage", name: "Manage people", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
@@ -135,18 +149,33 @@ async function main() {
 
     { key: "wochenplan.manage", name: "Manage Wochenplan", module: PermissionModule.WOCHENPLAN, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "news.manage", name: "Manage news", module: PermissionModule.NEWS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of news articles.
+    { key: "news.delete", name: "Permanently delete news articles", module: PermissionModule.NEWS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "website.manage", name: "Manage website content", module: PermissionModule.WEBSITE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of website content (pages, nav, media).
+    { key: "website.delete", name: "Permanently delete website content", module: PermissionModule.WEBSITE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "infoboard.manage", name: "Manage infoboard", module: PermissionModule.INFOBOARD, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI-UPLIFT: permanent deletion of Infoboard records.
+    { key: "infoboard.delete", name: "Permanently delete infoboards", module: PermissionModule.INFOBOARD, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "functions.manage", name: "Manage functions", module: PermissionModule.FUNCTIONS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "targets.view", name: "View targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "targets.manage", name: "Manage targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI: canonical permanent-deletion permission for Targets.
+    // Deliberately separate from targets.manage. Follows the "<module>.delete" convention.
+    { key: "targets.delete", name: "Permanently delete targets", module: PermissionModule.TARGETS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "meetings.view", name: "View meetings", module: PermissionModule.MEETINGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "meetings.manage", name: "Manage meetings", module: PermissionModule.MEETINGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI: canonical permanent-deletion permission for Meetings.
+    // Deliberately separate from meetings.manage. Follows the "<module>.delete" convention.
+    { key: "meetings.delete", name: "Permanently delete meetings", module: PermissionModule.MEETINGS, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "initiatives.view", name: "View initiatives", module: PermissionModule.INITIATIVES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "initiatives.manage", name: "Manage initiatives", module: PermissionModule.INITIATIVES, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // ADMIN-HARD-DELETE-UI: canonical permanent-deletion permission for Initiatives.
+    // Deliberately separate from initiatives.manage. Follows the "<module>.delete" convention.
+    { key: "initiatives.delete", name: "Permanently delete initiatives", module: PermissionModule.INITIATIVES, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "templates.view", name: "View templates", module: PermissionModule.TEMPLATES, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "templates.manage", name: "Manage templates", module: PermissionModule.TEMPLATES, scope: PermissionScope.TENANT, grantableByAdmin: true },

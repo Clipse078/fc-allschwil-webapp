@@ -4,10 +4,14 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { getTargetById } from "@/lib/targets/queries";
 import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 import TargetMetricProgress from "@/components/admin/targets/TargetMetricProgress";
 import TargetDataPointForm from "@/components/admin/targets/TargetDataPointForm";
 import TargetStageActions from "@/components/admin/targets/TargetStageActions";
 import TargetLinksPanel from "@/components/admin/targets/TargetLinksPanel";
+import TargetDeleteButton from "@/components/admin/targets/TargetDeleteButton";
 import ReviewStageBadge from "@/components/admin/shared/ReviewStageBadge";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { Edit, ArrowLeft, Calendar, Tag, ShieldCheck } from "lucide-react";
@@ -53,6 +57,18 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
 
   if (!target) notFound();
 
+  // Resolve permanent-delete authority for delete button visibility
+  const tenantId = session.user?.activeTenantId;
+  let canDelete = false;
+  if (tenantId) {
+    const resolver = createEffectivePermissionResolver(prisma);
+    canDelete = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.TARGETS_DELETE,
+      tenantId,
+    });
+  }
+
   const statusInfo = STATUS_LABELS[target.status] ?? STATUS_LABELS.DRAFT;
   const categoryLabel = CATEGORY_LABELS[target.category] ?? target.category;
 
@@ -64,6 +80,9 @@ export default async function TargetDetailPage({ params, searchParams }: PagePro
         description={target.description ?? ""}
         actions={
           <div className="flex items-center gap-2">
+            {canDelete ? (
+              <TargetDeleteButton targetId={id} targetTitle={target.title} />
+            ) : null}
             <Link
               href="/vereinsleitung/targets"
               className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"

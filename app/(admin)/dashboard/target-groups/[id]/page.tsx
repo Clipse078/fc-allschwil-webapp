@@ -5,9 +5,12 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTargetGroupById } from "@/lib/org/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { prisma } from "@/lib/db/prisma";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import TargetGroupForm from "@/components/admin/org/TargetGroupForm";
+import TargetGroupDeleteButton from "@/components/admin/org/TargetGroupDeleteButton";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -23,7 +26,7 @@ function getStatusTone(status: string): "success" | "muted" | "default" {
 }
 
 export default async function TargetGroupDetailPage({ params }: PageProps) {
-  await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
+  const session = await requireAnyPermission([PERMISSIONS.ORG_VIEW, PERMISSIONS.ORG_MANAGE]);
   const { id } = await params;
   const [tg, tenant] = await Promise.all([
     getTargetGroupById(id),
@@ -31,6 +34,18 @@ export default async function TargetGroupDetailPage({ params }: PageProps) {
   ]);
   if (!tg) notFound();
   if (tg.tenantId !== null && tenant && tg.tenantId !== tenant.id) notFound();
+
+  // Resolve permanent-delete authority
+  const tenantId = tg.tenantId ?? tenant?.id;
+  let canDelete = false;
+  if (tenantId) {
+    const resolver = createEffectivePermissionResolver(prisma);
+    canDelete = await resolver.hasTenantDeletionAuthority({
+      userId: session.user.id,
+      permission: PERMISSIONS.ORG_DELETE,
+      tenantId,
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -64,6 +79,13 @@ export default async function TargetGroupDetailPage({ params }: PageProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {canDelete ? (
+              <TargetGroupDeleteButton
+                targetGroupId={tg.id}
+                targetGroupName={tg.name}
+                targetGroupKey={tg.key}
+              />
+            ) : null}
             <Link
               href="/dashboard/target-groups"
               className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"

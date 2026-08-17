@@ -20,6 +20,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import SfvTenantConfigPanel from "@/components/admin/integrations/SfvTenantConfigPanel";
+import SfvConfigDeleteButton from "@/components/admin/integrations/SfvConfigDeleteButton";
 import { getSfvConfigForTenant } from "@/lib/integrations/sfv/tenant-config-service";
 import type { TenantSfvConfig } from "@/lib/integrations/sfv/tenant-config-types";
 
@@ -48,6 +49,20 @@ export default async function SfvIntegrationPage() {
         />
 
         <SfvTenantConfigPanel initialConfig={initialConfig} />
+
+        {initialConfig ? (
+          <div className="rounded-lg border border-red-200 bg-red-50/50 p-5">
+            <p className="mb-3 text-sm font-semibold text-red-800">Konfiguration entfernen</p>
+            <p className="mb-4 text-sm text-red-700">
+              Entfernt die Verbindungskonfiguration dauerhaft. Importierte Daten bleiben erhalten.
+              Die Konfiguration kann jederzeit neu erstellt werden.
+            </p>
+            <SfvConfigDeleteButton
+              clubId={initialConfig.clubId}
+              defaultSeasonId={initialConfig.defaultSeasonId}
+            />
+          </div>
+        ) : null}
       </div>
     </ToastProvider>
   );
