@@ -8,6 +8,17 @@ import { cn } from "@/lib/cn";
 
 const MIN_PASSWORD_LENGTH = 12;
 
+type TokenValidation =
+  | { valid: false }
+  | { valid: true; isInvitation: false }
+  | {
+      valid: true;
+      isInvitation: true;
+      isExistingUser: boolean;
+      tenantName: string | null;
+      recipientFirstName: string | null;
+    };
+
 function ScePlatformWordmark({ size = 42 }: { size?: number }) {
   return (
     <Image
@@ -25,7 +36,7 @@ export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
 
-  const [tokenValid, setTokenValid] = useState<boolean | null>(null);
+  const [validation, setValidation] = useState<TokenValidation | null>(null);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -34,17 +45,17 @@ export default function ResetPasswordForm() {
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // Pre-validate the token so we can show an error immediately if it's bad.
+  // Pre-validate the token; receive full context for invitation tokens.
   useEffect(() => {
     if (!token) {
-      setTokenValid(false);
+      setValidation({ valid: false });
       return;
     }
 
     fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())
-      .then((data: { valid: boolean }) => setTokenValid(data.valid))
-      .catch(() => setTokenValid(false));
+      .then((data: TokenValidation) => setValidation(data))
+      .catch(() => setValidation({ valid: false }));
   }, [token]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -90,6 +101,9 @@ export default function ResetPasswordForm() {
     }
   }
 
+  const isInvite = validation?.valid && validation.isInvitation;
+  const tenantName = isInvite ? (validation as { tenantName: string | null }).tenantName : null;
+
   return (
     <main className="relative flex min-h-screen" style={{ background: "#F8FAFC" }}>
       <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-12">
@@ -107,7 +121,7 @@ export default function ResetPasswordForm() {
                 "0 4px 24px rgba(17,24,39,0.08), 0 1px 4px rgba(17,24,39,0.04)",
             }}
           >
-            {tokenValid === null && (
+            {validation === null && (
               <div className="py-8 text-center">
                 <p className="text-[0.875rem]" style={{ color: "#9CA3AF" }}>
                   Überprüfe Link…
@@ -115,25 +129,46 @@ export default function ResetPasswordForm() {
               </div>
             )}
 
-            {tokenValid === false && <InvalidTokenState />}
+            {validation?.valid === false && <InvalidTokenState />}
 
-            {tokenValid === true && !success && (
-              <ResetForm
-                newPassword={newPassword}
-                setNewPassword={setNewPassword}
-                confirmPassword={confirmPassword}
-                setConfirmPassword={setConfirmPassword}
-                showNewPassword={showNewPassword}
-                setShowNewPassword={setShowNewPassword}
-                showConfirmPassword={showConfirmPassword}
-                setShowConfirmPassword={setShowConfirmPassword}
-                isSubmitting={isSubmitting}
-                errorMessage={errorMessage}
-                onSubmit={handleSubmit}
+            {validation?.valid === true &&
+              validation.isInvitation &&
+              validation.isExistingUser &&
+              !success && (
+                <ExistingUserInvitationState
+                  tenantName={tenantName}
+                  recipientFirstName={validation.recipientFirstName}
+                  token={token}
+                  onActivated={() => setSuccess(true)}
+                />
+              )}
+
+            {validation?.valid === true &&
+              !(validation.isInvitation && (validation as { isExistingUser?: boolean }).isExistingUser) &&
+              !success && (
+                <ResetForm
+                  isInvitation={validation.isInvitation}
+                  tenantName={tenantName}
+                  newPassword={newPassword}
+                  setNewPassword={setNewPassword}
+                  confirmPassword={confirmPassword}
+                  setConfirmPassword={setConfirmPassword}
+                  showNewPassword={showNewPassword}
+                  setShowNewPassword={setShowNewPassword}
+                  showConfirmPassword={showConfirmPassword}
+                  setShowConfirmPassword={setShowConfirmPassword}
+                  isSubmitting={isSubmitting}
+                  errorMessage={errorMessage}
+                  onSubmit={handleSubmit}
+                />
+              )}
+
+            {success && (
+              <SuccessState
+                isInvitation={isInvite ?? false}
+                tenantName={tenantName}
               />
             )}
-
-            {success && <SuccessState />}
           </div>
 
           <p
@@ -150,6 +185,112 @@ export default function ResetPasswordForm() {
     </main>
   );
 }
+
+// ── Existing-user invitation state ────────────────────────────────────────────
+
+/**
+ * Shown when an already-active global User receives a tenant invitation.
+ * They don't need to set a password — they should log in with existing credentials.
+ * Consuming the token marks it as used (idempotent on repeated visits).
+ */
+function ExistingUserInvitationState({
+  tenantName,
+  recipientFirstName,
+  token,
+  onActivated,
+}: {
+  tenantName: string | null;
+  recipientFirstName: string | null;
+  token: string;
+  onActivated: () => void;
+}) {
+  const [accepting, setAccepting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const clubLabel = tenantName ?? "Ihrem Club";
+  const greeting = recipientFirstName ? `Hallo ${recipientFirstName},` : "Hallo,";
+
+  async function handleAccept() {
+    setAccepting(true);
+    setError(null);
+    try {
+      // Consume the token by posting with a dummy no-op payload — the server
+      // validates and marks the token used regardless of this path.
+      const res = await fetch("/api/auth/invitation/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError((data as { error?: string }).error ?? "Ein Fehler ist aufgetreten.");
+        return;
+      }
+      onActivated();
+    } catch {
+      setError("Netzwerkfehler. Bitte versuche es erneut.");
+    } finally {
+      setAccepting(false);
+    }
+  }
+
+  return (
+    <div className="text-center">
+      <div
+        className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+        style={{ background: "rgba(37,99,235,0.10)" }}
+        aria-hidden="true"
+      >
+        <span style={{ fontSize: "1.5rem" }}>✉️</span>
+      </div>
+
+      <h2
+        className="mb-3 text-[1.25rem] font-bold tracking-tight"
+        style={{ color: "#111827" }}
+      >
+        Einladung zu {clubLabel}
+      </h2>
+
+      <p className="mb-4 text-[0.875rem] leading-relaxed" style={{ color: "#6B7280" }}>
+        {greeting}
+      </p>
+      <p className="mb-6 text-[0.875rem] leading-relaxed" style={{ color: "#6B7280" }}>
+        Du hast bereits ein SportClubEvo-Konto. Klicke auf den Button unten, um die
+        Einladung zu <strong>{clubLabel}</strong> anzunehmen. Danach kannst du dich mit
+        deinen bestehenden Zugangsdaten einloggen.
+      </p>
+
+      {error ? (
+        <p className="mb-4 text-[0.8125rem] text-red-600">{error}</p>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={handleAccept}
+        disabled={accepting}
+        className="mb-4 inline-flex h-10 w-full items-center justify-center rounded-xl px-6 text-[0.875rem] font-semibold text-white transition disabled:opacity-60"
+        style={{
+          background: accepting
+            ? "#3b82f6"
+            : "linear-gradient(135deg, #2563EB 0%, #3b82f6 100%)",
+          boxShadow: "0 2px 10px rgba(37,99,235,0.30)",
+        }}
+      >
+        {accepting ? "Wird angenommen…" : "Einladung annehmen"}
+      </button>
+
+      <Link
+        href="/login"
+        className="text-[0.8125rem] transition-colors"
+        style={{ color: "#6B7280" }}
+      >
+        ← Zum Login
+      </Link>
+    </div>
+  );
+}
+
+// ── Invalid token ─────────────────────────────────────────────────────────────
 
 function InvalidTokenState() {
   return (
@@ -170,12 +311,12 @@ function InvalidTokenState() {
       </h2>
 
       <p className="mb-6 text-[0.875rem] leading-relaxed" style={{ color: "#6B7280" }}>
-        Dieser Zurücksetzen-Link ist ungültig, bereits verwendet oder abgelaufen.
-        Bitte fordere einen neuen Link an.
+        Dieser Link ist ungültig, bereits verwendet oder abgelaufen.
+        Bitte kontaktiere deinen Club-Administrator für eine neue Einladung.
       </p>
 
       <Link
-        href="/forgot-password"
+        href="/login"
         className="inline-flex h-10 items-center justify-center rounded-xl px-6 text-[0.875rem] font-semibold transition"
         style={{
           background: "linear-gradient(135deg, #FF6A00 0%, #FF8533 100%)",
@@ -183,13 +324,61 @@ function InvalidTokenState() {
           boxShadow: "0 2px 10px rgba(255,106,0,0.30)",
         }}
       >
-        Neuen Link anfordern
+        Zum Login
       </Link>
     </div>
   );
 }
 
-function SuccessState() {
+// ── Success state ─────────────────────────────────────────────────────────────
+
+function SuccessState({
+  isInvitation,
+  tenantName,
+}: {
+  isInvitation: boolean;
+  tenantName: string | null;
+}) {
+  const clubLabel = tenantName ?? "deinem Club";
+
+  if (isInvitation) {
+    return (
+      <div className="text-center">
+        <div
+          className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
+          style={{ background: "rgba(22,163,74,0.10)" }}
+          aria-hidden="true"
+        >
+          <span style={{ fontSize: "1.5rem" }}>✅</span>
+        </div>
+
+        <h2
+          className="mb-3 text-[1.25rem] font-bold tracking-tight"
+          style={{ color: "#111827" }}
+        >
+          Konto aktiviert
+        </h2>
+
+        <p className="mb-6 text-[0.875rem] leading-relaxed" style={{ color: "#6B7280" }}>
+          Dein Konto wurde erfolgreich aktiviert. Du kannst dich jetzt bei{" "}
+          <strong>{clubLabel}</strong> einloggen.
+        </p>
+
+        <Link
+          href="/login"
+          className="inline-flex h-10 items-center justify-center rounded-xl px-6 text-[0.875rem] font-semibold transition"
+          style={{
+            background: "linear-gradient(135deg, #FF6A00 0%, #FF8533 100%)",
+            color: "#ffffff",
+            boxShadow: "0 2px 10px rgba(255,106,0,0.30)",
+          }}
+        >
+          Jetzt einloggen
+        </Link>
+      </div>
+    );
+  }
+
   return (
     <div className="text-center">
       <div
@@ -227,7 +416,11 @@ function SuccessState() {
   );
 }
 
+// ── Password reset / invitation setup form ────────────────────────────────────
+
 type ResetFormProps = {
+  isInvitation: boolean;
+  tenantName: string | null;
   newPassword: string;
   setNewPassword: (v: string) => void;
   confirmPassword: string;
@@ -242,6 +435,8 @@ type ResetFormProps = {
 };
 
 function ResetForm({
+  isInvitation,
+  tenantName,
   newPassword,
   setNewPassword,
   confirmPassword,
@@ -256,20 +451,37 @@ function ResetForm({
 }: ResetFormProps) {
   const passwordMeetsLength = newPassword.length >= MIN_PASSWORD_LENGTH;
   const passwordsMatch = newPassword === confirmPassword && confirmPassword.length > 0;
+  const clubLabel = tenantName ?? "SportClubEvo";
 
   return (
     <>
       <div className="mb-6">
-        <h2
-          className="text-[1.375rem] font-bold tracking-tight"
-          style={{ color: "#111827" }}
-        >
-          Neues Passwort wählen
-        </h2>
-
-        <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
-          Wähle ein sicheres Passwort für dein Konto.
-        </p>
+        {isInvitation ? (
+          <>
+            <h2
+              className="text-[1.375rem] font-bold tracking-tight"
+              style={{ color: "#111827" }}
+            >
+              Konto aktivieren
+            </h2>
+            <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
+              Lege ein Passwort fest, um deinen Zugang zu{" "}
+              <strong>{clubLabel}</strong> zu aktivieren.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2
+              className="text-[1.375rem] font-bold tracking-tight"
+              style={{ color: "#111827" }}
+            >
+              Neues Passwort wählen
+            </h2>
+            <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
+              Wähle ein sicheres Passwort für dein Konto.
+            </p>
+          </>
+        )}
       </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
@@ -279,7 +491,7 @@ function ResetForm({
             className="mb-1.5 block text-[0.8125rem] font-medium"
             style={{ color: "#374151" }}
           >
-            Neues Passwort
+            {isInvitation ? "Passwort wählen" : "Neues Passwort"}
           </label>
 
           <div className="relative">
@@ -378,7 +590,13 @@ function ResetForm({
             boxShadow: "0 2px 10px rgba(255,106,0,0.30)",
           }}
         >
-          {isSubmitting ? "Wird gespeichert…" : "Passwort speichern"}
+          {isSubmitting
+            ? isInvitation
+              ? "Wird aktiviert…"
+              : "Wird gespeichert…"
+            : isInvitation
+              ? "Konto aktivieren"
+              : "Passwort speichern"}
         </button>
 
         <div className="text-center">

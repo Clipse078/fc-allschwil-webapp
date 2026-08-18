@@ -387,17 +387,19 @@ export async function invitePersonToTenant(
     data: { userId: newUser.id },
   });
 
-  // 6. Create TenantMembership (active — access granted when they first log in).
+  // 6. Create TenantMembership (inactive until the invitation is accepted).
+  //    Access becomes usable only when the user sets their password and the
+  //    acceptance flow calls activatePendingInvitationMemberships().
   await prisma.tenantMembership.create({
     data: {
       tenantId,
       userId: newUser.id,
-      isActive: true,
+      isActive: false,
     },
   });
 
-  // 7. Create invitation token.
-  const rawToken = await _createInvitationToken(newUser.id);
+  // 7. Create invitation token (stores tenantId for exact membership activation at acceptance).
+  const rawToken = await _createInvitationToken(newUser.id, tenantId);
 
   await logAction({
     actorUserId,
@@ -433,19 +435,57 @@ export async function createPersonAndInvite(
   const { firstName, lastName, email } = personData;
   const normalizedEmail = email.toLowerCase().trim();
 
-  // 1. Check email uniqueness globally.
-  const existing = await prisma.user.findUnique({
+  // 1. Check whether a global User already exists for this email.
+  //    Multi-tenant invariant: an existing global User must be reused, not
+  //    duplicated. Same-tenant cross-person conflicts are still rejected.
+  const existingUser = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      person: { select: { id: true, tenantId: true } },
+    },
   });
-  if (existing) {
-    throw new InvitationDomainError(
-      "EMAIL_TAKEN_BY_OTHER_USER",
-      `A user with email ${normalizedEmail} already exists.`,
+
+  if (existingUser) {
+    // Hard conflict: existing User is already linked to a different Person in
+    // THIS tenant. Two Persons in the same tenant cannot share a User.
+    if (existingUser.person && existingUser.person.tenantId === tenantId) {
+      throw new InvitationDomainError(
+        "USER_ALREADY_LINKED_OTHER_PERSON",
+        `User ${normalizedEmail} is already linked to another Person in this tenant.`,
+      );
+    }
+
+    // Multi-tenant / unlinked case: create a new Person for this tenant and
+    // link it to the existing global User. Preserves all other memberships.
+    const person = await prisma.person.create({
+      data: { tenantId, firstName, lastName, email: normalizedEmail, userId: existingUser.id },
+      select: { id: true },
+    });
+
+    const result = await _ensureMembershipAndResendInvitation(
+      tenantId,
+      existingUser.id,
+      person.id,
+      actorUserId,
     );
+
+    await logAction({
+      actorUserId,
+      moduleKey: "users",
+      entityType: "User",
+      entityId: existingUser.id,
+      action: "INVITATION_SENT",
+      afterJson: { tenantId, personId: person.id, email: normalizedEmail, existingUser: true },
+      metadataJson: { tenantId },
+    });
+
+    return { userId: existingUser.id, personId: person.id, rawToken: result.rawToken };
   }
 
-  // 2. Create Person.
+  // 2. No existing User — create Person and a new User.
   const person = await prisma.person.create({
     data: { tenantId, firstName, lastName, email: normalizedEmail },
     select: { id: true },
@@ -472,13 +512,13 @@ export async function createPersonAndInvite(
     data: { userId: newUser.id },
   });
 
-  // 5. Create TenantMembership.
+  // 5. Create TenantMembership (inactive until accepted).
   await prisma.tenantMembership.create({
-    data: { tenantId, userId: newUser.id, isActive: true },
+    data: { tenantId, userId: newUser.id, isActive: false },
   });
 
-  // 6. Create invitation token.
-  const rawToken = await _createInvitationToken(newUser.id);
+  // 6. Create invitation token (stores tenantId for exact membership activation at acceptance).
+  const rawToken = await _createInvitationToken(newUser.id, tenantId);
 
   await logAction({
     actorUserId,
@@ -517,7 +557,7 @@ export async function resendTenantInvitation(
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
 
-  const rawToken = await _createInvitationToken(userId);
+  const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
     actorUserId,
@@ -557,8 +597,10 @@ export async function revokeTenantInvitation(
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
 
+  // Delete only the invitation token for this specific tenant — never touch
+  // tokens issued for other tenants or normal password-reset tokens.
   const deleted = await prisma.passwordResetToken.deleteMany({
-    where: { userId, isInvitation: true, usedAt: null },
+    where: { userId, isInvitation: true, invitationTenantId: tenantId, usedAt: null },
   });
 
   if (deleted.count === 0) throw new InvitationDomainError("NO_ACTIVE_INVITATION");
@@ -575,19 +617,56 @@ export async function revokeTenantInvitation(
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-/** Create a fresh invitation token, deleting all prior invitation tokens for the user. */
-async function _createInvitationToken(userId: string): Promise<string> {
+// ── Invitation acceptance: activate exact tenant membership ──────────────────
+
+/**
+ * Activate exactly the TenantMembership for `userId` in `tenantId`.
+ *
+ * Called by both acceptance paths after the invitation token is consumed:
+ *   - New User: POST /api/auth/reset-password (password setup)
+ *   - Existing User: POST /api/auth/invitation/accept
+ *
+ * Uses the `invitationTenantId` stored on the token to target the exact
+ * membership row — no timestamp heuristics, no collateral activation.
+ *
+ * Multi-tenant safety:
+ *   - Only the membership for `tenantId` is updated; other tenants unaffected.
+ *   - If the membership is already active (e.g. admin activated it manually),
+ *     updateMany is a no-op (idempotent).
+ */
+export async function activateInvitationMembership(
+  userId: string,
+  tenantId: string,
+): Promise<void> {
+  await prisma.tenantMembership.updateMany({
+    where: { userId, tenantId, isActive: false },
+    data: { isActive: true },
+  });
+}
+
+/**
+ * Create a fresh invitation token for `userId` issued on behalf of `tenantId`.
+ *
+ * Stores `invitationTenantId` on the token so that both acceptance paths can
+ * activate exactly the right TenantMembership without timestamp heuristics.
+ *
+ * All prior invitation tokens for this user are invalidated first (single
+ * active invitation invariant — one user, one outstanding invite token).
+ */
+async function _createInvitationToken(userId: string, tenantId: string): Promise<string> {
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashResetToken(rawToken);
   const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
 
-  // Invalidate all prior invitation tokens (not reset tokens — those are separate).
+  // Invalidate prior invitation tokens for this user+tenant only.
+  // Tokens for other tenants are deliberately left untouched so a simultaneous
+  // invitation to Tenant C is never cancelled when issuing one to Tenant B.
   await prisma.passwordResetToken.deleteMany({
-    where: { userId, isInvitation: true },
+    where: { userId, isInvitation: true, invitationTenantId: tenantId },
   });
 
   await prisma.passwordResetToken.create({
-    data: { userId, tokenHash, expiresAt, isInvitation: true },
+    data: { userId, tokenHash, expiresAt, isInvitation: true, invitationTenantId: tenantId },
   });
 
   return rawToken;
@@ -611,7 +690,7 @@ async function _ensureMembershipAndResendInvitation(
     // Check if there's already a pending invitation token; if so, resend.
     // If they're fully active (have logged in), reject to avoid confusion.
     const hasActiveInvite = await prisma.passwordResetToken.findFirst({
-      where: { userId, isInvitation: true, usedAt: null, expiresAt: { gt: new Date() } },
+      where: { userId, isInvitation: true, invitationTenantId: tenantId, usedAt: null, expiresAt: { gt: new Date() } },
       select: { id: true },
     });
     if (!hasActiveInvite) {
@@ -622,7 +701,7 @@ async function _ensureMembershipAndResendInvitation(
       );
     }
     // Has a pending invitation — resend it.
-    const rawToken = await _createInvitationToken(userId);
+    const rawToken = await _createInvitationToken(userId, tenantId);
     await logAction({
       actorUserId,
       moduleKey: "users",
@@ -635,12 +714,15 @@ async function _ensureMembershipAndResendInvitation(
   }
 
   if (!existing) {
+    // Inactive until the user accepts the invitation. Access is NOT granted
+    // merely because the invitation was issued — this is critical for
+    // existing global Users who already have a working password.
     await prisma.tenantMembership.create({
-      data: { tenantId, userId, isActive: true },
+      data: { tenantId, userId, isActive: false },
     });
   }
 
-  const rawToken = await _createInvitationToken(userId);
+  const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
     actorUserId,

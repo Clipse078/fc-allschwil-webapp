@@ -67,6 +67,20 @@ export type ValidatedToken = {
   tokenId: string;
   userId: string;
   userEmail: string;
+  /** True when this token was issued as an invitation (isInvitation flag set). */
+  isInvitation: boolean;
+  /**
+   * True when the user has previously logged in (lastLoginAt is set).
+   * On invitation acceptance pages, existing users should be directed to
+   * login rather than shown the password-setup form.
+   */
+  isExistingUser: boolean;
+  /**
+   * Non-null for invitation tokens: the tenantId the invitation was issued for.
+   * Used by both acceptance paths to activate exactly that TenantMembership,
+   * without timestamp heuristics.
+   */
+  invitationTenantId: string | null;
 };
 
 /**
@@ -89,7 +103,9 @@ export async function validatePasswordResetToken(
 
   const record = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
-    include: { user: { select: { id: true, email: true, isActive: true } } },
+    include: {
+      user: { select: { id: true, email: true, isActive: true, lastLoginAt: true } },
+    },
   });
 
   if (!record) return null;
@@ -101,6 +117,9 @@ export async function validatePasswordResetToken(
     tokenId: record.id,
     userId: record.user.id,
     userEmail: record.user.email,
+    isInvitation: record.isInvitation,
+    isExistingUser: record.user.lastLoginAt !== null,
+    invitationTenantId: record.invitationTenantId ?? null,
   };
 }
 
