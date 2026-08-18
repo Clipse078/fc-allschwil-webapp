@@ -66,7 +66,7 @@ import {
   FolderOpen,
   KeyRound,
 } from "lucide-react";
-import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership } from "@/lib/people/queries";
+import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord } from "@/lib/people/queries";
 import type { PersonAccessRole, PersonAccessLinkedUser } from "./PersonAccessRolesCard";
 import type { PersonDomainPermissions } from "@/lib/people/person-domain-auth";
 import { resolvePersonCapacities } from "@/lib/people/capacity";
@@ -78,6 +78,7 @@ import PersonTrainerTab from "./PersonTrainerTab";
 import PersonSportTab from "./PersonSportTab";
 import PersonZugangTab from "./PersonZugangTab";
 import PersonDomainPlaceholder from "./PersonDomainPlaceholder";
+import PersonMembershipTab from "./PersonMembershipTab";
 
 type Tab =
   | "uebersicht"
@@ -116,6 +117,8 @@ type PersonDetailTabsProps = {
    * Defaults to all-denied when absent (fail-closed).
    */
   domainPermissions?: PersonDomainPermissions;
+  /** PERSON-UX-04: Club membership records, newest first. */
+  memberships?: PersonMembershipRecord[];
 };
 
 /**
@@ -151,6 +154,7 @@ export default function PersonDetailTabs({
   activeSeason,
   accessRolesCard,
   domainPermissions,
+  memberships = [],
 }: PersonDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
 
@@ -223,7 +227,7 @@ export default function PersonDetailTabs({
       key: "mitgliedschaft",
       label: "Mitgliedschaft",
       icon: <CreditCard className="h-3.5 w-3.5" />,
-      deferred: true,
+      // PERSON-UX-04: No longer deferred — real implementation.
     },
     {
       key: "finanzen",
@@ -407,7 +411,7 @@ export default function PersonDetailTabs({
           </div>
         ) : null}
 
-        {/* Mitgliedschaft — deferred, no dedicated sensitive-domain permission in this slice */}
+        {/* Mitgliedschaft — PERSON-UX-04: real implementation */}
         <div
           role="tabpanel"
           id="tabpanel-mitgliedschaft"
@@ -415,12 +419,10 @@ export default function PersonDetailTabs({
           hidden={safeActiveTab !== "mitgliedschaft"}
         >
           {safeActiveTab === "mitgliedschaft" ? (
-            <PersonDomainPlaceholder
-              icon={<CreditCard className="h-6 w-6" />}
-              title="Mitgliedschaft"
-              description="Mitgliedschaftslebenszyklus, -typ, Eintrittsdatum, Austrittsdatum und
-                Mitgliedschaftshistorie werden in einem späteren Modul implementiert."
-              plannedFor="PERSON-UX-03 (Mitgliedschaft)"
+            <PersonMembershipTab
+              personId={person.id}
+              memberships={memberships}
+              canManage={canManage}
             />
           ) : null}
         </div>
