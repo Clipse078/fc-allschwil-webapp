@@ -439,6 +439,93 @@ export async function getPersonMemberships(personId: string) {
   });
 }
 
+// ── PERSON-UX-05: Assessment queries ─────────────────────────────────────────
+
+/**
+ * Returns all development assessments for a person, newest first.
+ * Includes full rating list with criterion snapshots.
+ * Caller is responsible for verifying read authorization before calling.
+ */
+export async function getPersonAssessments(personId: string, tenantId: string) {
+  return prisma.developmentAssessment.findMany({
+    where: { personId, tenantId },
+    orderBy: [{ assessedAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      tenantId: true,
+      personId: true,
+      seasonId: true,
+      teamSeasonId: true,
+      assessedAt: true,
+      assessorUserId: true,
+      notes: true,
+      createdAt: true,
+      updatedAt: true,
+      season: { select: { id: true, name: true, key: true, isActive: true } },
+      teamSeason: {
+        select: {
+          id: true,
+          team: { select: { id: true, name: true, shortName: true } },
+        },
+      },
+      assessor: { select: { id: true, firstName: true, lastName: true } },
+      ratings: {
+        select: {
+          id: true,
+          criterionId: true,
+          normalizedScore: true,
+          criterionNameSnapshot: true,
+          criterionCategorySnapshot: true,
+          comment: true,
+          createdAt: true,
+        },
+        orderBy: [
+          { criterionCategorySnapshot: "asc" },
+          { criterionNameSnapshot: "asc" },
+        ],
+      },
+    },
+  });
+}
+
+/**
+ * Returns active DevelopmentCriteria for a tenant, sorted for display.
+ * Used when populating assessment create/edit forms.
+ */
+export async function getTenantActiveCriteria(tenantId: string) {
+  return prisma.developmentCriterion.findMany({
+    where: { tenantId, isActive: true },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      category: true,
+      sortOrder: true,
+    },
+  });
+}
+
+/**
+ * Returns ALL (active + inactive) DevelopmentCriteria for a tenant.
+ * Used in admin criterion management.
+ */
+export async function getTenantAllCriteria(tenantId: string) {
+  return prisma.developmentCriterion.findMany({
+    where: { tenantId },
+    orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      category: true,
+      sortOrder: true,
+      isActive: true,
+      createdAt: true,
+    },
+  });
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
 export type PersonDirectoryItem = Awaited<ReturnType<typeof getPersonsForDirectory>>[number];
@@ -446,3 +533,5 @@ export type PersonAssignment = Awaited<ReturnType<typeof getPersonAssignments>>[
 export type PersonSquadMembership = Awaited<ReturnType<typeof getPersonSquadMemberships>>[number];
 export type PersonTrainerMembership = Awaited<ReturnType<typeof getPersonTrainerMemberships>>[number];
 export type PersonMembershipRecord = Awaited<ReturnType<typeof getPersonMemberships>>[number];
+export type PersonAssessmentRecord = Awaited<ReturnType<typeof getPersonAssessments>>[number];
+export type TenantCriterion = Awaited<ReturnType<typeof getTenantActiveCriteria>>[number];

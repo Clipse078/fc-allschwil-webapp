@@ -28,13 +28,15 @@
  * the tab registry in PersonDetailTabs.
  */
 
-import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, TrendingUp, Building2 } from "lucide-react";
+import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, Building2 } from "lucide-react";
 import { useState } from "react";
-import type { PersonSquadMembership, PersonTrainerMembership, PersonAssignment } from "@/lib/people/queries";
+import type { PersonSquadMembership, PersonTrainerMembership, PersonAssignment, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
 import { EmptyState } from "@/components/ui/page";
+import PersonAssessmentSection from "./PersonAssessmentSection";
 
 type PersonSportTabProps = {
+  personId: string;
   squadMemberships: PersonSquadMembership[];
   trainerMemberships: PersonTrainerMembership[];
   assignments: PersonAssignment[];
@@ -45,6 +47,17 @@ type PersonSportTabProps = {
    * Future individual ratings must NEVER be shown without this flag.
    */
   canViewDevelopment?: boolean;
+  /**
+   * PERSON-UX-05: Whether the viewer holds people.assessments.view.
+   * Assessment data is absent when false — no existence hint.
+   */
+  canViewAssessments?: boolean;
+  /** PERSON-UX-05: Whether the viewer holds people.assessments.manage. */
+  canManageAssessments?: boolean;
+  /** PERSON-UX-05: Pre-fetched assessments (server-side). */
+  assessments?: PersonAssessmentRecord[];
+  /** PERSON-UX-05: Active criteria for assessment forms. */
+  criteria?: TenantCriterion[];
 };
 
 type SeasonSnapshot = {
@@ -209,10 +222,15 @@ function SeasonAccordion({ snapshot }: { snapshot: SeasonSnapshot }) {
 }
 
 export default function PersonSportTab({
+  personId,
   squadMemberships,
   trainerMemberships,
   assignments,
   canViewDevelopment = false,
+  canViewAssessments = false,
+  canManageAssessments = false,
+  assessments = [],
+  criteria = [],
 }: PersonSportTabProps) {
   const snapshots = buildSeasonSnapshots(squadMemberships, trainerMemberships, assignments);
   const hasSeasonData = snapshots.length > 0;
@@ -253,28 +271,29 @@ export default function PersonSportTab({
         ) : null}
       </div>
 
-      {/* ── Spieler-Entwicklung — gated by people.development.view ─── */}
-      {/* PERSON-UX-03: development section is absent when canViewDevelopment=false.
-          No locked state, no existence hint. Future ratings must NEVER inherit
-          generic people.view — this flag is the sole gate. */}
-      {canViewDevelopment ? (
+      {/* ── Spieler-Entwicklung / Bewertungen ── PERSON-UX-05 ────────────── */}
+      {/* Gated by people.assessments.view (narrowest permission).
+          Completely absent when canViewAssessments=false — no existence hint.
+          people.development.view alone does NOT grant assessment access.
+          Only one of these two sections is shown; if assessments are visible,
+          the assessment section replaces the development-only banner. */}
+      {canViewAssessments ? (
+        <PersonAssessmentSection
+          personId={personId}
+          assessments={assessments}
+          criteria={criteria}
+          canManage={canManageAssessments}
+        />
+      ) : canViewDevelopment ? (
         <div>
           <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--muted)]">
             Spieler-Entwicklung
           </h3>
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-8 text-center">
-            <TrendingUp className="h-8 w-8 text-[var(--muted)]" />
-            <div>
-              <p className="text-sm font-semibold text-[var(--foreground)]">
-                Entwicklungs-Bewertungen
-              </p>
-              <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--muted)]">
-                Dieses Modul ist für PERSON-UX-03 vorgesehen. Geplant ist ein
-                Bewertungssystem: Einzelbewertungen → Kategorien → normierter 0–100
-                Gesamtwert → saisonaler Durchschnitt → saisonübergreifende Progression.
-                Das Kategorie-Framework wird alters- und teamspezifisch sein.
-              </p>
-            </div>
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4">
+            <p className="text-xs text-[var(--muted)]">
+              Entwicklungsdaten stehen zur Verfügung, sobald Bewertungs-Berechtigungen
+              erteilt werden.
+            </p>
           </div>
         </div>
       ) : null}

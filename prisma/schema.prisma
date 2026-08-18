@@ -621,6 +621,9 @@ model Tenant {
   personAssignments PersonAssignment[] @relation("TenantPersonAssignments")
   // PERSON-UX-04: canonical club membership history
   personMemberships PersonMembership[] @relation("TenantPersonMemberships")
+  // PERSON-UX-05: development assessment foundation
+  developmentCriteria   DevelopmentCriterion[]   @relation("TenantDevelopmentCriteria")
+  developmentAssessments DevelopmentAssessment[] @relation("TenantDevelopmentAssessments")
 
   @@index([status])
   @@index([name])
@@ -677,6 +680,9 @@ model User {
   /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
   /// every User that isn't the linked application account of a Person.
   person Person?
+
+  // PERSON-UX-05: assessments authored by this user as assessor
+  assessorAssessments DevelopmentAssessment[] @relation("AssessorDevelopmentAssessments")
 
   @@index([isActive])
   @@index([tenantId])
@@ -959,6 +965,8 @@ model Season {
   trainingPlans      TrainingPlan[]
   // PERSONS-02: person assignment back-relation
   personAssignments  PersonAssignment[]  @relation("SeasonPersonAssignments")
+  // PERSON-UX-05: development assessments in this season
+  developmentAssessments DevelopmentAssessment[] @relation("SeasonDevelopmentAssessments")
 
   @@index([isActive])
 }
@@ -1143,6 +1151,8 @@ model Person {
   personAssignments    PersonAssignment[]
   // PERSON-UX-04: canonical club membership history
   personMemberships    PersonMembership[]
+  // PERSON-UX-05: development assessment history
+  developmentAssessments DevelopmentAssessment[] @relation("PersonDevelopmentAssessments")
   authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
   authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
   // Registrations currently linked to this Person (Goal 2/3 — may include
@@ -1341,6 +1351,8 @@ model TeamSeason {
   trainingSeries     TrainingSeries[]
   // TRAININGCENTER-02: canonical generated training sessions for this TeamSeason
   trainingSessions   TrainingSession[]
+  // PERSON-UX-05: optional team context for development assessments
+  developmentAssessments DevelopmentAssessment[] @relation("TeamSeasonDevelopmentAssessments")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -4621,4 +4633,121 @@ model Infoboard {
   @@unique([tenantId, slug])
   @@index([tenantId, status])
   @@index([tenantId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// PERSON-UX-05 — Player Development Assessment Foundation
+//
+// Ownership: Person + Season (TeamSeason is optional context only).
+// Assessment history must survive team changes, multi-team seasons,
+// simultaneous player+trainer capacities, and roster modifications.
+// Do NOT attach assessment ownership to PlayerSquadMember.
+//
+// Criterion names and category labels are snapshot-copied into each
+// DevelopmentAssessmentRating at creation time to guarantee historical
+// stability — renaming or deactivating a DevelopmentCriterion later never
+// makes old assessments uninterpretable.
+//
+// Score: integer 0..100 inclusive, validated server-side.
+// ---------------------------------------------------------------------------
+
+/// PERSON-UX-05: Tenant-owned configurable development criterion.
+///
+/// Multi-sport by design. No hardcoded sport enums.
+/// Criterion admin UI is deferred; this model exists to support real
+/// assessments without hardcoding any sport-specific list.
+model DevelopmentCriterion {
+  id          String   @id @default(cuid())
+  tenantId    String
+  /// Display name shown in assessments and admin UIs.
+  name        String
+  /// Optional longer description of what is being rated.
+  description String?
+  /// Optional grouping label (e.g. "Technik", "Taktik", "Fitness").
+  /// Free text — no enum — supports any sport or development framework.
+  category    String?
+  /// Lower = shown earlier in lists.
+  sortOrder   Int      @default(0)
+  /// Inactive criteria are hidden from new-assessment forms but historical
+  /// ratings that reference them remain fully interpretable.
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant  Tenant                      @relation("TenantDevelopmentCriteria", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  ratings DevelopmentAssessmentRating[]
+
+  @@index([tenantId, isActive, sortOrder])
+  @@index([tenantId])
+}
+
+/// PERSON-UX-05: Development assessment snapshot.
+///
+/// One assessment = one evaluator session for one Person in one Season.
+/// TeamSeason context is optional — present when the assessor evaluates the
+/// person in the context of a specific team, absent for general assessments.
+///
+/// Assessment history is permanent: person/team/squad changes after the
+/// fact must never destroy or invalidate existing records.
+model DevelopmentAssessment {
+  id             String    @id @default(cuid())
+  tenantId       String
+  personId       String
+  seasonId       String
+  /// Optional team context. TeamSeason.seasonId MUST equal seasonId when set.
+  /// Not a permanent dependency: roster changes must not break old records.
+  teamSeasonId   String?
+  assessedAt     DateTime
+  /// User who performed the assessment. Nullable for data-import cases or
+  /// when the assessor account has been removed.
+  assessorUserId String?
+  /// Free-text summary / general notes for this assessment.
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  tenant     Tenant                       @relation("TenantDevelopmentAssessments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person     Person                       @relation("PersonDevelopmentAssessments", fields: [personId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  season     Season                       @relation("SeasonDevelopmentAssessments", fields: [seasonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  teamSeason TeamSeason?                  @relation("TeamSeasonDevelopmentAssessments", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assessor   User?                        @relation("AssessorDevelopmentAssessments", fields: [assessorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  ratings    DevelopmentAssessmentRating[]
+
+  @@index([tenantId, personId, assessedAt])
+  @@index([tenantId, seasonId])
+  @@index([personId, seasonId])
+  @@index([teamSeasonId])
+}
+
+/// PERSON-UX-05: Per-criterion rating within a DevelopmentAssessment.
+///
+/// normalizedScore: integer 0–100 inclusive, validated server-side.
+///
+/// criterionNameSnapshot + criterionCategorySnapshot: copied from the
+/// DevelopmentCriterion at rating creation time. These snapshots ensure that
+/// renaming or deactivating a criterion never makes an old assessment
+/// uninterpretable — historical display never reconstructs from current state.
+model DevelopmentAssessmentRating {
+  id           String   @id @default(cuid())
+  assessmentId String
+  criterionId  String
+  /// 0–100 inclusive. 0 is valid. Server-side range validation required.
+  normalizedScore Int
+  /// Snapshot of criterion name at time of rating creation.
+  /// Never use the live DevelopmentCriterion.name for historical display.
+  criterionNameSnapshot     String
+  /// Snapshot of criterion category at time of rating creation. Null when
+  /// the criterion had no category at creation time.
+  criterionCategorySnapshot String?
+  /// Optional qualitative comment for this criterion.
+  comment      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assessment DevelopmentAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  criterion  DevelopmentCriterion  @relation(fields: [criterionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([assessmentId, criterionId])
+  @@index([assessmentId])
+  @@index([criterionId])
 }

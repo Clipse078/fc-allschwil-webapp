@@ -141,6 +141,8 @@ const ALL_DOMAIN_PERMS: PersonDomainPermissions = {
   canManagePrivateDocuments: true,
   canViewDevelopment: true,
   canManageDevelopment: true,
+  canViewAssessments: true,
+  canManageAssessments: true,
   canViewAudit: true,
 };
 

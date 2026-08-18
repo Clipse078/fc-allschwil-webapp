@@ -163,6 +163,8 @@ const NO_DOMAIN_PERMS: PersonDomainPermissions = {
   canManagePrivateDocuments: false,
   canViewDevelopment: false,
   canManageDevelopment: false,
+  canViewAssessments: false,
+  canManageAssessments: false,
   canViewAudit: false,
 };
 
@@ -175,6 +177,8 @@ const ALL_DOMAIN_PERMS: PersonDomainPermissions = {
   canManagePrivateDocuments: true,
   canViewDevelopment: true,
   canManageDevelopment: true,
+  canViewAssessments: true,
+  canManageAssessments: true,
   canViewAudit: true,
 };
 
@@ -265,6 +269,7 @@ describe("7. Development permission gates Spieler-Entwicklung section", () => {
   it("7a. Spieler-Entwicklung section is absent when canViewDevelopment=false", () => {
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[makeSquadMembership()]}
         trainerMemberships={[]}
         assignments={[]}
@@ -272,22 +277,27 @@ describe("7. Development permission gates Spieler-Entwicklung section", () => {
       />,
     );
     expect(screen.queryByText("Spieler-Entwicklung")).toBeNull();
+    // PERSON-UX-05: assessment section also absent when canViewAssessments=false
     expect(screen.queryByText("Entwicklungs-Bewertungen")).toBeNull();
     // Non-sensitive sporting history still present
     expect(screen.getByText("Saison-Biografie")).toBeTruthy();
   });
 
-  it("7b. Spieler-Entwicklung section is visible when canViewDevelopment=true", () => {
+  it("7b. Spieler-Entwicklung fallback visible when canViewDevelopment=true and canViewAssessments=false", () => {
+    // PERSON-UX-05: when canViewDevelopment=true but canViewAssessments=false,
+    // a lightweight development section renders — "Entwicklungs-Bewertungen" only
+    // appears when canViewAssessments=true via the full PersonAssessmentSection.
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[makeSquadMembership()]}
         trainerMemberships={[]}
         assignments={[]}
         canViewDevelopment={true}
+        canViewAssessments={false}
       />,
     );
     expect(screen.getByText("Spieler-Entwicklung")).toBeTruthy();
-    expect(screen.getByText("Entwicklungs-Bewertungen")).toBeTruthy();
     // Non-sensitive sporting history also present
     expect(screen.getByText("Saison-Biografie")).toBeTruthy();
   });
