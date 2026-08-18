@@ -389,6 +389,7 @@ export default function PersonDetailTabs({
             {safeActiveTab === "spieler" ? (
               <PersonSpielerTab
                 squadMemberships={person.squadMemberships}
+                assignments={person.assignments}
                 personId={person.id}
                 canViewDevelopment={canViewDevelopment}
                 canViewAssessments={canViewAssessments}
@@ -412,6 +413,7 @@ export default function PersonDetailTabs({
             {safeActiveTab === "trainer" ? (
               <PersonTrainerTab
                 trainerMemberships={person.trainerMemberships}
+                assignments={person.assignments}
                 onNavigateToTab={setActiveTab}
               />
             ) : null}

@@ -3,19 +3,26 @@
 /**
  * PERSON-UX-01 — Person 360° Übersicht tab.
  * PERSON-UX-07 — Multi-capacity header: shows all active capacities compactly.
- * PERSON-UX-07 UX-ACCEPTANCE — Aktuelle Funktionen section clearly distinguishes
- *   capacity profile from actual team/season assignment.
+ * PERSON-UX-07 UX-ACCEPTANCE — Aktuelle Funktionen section distinguishes three
+ *   semantically distinct assignment states per capacity:
  *
- * Shows the current canonical state of this Person across all simultaneously
- * held roles and relationships. A Person may have multiple capacities at once;
- * this tab never reduces a Person to a single "primary role".
+ *   A. NO RELATIONSHIP
+ *      No team/org relationship exists.
+ *      "Noch keinem Team als Spieler/in zugeordnet"
  *
- * Aktuelle Funktionen section (key UX improvement):
- *   For each capacity flag (isPlayer, isTrainer), the section shows:
- *   • Current active team assignment(s) with team name, role, and season.
- *   • An actionable nudge when the capacity profile exists but NO current-season
- *     team assignment is present — distinguishing the two concepts clearly.
- *   PersonAssignment functions (Organisation) shown as a separate group.
+ *   B. RELATIONSHIP EXISTS BUT INCOMPLETE
+ *      A PersonAssignment for a team exists with a player/trainer functionKey,
+ *      but the canonical current-season PlayerSquadMember/TrainerTeamMember
+ *      record is absent.
+ *      "Zuordnung unvollständig" + team name + role + what is missing.
+ *
+ *   C. COMPLETE CURRENT-SEASON RELATIONSHIP
+ *      Canonical squad/trainer membership exists.
+ *      Normal assignment card.
+ *
+ * PersonAssignment functions shown as "Weitere Funktionen" ONLY when they are
+ * not already surfaced in the incomplete (State B) section — preventing the
+ * same team/role from appearing twice in conflicting contexts.
  *
  * Security principle: this tab shows only data visible under people.view.
  * Medical, financial, and private document domains require separate
@@ -31,6 +38,7 @@ import {
   KeyRound,
   Star,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
 import type {
   PersonAssignment,
@@ -38,8 +46,12 @@ import type {
   PersonTrainerMembership,
 } from "@/lib/people/queries";
 import type { PersonDetail } from "@/lib/people/queries";
-import { getPersonFunctionLabel } from "@/lib/people/functions";
+import { getPersonFunctionLabel, PERSON_FUNCTION_GROUPS } from "@/lib/people/functions";
 import { EmptyState } from "@/components/ui/page";
+
+/** functionKey sets for player and trainer capacities */
+const PLAYER_FUNCTION_KEYS = new Set<string>(PERSON_FUNCTION_GROUPS.SPIELER);
+const TRAINER_FUNCTION_KEYS = new Set<string>(PERSON_FUNCTION_GROUPS.TRAINER_STAFF);
 
 type PersonOverviewTabProps = {
   person: PersonDetail & {
@@ -78,7 +90,7 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-/** Card for an active team assignment under a specific capacity */
+/** Card for an active team assignment under a specific capacity (State C) */
 function CapacityAssignmentCard({
   icon,
   title,
@@ -133,8 +145,8 @@ function CapacityAssignmentCard({
 }
 
 /**
- * Nudge card shown when a capacity profile exists but no current team assignment.
- * Clearly distinguishes "capacity profile present" from "actual assignment present".
+ * State A nudge: capacity profile exists but no team relationship at all.
+ * "Noch keinem Team zugeordnet."
  */
 function UnassignedCapacityNudge({
   capacityLabel,
@@ -166,6 +178,57 @@ function UnassignedCapacityNudge({
           >
             {onTabLinkLabel}
           </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * State B card: a PersonAssignment exists for a team but the canonical
+ * current-season squad/trainer membership is missing.
+ * "Zuordnung unvollständig" — names the team, role, and what is missing.
+ */
+function IncompleteAssignmentCard({
+  teamName,
+  roleLabel,
+  teamId,
+  missingDescription,
+}: {
+  teamName: string;
+  roleLabel: string;
+  teamId: string | null | undefined;
+  missingDescription: string;
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      data-testid="incomplete-assignment-card"
+    >
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+        <AlertCircle className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-semibold text-amber-800">{teamName}</span>
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+            {roleLabel}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-amber-700">
+          Die Funktion ist bereits dem Team zugeordnet, aber die Zuordnung für die aktuelle Saison ist noch nicht vollständig.
+        </p>
+        <p className="mt-0.5 text-xs font-medium text-amber-700">{missingDescription}</p>
+        {teamId ? (
+          <a
+            href={`/dashboard/teams/${teamId}`}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+            data-testid="incomplete-assignment-team-link"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Zum Team
+          </a>
         ) : null}
       </div>
     </div>
@@ -246,9 +309,35 @@ export default function PersonWorkspaceOverviewTab({
   const isPlayerProfile = person.isPlayer === true;
   const isTrainerProfile = person.isTrainer === true;
 
-  // Whether actual current assignments exist
-  const hasCurrentPlayerAssignment = activeSquadMemberships.length > 0;
-  const hasCurrentTrainerAssignment = activeTrainerMemberships.length > 0;
+  // Team IDs with complete current-season memberships
+  const playerCompleteTeamIds = new Set(activeSquadMemberships.map((sm) => sm.teamSeason.team.id));
+  const trainerCompleteTeamIds = new Set(activeTrainerMemberships.map((tm) => tm.teamSeason.team.id));
+
+  // State B: active PersonAssignment with player/trainer function but no matching canonical membership
+  const incompletePlayerAssignments = activeAssignments.filter(
+    (a) =>
+      a.functionKey !== null &&
+      a.functionKey !== undefined &&
+      PLAYER_FUNCTION_KEYS.has(a.functionKey) &&
+      a.team != null &&
+      !playerCompleteTeamIds.has(a.team.id),
+  );
+  const incompleteTrainerAssignments = activeAssignments.filter(
+    (a) =>
+      a.functionKey !== null &&
+      a.functionKey !== undefined &&
+      TRAINER_FUNCTION_KEYS.has(a.functionKey) &&
+      a.team != null &&
+      !trainerCompleteTeamIds.has(a.team.id),
+  );
+
+  // Assignments to suppress from "Weitere Funktionen" (already surfaced as State B)
+  const suppressedFromWeitere = new Set<string>([
+    ...incompletePlayerAssignments.map((a) => a.id),
+    ...incompleteTrainerAssignments.map((a) => a.id),
+  ]);
+
+  const weitereAssignments = activeAssignments.filter((a) => !suppressedFromWeitere.has(a.id));
 
   // Collect all unique active teams from all sources (for identity section)
   const activeTeamIds = new Set<string>();
@@ -286,8 +375,8 @@ export default function PersonWorkspaceOverviewTab({
 
   // For the "Aktuelle Funktionen" section: check if there is anything to show
   const hasCapacityRows = isPlayerProfile || isTrainerProfile;
-  const hasAssignmentRows = activeAssignments.length > 0;
-  const hasSomething = hasCapacityRows || hasAssignmentRows;
+  const hasWeitereRows = weitereAssignments.length > 0;
+  const hasSomething = hasCapacityRows || hasWeitereRows;
 
   return (
     <div className="space-y-8">
@@ -329,14 +418,14 @@ export default function PersonWorkspaceOverviewTab({
        * PERSON-UX-07 UX-ACCEPTANCE: This section answers:
        *   "Where is this Person currently a player / trainer?"
        *
-       * For each capacity flag, we show either:
-       *   (a) the concrete current team assignment(s), or
-       *   (b) an actionable nudge distinguishing "profile exists, not yet
-       *       assigned to a team for the current season."
+       * Three states per capacity:
+       *   A. No relationship → "Noch keinem Team zugeordnet" nudge
+       *   B. Relationship exists but incomplete → "Zuordnung unvollständig"
+       *      card naming the team, role, and missing element
+       *   C. Complete current-season membership → assignment card
        *
-       * PersonAssignment functions (Organisation) shown below as a separate
-       * group. The two concepts (capacity profile vs. team assignment) are
-       * visually distinct. ──────────────────────────────────────── */}
+       * PersonAssignment functions NOT already surfaced in State B are shown
+       * as "Weitere Funktionen". ────────────────────────────────── */}
       <div>
         <SectionHeader label="Aktuelle Funktionen" />
 
@@ -354,7 +443,8 @@ export default function PersonWorkspaceOverviewTab({
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
                   Spieler/in
                 </p>
-                {hasCurrentPlayerAssignment ? (
+                {/* State C: complete squad memberships */}
+                {activeSquadMemberships.length > 0 ? (
                   <div className="space-y-2">
                     {activeSquadMemberships.map((sm) => (
                       <CapacityAssignmentCard
@@ -372,8 +462,40 @@ export default function PersonWorkspaceOverviewTab({
                         onTabLinkLabel="Zum Spieler-Tab"
                       />
                     ))}
+                    {/* State B: additional incomplete assignments alongside complete ones */}
+                    {incompletePlayerAssignments.map((a) => (
+                      <IncompleteAssignmentCard
+                        key={a.id}
+                        teamName={a.team!.name}
+                        roleLabel={getPersonFunctionLabel(a.functionKey)}
+                        teamId={a.team!.id}
+                        missingDescription={
+                          a.season == null
+                            ? "Saison-Verknüpfung fehlt."
+                            : "Kader-Zuordnung für die aktuelle Saison fehlt."
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : incompletePlayerAssignments.length > 0 ? (
+                  /* State B only: relationship exists but canonical membership is missing */
+                  <div className="space-y-2">
+                    {incompletePlayerAssignments.map((a) => (
+                      <IncompleteAssignmentCard
+                        key={a.id}
+                        teamName={a.team!.name}
+                        roleLabel={getPersonFunctionLabel(a.functionKey)}
+                        teamId={a.team!.id}
+                        missingDescription={
+                          a.season == null
+                            ? "Saison-Verknüpfung fehlt."
+                            : "Kader-Zuordnung für die aktuelle Saison fehlt."
+                        }
+                      />
+                    ))}
                   </div>
                 ) : (
+                  /* State A: no relationship at all */
                   <UnassignedCapacityNudge
                     capacityLabel="Spielerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
                     explanation="Das Spielerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Kader-Zuordnungen werden über das Team-Management verwaltet."
@@ -390,7 +512,8 @@ export default function PersonWorkspaceOverviewTab({
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
                   Trainer/in
                 </p>
-                {hasCurrentTrainerAssignment ? (
+                {/* State C: complete trainer memberships */}
+                {activeTrainerMemberships.length > 0 ? (
                   <div className="space-y-2">
                     {activeTrainerMemberships.map((tm) => (
                       <CapacityAssignmentCard
@@ -405,8 +528,40 @@ export default function PersonWorkspaceOverviewTab({
                         onTabLinkLabel="Zum Trainer-Tab"
                       />
                     ))}
+                    {/* State B: additional incomplete assignments alongside complete ones */}
+                    {incompleteTrainerAssignments.map((a) => (
+                      <IncompleteAssignmentCard
+                        key={a.id}
+                        teamName={a.team!.name}
+                        roleLabel={getPersonFunctionLabel(a.functionKey)}
+                        teamId={a.team!.id}
+                        missingDescription={
+                          a.season == null
+                            ? "Saison-Verknüpfung fehlt."
+                            : "Trainer-Zuordnung für die aktuelle Saison fehlt."
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : incompleteTrainerAssignments.length > 0 ? (
+                  /* State B only: relationship exists but canonical membership is missing */
+                  <div className="space-y-2">
+                    {incompleteTrainerAssignments.map((a) => (
+                      <IncompleteAssignmentCard
+                        key={a.id}
+                        teamName={a.team!.name}
+                        roleLabel={getPersonFunctionLabel(a.functionKey)}
+                        teamId={a.team!.id}
+                        missingDescription={
+                          a.season == null
+                            ? "Saison-Verknüpfung fehlt."
+                            : "Trainer-Zuordnung für die aktuelle Saison fehlt."
+                        }
+                      />
+                    ))}
                   </div>
                 ) : (
+                  /* State A: no relationship at all */
                   <UnassignedCapacityNudge
                     capacityLabel="Trainerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
                     explanation="Das Trainerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Trainer-Zuordnungen werden über das Team-Management verwaltet."
@@ -417,8 +572,8 @@ export default function PersonWorkspaceOverviewTab({
               </div>
             ) : null}
 
-            {/* ─ PersonAssignment functions (Organisation) ─ */}
-            {activeAssignments.length > 0 ? (
+            {/* ─ Weitere Funktionen (PersonAssignment functions not already shown above) ─ */}
+            {weitereAssignments.length > 0 ? (
               <div>
                 {(isPlayerProfile || isTrainerProfile) ? (
                   <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
@@ -426,7 +581,7 @@ export default function PersonWorkspaceOverviewTab({
                   </p>
                 ) : null}
                 <div className="space-y-2">
-                  {activeAssignments.map((a) => (
+                  {weitereAssignments.map((a) => (
                     <CapacityAssignmentCard
                       key={a.id}
                       icon={

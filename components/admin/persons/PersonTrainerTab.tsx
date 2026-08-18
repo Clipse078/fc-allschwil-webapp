@@ -2,13 +2,23 @@
 
 /**
  * PERSON-UX-02 — Trainer tab.
+ * PERSON-UX-07 UX-ACCEPTANCE — Distinguishes three semantically distinct states:
  *
- * Rendered iff the Person has current OR historical trainer evidence
- * (TrainerTeamMember records exist, any status, any season).
+ *   A. NO RELATIONSHIP
+ *      No trainer-function PersonAssignment and no TrainerTeamMember records exist.
+ *      "Noch keinem Team als Trainer/in zugeordnet"
  *
- * Shows:
- * - Current active trainer roles (Aktuell section)
- * - Full historical trainer career by season (accordion, newest first)
+ *   B. RELATIONSHIP EXISTS BUT INCOMPLETE
+ *      A PersonAssignment with a trainer-function key exists for a team,
+ *      but the canonical current-season TrainerTeamMember record is absent.
+ *      "Zuordnung unvollständig" — names the team, role, and what is missing.
+ *      CTA deep-links to the Team management screen.
+ *
+ *   C. COMPLETE CURRENT-SEASON RELATIONSHIP
+ *      Active TrainerTeamMember record exists.
+ *      Normal assignment card.
+ *
+ * Rendered iff the Person has current OR historical trainer evidence.
  *
  * Data source: TrainerTeamMember → TeamSeason → Season (fully persisted,
  * historically stable chain). No fabrication from isTrainer flag.
@@ -17,16 +27,26 @@
  * where available (visible in the Organisation tab for full detail).
  */
 
-import { UserCheck, Trophy, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { UserCheck, Trophy, ChevronDown, ChevronRight, AlertCircle, ExternalLink } from "lucide-react";
 import { useState } from "react";
-import type { PersonTrainerMembership } from "@/lib/people/queries";
+import type { PersonTrainerMembership, PersonAssignment } from "@/lib/people/queries";
+import { getPersonFunctionLabel, PERSON_FUNCTION_GROUPS } from "@/lib/people/functions";
 import { EmptyState } from "@/components/ui/page";
+
+const TRAINER_FUNCTION_KEYS = new Set<string>(PERSON_FUNCTION_GROUPS.TRAINER_STAFF);
 
 type PersonTrainerTabProps = {
   trainerMemberships: PersonTrainerMembership[];
   /**
+   * PERSON-UX-07 UX-ACCEPTANCE: PersonAssignments used to detect the
+   * "relationship exists but incomplete" state (State B).
+   * When provided, distinguishes State A (no relationship) from State B
+   * (trainer assignment exists but no TrainerTeamMember for current season).
+   */
+  assignments?: PersonAssignment[];
+  /**
    * PERSON-UX-07 UX-ACCEPTANCE: optional callback to navigate to a sibling tab.
-   * Used for deep-link CTAs in empty/nudge states.
+   * Used for State A CTA (no assignment at all — go set one up via Organisation).
    */
   onNavigateToTab?: (tab: "organisation" | "spieler") => void;
 };
@@ -137,9 +157,25 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-export default function PersonTrainerTab({ trainerMemberships, onNavigateToTab }: PersonTrainerTabProps) {
+export default function PersonTrainerTab({
+  trainerMemberships,
+  assignments = [],
+  onNavigateToTab,
+}: PersonTrainerTabProps) {
   const activeTrainers = trainerMemberships.filter((m) => m.status === "ACTIVE");
   const snapshots = buildTrainerSeasonSnapshots(trainerMemberships);
+
+  // State B: active PersonAssignment with trainer function but no matching TrainerTeamMember
+  const trainerCompleteTeamIds = new Set(activeTrainers.map((tm) => tm.teamSeason.team.id));
+  const incompleteTrainerAssignments = assignments.filter(
+    (a) =>
+      a.status === "ACTIVE" &&
+      a.functionKey !== null &&
+      a.functionKey !== undefined &&
+      TRAINER_FUNCTION_KEYS.has(a.functionKey) &&
+      a.team != null &&
+      !trainerCompleteTeamIds.has(a.team.id),
+  );
 
   return (
     <div className="space-y-8">
@@ -147,15 +183,91 @@ export default function PersonTrainerTab({ trainerMemberships, onNavigateToTab }
       <div>
         <SectionHeader label="Aktuell" />
         {activeTrainers.length > 0 ? (
-          <div className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-            {activeTrainers.map((tr) => (
-              <TrainerEntry key={tr.id} tr={tr} />
+          /* State C: complete trainer memberships */
+          <div className="space-y-2">
+            <div className="divide-y divide-[var(--border)] overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+              {activeTrainers.map((tr) => (
+                <TrainerEntry key={tr.id} tr={tr} />
+              ))}
+            </div>
+            {/* State B alongside C: additional incomplete trainer assignments */}
+            {incompleteTrainerAssignments.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+                data-testid="trainer-incomplete-assignment"
+              >
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-amber-800">{a.team!.name}</span>
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                      {getPersonFunctionLabel(a.functionKey)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    {a.season == null
+                      ? "Saison-Verknüpfung fehlt. Die Trainer-Zuordnung für die aktuelle Saison ist noch nicht vollständig."
+                      : "Trainer-Zuordnung für die aktuelle Saison fehlt."}
+                  </p>
+                  {a.team?.id ? (
+                    <a
+                      href={`/dashboard/teams/${a.team.id}`}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                      data-testid="trainer-incomplete-team-link"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Trainer-Zuordnung vervollständigen
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : incompleteTrainerAssignments.length > 0 ? (
+          /* State B only: relationship exists but no TrainerTeamMember */
+          <div className="space-y-2">
+            {incompleteTrainerAssignments.map((a) => (
+              <div
+                key={a.id}
+                className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+                data-testid="trainer-incomplete-assignment"
+              >
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                  <AlertCircle className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
+                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-semibold text-amber-800">{a.team!.name}</span>
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                      {getPersonFunctionLabel(a.functionKey)}
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-amber-700">
+                    {a.season == null
+                      ? "Saison-Verknüpfung fehlt. Die Trainer-Zuordnung für die aktuelle Saison ist noch nicht vollständig."
+                      : "Trainer-Zuordnung für die aktuelle Saison fehlt."}
+                  </p>
+                  {a.team?.id ? (
+                    <a
+                      href={`/dashboard/teams/${a.team.id}`}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                      data-testid="trainer-incomplete-team-link"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Trainer-Zuordnung vervollständigen
+                    </a>
+                  ) : null}
+                </div>
+              </div>
             ))}
           </div>
         ) : (
-          /* PERSON-UX-07 UX-ACCEPTANCE: Actionable nudge instead of passive message.
-           * The Trainerprofil exists (otherwise this tab would be hidden) but no
-           * current-season team assignment is present. Admin needs guidance. */
+          /* State A: no relationship at all — profile exists but no team assignment */
           <div
             className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
             data-testid="trainer-unassigned-nudge"
