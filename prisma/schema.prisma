@@ -4651,11 +4651,11 @@ model Infoboard {
 // Score: integer 0..100 inclusive, validated server-side.
 // ---------------------------------------------------------------------------
 
-/// PERSON-UX-05: Tenant-owned configurable development criterion.
+/// PERSON-UX-05/06: Tenant-owned configurable development criterion.
 ///
 /// Multi-sport by design. No hardcoded sport enums.
-/// Criterion admin UI is deferred; this model exists to support real
-/// assessments without hardcoding any sport-specific list.
+/// PERSON-UX-06 adds: ratingMode, qualitativeLabels, showTeamBenchmark,
+/// showJahrgangBenchmark.
 model DevelopmentCriterion {
   id          String   @id @default(cuid())
   tenantId    String
@@ -4671,6 +4671,22 @@ model DevelopmentCriterion {
   /// Inactive criteria are hidden from new-assessment forms but historical
   /// ratings that reference them remain fully interpretable.
   isActive    Boolean  @default(true)
+  /// PERSON-UX-06: Rating input/display mode. One of:
+  ///   SCORE_0_100   — direct 0..100 integer (canonical = same value)
+  ///   QUALITATIVE_5 — five-level selector (canonical: 0/25/50/75/100)
+  ///   SCORE_1_10    — integer 1..10 (canonical: linear (v-1)/9*100)
+  ///   PERCENTAGE    — 0..100 percentage (canonical = same value)
+  /// Stored as a plain String so no DB enum migration is required for
+  /// future modes. Validated server-side.
+  ratingMode  String   @default("SCORE_0_100")
+  /// PERSON-UX-06: Custom qualitative labels for QUALITATIVE_5 mode.
+  /// Stored as JSON array of 5 label strings. Null = use system defaults.
+  /// Example: ["Entwicklungsbedarf","Basis","Solide","Stark","Herausragend"]
+  qualitativeLabels Json?
+  /// PERSON-UX-06: Show Team benchmark for this criterion.
+  showTeamBenchmark     Boolean  @default(false)
+  /// PERSON-UX-06: Show Jahrgang (birth-year cohort) benchmark.
+  showJahrgangBenchmark Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -4719,7 +4735,7 @@ model DevelopmentAssessment {
   @@index([teamSeasonId])
 }
 
-/// PERSON-UX-05: Per-criterion rating within a DevelopmentAssessment.
+/// PERSON-UX-05/06: Per-criterion rating within a DevelopmentAssessment.
 ///
 /// normalizedScore: integer 0–100 inclusive, validated server-side.
 ///
@@ -4727,6 +4743,14 @@ model DevelopmentAssessment {
 /// DevelopmentCriterion at rating creation time. These snapshots ensure that
 /// renaming or deactivating a criterion never makes an old assessment
 /// uninterpretable — historical display never reconstructs from current state.
+///
+/// PERSON-UX-06 additions:
+///   ratingModeSnapshot  — the rating mode active at creation time.
+///   rawValue            — the raw input value before normalization.
+///   rawLabelSnapshot    — human-readable label snapshot (QUALITATIVE_5 etc.).
+///
+/// These snapshot fields guarantee that changing a criterion's mode or labels
+/// does NOT reinterpret historical data.
 model DevelopmentAssessmentRating {
   id           String   @id @default(cuid())
   assessmentId String
@@ -4739,6 +4763,15 @@ model DevelopmentAssessmentRating {
   /// Snapshot of criterion category at time of rating creation. Null when
   /// the criterion had no category at creation time.
   criterionCategorySnapshot String?
+  /// PERSON-UX-06: Snapshot of the rating mode used when this rating was
+  /// created. Null for ratings created before UX-06 (treated as SCORE_0_100).
+  ratingModeSnapshot        String?
+  /// PERSON-UX-06: Raw input value before normalization. Null for ratings
+  /// created before UX-06 or when rawValue equals normalizedScore (SCORE_0_100).
+  rawValue                  Int?
+  /// PERSON-UX-06: Human-readable label snapshot (e.g. "Stark" for
+  /// QUALITATIVE_5 level 4). Null when the mode has no named levels.
+  rawLabelSnapshot          String?
   /// Optional qualitative comment for this criterion.
   comment      String?
   createdAt    DateTime @default(now())

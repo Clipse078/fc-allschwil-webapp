@@ -439,11 +439,12 @@ export async function getPersonMemberships(personId: string) {
   });
 }
 
-// ── PERSON-UX-05: Assessment queries ─────────────────────────────────────────
+// ── PERSON-UX-05/06: Assessment queries ──────────────────────────────────────
 
 /**
  * Returns all development assessments for a person, newest first.
  * Includes full rating list with criterion snapshots.
+ * PERSON-UX-06: Includes ratingModeSnapshot, rawValue, rawLabelSnapshot.
  * Caller is responsible for verifying read authorization before calling.
  */
 export async function getPersonAssessments(personId: string, tenantId: string) {
@@ -476,6 +477,9 @@ export async function getPersonAssessments(personId: string, tenantId: string) {
           normalizedScore: true,
           criterionNameSnapshot: true,
           criterionCategorySnapshot: true,
+          ratingModeSnapshot: true,
+          rawValue: true,
+          rawLabelSnapshot: true,
           comment: true,
           createdAt: true,
         },
@@ -491,6 +495,7 @@ export async function getPersonAssessments(personId: string, tenantId: string) {
 /**
  * Returns active DevelopmentCriteria for a tenant, sorted for display.
  * Used when populating assessment create/edit forms.
+ * PERSON-UX-06: Includes ratingMode, qualitativeLabels, benchmark flags.
  */
 export async function getTenantActiveCriteria(tenantId: string) {
   return prisma.developmentCriterion.findMany({
@@ -502,6 +507,10 @@ export async function getTenantActiveCriteria(tenantId: string) {
       description: true,
       category: true,
       sortOrder: true,
+      ratingMode: true,
+      qualitativeLabels: true,
+      showTeamBenchmark: true,
+      showJahrgangBenchmark: true,
     },
   });
 }
@@ -509,6 +518,7 @@ export async function getTenantActiveCriteria(tenantId: string) {
 /**
  * Returns ALL (active + inactive) DevelopmentCriteria for a tenant.
  * Used in admin criterion management.
+ * PERSON-UX-06: Includes ratingMode, qualitativeLabels, benchmark flags.
  */
 export async function getTenantAllCriteria(tenantId: string) {
   return prisma.developmentCriterion.findMany({
@@ -521,7 +531,12 @@ export async function getTenantAllCriteria(tenantId: string) {
       category: true,
       sortOrder: true,
       isActive: true,
+      ratingMode: true,
+      qualitativeLabels: true,
+      showTeamBenchmark: true,
+      showJahrgangBenchmark: true,
       createdAt: true,
+      updatedAt: true,
     },
   });
 }
@@ -535,3 +550,4 @@ export type PersonTrainerMembership = Awaited<ReturnType<typeof getPersonTrainer
 export type PersonMembershipRecord = Awaited<ReturnType<typeof getPersonMemberships>>[number];
 export type PersonAssessmentRecord = Awaited<ReturnType<typeof getPersonAssessments>>[number];
 export type TenantCriterion = Awaited<ReturnType<typeof getTenantActiveCriteria>>[number];
+export type TenantCriterionAdmin = Awaited<ReturnType<typeof getTenantAllCriteria>>[number];

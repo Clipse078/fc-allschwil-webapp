@@ -88,11 +88,20 @@ export async function resolveTeamSeasonContext(
 /**
  * Resolves a DevelopmentCriterion and enforces tenant isolation.
  * Returns null when missing or cross-tenant.
+ * PERSON-UX-06: Also returns ratingMode, qualitativeLabels, and benchmark flags.
  */
 export async function resolveTenantCriterion(criterionId: string, tenantId: string) {
   const criterion = await prisma.developmentCriterion.findUnique({
     where: { id: criterionId },
-    select: { id: true, tenantId: true, name: true, category: true, isActive: true },
+    select: {
+      id: true,
+      tenantId: true,
+      name: true,
+      category: true,
+      isActive: true,
+      ratingMode: true,
+      qualitativeLabels: true,
+    },
   });
   if (!criterion || criterion.tenantId !== tenantId) return null;
   return criterion;
@@ -125,6 +134,9 @@ export async function resolveTenantAssessment(
           normalizedScore: true,
           criterionNameSnapshot: true,
           criterionCategorySnapshot: true,
+          ratingModeSnapshot: true,
+          rawValue: true,
+          rawLabelSnapshot: true,
           comment: true,
         },
         orderBy: { criterionNameSnapshot: "asc" },
@@ -140,6 +152,12 @@ export type RatingInput = {
   criterionId: string;
   normalizedScore: number;
   comment?: string | null;
+  /** PERSON-UX-06: Raw input value before normalization (e.g. 1..5 for QUALITATIVE_5). */
+  rawValue?: number | null;
+  /** PERSON-UX-06: Snapshot of the mode used at rating creation time. */
+  ratingModeSnapshot?: string | null;
+  /** PERSON-UX-06: Human-readable label snapshot (e.g. "Stark"). */
+  rawLabelSnapshot?: string | null;
 };
 
 // ── Service operations ────────────────────────────────────────────────────────
@@ -189,6 +207,9 @@ function getAssessmentSelect() {
         normalizedScore: true,
         criterionNameSnapshot: true,
         criterionCategorySnapshot: true,
+        ratingModeSnapshot: true,
+        rawValue: true,
+        rawLabelSnapshot: true,
         comment: true,
         createdAt: true,
       },
@@ -211,10 +232,11 @@ function getAssessmentSelect() {
  *   - All scores within [0, 100].
  *
  * Snapshots criterion name + category into each rating.
+ * PERSON-UX-06: Also snapshots ratingMode, rawValue, rawLabelSnapshot.
  */
 export async function createAssessment(
   input: CreateAssessmentInput,
-  criterionMap: Map<string, { name: string; category: string | null }>,
+  criterionMap: Map<string, { name: string; category: string | null; ratingMode?: string | null }>,
 ) {
   return prisma.developmentAssessment.create({
     data: {
@@ -233,6 +255,9 @@ export async function createAssessment(
             normalizedScore: r.normalizedScore,
             criterionNameSnapshot: criterion.name,
             criterionCategorySnapshot: criterion.category ?? null,
+            ratingModeSnapshot: r.ratingModeSnapshot ?? criterion.ratingMode ?? null,
+            rawValue: r.rawValue ?? null,
+            rawLabelSnapshot: r.rawLabelSnapshot ?? null,
             comment: r.comment ?? null,
           };
         }),
@@ -248,11 +273,12 @@ export async function createAssessment(
  *
  * Rating replacement: deletes all existing ratings then inserts new ones.
  * This is safe because ratings are children of the assessment.
+ * PERSON-UX-06: Preserves rawValue/rawLabelSnapshot/ratingModeSnapshot in replacements.
  */
 export async function updateAssessment(
   assessmentId: string,
   input: UpdateAssessmentInput,
-  criterionMap?: Map<string, { name: string; category: string | null }>,
+  criterionMap?: Map<string, { name: string; category: string | null; ratingMode?: string | null }>,
 ) {
   return prisma.$transaction(async (tx) => {
     if (input.ratings !== undefined && criterionMap) {
@@ -268,6 +294,9 @@ export async function updateAssessment(
             normalizedScore: r.normalizedScore,
             criterionNameSnapshot: criterion.name,
             criterionCategorySnapshot: criterion.category ?? null,
+            ratingModeSnapshot: r.ratingModeSnapshot ?? criterion.ratingMode ?? null,
+            rawValue: r.rawValue ?? null,
+            rawLabelSnapshot: r.rawLabelSnapshot ?? null,
             comment: r.comment ?? null,
           };
         }),

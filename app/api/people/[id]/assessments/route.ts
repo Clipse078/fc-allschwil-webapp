@@ -1,5 +1,5 @@
 /**
- * PERSON-UX-05: Development assessment management API.
+ * PERSON-UX-05/06: Development assessment management API.
  *
  * GET  /api/people/[id]/assessments  — list assessments for a person (newest first)
  * POST /api/people/[id]/assessments  — create a new DevelopmentAssessment
@@ -7,6 +7,11 @@
  * Authorization:
  *   VIEW:   requires people.assessments.view
  *   CREATE: requires people.assessments.manage
+ *
+ * PERSON-UX-06: Supports configurable rating modes (SCORE_0_100, QUALITATIVE_5,
+ * SCORE_1_10, PERCENTAGE). Callers may supply rawValue; the server normalizes
+ * to canonical 0–100 and snapshots ratingModeSnapshot, rawValue, rawLabelSnapshot.
+ * Existing normalizedScore-only payloads remain supported for backward compatibility.
  *
  * Assessment data is sensitive/internal. Never exposed via public APIs.
  * Server-side authorization is authoritative. Fail closed.
@@ -27,6 +32,13 @@ import {
   createAssessment,
   type RatingInput,
 } from "@/lib/people/assessment-service";
+import {
+  RATING_MODES,
+  validateRawInput,
+  normalizeRating,
+  getRawLabel,
+  isValidRatingMode,
+} from "@/lib/people/rating-modes";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -113,7 +125,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Mindestens eine Bewertung ist erforderlich." }, { status: 400 });
   }
 
-  const criterionMap = new Map<string, { name: string; category: string | null }>();
+  const criterionMap = new Map<string, { name: string; category: string | null; ratingMode: string | null }>();
   const validatedRatings: RatingInput[] = [];
 
   for (const r of ratingsRaw) {
@@ -133,14 +145,6 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
     }
 
-    const score = Number(rr.normalizedScore);
-    if (!isValidScore(score)) {
-      return NextResponse.json(
-        { error: `Score muss eine ganze Zahl zwischen 0 und 100 sein.` },
-        { status: 400 },
-      );
-    }
-
     const criterion = await resolveTenantCriterion(criterionId, tenantId);
     if (!criterion) {
       return NextResponse.json(
@@ -149,10 +153,54 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       );
     }
 
-    criterionMap.set(criterionId, { name: criterion.name, category: criterion.category ?? null });
+    // ── Rating mode resolution ──────────────────────────────────────────────
+    // The criterion's current ratingMode is used for validation + normalization.
+    // The mode is also snapshotted so future changes don't reinterpret history.
+    const criterionRatingMode = isValidRatingMode(criterion.ratingMode)
+      ? criterion.ratingMode
+      : RATING_MODES.SCORE_0_100;
+
+    let normalizedScore: number;
+    let rawValue: number | null = null;
+    let rawLabelSnapshot: string | null = null;
+
+    if (rr.rawValue !== undefined && rr.rawValue !== null) {
+      // Caller supplied a rawValue — validate and normalize per criterion mode
+      const rv = Number(rr.rawValue);
+      if (!validateRawInput(criterionRatingMode, rv)) {
+        return NextResponse.json(
+          {
+            error: `rawValue ${rv} ist für Modus ${criterionRatingMode} ungültig.`,
+          },
+          { status: 400 },
+        );
+      }
+      normalizedScore = normalizeRating(criterionRatingMode, rv);
+      rawValue = rv;
+      rawLabelSnapshot = getRawLabel(criterionRatingMode, rv, criterion.qualitativeLabels);
+    } else {
+      // Legacy path: caller supplied normalizedScore directly (SCORE_0_100 semantics)
+      const score = Number(rr.normalizedScore);
+      if (!isValidScore(score)) {
+        return NextResponse.json(
+          { error: `Score muss eine ganze Zahl zwischen 0 und 100 sein.` },
+          { status: 400 },
+        );
+      }
+      normalizedScore = score;
+    }
+
+    criterionMap.set(criterionId, {
+      name: criterion.name,
+      category: criterion.category ?? null,
+      ratingMode: criterionRatingMode,
+    });
     validatedRatings.push({
       criterionId,
-      normalizedScore: score,
+      normalizedScore,
+      rawValue,
+      rawLabelSnapshot,
+      ratingModeSnapshot: criterionRatingMode,
       comment: String(rr.comment ?? "").trim() || null,
     });
   }

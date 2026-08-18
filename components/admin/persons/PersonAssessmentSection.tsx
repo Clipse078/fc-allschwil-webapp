@@ -1,28 +1,25 @@
 "use client";
 
 /**
- * PERSON-UX-05 — Entwicklungs-Bewertungen (Development Assessment) section.
+ * PERSON-UX-05/06 — Entwicklungs-Bewertungen (Development Assessment) section.
  *
- * Replaces the assessment placeholder in PersonSportTab when the viewer
- * holds people.assessments.view. Completely absent when permission is missing.
- *
- * Sections:
- *   A) LATEST ASSESSMENT   — most recent assessment with all criterion ratings
- *   B) HISTORY             — all assessments newest first (season progression)
- *   C) CREATE ASSESSMENT   — dialog for authorized managers
- *   D) EMPTY STATE         — quiet, no fabricated scores
+ * PERSON-UX-06 additions:
+ *   - Mode-specific rating inputs (QUALITATIVE_5, SCORE_1_10, PERCENTAGE, SCORE_0_100).
+ *   - Raw input captured and displayed in historical records.
+ *   - Team and Jahrgang benchmark display (loaded lazily per assessment).
+ *   - Criterion management link visible to managers.
  *
  * Authorization invariant (enforced by parent PersonSportTab):
  *   This component is only rendered when canViewAssessments=true.
  *   The canManageAssessments flag controls create/edit actions.
  *   Server-side is authoritative — this component only uses pre-resolved flags.
  *
- * Score: integer 0–100. Derived overall = arithmetic mean (labeled as "Ø").
- * Historical snapshots: criterion names come from criterionNameSnapshot,
+ * Score: canonical integer 0–100. Derived overall = arithmetic mean (labeled "Ø").
+ * Historical snapshots: criterion names/labels come from snapshot fields,
  * never from live criterion data.
  */
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   TrendingUp,
@@ -30,11 +27,20 @@ import {
   ChevronDown,
   ChevronRight,
   BarChart2,
+  Settings,
 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/page";
 import type { PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
+import {
+  DEFAULT_QUALITATIVE_5_LABELS,
+  resolveQualitative5Labels,
+  validateRawInput,
+  normalizeRating,
+  RATING_MODES,
+  type RatingMode,
+} from "@/lib/people/rating-modes";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -52,13 +58,9 @@ function deriveOverall(ratings: Array<{ normalizedScore: number }>): number | nu
   return Math.round(sum / ratings.length);
 }
 
-function ScorePill({
-  score,
-  size = "sm",
-}: {
-  score: number;
-  size?: "sm" | "md" | "lg";
-}) {
+// ── Score display helpers ─────────────────────────────────────────────────────
+
+function ScorePill({ score, size = "sm" }: { score: number; size?: "sm" | "md" | "lg" }) {
   const color =
     score >= 75
       ? "bg-emerald-100 text-emerald-700"
@@ -73,8 +75,6 @@ function ScorePill({
       : "text-xs font-semibold px-2 py-0.5 rounded";
   return <span className={`inline-block ${color} ${sizeClass}`}>{score}</span>;
 }
-
-// ── Score bar ─────────────────────────────────────────────────────────────────
 
 function ScoreBar({ score }: { score: number }) {
   const pct = Math.min(100, Math.max(0, score));
@@ -91,13 +91,68 @@ function ScoreBar({ score }: { score: number }) {
   );
 }
 
+// ── Benchmark inline display ──────────────────────────────────────────────────
+
+type BenchmarkEntry = {
+  team?: { average: number; cohortSize: number } | null;
+  jahrgang?: { average: number; cohortSize: number; birthYear: number } | null;
+};
+
+function BenchmarkDisplay({
+  personScore,
+  benchmark,
+}: {
+  personScore: number;
+  benchmark: BenchmarkEntry;
+}) {
+  const lines: React.ReactNode[] = [];
+
+  if (benchmark.team) {
+    const delta = personScore - benchmark.team.average;
+    lines.push(
+      <span key="team" className="text-[10px] text-[var(--muted)]">
+        Team Ø: {benchmark.team.average}
+        <span className={delta >= 0 ? "text-emerald-600" : "text-red-500"}>
+          {" "}({delta >= 0 ? "+" : ""}{delta})
+        </span>
+      </span>,
+    );
+  }
+
+  if (benchmark.jahrgang) {
+    const delta = personScore - benchmark.jahrgang.average;
+    lines.push(
+      <span key="jg" className="text-[10px] text-[var(--muted)]">
+        Jg. {benchmark.jahrgang.birthYear} Ø: {benchmark.jahrgang.average}
+        <span className={delta >= 0 ? "text-emerald-600" : "text-red-500"}>
+          {" "}({delta >= 0 ? "+" : ""}{delta})
+        </span>
+      </span>,
+    );
+  }
+
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="mt-0.5 flex flex-wrap gap-3">
+      {lines}
+    </div>
+  );
+}
+
 // ── Rating row ────────────────────────────────────────────────────────────────
 
 function RatingRow({
   rating,
+  benchmark,
 }: {
   rating: PersonAssessmentRecord["ratings"][number];
+  benchmark?: BenchmarkEntry | null;
 }) {
+  // Derive a human-friendly display value from snapshots
+  const displayLabel = rating.rawLabelSnapshot ?? null;
+  const displayScore = rating.normalizedScore;
+
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="min-w-0 flex-1">
@@ -105,9 +160,17 @@ function RatingRow({
           <span className="truncate text-xs text-[var(--foreground)]">
             {rating.criterionNameSnapshot}
           </span>
-          <ScorePill score={rating.normalizedScore} />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {displayLabel ? (
+              <span className="text-[10px] font-medium text-[var(--muted)]">{displayLabel}</span>
+            ) : null}
+            <ScorePill score={displayScore} />
+          </div>
         </div>
-        <ScoreBar score={rating.normalizedScore} />
+        <ScoreBar score={displayScore} />
+        {benchmark ? (
+          <BenchmarkDisplay personScore={displayScore} benchmark={benchmark} />
+        ) : null}
         {rating.comment ? (
           <p className="mt-0.5 text-[11px] italic text-[var(--muted)]">{rating.comment}</p>
         ) : null}
@@ -116,9 +179,15 @@ function RatingRow({
   );
 }
 
-// ── Grouped ratings (by category snapshot) ───────────────────────────────────
+// ── Grouped ratings ───────────────────────────────────────────────────────────
 
-function GroupedRatings({ ratings }: { ratings: PersonAssessmentRecord["ratings"] }) {
+function GroupedRatings({
+  ratings,
+  benchmarks,
+}: {
+  ratings: PersonAssessmentRecord["ratings"];
+  benchmarks?: Record<string, BenchmarkEntry> | null;
+}) {
   const byCategory = new Map<string, typeof ratings>();
   for (const r of ratings) {
     const cat = r.criterionCategorySnapshot ?? "Allgemein";
@@ -137,7 +206,11 @@ function GroupedRatings({ ratings }: { ratings: PersonAssessmentRecord["ratings"
           </p>
           <div className="divide-y divide-[var(--border)]">
             {catRatings.map((r) => (
-              <RatingRow key={r.id} rating={r} />
+              <RatingRow
+                key={r.id}
+                rating={r}
+                benchmark={benchmarks?.[r.criterionId] ?? null}
+              />
             ))}
           </div>
         </div>
@@ -152,15 +225,39 @@ function AssessmentCard({
   assessment,
   isLatest,
   canManage,
+  personId,
   onEdit,
 }: {
   assessment: PersonAssessmentRecord;
   isLatest: boolean;
   canManage: boolean;
+  personId: string;
   onEdit: (a: PersonAssessmentRecord) => void;
 }) {
   const [open, setOpen] = useState(isLatest);
+  const [benchmarks, setBenchmarks] = useState<Record<string, BenchmarkEntry> | null>(null);
+  const [benchmarksLoaded, setBenchmarksLoaded] = useState(false);
   const overall = deriveOverall(assessment.ratings);
+
+  // Lazy-load benchmarks when card is expanded for the first time
+  const handleToggle = useCallback(async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && !benchmarksLoaded) {
+      setBenchmarksLoaded(true);
+      try {
+        const res = await fetch(
+          `/api/people/${personId}/assessments/${assessment.id}/benchmarks`,
+        );
+        if (res.ok) {
+          const data = (await res.json()) as { benchmarks: Record<string, BenchmarkEntry> };
+          setBenchmarks(data.benchmarks);
+        }
+      } catch {
+        // Non-fatal: benchmarks are secondary context
+      }
+    }
+  }, [open, benchmarksLoaded, personId, assessment.id]);
 
   return (
     <div
@@ -172,7 +269,7 @@ function AssessmentCard({
     >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleToggle}
         className="flex w-full items-center justify-between px-4 py-3 text-left transition hover:bg-[var(--surface-2)]"
         aria-expanded={open}
       >
@@ -224,7 +321,7 @@ function AssessmentCard({
       {open ? (
         <div className="border-t border-[var(--border)] px-4 py-4">
           {assessment.ratings.length > 0 ? (
-            <GroupedRatings ratings={assessment.ratings} />
+            <GroupedRatings ratings={assessment.ratings} benchmarks={benchmarks} />
           ) : (
             <p className="text-xs text-[var(--muted)]">Keine Einzelbewertungen erfasst.</p>
           )}
@@ -273,13 +370,139 @@ function HistoryRow({ assessment }: { assessment: PersonAssessmentRecord }) {
   );
 }
 
-// ── Create/Edit form ──────────────────────────────────────────────────────────
+// ── Mode-specific rating input ────────────────────────────────────────────────
 
 type RatingDraft = {
   criterionId: string;
-  normalizedScore: number;
+  rawValue: number;
   comment: string;
 };
+
+function ModeRatingInput({
+  criterion,
+  rawValue,
+  onChange,
+}: {
+  criterion: TenantCriterion;
+  rawValue: number;
+  onChange: (v: number) => void;
+}) {
+  const mode = (criterion.ratingMode ?? RATING_MODES.SCORE_0_100) as RatingMode;
+
+  if (mode === RATING_MODES.QUALITATIVE_5) {
+    const labels = resolveQualitative5Labels(criterion.qualitativeLabels);
+    return (
+      <div className="flex flex-wrap gap-1">
+        {labels.map((label, idx) => {
+          const level = idx + 1;
+          const selected = rawValue === level;
+          return (
+            <button
+              key={level}
+              type="button"
+              onClick={() => onChange(level)}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition ${
+                selected
+                  ? "bg-[var(--sce-primary)] text-white"
+                  : "bg-[var(--surface-3)] text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+              }`}
+            >
+              {level}. {label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  if (mode === RATING_MODES.SCORE_1_10) {
+    return (
+      <div className="flex flex-wrap gap-1">
+        {Array.from({ length: 10 }, (_, i) => i + 1).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={`h-7 w-7 rounded-lg text-xs font-semibold transition ${
+              rawValue === v
+                ? "bg-[var(--sce-primary)] text-white"
+                : "bg-[var(--surface-3)] text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  if (mode === RATING_MODES.PERCENTAGE) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={0}
+          max={100}
+          step={1}
+          value={rawValue}
+          onChange={(e) => {
+            const v = Math.round(Number(e.target.value));
+            if (!isNaN(v) && v >= 0 && v <= 100) onChange(v);
+          }}
+          className="w-20 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm font-semibold text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
+        />
+        <span className="text-xs text-[var(--muted)]">%</span>
+      </div>
+    );
+  }
+
+  // Default: SCORE_0_100
+  return (
+    <input
+      type="number"
+      min={0}
+      max={100}
+      step={1}
+      value={rawValue}
+      onChange={(e) => {
+        const v = Math.round(Number(e.target.value));
+        if (!isNaN(v) && v >= 0 && v <= 100) onChange(v);
+      }}
+      className="w-16 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm font-semibold text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
+    />
+  );
+}
+
+// ── Mode label hint ───────────────────────────────────────────────────────────
+
+function getModeHint(mode: string): string {
+  switch (mode) {
+    case RATING_MODES.QUALITATIVE_5:
+      return "5 Stufen";
+    case RATING_MODES.SCORE_1_10:
+      return "1–10";
+    case RATING_MODES.PERCENTAGE:
+      return "0–100 %";
+    default:
+      return "0–100";
+  }
+}
+
+// ── Default raw value per mode ────────────────────────────────────────────────
+
+function defaultRawValueForMode(mode: string): number {
+  switch (mode) {
+    case RATING_MODES.QUALITATIVE_5:
+      return 3; // "Solide"
+    case RATING_MODES.SCORE_1_10:
+      return 5;
+    case RATING_MODES.PERCENTAGE:
+    default:
+      return 50;
+  }
+}
+
+// ── Create/Edit form ──────────────────────────────────────────────────────────
 
 function AssessmentForm({
   personId,
@@ -301,23 +524,31 @@ function AssessmentForm({
       : new Date().toISOString().slice(0, 10),
   );
   const [notes, setNotes] = useState(initialAssessment?.notes ?? "");
+
+  // Initialize ratings with rawValue derived from existing rating or mode default
   const [ratings, setRatings] = useState<RatingDraft[]>(() => {
     if (initialAssessment) {
-      return initialAssessment.ratings.map((r) => ({
-        criterionId: r.criterionId,
-        normalizedScore: r.normalizedScore,
-        comment: r.comment ?? "",
-      }));
+      return initialAssessment.ratings.map((r) => {
+        const criterion = criteria.find((c) => c.id === r.criterionId);
+        const mode = (criterion?.ratingMode ?? RATING_MODES.SCORE_0_100) as RatingMode;
+        // Use rawValue if available, else fall back to normalizedScore (legacy)
+        const rawValue = r.rawValue ?? r.normalizedScore;
+        return {
+          criterionId: r.criterionId,
+          rawValue: validateRawInput(mode, rawValue) ? rawValue : defaultRawValueForMode(mode),
+          comment: r.comment ?? "",
+        };
+      });
     }
     return criteria.map((c) => ({
       criterionId: c.id,
-      normalizedScore: 50,
+      rawValue: defaultRawValueForMode(c.ratingMode ?? RATING_MODES.SCORE_0_100),
       comment: "",
     }));
   });
+
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
   const isEdit = !!initialAssessment;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -329,9 +560,22 @@ function AssessmentForm({
         ? `/api/people/${personId}/assessments/${initialAssessment!.id}`
         : `/api/people/${personId}/assessments`;
       const method = isEdit ? "PATCH" : "POST";
+
+      // Build ratings payload with rawValue (server normalizes)
+      const ratingsPayload = ratings.map((r) => {
+        const criterion = criteria.find((c) => c.id === r.criterionId);
+        const mode = (criterion?.ratingMode ?? RATING_MODES.SCORE_0_100) as RatingMode;
+        return {
+          criterionId: r.criterionId,
+          rawValue: r.rawValue,
+          normalizedScore: normalizeRating(mode, r.rawValue),
+          comment: r.comment || null,
+        };
+      });
+
       const body = isEdit
-        ? { assessedAt, notes: notes || null, ratings }
-        : { seasonId, assessedAt, notes: notes || null, ratings };
+        ? { assessedAt, notes: notes || null, ratings: ratingsPayload }
+        : { seasonId, assessedAt, notes: notes || null, ratings: ratingsPayload };
 
       const res = await fetch(url, {
         method,
@@ -351,11 +595,9 @@ function AssessmentForm({
     }
   }
 
-  function updateRating(criterionId: string, field: "normalizedScore" | "comment", value: number | string) {
+  function updateRating(criterionId: string, field: "rawValue" | "comment", value: number | string) {
     setRatings((prev) =>
-      prev.map((r) =>
-        r.criterionId === criterionId ? { ...r, [field]: value } : r,
-      ),
+      prev.map((r) => (r.criterionId === criterionId ? { ...r, [field]: value } : r)),
     );
   }
 
@@ -392,39 +634,39 @@ function AssessmentForm({
 
       {ratings.length > 0 ? (
         <div>
-          <p className="mb-2 text-xs font-medium text-[var(--foreground)]">
-            Kriterien (0–100)
-          </p>
+          <p className="mb-2 text-xs font-medium text-[var(--foreground)]">Kriterien</p>
           <div className="space-y-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
             {ratings.map((r) => {
               const criterion = criteria.find((c) => c.id === r.criterionId);
               const label = criterion?.name ?? r.criterionId;
               const category = criterion?.category ?? null;
+              const mode = (criterion?.ratingMode ?? RATING_MODES.SCORE_0_100) as RatingMode;
+              const modeHint = getModeHint(mode);
+              const normalized = normalizeRating(mode, r.rawValue);
               return (
-                <div key={r.criterionId} className="space-y-1">
-                  <div className="flex items-center justify-between gap-2">
+                <div key={r.criterionId} className="space-y-1.5">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       {category ? (
                         <span className="text-[10px] text-[var(--muted)]">{category} · </span>
                       ) : null}
                       <span className="text-xs font-medium text-[var(--foreground)]">{label}</span>
+                      <span className="ml-1 text-[10px] text-[var(--muted)]">({modeHint})</span>
                     </div>
-                    <input
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={r.normalizedScore}
-                      onChange={(e) => {
-                        const v = Math.round(Number(e.target.value));
-                        if (!isNaN(v) && v >= 0 && v <= 100) {
-                          updateRating(r.criterionId, "normalizedScore", v);
-                        }
-                      }}
-                      className="w-16 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-right text-sm font-semibold text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
-                    />
+                    <span className="shrink-0 text-[10px] font-semibold text-[var(--muted)]">
+                      → {normalized}
+                    </span>
                   </div>
-                  <ScoreBar score={r.normalizedScore} />
+                  <ModeRatingInput
+                    criterion={criterion!}
+                    rawValue={r.rawValue}
+                    onChange={(v) => updateRating(r.criterionId, "rawValue", v)}
+                  />
+                  {mode === RATING_MODES.SCORE_0_100 || mode === RATING_MODES.PERCENTAGE ? (
+                    <ScoreBar score={r.rawValue} />
+                  ) : (
+                    <ScoreBar score={normalized} />
+                  )}
                   <input
                     type="text"
                     value={r.comment}
@@ -439,8 +681,8 @@ function AssessmentForm({
         </div>
       ) : (
         <p className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3 text-xs text-[var(--muted)]">
-          Keine aktiven Kriterien vorhanden. Kriterien müssen zuerst unter{" "}
-          <code className="font-mono">/api/people/criteria</code> erstellt werden.
+          Keine aktiven Kriterien vorhanden. Kriterien können unter{" "}
+          <strong>Einstellungen → Kriterien</strong> erstellt werden.
         </p>
       )}
 
@@ -481,6 +723,8 @@ type PersonAssessmentSectionProps = {
   criteria: TenantCriterion[];
   /** Viewer holds people.assessments.manage. Controls create/edit actions. */
   canManage: boolean;
+  /** Link to criterion management page (shown for managers). */
+  criteriaManagementUrl?: string;
 };
 
 export default function PersonAssessmentSection({
@@ -488,6 +732,7 @@ export default function PersonAssessmentSection({
   assessments,
   criteria,
   canManage,
+  criteriaManagementUrl,
 }: PersonAssessmentSectionProps) {
   const router = useRouter();
   const [createOpen, setCreateOpen] = useState(false);
@@ -512,16 +757,24 @@ export default function PersonAssessmentSection({
             Entwicklungs-Bewertungen
           </h3>
         </div>
-        {canManage ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="mr-1 h-3 w-3" />
-            Bewertung erfassen
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canManage && criteriaManagementUrl ? (
+            <a
+              href={criteriaManagementUrl}
+              className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+              title="Kriterien verwalten"
+            >
+              <Settings className="h-3 w-3" />
+              Kriterien
+            </a>
+          ) : null}
+          {canManage ? (
+            <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="mr-1 h-3 w-3" />
+              Bewertung erfassen
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {/* ── Empty state ──────────────────────────────────────────────────────── */}
@@ -543,6 +796,7 @@ export default function PersonAssessmentSection({
             assessment={latest}
             isLatest
             canManage={canManage}
+            personId={personId}
             onEdit={setEditTarget}
           />
         </div>
@@ -567,6 +821,7 @@ export default function PersonAssessmentSection({
                 assessment={a}
                 isLatest={false}
                 canManage={canManage}
+                personId={personId}
                 onEdit={setEditTarget}
               />
             ))}
@@ -609,3 +864,6 @@ export default function PersonAssessmentSection({
     </div>
   );
 }
+
+// Re-export label defaults for use in other display contexts
+export { DEFAULT_QUALITATIVE_5_LABELS, resolveQualitative5Labels };
