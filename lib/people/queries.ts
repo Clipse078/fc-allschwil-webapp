@@ -348,7 +348,71 @@ export async function getPersonProfileByUserId(
   };
 }
 
+// ── Squad / trainer memberships (for Person 360° workspace) ──────────────────
+
+/**
+ * PERSON-UX-01: Returns all PlayerSquadMember records for this person,
+ * ordered by season start date desc (most recent first).
+ *
+ * Season-trustworthiness: PlayerSquadMember → TeamSeason → Season is a fully
+ * persisted historical chain. Each squad membership record is its own row and
+ * does NOT disappear when the current season changes.
+ */
+export async function getPersonSquadMemberships(personId: string) {
+  return prisma.playerSquadMember.findMany({
+    where: { personId },
+    orderBy: [{ teamSeason: { season: { startDate: "desc" } } }],
+    select: {
+      id: true,
+      status: true,
+      shirtNumber: true,
+      positionLabel: true,
+      isCaptain: true,
+      isViceCaptain: true,
+      remarks: true,
+      teamSeason: {
+        select: {
+          id: true,
+          displayName: true,
+          shortName: true,
+          participationType: true,
+          team: { select: { id: true, name: true, shortName: true } },
+          season: { select: { id: true, name: true, key: true, isActive: true, startDate: true, endDate: true } },
+        },
+      },
+    },
+  });
+}
+
+/**
+ * PERSON-UX-01: Returns all TrainerTeamMember records for this person,
+ * ordered by season start date desc (most recent first).
+ */
+export async function getPersonTrainerMemberships(personId: string) {
+  return prisma.trainerTeamMember.findMany({
+    where: { personId },
+    orderBy: [{ teamSeason: { season: { startDate: "desc" } } }],
+    select: {
+      id: true,
+      status: true,
+      roleLabel: true,
+      remarks: true,
+      teamSeason: {
+        select: {
+          id: true,
+          displayName: true,
+          shortName: true,
+          team: { select: { id: true, name: true, shortName: true } },
+          season: { select: { id: true, name: true, key: true, isActive: true, startDate: true, endDate: true } },
+        },
+      },
+    },
+  });
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
 export type PersonDirectoryItem = Awaited<ReturnType<typeof getPersonsForDirectory>>[number];
 export type PersonAssignment = Awaited<ReturnType<typeof getPersonAssignments>>[number];
+export type PersonSquadMembership = Awaited<ReturnType<typeof getPersonSquadMemberships>>[number];
+export type PersonTrainerMembership = Awaited<ReturnType<typeof getPersonTrainerMemberships>>[number];
