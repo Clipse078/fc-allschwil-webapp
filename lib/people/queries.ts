@@ -410,9 +410,39 @@ export async function getPersonTrainerMemberships(personId: string) {
   });
 }
 
+// ── Club memberships (PERSON-UX-04) ──────────────────────────────────────────
+
+/**
+ * PERSON-UX-04: Returns all PersonMembership records for this person,
+ * ordered newest first (most recent startsAt desc).
+ *
+ * Historical records are returned permanently — ENDED memberships remain
+ * visible. The caller is responsible for distinguishing current vs historical.
+ */
+export async function getPersonMemberships(personId: string) {
+  return prisma.personMembership.findMany({
+    where: { personId },
+    orderBy: [{ startsAt: "desc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      tenantId: true,
+      personId: true,
+      membershipType: true,
+      status: true,
+      memberNumber: true,
+      startsAt: true,
+      endsAt: true,
+      notes: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
 export type PersonDirectoryItem = Awaited<ReturnType<typeof getPersonsForDirectory>>[number];
 export type PersonAssignment = Awaited<ReturnType<typeof getPersonAssignments>>[number];
 export type PersonSquadMembership = Awaited<ReturnType<typeof getPersonSquadMemberships>>[number];
 export type PersonTrainerMembership = Awaited<ReturnType<typeof getPersonTrainerMemberships>>[number];
+export type PersonMembershipRecord = Awaited<ReturnType<typeof getPersonMemberships>>[number];

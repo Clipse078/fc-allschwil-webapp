@@ -206,6 +206,28 @@ enum PersonAssignmentStatus {
   INACTIVE
 }
 
+/// PERSON-UX-04: Status for club membership lifecycle.
+/// ACTIVE  — current, valid club member.
+/// INACTIVE — suspended or temporarily paused (membership period not yet ended).
+/// ENDED   — membership formally ended; record is kept permanently for history.
+enum PersonMembershipStatus {
+  ACTIVE
+  INACTIVE
+  ENDED
+}
+
+/// PERSON-UX-04: Membership type for club membership.
+/// Generic across sports clubs. FCA-specific or tenant-configurable types
+/// are a future extensibility point — not implemented in this slice.
+/// LIMITATION: If multi-type or tenant-configurable types are required, this
+/// enum must be migrated to a lookup table (MembershipCategory model).
+enum PersonMembershipType {
+  ACTIVE_MEMBER
+  PASSIVE_MEMBER
+  HONORARY_MEMBER
+  OTHER
+}
+
 enum CommunicationTemplateCategory {
   MATCH_INVITATION
   MEETING_FOLLOWUP
@@ -597,6 +619,8 @@ model Tenant {
   persons           Person[]    @relation("TenantPersons")
   // PERSONS-02: canonical tenant-scoped person assignments
   personAssignments PersonAssignment[] @relation("TenantPersonAssignments")
+  // PERSON-UX-04: canonical club membership history
+  personMemberships PersonMembership[] @relation("TenantPersonMemberships")
 
   @@index([status])
   @@index([name])
@@ -1117,6 +1141,8 @@ model Person {
   orgUnitMemberships   OrgUnitMembership[]
   // PERSONS-02: canonical person assignments (dedicated model, separate from OrgUnitMembership)
   personAssignments    PersonAssignment[]
+  // PERSON-UX-04: canonical club membership history
+  personMemberships    PersonMembership[]
   authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
   authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
   // Registrations currently linked to this Person (Goal 2/3 — may include
@@ -1801,6 +1827,45 @@ model PersonAssignment {
   @@index([tenantId, status])
   @@index([personId, status])
   @@index([tenantId, orgUnitId, status])
+}
+
+// PERSON-UX-04: Canonical club membership lifecycle model.
+//
+// CRITICAL ARCHITECTURAL INVARIANTS:
+//   PersonMembership describes CLUB MEMBERSHIP only.
+//   It does NOT affect:
+//     - TenantMembership (login / tenant access)
+//     - OrgUnitMembership (RPERM/governance scope)
+//     - UserRole
+//     - PersonAssignment (organisational function)
+//     - PlayerSquadMember / TrainerTeamMember (sporting capacity)
+//
+// Historical records MUST remain persisted when a membership ends.
+// Membership is NOT season-bound and is NOT derived from other relations.
+// Future chain: PersonMembership → ContributionObligation → Invoice → Payment
+// (contribution obligations and finance are NOT implemented in this slice).
+model PersonMembership {
+  id           String                  @id @default(cuid())
+  tenantId     String
+  personId     String
+  membershipType PersonMembershipType  @default(ACTIVE_MEMBER)
+  status       PersonMembershipStatus  @default(ACTIVE)
+  memberNumber String?
+  startsAt     DateTime
+  endsAt       DateTime?
+  notes        String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+
+  tenant Tenant @relation("TenantPersonMemberships", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([personId])
+  @@index([tenantId, status])
+  @@index([personId, status])
+  @@index([tenantId, personId])
+  @@index([startsAt])
 }
 
 model TargetGroup {

@@ -23,6 +23,7 @@ import {
   getActiveSeasonForTenant,
   getPersonSquadMemberships,
   getPersonTrainerMemberships,
+  getPersonMemberships,
 } from "@/lib/people/queries";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
@@ -71,7 +72,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const [assignments, orgUnits, teams, activeSeason, squadMemberships, trainerMemberships] =
+  const [assignments, orgUnits, teams, activeSeason, squadMemberships, trainerMemberships, personMemberships] =
     await Promise.all([
       getPersonAssignments(id),
       tenantId ? getOrgUnitsForTenant(tenantId) : Promise.resolve([]),
@@ -79,6 +80,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
       tenantId ? getActiveSeasonForTenant(tenantId) : Promise.resolve(null),
       getPersonSquadMemberships(id),
       getPersonTrainerMemberships(id),
+      getPersonMemberships(id),
     ]);
 
   const fullName = person.displayName || `${person.firstName} ${person.lastName}`;
@@ -289,6 +291,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
           activeSeason={activeSeason}
           accessRolesCard={accessRolesCard}
           domainPermissions={domainPermissions}
+          memberships={personMemberships}
         />
       </DetailPagePattern>
     </PageShell>
