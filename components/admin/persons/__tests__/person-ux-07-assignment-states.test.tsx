@@ -261,8 +261,9 @@ function renderOverview(opts: {
 describe("1. State A — player profile, no relationship", () => {
   it("overview shows 'Spielerprofil vorhanden' nudge when no squads and no player assignments", () => {
     renderOverview({ person: { isPlayer: true }, squads: [], assignments: [] });
-    expect(document.body.textContent).toContain("Spielerprofil vorhanden");
-    expect(document.body.textContent).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // State A: compact neutral nudge — "Spielerprofil ist vorhanden" (new wording)
+    expect(document.body.textContent).toContain("Spielerprofil ist vorhanden");
+    expect(document.body.textContent).toContain("keine Kaderzuordnung");
   });
 
   it("Spieler tab shows 'Noch keinem Team als Spieler/in zugeordnet' when no squads and no assignments", () => {
@@ -279,8 +280,9 @@ describe("1. State A — player profile, no relationship", () => {
 describe("2. State A — trainer profile, no relationship", () => {
   it("overview shows 'Trainerprofil vorhanden' nudge when no trainers and no trainer assignments", () => {
     renderOverview({ person: { isTrainer: true }, trainers: [], assignments: [] });
-    expect(document.body.textContent).toContain("Trainerprofil vorhanden");
-    expect(document.body.textContent).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // State A: compact neutral nudge — "Trainerprofil ist vorhanden" (new wording)
+    expect(document.body.textContent).toContain("Trainerprofil ist vorhanden");
+    expect(document.body.textContent).toContain("keine Trainer-Zuordnung");
   });
 
   it("Trainer tab shows 'Noch keinem Team als Trainer/in zugeordnet' when no trainers and no assignments", () => {
@@ -417,14 +419,16 @@ describe("4. State B — trainer assignment exists, no trainer membership", () =
     expect(document.body.textContent).not.toContain("Noch keinem Team als Trainer/in zugeordnet");
   });
 
-  it("Trainer tab shows 'Saison-Verknüpfung fehlt' when assignment has no season", () => {
+  it("Trainer tab shows incomplete description when assignment has no season", () => {
     render(
       <PersonTrainerTab
         trainerMemberships={[]}
         assignments={[makeTrainerAssignment(TEAM_F2, null)]}
       />,
     );
-    expect(document.body.textContent).toContain("Saison-Verknüpfung fehlt");
+    // New wording: user-friendly description without "Saison-Verknüpfung fehlt"
+    expect(document.body.textContent).toContain("Zuordnung unvollständig");
+    expect(document.body.textContent).toContain("nicht im Trainerteam");
   });
 });
 
@@ -669,8 +673,9 @@ describe("14. True no-relationship renders 'noch keinem Team' message", () => {
       trainers: [],
       assignments: [],
     });
-    expect(document.body.textContent).toContain("Trainerprofil vorhanden");
-    expect(document.body.textContent).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // New wording: "Trainerprofil ist vorhanden"
+    expect(document.body.textContent).toContain("Trainerprofil ist vorhanden");
+    expect(document.body.textContent).toContain("keine Trainer-Zuordnung");
   });
 });
 
@@ -736,8 +741,8 @@ describe("17. CTA State A (Trainer): Zur Organisation callback invoked", () => {
 // 18 + 19. CTA State B: team deep-link
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("18. CTA State B (Spieler): team link points to /dashboard/teams/:id", () => {
-  it("Spieler tab State B renders team link with correct href", () => {
+describe("18. CTA State B (Spieler): team link points to /dashboard/teams/:id#spielerkader", () => {
+  it("Spieler tab State B renders team link with #spielerkader anchor", () => {
     render(
       <PersonSpielerTab
         squadMemberships={[]}
@@ -746,7 +751,7 @@ describe("18. CTA State B (Spieler): team link points to /dashboard/teams/:id", 
     );
     const link = document.querySelector('[data-testid="spieler-incomplete-team-link"]');
     expect(link).not.toBeNull();
-    expect(link?.getAttribute("href")).toBe(`/dashboard/teams/${TEAM_F2.id}`);
+    expect(link?.getAttribute("href")).toBe(`/dashboard/teams/${TEAM_F2.id}#spielerkader`);
   });
 
   it("Spieler tab State B does NOT render 'Zur Organisation' button", () => {
@@ -761,8 +766,8 @@ describe("18. CTA State B (Spieler): team link points to /dashboard/teams/:id", 
   });
 });
 
-describe("19. CTA State B (Trainer): team link points to /dashboard/teams/:id", () => {
-  it("Trainer tab State B renders team link with correct href", () => {
+describe("19. CTA State B (Trainer): team link points to /dashboard/teams/:id#trainerteam", () => {
+  it("Trainer tab State B renders team link with #trainerteam anchor", () => {
     render(
       <PersonTrainerTab
         trainerMemberships={[]}
@@ -771,7 +776,7 @@ describe("19. CTA State B (Trainer): team link points to /dashboard/teams/:id", 
     );
     const link = document.querySelector('[data-testid="trainer-incomplete-team-link"]');
     expect(link).not.toBeNull();
-    expect(link?.getAttribute("href")).toBe(`/dashboard/teams/${TEAM_F2.id}`);
+    expect(link?.getAttribute("href")).toBe(`/dashboard/teams/${TEAM_F2.id}#trainerteam`);
   });
 
   it("Trainer tab State B does NOT render 'Zur Organisation' button", () => {
@@ -865,7 +870,7 @@ describe("22. Overview State B — names team and shows Zuordnung unvollständig
   });
 });
 
-describe("23. Overview State A — shows nudge 'Spielerprofil vorhanden'", () => {
+describe("23. Overview State A — shows nudge 'Spielerprofil ist vorhanden'", () => {
   it("overview State A shows actionable nudge for player with no assignment and no squad", () => {
     renderOverview({
       person: { isPlayer: true },
@@ -873,7 +878,8 @@ describe("23. Overview State A — shows nudge 'Spielerprofil vorhanden'", () =>
       assignments: [],
     });
     const content = document.body.textContent ?? "";
-    expect(content).toContain("Spielerprofil vorhanden");
-    expect(content).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // New wording: "Spielerprofil ist vorhanden" (neutral card, not alarming amber)
+    expect(content).toContain("Spielerprofil ist vorhanden");
+    expect(content).toContain("keine Kaderzuordnung");
   });
 });

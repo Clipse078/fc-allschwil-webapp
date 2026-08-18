@@ -335,8 +335,9 @@ describe("C. Capacity with no current assignment shows actionable nudge", () => 
       squads: [],
     });
     const content = document.body.textContent ?? "";
-    expect(content).toContain("Spielerprofil vorhanden");
-    expect(content).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // State A: compact neutral nudge — contains "Spielerprofil ist vorhanden"
+    expect(content).toContain("Spielerprofil ist vorhanden");
+    expect(content).toContain("keine Kaderzuordnung");
   });
 
   it("isTrainer=true with no trainer memberships: overview shows unassigned nudge for Trainer", () => {
@@ -345,8 +346,9 @@ describe("C. Capacity with no current assignment shows actionable nudge", () => 
       trainers: [],
     });
     const content = document.body.textContent ?? "";
-    expect(content).toContain("Trainerprofil vorhanden");
-    expect(content).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // State A: compact neutral nudge — contains "Trainerprofil ist vorhanden"
+    expect(content).toContain("Trainerprofil ist vorhanden");
+    expect(content).toContain("keine Trainer-Zuordnung");
   });
 
   it("Spieler tab shows actionable nudge (not silent empty) when no active squad memberships", () => {
@@ -684,9 +686,9 @@ describe("I. Mixed state: assigned player, unassigned trainer", () => {
     const content = document.body.textContent ?? "";
     // Player team must be shown
     expect(content).toContain("FC Allschwil Junioren F2");
-    // Trainer nudge must appear
-    expect(content).toContain("Trainerprofil vorhanden");
-    expect(content).toContain("noch keinem Team für die aktuelle Saison zugeordnet");
+    // Trainer nudge must appear — neutral State A
+    expect(content).toContain("Trainerprofil ist vorhanden");
+    expect(content).toContain("keine Trainer-Zuordnung");
   });
 
   it("shows trainer team in Trainer section and nudge in Spieler section", () => {
@@ -698,8 +700,8 @@ describe("I. Mixed state: assigned player, unassigned trainer", () => {
     const content = document.body.textContent ?? "";
     // Trainer team must be shown
     expect(content).toContain("FC Allschwil Junioren E3");
-    // Spieler nudge must appear
-    expect(content).toContain("Spielerprofil vorhanden");
+    // Spieler nudge must appear — neutral State A
+    expect(content).toContain("Spielerprofil ist vorhanden");
   });
 });
 
@@ -730,5 +732,438 @@ describe("J. PersonAssignment functions shown in overview", () => {
     expect(content).toContain("FC Allschwil Junioren F2");
     // Function assignment org unit present
     expect(content).toContain("Vereinsleitung");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// K. NEW UX-ACCEPTANCE: Overview shows trainer team BEFORE incomplete status
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("K. Overview operational first: trainer team visible before incomplete status", () => {
+  const trainerAssignment = {
+    id: "a-trainer-b",
+    orgUnitId: "ou-1",
+    teamId: TEAM_F2.id,
+    seasonId: null,
+    functionKey: "TRAINER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: TEAM_F2,
+    season: null,
+  } as unknown as PersonAssignment;
+
+  it("overview State B shows team name as primary content (not warning title first)", () => {
+    renderOverview({
+      person: { isTrainer: true },
+      trainers: [],
+      assignments: [trainerAssignment],
+    });
+    const content = document.body.textContent ?? "";
+    // Team name must appear
+    expect(content).toContain("FC Allschwil Junioren F2");
+    // "Zuordnung unvollständig" appears as status badge
+    expect(content).toContain("Zuordnung unvollständig");
+  });
+
+  it("overview State B shows incomplete card is NOT wrapped in amber container (operational card)", () => {
+    const { container } = render(
+      <PersonWorkspaceOverviewTab
+        person={{
+          ...makePerson({ isTrainer: true }),
+          assignments: [trainerAssignment],
+          squadMemberships: [],
+          trainerMemberships: [],
+        }}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const card = container.querySelector('[data-testid="incomplete-assignment-card"]');
+    expect(card).toBeTruthy();
+    // Card uses neutral border, not amber background as primary container
+    const classList = card?.className ?? "";
+    expect(classList).not.toMatch(/bg-amber/);
+  });
+
+  it("overview State B shows season name from activeSeason", () => {
+    renderOverview({
+      person: { isTrainer: true },
+      trainers: [],
+      assignments: [trainerAssignment],
+    });
+    const content = document.body.textContent ?? "";
+    expect(content).toContain(SEASON_ACTIVE.name);
+  });
+
+  it("overview State B trainer CTA includes trainerteam anchor in href", () => {
+    const { container } = render(
+      <PersonWorkspaceOverviewTab
+        person={{
+          ...makePerson({ isTrainer: true }),
+          assignments: [trainerAssignment],
+          squadMemberships: [],
+          trainerMemberships: [],
+        }}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const link = container.querySelector('[data-testid="incomplete-assignment-team-link"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.href).toContain("#trainerteam");
+  });
+
+  it("overview State B trainer CTA wording is task-oriented", () => {
+    renderOverview({
+      person: { isTrainer: true },
+      trainers: [],
+      assignments: [trainerAssignment],
+    });
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Trainer-Zuordnung vervollständigen");
+    expect(content).not.toContain("Zum Team");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// L. NEW UX-ACCEPTANCE: Spieler CTA anchor precision
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("L. Spieler CTA deep-links to spielerkader anchor", () => {
+  const playerAssignment = {
+    id: "a-player-b",
+    orgUnitId: "ou-1",
+    teamId: TEAM_F2.id,
+    seasonId: null,
+    functionKey: "SPIELER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: TEAM_F2,
+    season: null,
+  } as unknown as PersonAssignment;
+
+  it("Spieler tab State B CTA href includes #spielerkader", () => {
+    const { container } = render(
+      <PersonSpielerTab
+        squadMemberships={[]}
+        assignments={[playerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const link = container.querySelector('[data-testid="spieler-incomplete-team-link"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.href).toContain(`${TEAM_F2.id}#spielerkader`);
+  });
+
+  it("Spieler tab State B CTA wording is task-oriented", () => {
+    render(
+      <PersonSpielerTab
+        squadMemberships={[]}
+        assignments={[playerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Jetzt Kaderzuordnung ergänzen");
+    expect(content).not.toContain("Zum Team");
+  });
+
+  it("Overview State B player CTA href includes #spielerkader", () => {
+    const { container } = render(
+      <PersonWorkspaceOverviewTab
+        person={{
+          ...makePerson({ isPlayer: true }),
+          assignments: [playerAssignment],
+          squadMemberships: [],
+          trainerMemberships: [],
+        }}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const link = container.querySelector('[data-testid="incomplete-assignment-team-link"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.href).toContain("#spielerkader");
+  });
+
+  it("Spieler tab State A neutral card has no amber background", () => {
+    const { container } = render(
+      <PersonSpielerTab
+        squadMemberships={[]}
+        assignments={[]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const nudge = container.querySelector('[data-testid="spieler-unassigned-nudge"]');
+    expect(nudge).toBeTruthy();
+    const classList = nudge?.className ?? "";
+    expect(classList).not.toMatch(/bg-amber/);
+  });
+
+  it("Spieler tab section is labeled 'Aktuelle Spieler-Zuordnungen'", () => {
+    render(
+      <PersonSpielerTab
+        squadMemberships={[]}
+        assignments={[]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Aktuelle Spieler-Zuordnungen");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M. NEW UX-ACCEPTANCE: Trainer CTA anchor precision
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("M. Trainer CTA deep-links to trainerteam anchor", () => {
+  const trainerAssignment = {
+    id: "a-trainer-b2",
+    orgUnitId: "ou-1",
+    teamId: TEAM_E3.id,
+    seasonId: null,
+    functionKey: "TRAINER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: TEAM_E3,
+    season: null,
+  } as unknown as PersonAssignment;
+
+  it("Trainer tab State B CTA href includes #trainerteam", () => {
+    const { container } = render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[trainerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const link = container.querySelector('[data-testid="trainer-incomplete-team-link"]') as HTMLAnchorElement | null;
+    expect(link).toBeTruthy();
+    expect(link?.href).toContain(`${TEAM_E3.id}#trainerteam`);
+  });
+
+  it("Trainer tab State B CTA wording is task-oriented", () => {
+    render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[trainerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Trainer-Zuordnung vervollständigen");
+    expect(content).not.toContain("Zum Team");
+  });
+
+  it("Trainer tab section is labeled 'Aktuelle Trainerteams'", () => {
+    render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Aktuelle Trainerteams");
+  });
+
+  it("Trainer tab State B shows season name", () => {
+    render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[trainerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain(SEASON_ACTIVE.name);
+  });
+
+  it("Trainer tab State B uses personFirstName in description", () => {
+    render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[trainerAssignment]}
+        activeSeason={SEASON_ACTIVE}
+        personFirstName="Michael"
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Michael");
+    expect(content).toContain("FC Allschwil Junioren E3");
+  });
+
+  it("Trainer tab State A neutral card has no amber background", () => {
+    const { container } = render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const nudge = container.querySelector('[data-testid="trainer-unassigned-nudge"]');
+    expect(nudge).toBeTruthy();
+    const classList = nudge?.className ?? "";
+    expect(classList).not.toMatch(/bg-amber/);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// N. NEW UX-ACCEPTANCE: No duplicate in Weitere Funktionen
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("N. No duplicate incomplete relationship in Weitere Funktionen", () => {
+  it("incomplete trainer assignment not shown again in Weitere Funktionen", () => {
+    const incompleteTrainer = {
+      id: "a-trainer-dup",
+      orgUnitId: "ou-1",
+      teamId: TEAM_F2.id,
+      seasonId: null,
+      functionKey: "TRAINER",
+      status: "ACTIVE",
+      notes: null,
+      orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+      team: TEAM_F2,
+      season: null,
+    } as unknown as PersonAssignment;
+
+    renderOverview({
+      person: { isTrainer: true },
+      trainers: [],
+      assignments: [incompleteTrainer],
+    });
+
+    // Team name appears exactly once in the Trainer section, not duplicated in Weitere Funktionen
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("FC Allschwil Junioren F2");
+    // "Weitere Funktionen" heading must NOT appear (suppressed)
+    expect(content).not.toContain("Weitere Funktionen");
+  });
+
+  it("incomplete player assignment not shown again in Weitere Funktionen", () => {
+    const incompletePlayer = {
+      id: "a-player-dup",
+      orgUnitId: "ou-1",
+      teamId: TEAM_F2.id,
+      seasonId: null,
+      functionKey: "SPIELER",
+      status: "ACTIVE",
+      notes: null,
+      orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+      team: TEAM_F2,
+      season: null,
+    } as unknown as PersonAssignment;
+
+    renderOverview({
+      person: { isPlayer: true },
+      squads: [],
+      assignments: [incompletePlayer],
+    });
+
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("FC Allschwil Junioren F2");
+    // "Weitere Funktionen" heading must NOT appear (suppressed)
+    expect(content).not.toContain("Weitere Funktionen");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// O. NEW UX-ACCEPTANCE: Sport tab warning appears before empty state
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("O. Sport tab incomplete warning appears before empty biography state", () => {
+  const unseasonedAssignment = {
+    id: "a-unseasoned-o",
+    orgUnitId: "ou-1",
+    teamId: "t-f2",
+    seasonId: null,
+    functionKey: "PLAYER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: { id: "t-f2", name: "FC Allschwil Junioren F2", shortName: "F2" },
+    season: null,
+  } as unknown as PersonAssignment;
+
+  it("Sport tab renders warning BEFORE the empty biography state in DOM order", () => {
+    const { container } = render(
+      <PersonSportTab
+        personId="p-acc"
+        squadMemberships={[]}
+        trainerMemberships={[]}
+        assignments={[unseasonedAssignment]}
+      />,
+    );
+
+    const warning = container.querySelector('[data-testid="unseasoned-assignment-warning"]');
+    const emptyHeading = Array.from(container.querySelectorAll("p, h3")).find(
+      (el) => el.textContent?.includes("Noch keine Saison-Einträge"),
+    );
+
+    expect(warning).toBeTruthy();
+    expect(emptyHeading).toBeTruthy();
+
+    // Warning must appear before the empty state in the DOM
+    if (warning && emptyHeading) {
+      const position = warning.compareDocumentPosition(emptyHeading);
+      // DOCUMENT_POSITION_FOLLOWING = 4: emptyHeading is after warning
+      expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// P. NEW UX-ACCEPTANCE: Multiple trainer teams all render (overview and tab)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("P. Multiple trainer teams all render", () => {
+  const trainerAssignmentF2 = {
+    id: "a-tr-f2",
+    orgUnitId: "ou-1",
+    teamId: TEAM_F2.id,
+    seasonId: null,
+    functionKey: "TRAINER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: TEAM_F2,
+    season: null,
+  } as unknown as PersonAssignment;
+  const trainerAssignmentE3 = {
+    id: "a-tr-e3",
+    orgUnitId: "ou-1",
+    teamId: TEAM_E3.id,
+    seasonId: null,
+    functionKey: "TRAINER",
+    status: "ACTIVE",
+    notes: null,
+    orgUnit: { id: "ou-1", name: "Fussball", key: "fussball" },
+    team: TEAM_E3,
+    season: null,
+  } as unknown as PersonAssignment;
+
+  it("Trainer tab State B renders all incomplete assignments (not collapsed to one)", () => {
+    render(
+      <PersonTrainerTab
+        trainerMemberships={[]}
+        assignments={[trainerAssignmentF2, trainerAssignmentE3]}
+        activeSeason={SEASON_ACTIVE}
+      />,
+    );
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("FC Allschwil Junioren F2");
+    expect(content).toContain("FC Allschwil Junioren E3");
+  });
+
+  it("overview State B renders all incomplete trainer assignments", () => {
+    renderOverview({
+      person: { isTrainer: true },
+      trainers: [],
+      assignments: [trainerAssignmentF2, trainerAssignmentE3],
+    });
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("FC Allschwil Junioren F2");
+    expect(content).toContain("FC Allschwil Junioren E3");
   });
 });

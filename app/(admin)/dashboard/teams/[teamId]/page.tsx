@@ -317,6 +317,70 @@ export default async function TeamDetailPage({ params }: Props) {
             </div>
           </div>
         )}
+
+        {/* PERSON-UX-07: Stable anchor target for precision CTA from Person workspace.
+         * Player roster section — /dashboard/teams/:teamId#spielerkader */}
+        <section
+          id="spielerkader"
+          className="scroll-mt-20 rounded-xl border border-[var(--border)] bg-[var(--surface)] target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
+          aria-label="Spielerkader"
+        >
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-4">
+            <Users className="h-4 w-4 text-[var(--sce-primary)]" />
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+              Spielerkader
+            </p>
+            {activeSeason ? (
+              <span className="ml-auto inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sce-primary)]">
+                {activeSeason.season.name}
+              </span>
+            ) : null}
+          </div>
+          <div className="px-5 py-4">
+            {activeSeason ? (
+              <p className="text-sm text-[var(--muted)]">
+                Spielerkader-Verwaltung für die Saison {activeSeason.season.name}.
+                Kader-Zuordnungen werden hier hinterlegt und verwaltet.
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                Noch keine aktive Saison vorhanden. Für die Kader-Verwaltung wird eine Team-Saison benötigt.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* PERSON-UX-07: Stable anchor target for precision CTA from Person workspace.
+         * Trainer team section — /dashboard/teams/:teamId#trainerteam */}
+        <section
+          id="trainerteam"
+          className="scroll-mt-20 rounded-xl border border-[var(--border)] bg-[var(--surface)] target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
+          aria-label="Trainerteam"
+        >
+          <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-4">
+            <Users className="h-4 w-4 text-[var(--sce-primary)]" />
+            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+              Trainerteam
+            </p>
+            {activeSeason ? (
+              <span className="ml-auto inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sce-primary)]">
+                {activeSeason.season.name}
+              </span>
+            ) : null}
+          </div>
+          <div className="px-5 py-4">
+            {activeSeason ? (
+              <p className="text-sm text-[var(--muted)]">
+                Trainerteam-Verwaltung für die Saison {activeSeason.season.name}.
+                Trainer-Zuordnungen werden hier hinterlegt und verwaltet.
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">
+                Noch keine aktive Saison vorhanden. Für die Trainerteam-Verwaltung wird eine Team-Saison benötigt.
+              </p>
+            )}
+          </div>
+        </section>
       </DetailPagePattern>
     </PageShell>
   );

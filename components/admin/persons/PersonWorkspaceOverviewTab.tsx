@@ -8,13 +8,15 @@
  *
  *   A. NO RELATIONSHIP
  *      No team/org relationship exists.
- *      "Noch keinem Team als Spieler/in zugeordnet"
+ *      "Noch kein Team" — compact neutral card with action nudge.
  *
  *   B. RELATIONSHIP EXISTS BUT INCOMPLETE
  *      A PersonAssignment for a team exists with a player/trainer functionKey,
  *      but the canonical current-season PlayerSquadMember/TrainerTeamMember
  *      record is absent.
- *      "Zuordnung unvollständig" + team name + role + what is missing.
+ *      Shows team name + role as primary, "Zuordnung unvollständig" as
+ *      secondary status badge, with precision CTA deep-linking to the
+ *      relevant Team page section (spielerkader / trainerteam).
  *
  *   C. COMPLETE CURRENT-SEASON RELATIONSHIP
  *      Canonical squad/trainer membership exists.
@@ -37,7 +39,6 @@ import {
   ShieldCheck,
   KeyRound,
   Star,
-  AlertCircle,
   ExternalLink,
 } from "lucide-react";
 import type {
@@ -146,37 +147,32 @@ function CapacityAssignmentCard({
 
 /**
  * State A nudge: capacity profile exists but no team relationship at all.
- * "Noch keinem Team zugeordnet."
+ * Compact neutral card — not alarming, just informational.
  */
 function UnassignedCapacityNudge({
-  capacityLabel,
   explanation,
   onTabLink,
   onTabLinkLabel,
 }: {
-  capacityLabel: string;
   explanation: string;
   onTabLink?: () => void;
   onTabLinkLabel?: string;
 }) {
   return (
     <div
-      className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
       data-testid="unassigned-capacity-nudge"
     >
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-        <AlertCircle className="h-4 w-4" />
-      </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-amber-800">{capacityLabel}</p>
-        <p className="mt-0.5 text-xs text-amber-700">{explanation}</p>
+        <p className="text-sm font-medium text-[var(--foreground)]">Noch kein Team</p>
+        <p className="mt-0.5 text-xs text-[var(--muted)]">{explanation}</p>
         {onTabLink && onTabLinkLabel ? (
           <button
             type="button"
             onClick={onTabLink}
-            className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+            className="mt-2 inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold text-[var(--sce-primary)] hover:bg-[var(--sce-accent)] transition"
           >
-            {onTabLinkLabel}
+            {onTabLinkLabel} →
           </button>
         ) : null}
       </div>
@@ -187,47 +183,63 @@ function UnassignedCapacityNudge({
 /**
  * State B card: a PersonAssignment exists for a team but the canonical
  * current-season squad/trainer membership is missing.
- * "Zuordnung unvollständig" — names the team, role, and what is missing.
+ *
+ * Operational UX: team name + role are PRIMARY. "Zuordnung unvollständig"
+ * is a secondary amber status badge. The CTA deep-links directly to the
+ * relevant section on the Team page (spielerkader / trainerteam).
  */
 function IncompleteAssignmentCard({
   teamName,
   roleLabel,
   teamId,
-  missingDescription,
+  seasonName,
+  incompleteDescription,
+  ctaLabel,
+  anchor,
+  icon,
 }: {
   teamName: string;
   roleLabel: string;
   teamId: string | null | undefined;
-  missingDescription: string;
+  seasonName?: string | null;
+  incompleteDescription: string;
+  ctaLabel: string;
+  anchor: "spielerkader" | "trainerteam";
+  icon: React.ReactNode;
 }) {
   return (
     <div
-      className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
       data-testid="incomplete-assignment-card"
     >
-      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-        <AlertCircle className="h-4 w-4" />
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--sce-accent)] text-[var(--sce-primary)]">
+        {icon}
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-semibold text-amber-800">{teamName}</span>
-          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-[var(--foreground)]">{teamName}</span>
+          <span className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--sce-primary)]">
             {roleLabel}
           </span>
+          <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+            Zuordnung unvollständig
+          </span>
         </div>
-        <p className="mt-1 text-xs text-amber-700">
-          Die Funktion ist bereits dem Team zugeordnet, aber die Zuordnung für die aktuelle Saison ist noch nicht vollständig.
-        </p>
-        <p className="mt-0.5 text-xs font-medium text-amber-700">{missingDescription}</p>
+        {seasonName ? (
+          <div className="mt-1 flex items-center gap-1 text-xs text-[var(--muted)]">
+            <Calendar className="h-3 w-3" />
+            {seasonName}
+          </div>
+        ) : null}
+        <p className="mt-1 text-xs text-[var(--text-2)]">{incompleteDescription}</p>
         {teamId ? (
           <a
-            href={`/dashboard/teams/${teamId}`}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+            href={`/dashboard/teams/${teamId}#${anchor}`}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[var(--sce-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
             data-testid="incomplete-assignment-team-link"
           >
             <ExternalLink className="h-3 w-3" />
-            Zum Team
+            {ctaLabel}
           </a>
         ) : null}
       </div>
@@ -378,6 +390,8 @@ export default function PersonWorkspaceOverviewTab({
   const hasWeitereRows = weitereAssignments.length > 0;
   const hasSomething = hasCapacityRows || hasWeitereRows;
 
+  const seasonName = activeSeason?.name ?? null;
+
   return (
     <div className="space-y-8">
       {/* ── Identity & Status ─────────────────────────────────────── */}
@@ -415,13 +429,13 @@ export default function PersonWorkspaceOverviewTab({
       </div>
 
       {/* ── Aktuelle Funktionen ────────────────────────────────────
-       * PERSON-UX-07 UX-ACCEPTANCE: This section answers:
-       *   "Where is this Person currently a player / trainer?"
+       * PERSON-UX-07 UX-ACCEPTANCE: Operational first — shows WHERE this
+       * person is a player/trainer, with incomplete status as secondary.
        *
        * Three states per capacity:
-       *   A. No relationship → "Noch keinem Team zugeordnet" nudge
-       *   B. Relationship exists but incomplete → "Zuordnung unvollständig"
-       *      card naming the team, role, and missing element
+       *   A. No relationship → compact neutral nudge ("Noch kein Team")
+       *   B. Relationship exists but incomplete → team+role as primary,
+       *      "Zuordnung unvollständig" badge, precision CTA to team section
        *   C. Complete current-season membership → assignment card
        *
        * PersonAssignment functions NOT already surfaced in State B are shown
@@ -466,14 +480,14 @@ export default function PersonWorkspaceOverviewTab({
                     {incompletePlayerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
+                        icon={<Users2 className="h-4 w-4" />}
                         teamName={a.team!.name}
                         roleLabel={getPersonFunctionLabel(a.functionKey)}
                         teamId={a.team!.id}
-                        missingDescription={
-                          a.season == null
-                            ? "Saison-Verknüpfung fehlt."
-                            : "Kader-Zuordnung für die aktuelle Saison fehlt."
-                        }
+                        seasonName={a.season?.name ?? seasonName}
+                        incompleteDescription={`Das Spielerprofil ist vorhanden, aber für die Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
+                        ctaLabel="Jetzt Kaderzuordnung ergänzen"
+                        anchor="spielerkader"
                       />
                     ))}
                   </div>
@@ -483,22 +497,21 @@ export default function PersonWorkspaceOverviewTab({
                     {incompletePlayerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
+                        icon={<Users2 className="h-4 w-4" />}
                         teamName={a.team!.name}
                         roleLabel={getPersonFunctionLabel(a.functionKey)}
                         teamId={a.team!.id}
-                        missingDescription={
-                          a.season == null
-                            ? "Saison-Verknüpfung fehlt."
-                            : "Kader-Zuordnung für die aktuelle Saison fehlt."
-                        }
+                        seasonName={a.season?.name ?? seasonName}
+                        incompleteDescription={`Das Spielerprofil ist vorhanden, aber für die Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
+                        ctaLabel="Jetzt Kaderzuordnung ergänzen"
+                        anchor="spielerkader"
                       />
                     ))}
                   </div>
                 ) : (
                   /* State A: no relationship at all */
                   <UnassignedCapacityNudge
-                    capacityLabel="Spielerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
-                    explanation="Das Spielerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Kader-Zuordnungen werden über das Team-Management verwaltet."
+                    explanation={`Das Spielerprofil ist vorhanden, aber für die Saison ${seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
                     onTabLink={onNavigateToTab ? () => onNavigateToTab("spieler") : undefined}
                     onTabLinkLabel="Zum Spieler-Tab"
                   />
@@ -510,7 +523,7 @@ export default function PersonWorkspaceOverviewTab({
             {isTrainerProfile ? (
               <div>
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                  Trainer/in
+                  Trainer & Staff
                 </p>
                 {/* State C: complete trainer memberships */}
                 {activeTrainerMemberships.length > 0 ? (
@@ -532,14 +545,14 @@ export default function PersonWorkspaceOverviewTab({
                     {incompleteTrainerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
+                        icon={<UserCheck className="h-4 w-4" />}
                         teamName={a.team!.name}
                         roleLabel={getPersonFunctionLabel(a.functionKey)}
                         teamId={a.team!.id}
-                        missingDescription={
-                          a.season == null
-                            ? "Saison-Verknüpfung fehlt."
-                            : "Trainer-Zuordnung für die aktuelle Saison fehlt."
-                        }
+                        seasonName={a.season?.name ?? seasonName}
+                        incompleteDescription={`${person.firstName} ist bereits dem Team ${a.team!.name} zugeordnet, aber noch nicht im Trainerteam der Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} hinterlegt.`}
+                        ctaLabel="Trainer-Zuordnung vervollständigen"
+                        anchor="trainerteam"
                       />
                     ))}
                   </div>
@@ -549,22 +562,21 @@ export default function PersonWorkspaceOverviewTab({
                     {incompleteTrainerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
+                        icon={<UserCheck className="h-4 w-4" />}
                         teamName={a.team!.name}
                         roleLabel={getPersonFunctionLabel(a.functionKey)}
                         teamId={a.team!.id}
-                        missingDescription={
-                          a.season == null
-                            ? "Saison-Verknüpfung fehlt."
-                            : "Trainer-Zuordnung für die aktuelle Saison fehlt."
-                        }
+                        seasonName={a.season?.name ?? seasonName}
+                        incompleteDescription={`${person.firstName} ist bereits dem Team ${a.team!.name} zugeordnet, aber noch nicht im Trainerteam der Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} hinterlegt.`}
+                        ctaLabel="Trainer-Zuordnung vervollständigen"
+                        anchor="trainerteam"
                       />
                     ))}
                   </div>
                 ) : (
                   /* State A: no relationship at all */
                   <UnassignedCapacityNudge
-                    capacityLabel="Trainerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
-                    explanation="Das Trainerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Trainer-Zuordnungen werden über das Team-Management verwaltet."
+                    explanation={`Das Trainerprofil ist vorhanden, aber für die Saison ${seasonName ?? "die aktuelle Saison"} besteht noch keine Trainer-Zuordnung.`}
                     onTabLink={onNavigateToTab ? () => onNavigateToTab("trainer") : undefined}
                     onTabLinkLabel="Zum Trainer-Tab"
                   />

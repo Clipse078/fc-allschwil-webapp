@@ -7,11 +7,12 @@
  * Rendered iff person.isPlayer === true (PERSON-UX-07 flag-based visibility).
  *
  * Shows:
- * - Current active squad memberships (Aktuell section) — three states:
+ * - Aktuelle Spieler-Zuordnungen — three states:
  *     A. No relationship: no PersonAssignment with player function, no squad membership
- *        → "Noch keinem Team als Spieler/in zugeordnet"
+ *        → "Noch keinem Team als Spieler/in zugeordnet" — neutral card with action
  *     B. Incomplete: player-function PersonAssignment exists but no squad membership
- *        → "Zuordnung unvollständig" + team + what is missing
+ *        → Team + role as primary, "Zuordnung unvollständig" badge, precision CTA
+ *        → deep-links to /dashboard/teams/:teamId#spielerkader
  *     C. Complete: active squad membership exists → normal card(s)
  * - Full historical player career by season (accordion, newest first)
  * - Player development / assessments (when viewer holds permission)
@@ -27,7 +28,7 @@
  * Removing isPlayer capacity does NOT affect assessment permissions.
  */
 
-import { Users2, Trophy, Star, ChevronDown, ChevronRight, AlertCircle, ExternalLink } from "lucide-react";
+import { Users2, Trophy, Star, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import type { PersonSquadMembership, PersonAssessmentRecord, TenantCriterion, PersonAssignment } from "@/lib/people/queries";
 import { getPersonFunctionLabel, PERSON_FUNCTION_GROUPS } from "@/lib/people/functions";
@@ -45,6 +46,11 @@ type PersonSpielerTabProps = {
    * (player assignment exists but no squad membership for current season).
    */
   assignments?: PersonAssignment[];
+  /**
+   * PERSON-UX-07 UX-ACCEPTANCE: active season for user-facing wording.
+   * When provided, used in incomplete state description ("für die Saison X").
+   */
+  activeSeason?: { id: string; name: string; key: string } | null;
   /** PERSON-UX-07: person id for assessment actions */
   personId?: string;
   /** PERSON-UX-05/07: viewer holds people.development.view */
@@ -198,6 +204,7 @@ function SectionHeader({ label }: { label: string }) {
 export default function PersonSpielerTab({
   squadMemberships,
   assignments = [],
+  activeSeason,
   personId,
   canViewDevelopment = false,
   canViewAssessments = false,
@@ -224,11 +231,13 @@ export default function PersonSpielerTab({
 
   const snapshots = buildPlayerSeasonSnapshots(squadMemberships);
 
+  const seasonLabel = activeSeason?.name ?? "die aktuelle Saison";
+
   return (
     <div className="space-y-8">
-      {/* ── Aktuell ──────────────────────────────────────────────── */}
+      {/* ── Aktuelle Spieler-Zuordnungen ─────────────────────────── */}
       <div>
-        <SectionHeader label="Aktuell" />
+        <SectionHeader label="Aktuelle Spieler-Zuordnungen" />
         {activeSquads.length > 0 ? (
           /* State C: complete squad memberships */
           <div className="space-y-2">
@@ -241,33 +250,33 @@ export default function PersonSpielerTab({
             {incompletePlayerAssignments.map((a) => (
               <div
                 key={a.id}
-                className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+                className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
                 data-testid="spieler-incomplete-assignment"
               >
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                  <AlertCircle className="h-4 w-4" />
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--sce-accent)] text-[var(--sce-primary)]">
+                  <Users2 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-amber-800">{a.team!.name}</span>
-                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">{a.team!.name}</span>
+                    <span className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--sce-primary)]">
                       {getPersonFunctionLabel(a.functionKey)}
                     </span>
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                      Zuordnung unvollständig
+                    </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-amber-700">
-                    {a.season == null
-                      ? "Saison-Verknüpfung fehlt. Die Kader-Zuordnung für die aktuelle Saison ist noch nicht vollständig."
-                      : "Kader-Zuordnung für die aktuelle Saison fehlt."}
+                  <p className="mt-1 text-xs text-[var(--text-2)]">
+                    Das Spielerprofil ist vorhanden, aber für die Saison {a.season?.name ?? seasonLabel} besteht noch keine Kaderzuordnung.
                   </p>
                   {a.team?.id ? (
                     <a
-                      href={`/dashboard/teams/${a.team.id}`}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                      href={`/dashboard/teams/${a.team.id}#spielerkader`}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[var(--sce-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
                       data-testid="spieler-incomplete-team-link"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Kader vervollständigen
+                      Jetzt Kaderzuordnung ergänzen
                     </a>
                   ) : null}
                 </div>
@@ -280,33 +289,33 @@ export default function PersonSpielerTab({
             {incompletePlayerAssignments.map((a) => (
               <div
                 key={a.id}
-                className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+                className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3"
                 data-testid="spieler-incomplete-assignment"
               >
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                  <AlertCircle className="h-4 w-4" />
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--sce-accent)] text-[var(--sce-primary)]">
+                  <Users2 className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-amber-800">Zuordnung unvollständig</p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-amber-800">{a.team!.name}</span>
-                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-semibold text-[var(--foreground)]">{a.team!.name}</span>
+                    <span className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--sce-primary)]">
                       {getPersonFunctionLabel(a.functionKey)}
                     </span>
+                    <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-amber-700">
+                      Zuordnung unvollständig
+                    </span>
                   </div>
-                  <p className="mt-0.5 text-xs text-amber-700">
-                    {a.season == null
-                      ? "Saison-Verknüpfung fehlt. Die Kader-Zuordnung für die aktuelle Saison ist noch nicht vollständig."
-                      : "Kader-Zuordnung für die aktuelle Saison fehlt."}
+                  <p className="mt-1 text-xs text-[var(--text-2)]">
+                    Das Spielerprofil ist vorhanden, aber für die Saison {a.season?.name ?? seasonLabel} besteht noch keine Kaderzuordnung.
                   </p>
                   {a.team?.id ? (
                     <a
-                      href={`/dashboard/teams/${a.team.id}`}
-                      className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                      href={`/dashboard/teams/${a.team.id}#spielerkader`}
+                      className="mt-2 inline-flex items-center gap-1.5 rounded-md bg-[var(--sce-primary)] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90 transition"
                       data-testid="spieler-incomplete-team-link"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      Kader vervollständigen
+                      Jetzt Kaderzuordnung ergänzen
                     </a>
                   ) : null}
                 </div>
@@ -316,27 +325,24 @@ export default function PersonSpielerTab({
         ) : (
           /* State A: no relationship at all — profile exists but no team assignment */
           <div
-            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+            className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-4"
             data-testid="spieler-unassigned-nudge"
           >
-            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-              <AlertCircle className="h-4 w-4" />
-            </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-amber-800">
+              <p className="text-sm font-semibold text-[var(--foreground)]">
                 Noch keinem Team als Spieler/in zugeordnet
               </p>
-              <p className="mt-0.5 text-xs text-amber-700">
-                Das Spielerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung.
-                Kader-Zuordnungen werden über das Team-Management verwaltet.
+              <p className="mt-0.5 text-xs text-[var(--muted)]">
+                Das Spielerprofil ist vorhanden, aber für die Saison {seasonLabel} besteht noch keine Kaderzuordnung.
+                Kader-Zuordnungen werden im Team-Management hinterlegt.
               </p>
               {onNavigateToTab ? (
                 <button
                   type="button"
                   onClick={() => onNavigateToTab("organisation")}
-                  className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                  className="mt-2 inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold text-[var(--sce-primary)] hover:bg-[var(--sce-accent)] transition"
                 >
-                  Zur Organisation
+                  Zur Organisation →
                 </button>
               ) : null}
             </div>

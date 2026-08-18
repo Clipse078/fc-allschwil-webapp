@@ -251,26 +251,13 @@ export default function PersonSportTab({
           Saison-Biografie
         </h3>
 
-        {hasSeasonData ? (
-          <div className="space-y-3">
-            {snapshots.map((s) => (
-              <SeasonAccordion key={s.seasonId} snapshot={s} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            icon={<Trophy className="h-8 w-8" />}
-            heading="Noch keine Saison-Einträge"
-            description="Sobald diese Person einem Team oder Kader zugeordnet wird, erscheinen hier die Saison-Einträge."
-          />
-        )}
-
-        {/* PERSON-UX-07 UX-ACCEPTANCE: User-facing actionable warning for unseasoned assignments.
-         * Previous: generic technical notice. Now: identifies the affected assignment(s),
-         * explains the operational impact, and deep-links to the canonical management surface. */}
+        {/* PERSON-UX-07 UX-ACCEPTANCE: Incomplete assignment warning shown BEFORE the empty
+         * biography state so admins see the actionable issue before a large empty area.
+         * Identifies affected assignment(s), explains the operational impact, and deep-links
+         * to the canonical management surface. */}
         {unseasoned.length > 0 ? (
           <div
-            className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+            className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
             data-testid="unseasoned-assignment-warning"
           >
             <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
@@ -306,6 +293,20 @@ export default function PersonSportTab({
             </div>
           </div>
         ) : null}
+
+        {hasSeasonData ? (
+          <div className="space-y-3">
+            {snapshots.map((s) => (
+              <SeasonAccordion key={s.seasonId} snapshot={s} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Trophy className="h-8 w-8" />}
+            heading="Noch keine Saison-Einträge"
+            description="Sobald diese Person einem Team oder Kader zugeordnet wird, erscheinen hier die Saison-Einträge."
+          />
+        )}
       </div>
 
       {/* ── Spieler-Entwicklung / Bewertungen ── PERSON-UX-05 ────────────── */}
