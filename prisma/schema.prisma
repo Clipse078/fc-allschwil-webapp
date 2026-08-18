@@ -1087,6 +1087,25 @@ model Person {
   isActive    Boolean   @default(true)
   isPlayer    Boolean   @default(false)
   isTrainer   Boolean   @default(false)
+
+  /// PERSON-UX-07: standard capacities — "What is this Person?"
+  /// These are profile classifications set by club administrators.
+  /// They determine which workspace domains exist for this Person.
+  /// They are INDEPENDENT of authorization (no automatic permissions)
+  /// and INDEPENDENT of assignment (no automatic team/org placement).
+  /// Multiple capacities may be true simultaneously.
+  isFunctionary   Boolean  @default(false) // Funktionär/in
+  isVolunteer     Boolean  @default(false) // Freiwillige/r
+  isReferee       Boolean  @default(false) // Schiedsrichter/in
+  isSponsorContact Boolean @default(false) // Sponsor-/Partner-Kontakt
+
+  /// PERSON-UX-07: club-specific custom functions ("Weitere Funktion").
+  /// Tenant-defined labels (e.g. "Materialverantwortlicher", "Fotograf/in").
+  /// Stored as a list; each entry is a free-text label (max 100 chars each).
+  /// NOT automatically converted to authorization roles or assignments.
+  /// Empty array = no custom functions active.
+  customFunctions String[] @default([])
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -1165,6 +1184,10 @@ model Person {
   @@index([isActive])
   @@index([isPlayer])
   @@index([isTrainer])
+  @@index([isFunctionary])
+  @@index([isVolunteer])
+  @@index([isReferee])
+  @@index([isSponsorContact])
   @@index([createdRegistrationId])
   @@index([tenantId])
   @@index([tenantId, isActive])

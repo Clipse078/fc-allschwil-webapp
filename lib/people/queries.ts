@@ -167,6 +167,12 @@ export async function getPersonById(id: string) {
       isActive: true,
       isPlayer: true,
       isTrainer: true,
+      // PERSON-UX-07: standard capacity flags
+      isFunctionary: true,
+      isVolunteer: true,
+      isReferee: true,
+      isSponsorContact: true,
+      customFunctions: true,
       tenantId: true,
       createdAt: true,
       updatedAt: true,

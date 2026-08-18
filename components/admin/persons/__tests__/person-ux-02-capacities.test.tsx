@@ -61,6 +61,11 @@ type PersonFixture = {
   isActive: boolean;
   isPlayer: boolean;
   isTrainer: boolean;
+  isFunctionary: boolean;
+  isVolunteer: boolean;
+  isReferee: boolean;
+  isSponsorContact: boolean;
+  customFunctions: string[];
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -90,6 +95,11 @@ const BASE_PERSON: PersonFixture = {
   isActive: true,
   isPlayer: false,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [],
   tenantId: "tenant-1",
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2024-01-01"),
@@ -252,7 +262,20 @@ function renderTabs(
     person?: Partial<PersonFixture>;
   } = {},
 ) {
-  const person = makePerson(overrides.person ?? {});
+  // PERSON-UX-07: tab visibility is flag-based. Auto-set flags from test
+  // intent so existing UX-02 tests continue testing the right behaviors.
+  const hasSquads = (overrides.squads?.length ?? 0) > 0;
+  const hasTrainers = (overrides.trainers?.length ?? 0) > 0;
+  const person = makePerson({
+    // Set flags to match squad/trainer presence unless explicitly overridden
+    isPlayer: overrides.person?.isPlayer !== undefined
+      ? overrides.person.isPlayer
+      : hasSquads,
+    isTrainer: overrides.person?.isTrainer !== undefined
+      ? overrides.person.isTrainer
+      : hasTrainers,
+    ...overrides.person,
+  });
   render(
     <PersonDetailTabs
       person={{
@@ -844,14 +867,14 @@ describe("18. permission-ready tab architecture", () => {
     expect(caps2.hasPlayerEvidence).toBe(true);
   });
 
-  it("Spieler tab hidden flag is determined by capacity, not by isPlayer flag", () => {
-    // isPlayer=true but no squad memberships → Spieler tab hidden
+  it("PERSON-UX-07: Spieler tab visible when isPlayer=true even without squad memberships", () => {
+    // UX-07: tab is flag-based. isPlayer=true → tab shown, even without evidence.
     const { container } = render(
       <PersonDetailTabs
         person={{
           ...makePerson({ isPlayer: true }),
           assignments: [],
-          squadMemberships: [], // no actual evidence
+          squadMemberships: [], // no evidence, but flag is set
           trainerMemberships: [],
         }}
         canManage={false}
@@ -862,21 +885,20 @@ describe("18. permission-ready tab architecture", () => {
         accessRolesCard={null}
       />,
     );
-    // Tab must not appear
     const tabs = container.querySelectorAll("[role='tab']");
-    const spielerTab = Array.from(tabs).find((t) => t.textContent?.trim() === "Spieler");
-    expect(spielerTab).toBeUndefined();
+    const spielerTab = Array.from(tabs).find((t) => /Spieler/.test(t.textContent ?? ""));
+    expect(spielerTab).toBeTruthy();
   });
 
-  it("Trainer tab hidden flag is determined by capacity, not by isTrainer flag", () => {
-    // isTrainer=true but no trainer memberships → Trainer tab hidden
+  it("PERSON-UX-07: Trainer tab visible when isTrainer=true even without trainer memberships", () => {
+    // UX-07: tab is flag-based. isTrainer=true → tab shown, even without evidence.
     const { container } = render(
       <PersonDetailTabs
         person={{
           ...makePerson({ isTrainer: true }),
           assignments: [],
           squadMemberships: [],
-          trainerMemberships: [], // no actual evidence
+          trainerMemberships: [], // no evidence, but flag is set
         }}
         canManage={false}
         canDelete={false}
@@ -887,7 +909,7 @@ describe("18. permission-ready tab architecture", () => {
       />,
     );
     const tabs = container.querySelectorAll("[role='tab']");
-    const trainerTab = Array.from(tabs).find((t) => t.textContent?.trim() === "Trainer");
-    expect(trainerTab).toBeUndefined();
+    const trainerTab = Array.from(tabs).find((t) => /Trainer/.test(t.textContent ?? ""));
+    expect(trainerTab).toBeTruthy();
   });
 });

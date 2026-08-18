@@ -28,6 +28,11 @@ export default async function EditPersonPage({ params }: PageProps) {
         isActive: person.isActive,
         isPlayer: person.isPlayer,
         isTrainer: person.isTrainer,
+        isFunctionary: person.isFunctionary,
+        isVolunteer: person.isVolunteer,
+        isReferee: person.isReferee,
+        isSponsorContact: person.isSponsorContact,
+        customFunctions: person.customFunctions,
       }}
     />
   );

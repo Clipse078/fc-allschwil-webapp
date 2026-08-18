@@ -2,10 +2,15 @@
 
 /**
  * PERSON-UX-01 — Person 360° Übersicht tab.
+ * PERSON-UX-07 — Multi-capacity header: shows all active capacities compactly.
  *
  * Shows the current canonical state of this Person across all simultaneously
- * held roles and relationships. A Person may have multiple roles at once;
+ * held roles and relationships. A Person may have multiple capacities at once;
  * this tab never reduces a Person to a single "primary role".
+ *
+ * Header capacity row shows: Spieler/in, Trainer/in, Funktionär/in,
+ * Schiedsrichter/in, Freiwillige/r, Sponsor-/Partner-Kontakt — compactly.
+ * Custom functions (Weitere Funktion) shown in a separate "Profile & Funktionen" row.
  *
  * Security principle: this tab shows only data visible under people.view.
  * Medical, financial, and private document domains require separate
@@ -111,6 +116,53 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
   );
 }
 
+/**
+ * PERSON-UX-07: Compact capacity badge row for the Identity & Status section.
+ * Shows all active standard capacities as inline badges.
+ * Custom functions (Weitere Funktion) rendered in a separate line below.
+ * When no capacities are active, renders nothing (zero DOM cost).
+ */
+function CapacitiesRow({ person }: { person: PersonOverviewTabProps["person"] }) {
+  const standardCapacities: string[] = [];
+  if (person.isPlayer) standardCapacities.push("Spieler/in");
+  if (person.isTrainer) standardCapacities.push("Trainer/in");
+  if ("isFunctionary" in person && person.isFunctionary) standardCapacities.push("Funktionär/in");
+  if ("isReferee" in person && person.isReferee) standardCapacities.push("Schiedsrichter/in");
+  if ("isVolunteer" in person && person.isVolunteer) standardCapacities.push("Freiwillige/r");
+  if ("isSponsorContact" in person && person.isSponsorContact) standardCapacities.push("Sponsor-/Partner-Kontakt");
+
+  const customFunctions: string[] =
+    "customFunctions" in person && Array.isArray(person.customFunctions)
+      ? (person.customFunctions as string[])
+      : [];
+
+  if (standardCapacities.length === 0 && customFunctions.length === 0) return null;
+
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 text-sm">
+      <span className="shrink-0 text-[var(--muted)]">Profile</span>
+      <div className="flex flex-wrap justify-end gap-1.5">
+        {standardCapacities.map((c) => (
+          <span
+            key={c}
+            className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sce-primary)]"
+          >
+            {c}
+          </span>
+        ))}
+        {customFunctions.map((fn) => (
+          <span
+            key={fn}
+            className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-[10px] font-medium text-[var(--text-2)]"
+          >
+            {fn}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function PersonWorkspaceOverviewTab({
   person,
   activeSeason,
@@ -176,6 +228,8 @@ export default function PersonWorkspaceOverviewTab({
               value={`${formatDate(person.dateOfBirth)} (${calculateAge(person.dateOfBirth)} Jahre)`}
             />
           ) : null}
+          {/* PERSON-UX-07: Multi-capacity row — shows all active profile capacities compactly */}
+          <CapacitiesRow person={person} />
           {activeTeamNames.length > 0 ? (
             <InfoRow
               label="Aktuelle Teams"

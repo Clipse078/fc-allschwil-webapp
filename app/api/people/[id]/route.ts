@@ -69,6 +69,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
       isActive: true,
       isPlayer: true,
       isTrainer: true,
+      isFunctionary: true,
+      isVolunteer: true,
+      isReferee: true,
+      isSponsorContact: true,
+      customFunctions: true,
       tenantId: true,
       createdAt: true,
       updatedAt: true,
@@ -127,6 +132,20 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const isActive = body.isActive !== false;
     const isPlayer = body.isPlayer === true;
     const isTrainer = body.isTrainer === true;
+    // PERSON-UX-07: new capacity flags
+    const isFunctionary = body.isFunctionary === true;
+    const isVolunteer = body.isVolunteer === true;
+    const isReferee = body.isReferee === true;
+    const isSponsorContact = body.isSponsorContact === true;
+
+    // PERSON-UX-07: custom functions — validate array of strings
+    const rawCustomFunctions = body.customFunctions;
+    const customFunctions: string[] = Array.isArray(rawCustomFunctions)
+      ? rawCustomFunctions
+          .map((f) => String(f).trim())
+          .filter((f) => f.length > 0 && f.length <= 100)
+          .slice(0, 20)
+      : [];
 
     const person = await prisma.person.update({
       where: { id },
@@ -141,6 +160,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         isActive,
         isPlayer,
         isTrainer,
+        isFunctionary,
+        isVolunteer,
+        isReferee,
+        isSponsorContact,
+        customFunctions,
       },
       select: {
         id: true,
@@ -153,6 +177,11 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         isActive: true,
         isPlayer: true,
         isTrainer: true,
+        isFunctionary: true,
+        isVolunteer: true,
+        isReferee: true,
+        isSponsorContact: true,
+        customFunctions: true,
       },
     });
 

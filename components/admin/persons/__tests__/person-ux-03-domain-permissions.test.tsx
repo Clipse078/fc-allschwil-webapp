@@ -60,6 +60,11 @@ type PersonFixture = {
   isActive: boolean;
   isPlayer: boolean;
   isTrainer: boolean;
+  isFunctionary: boolean;
+  isVolunteer: boolean;
+  isReferee: boolean;
+  isSponsorContact: boolean;
+  customFunctions: string[];
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -89,6 +94,11 @@ const BASE_PERSON: PersonFixture = {
   isActive: true,
   isPlayer: true,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [],
   tenantId: "tenant-1",
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2024-01-01"),

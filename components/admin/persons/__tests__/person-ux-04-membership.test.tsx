@@ -50,6 +50,11 @@ const BASE_PERSON = {
   isActive: true,
   isPlayer: false,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [] as string[],
   tenantId: "tenant-1",
   createdAt: new Date("2020-01-01"),
   updatedAt: new Date("2024-01-01"),
@@ -164,9 +169,16 @@ function renderTabs(
     domainPermissions = NO_DOMAIN_PERMS,
     person = BASE_PERSON,
   } = overrides;
+  // PERSON-UX-07: tab visibility uses isPlayer/isTrainer flags. Auto-set from
+  // squad/trainer evidence in tests that previously assumed evidence-based visibility.
+  const effectivePerson = {
+    ...person,
+    isPlayer: person.isPlayer || squadMemberships.length > 0,
+    isTrainer: person.isTrainer || trainerMemberships.length > 0,
+  };
   return render(
     <PersonDetailTabs
-      person={{ ...person, assignments: [], squadMemberships, trainerMemberships }}
+      person={{ ...effectivePerson, assignments: [], squadMemberships, trainerMemberships }}
       canManage={canManage}
       canDelete={false}
       orgUnits={[]}
