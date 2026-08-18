@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Mail, Search, UserPlus, Users, UserX } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Mail, Search, UserPlus, Users, UserX, X } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { EmptyState } from "@/components/ui/page/EmptyState";
@@ -35,6 +35,7 @@ export default function TenantUsersSearchableList({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const uniqueRoles = useMemo(() => {
     const seen = new Map<string, string>();
@@ -192,7 +193,24 @@ export default function TenantUsersSearchableList({
             ))}
           </select>
         ) : null}
+
+        {/* Invite new person */}
+        {canInvite ? (
+          <button
+            type="button"
+            onClick={() => setShowInviteDialog(true)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--blue,#2563EB)] px-3 text-sm font-medium text-white hover:opacity-90 transition"
+          >
+            <UserPlus className="h-4 w-4" />
+            Neue Person einladen
+          </button>
+        ) : null}
       </div>
+
+      {/* New person invite dialog */}
+      {showInviteDialog ? (
+        <NewPersonInviteDialog onClose={() => setShowInviteDialog(false)} />
+      ) : null}
 
       {/* Result count */}
       {isFiltered ? (
@@ -381,6 +399,184 @@ export default function TenantUsersSearchableList({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── New person invite dialog ──────────────────────────────────────────────────
+
+/**
+ * Dialog for creating a new Person + sending an invitation in one step.
+ * Calls POST /api/admin/users/invite with { firstName, lastName, email }.
+ */
+function NewPersonInviteDialog({ onClose }: { onClose: () => void }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setPending(true);
+    try {
+      const res = await fetch("/api/admin/users/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          email: email.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Fehler beim Senden der Einladung.");
+        return;
+      }
+      setSuccess(true);
+    } catch {
+      setError("Netzwerkfehler. Bitte versuche es erneut.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Neue Person einladen"
+      onClick={(e) => {
+        if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={dialogRef}
+        className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-white p-6 shadow-xl"
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            Neue Person einladen
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] transition"
+            aria-label="Schließen"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {success ? (
+          <div className="space-y-4 text-center">
+            <p className="text-sm text-emerald-600">
+              Einladung wurde erfolgreich gesendet.
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] transition"
+            >
+              Schließen
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <p className="text-sm text-[var(--muted)]">
+              Eine neue Person wird angelegt und erhält eine Einladungs-E-Mail.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label
+                  htmlFor="inv-firstName"
+                  className="mb-1 block text-xs font-medium text-[var(--foreground)]"
+                >
+                  Vorname <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="inv-firstName"
+                  type="text"
+                  required
+                  autoComplete="given-name"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="fca-input w-full"
+                  placeholder="Anna"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="inv-lastName"
+                  className="mb-1 block text-xs font-medium text-[var(--foreground)]"
+                >
+                  Nachname <span aria-hidden="true">*</span>
+                </label>
+                <input
+                  id="inv-lastName"
+                  type="text"
+                  required
+                  autoComplete="family-name"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="fca-input w-full"
+                  placeholder="Müller"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label
+                htmlFor="inv-email"
+                className="mb-1 block text-xs font-medium text-[var(--foreground)]"
+              >
+                E-Mail-Adresse <span aria-hidden="true">*</span>
+              </label>
+              <input
+                id="inv-email"
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="fca-input w-full"
+                placeholder="anna@example.com"
+              />
+            </div>
+
+            {error ? (
+              <p className="text-xs text-red-600">{error}</p>
+            ) : null}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={pending}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
+              >
+                Abbrechen
+              </button>
+              <button
+                type="submit"
+                disabled={pending || !firstName.trim() || !lastName.trim() || !email.trim()}
+                className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--blue,#2563EB)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {pending ? "Wird gesendet…" : "Einladen"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

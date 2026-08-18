@@ -88,6 +88,15 @@ export async function POST(req: NextRequest) {
  * Pre-validates a token before the user sees the reset form — allows
  * the page to show an "invalid/expired" message immediately instead of
  * after the user fills in their new password.
+ *
+ * For invitation tokens, also returns contextual metadata so the client
+ * can render invitation-specific UI (club name, existing-user guidance, etc.).
+ *
+ * Response schema:
+ *   { valid: false }                    — invalid/expired/used token
+ *   { valid: true, isInvitation: false } — standard password reset
+ *   { valid: true, isInvitation: true, isExistingUser: boolean,
+ *     tenantName: string | null, recipientFirstName: string | null }
  */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get("token")?.trim() ?? "";
@@ -98,7 +107,51 @@ export async function GET(req: NextRequest) {
 
   try {
     const validated = await validatePasswordResetToken(prisma, token);
-    return NextResponse.json({ valid: validated !== null }, { status: 200 });
+    if (!validated) {
+      return NextResponse.json({ valid: false }, { status: 200 });
+    }
+
+    if (!validated.isInvitation) {
+      return NextResponse.json({ valid: true, isInvitation: false }, { status: 200 });
+    }
+
+    // For invitation tokens, fetch tenant name (best-effort: use the single
+    // TenantMembership for newly created users, or null for multi-tenant users).
+    let tenantName: string | null = null;
+    let recipientFirstName: string | null = null;
+
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: validated.userId },
+        select: {
+          firstName: true,
+          tenantMemberships: {
+            orderBy: { joinedAt: "desc" },
+            take: 1,
+            select: {
+              tenant: { select: { name: true } },
+            },
+          },
+        },
+      });
+      if (user) {
+        recipientFirstName = user.firstName;
+        tenantName = user.tenantMemberships[0]?.tenant.name ?? null;
+      }
+    } catch {
+      // Non-fatal — invitation page will fall back to generic text.
+    }
+
+    return NextResponse.json(
+      {
+        valid: true,
+        isInvitation: true,
+        isExistingUser: validated.isExistingUser,
+        tenantName,
+        recipientFirstName,
+      },
+      { status: 200 },
+    );
   } catch (err) {
     console.error(
       "[reset-password:validate]",

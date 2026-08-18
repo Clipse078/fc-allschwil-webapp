@@ -433,19 +433,57 @@ export async function createPersonAndInvite(
   const { firstName, lastName, email } = personData;
   const normalizedEmail = email.toLowerCase().trim();
 
-  // 1. Check email uniqueness globally.
-  const existing = await prisma.user.findUnique({
+  // 1. Check whether a global User already exists for this email.
+  //    Multi-tenant invariant: an existing global User must be reused, not
+  //    duplicated. Same-tenant cross-person conflicts are still rejected.
+  const existingUser = await prisma.user.findUnique({
     where: { email: normalizedEmail },
-    select: { id: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      person: { select: { id: true, tenantId: true } },
+    },
   });
-  if (existing) {
-    throw new InvitationDomainError(
-      "EMAIL_TAKEN_BY_OTHER_USER",
-      `A user with email ${normalizedEmail} already exists.`,
+
+  if (existingUser) {
+    // Hard conflict: existing User is already linked to a different Person in
+    // THIS tenant. Two Persons in the same tenant cannot share a User.
+    if (existingUser.person && existingUser.person.tenantId === tenantId) {
+      throw new InvitationDomainError(
+        "USER_ALREADY_LINKED_OTHER_PERSON",
+        `User ${normalizedEmail} is already linked to another Person in this tenant.`,
+      );
+    }
+
+    // Multi-tenant / unlinked case: create a new Person for this tenant and
+    // link it to the existing global User. Preserves all other memberships.
+    const person = await prisma.person.create({
+      data: { tenantId, firstName, lastName, email: normalizedEmail, userId: existingUser.id },
+      select: { id: true },
+    });
+
+    const result = await _ensureMembershipAndResendInvitation(
+      tenantId,
+      existingUser.id,
+      person.id,
+      actorUserId,
     );
+
+    await logAction({
+      actorUserId,
+      moduleKey: "users",
+      entityType: "User",
+      entityId: existingUser.id,
+      action: "INVITATION_SENT",
+      afterJson: { tenantId, personId: person.id, email: normalizedEmail, existingUser: true },
+      metadataJson: { tenantId },
+    });
+
+    return { userId: existingUser.id, personId: person.id, rawToken: result.rawToken };
   }
 
-  // 2. Create Person.
+  // 2. No existing User — create Person and a new User.
   const person = await prisma.person.create({
     data: { tenantId, firstName, lastName, email: normalizedEmail },
     select: { id: true },
