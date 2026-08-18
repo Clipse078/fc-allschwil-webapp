@@ -30,6 +30,7 @@ vi.mock("@/lib/db/prisma", () => ({
     tenantMembership: {
       findUnique: vi.fn(),
       create: vi.fn(),
+      updateMany: vi.fn(),
     },
     passwordResetToken: {
       deleteMany: vi.fn(),
@@ -57,6 +58,7 @@ import {
   createPersonAndInvite,
   resendTenantInvitation,
   revokeTenantInvitation,
+  activatePendingInvitationMemberships,
   InvitationDomainError,
 } from "../mutations";
 
@@ -67,6 +69,7 @@ const mockUserFindUnique = vi.mocked(prisma.user.findUnique);
 const mockUserCreate = vi.mocked(prisma.user.create);
 const mockMembershipFindUnique = vi.mocked(prisma.tenantMembership.findUnique);
 const mockMembershipCreate = vi.mocked(prisma.tenantMembership.create);
+const mockMembershipUpdateMany = vi.mocked(prisma.tenantMembership.updateMany);
 const mockTokenDeleteMany = vi.mocked(prisma.passwordResetToken.deleteMany);
 const mockTokenCreate = vi.mocked(prisma.passwordResetToken.create);
 const mockTokenFindFirst = vi.mocked(prisma.passwordResetToken.findFirst);
@@ -102,6 +105,7 @@ beforeEach(() => {
   mockUserCreate.mockResolvedValue({ id: USER_ID } as Awaited<ReturnType<typeof prisma.user.create>>);
   mockMembershipFindUnique.mockResolvedValue(null);
   mockMembershipCreate.mockResolvedValue({} as Awaited<ReturnType<typeof prisma.tenantMembership.create>>);
+  mockMembershipUpdateMany.mockResolvedValue({ count: 1 });
   mockTokenDeleteMany.mockResolvedValue({ count: 1 });
   mockTokenCreate.mockResolvedValue({ id: "token-001" } as Awaited<ReturnType<typeof prisma.passwordResetToken.create>>);
   mockTokenFindFirst.mockResolvedValue(null);
@@ -116,7 +120,7 @@ afterEach(() => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("invitePersonToTenant — happy path", () => {
-  it("INVITE-1. creates user, links person, creates membership, creates invitation token", async () => {
+  it("INVITE-1. creates user, links person, creates membership (isActive=false), creates invitation token", async () => {
     const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
 
     expect(result.userId).toBe(USER_ID);
@@ -127,9 +131,10 @@ describe("invitePersonToTenant — happy path", () => {
     expect(mockPersonUpdate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: PERSON_ID }, data: { userId: USER_ID } }),
     );
+    // SAFETY: membership must be inactive until invitation is accepted.
     expect(mockMembershipCreate).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ tenantId: TENANT_ID, userId: USER_ID }),
+        data: expect.objectContaining({ tenantId: TENANT_ID, userId: USER_ID, isActive: false }),
       }),
     );
     expect(mockTokenCreate).toHaveBeenCalledWith(
@@ -211,7 +216,7 @@ describe("invitePersonToTenant — identity conflicts", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: { id: OTHER_PERSON_ID, tenantId: TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
 
     await expect(
       invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID),
@@ -225,7 +230,7 @@ describe("invitePersonToTenant — identity conflicts", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     // Membership does not exist for this tenant yet
     mockMembershipFindUnique.mockResolvedValue(null);
 
@@ -247,7 +252,7 @@ describe("invitePersonToTenant — identity conflicts", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: null,
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     mockMembershipFindUnique.mockResolvedValue(null);
 
     const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
@@ -264,7 +269,7 @@ describe("invitePersonToTenant — identity conflicts", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: { id: OTHER_PERSON_ID, tenantId: TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
 
     await expect(invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID)).rejects.toThrow();
 
@@ -277,7 +282,7 @@ describe("invitePersonToTenant — identity conflicts", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("createPersonAndInvite", () => {
-  it("CREATE-1. creates person, user, links them, creates membership and invitation token", async () => {
+  it("CREATE-1. creates person, user, links them, creates membership (isActive=false) and invitation token", async () => {
     const result = await createPersonAndInvite(
       TENANT_ID,
       { firstName: "Anna", lastName: "Müller", email: "anna@example.invalid" },
@@ -290,7 +295,12 @@ describe("createPersonAndInvite", () => {
 
     expect(mockPersonCreate).toHaveBeenCalledOnce();
     expect(mockUserCreate).toHaveBeenCalledOnce();
-    expect(mockMembershipCreate).toHaveBeenCalledOnce();
+    // SAFETY: membership must be inactive until invitation is accepted.
+    expect(mockMembershipCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tenantId: TENANT_ID, isActive: false }),
+      }),
+    );
     expect(mockTokenCreate).toHaveBeenCalledOnce();
   });
 
@@ -302,7 +312,7 @@ describe("createPersonAndInvite", () => {
       firstName: "Anna",
       lastName: "Müller",
       person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     mockMembershipFindUnique.mockResolvedValue(null);
 
     const result = await createPersonAndInvite(
@@ -334,7 +344,7 @@ describe("createPersonAndInvite", () => {
       firstName: "Anna",
       lastName: "Müller",
       person: null,
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     mockMembershipFindUnique.mockResolvedValue(null);
 
     const result = await createPersonAndInvite(
@@ -355,7 +365,7 @@ describe("createPersonAndInvite", () => {
       firstName: "Anna",
       lastName: "Müller",
       person: { id: OTHER_PERSON_ID, tenantId: TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
 
     await expect(
       createPersonAndInvite(
@@ -462,7 +472,7 @@ describe("revokeTenantInvitation", () => {
 
     await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
-    const deleteWhere = mockTokenDeleteMany.mock.calls[0][0].where;
+    const deleteWhere = mockTokenDeleteMany.mock.calls[0]?.[0]?.where;
     expect(deleteWhere).toMatchObject({ isInvitation: true });
   });
 });
@@ -477,7 +487,7 @@ describe("invitePersonToTenant — ALREADY_HAS_ACTIVE_MEMBERSHIP", () => {
     mockPersonFindUnique.mockResolvedValue(
       makePerson({ userId: USER_ID }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
     );
-    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     // Active membership
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     // No pending invitation token
@@ -492,7 +502,7 @@ describe("invitePersonToTenant — ALREADY_HAS_ACTIVE_MEMBERSHIP", () => {
     mockPersonFindUnique.mockResolvedValue(
       makePerson({ userId: USER_ID }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
     );
-    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    mockUserFindUnique.mockResolvedValue({ id: USER_ID, isActive: true } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     // Active membership
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     // Has a pending invitation token
@@ -546,7 +556,7 @@ describe("Multi-tenant invariants", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     mockMembershipFindUnique.mockResolvedValue(null);
 
     const result = await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
@@ -559,7 +569,7 @@ describe("Multi-tenant invariants", () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
-    } as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
     mockMembershipFindUnique.mockResolvedValue(null);
 
     await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
@@ -592,7 +602,7 @@ describe("Token idempotency and safety", () => {
 
     await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
-    const where = mockTokenDeleteMany.mock.calls[0][0].where;
+    const where = mockTokenDeleteMany.mock.calls[0]?.[0]?.where;
     expect(where).toMatchObject({ isInvitation: true, usedAt: null });
     // Must NOT delete non-invitation tokens (no `isInvitation: false` delete).
     expect(mockTokenDeleteMany).not.toHaveBeenCalledWith(
@@ -608,5 +618,107 @@ describe("Token idempotency and safety", () => {
     expect(mockTokenCreate).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ isInvitation: true }) }),
     );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Access activation timing invariants (INVITE-01 safety check)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Access activation timing — PENDING must not grant access", () => {
+  it("ACCESS-1. invitation-created membership is isActive=false (new User)", async () => {
+    await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+
+    const createCall = mockMembershipCreate.mock.calls.find((c) =>
+      c[0]?.data?.tenantId === TENANT_ID,
+    );
+    expect(createCall).toBeDefined();
+    // Must be inactive — the session resolver excludes isActive=false memberships.
+    expect(createCall![0].data.isActive).toBe(false);
+  });
+
+  it("ACCESS-2. invitation-created membership is isActive=false (existing global User, new tenant)", async () => {
+    mockUserFindUnique.mockResolvedValue({
+      id: OTHER_USER_ID,
+      person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    mockMembershipFindUnique.mockResolvedValue(null);
+
+    await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+
+    const createCall = mockMembershipCreate.mock.calls.find((c) =>
+      c[0]?.data?.tenantId === TENANT_ID,
+    );
+    expect(createCall).toBeDefined();
+    // Critical: existing User must not gain access before acceptance.
+    expect(createCall![0].data.isActive).toBe(false);
+  });
+
+  it("ACCESS-3. revoke after pending invitation leaves membership isActive=false (no access granted)", async () => {
+    // Membership exists but is inactive (pending invitation state).
+    mockMembershipFindUnique.mockResolvedValue({ isActive: false } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    mockTokenDeleteMany.mockResolvedValue({ count: 1 });
+
+    await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
+
+    // Token deleted — invitation invalidated.
+    expect(mockTokenDeleteMany).toHaveBeenCalled();
+    // Membership stays isActive=false (user never had access, still doesn't).
+    // updateMany must NOT be called to activate membership on revoke.
+    expect(mockMembershipUpdateMany).not.toHaveBeenCalledWith(
+      expect.objectContaining({ data: { isActive: true } }),
+    );
+  });
+
+  it("ACCESS-4. activatePendingInvitationMemberships uses recency window to avoid activating old admin-deactivated memberships", async () => {
+    await activatePendingInvitationMemberships(USER_ID);
+
+    expect(mockMembershipUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: USER_ID,
+          isActive: false,
+          joinedAt: expect.objectContaining({ gte: expect.any(Date) }),
+        }),
+        data: { isActive: true },
+      }),
+    );
+  });
+
+  it("ACCESS-5. createPersonAndInvite creates membership isActive=false for new User", async () => {
+    await createPersonAndInvite(
+      TENANT_ID,
+      { firstName: "Anna", lastName: "Müller", email: "anna@example.invalid" },
+      ACTOR_ID,
+    );
+
+    const createCall = mockMembershipCreate.mock.calls.find((c) =>
+      c[0]?.data?.tenantId === TENANT_ID,
+    );
+    expect(createCall).toBeDefined();
+    expect(createCall![0].data.isActive).toBe(false);
+  });
+
+  it("ACCESS-6. createPersonAndInvite with existing global User creates membership isActive=false", async () => {
+    mockUserFindUnique.mockResolvedValue({
+      id: OTHER_USER_ID,
+      firstName: "Anna",
+      lastName: "Müller",
+      person: { id: OTHER_PERSON_ID, tenantId: OTHER_TENANT_ID },
+    } as unknown as Awaited<ReturnType<typeof prisma.user.findUnique>>);
+    mockMembershipFindUnique.mockResolvedValue(null);
+
+    await createPersonAndInvite(
+      TENANT_ID,
+      { firstName: "Anna", lastName: "Müller", email: "anna@example.invalid" },
+      ACTOR_ID,
+    );
+
+    const createCall = mockMembershipCreate.mock.calls.find((c) =>
+      c[0]?.data?.tenantId === TENANT_ID,
+    );
+    expect(createCall).toBeDefined();
+    // Existing User must not gain new-tenant access before acceptance.
+    expect(createCall![0].data.isActive).toBe(false);
   });
 });

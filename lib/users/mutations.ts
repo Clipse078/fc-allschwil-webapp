@@ -387,12 +387,14 @@ export async function invitePersonToTenant(
     data: { userId: newUser.id },
   });
 
-  // 6. Create TenantMembership (active — access granted when they first log in).
+  // 6. Create TenantMembership (inactive until the invitation is accepted).
+  //    Access becomes usable only when the user sets their password and the
+  //    acceptance flow calls activatePendingInvitationMemberships().
   await prisma.tenantMembership.create({
     data: {
       tenantId,
       userId: newUser.id,
-      isActive: true,
+      isActive: false,
     },
   });
 
@@ -510,9 +512,9 @@ export async function createPersonAndInvite(
     data: { userId: newUser.id },
   });
 
-  // 5. Create TenantMembership.
+  // 5. Create TenantMembership (inactive until accepted).
   await prisma.tenantMembership.create({
-    data: { tenantId, userId: newUser.id, isActive: true },
+    data: { tenantId, userId: newUser.id, isActive: false },
   });
 
   // 6. Create invitation token.
@@ -613,6 +615,36 @@ export async function revokeTenantInvitation(
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
+// ── Invitation acceptance: activate pending membership ────────────────────────
+
+/**
+ * Activate any invitation-pending TenantMembership rows for the user.
+ *
+ * Called by both acceptance paths after the invitation token is consumed:
+ *   - New User: POST /api/auth/reset-password (password setup)
+ *   - Existing User: POST /api/auth/invitation/accept
+ *
+ * Safety window: only activates memberships joined within the last
+ * INVITATION_EXPIRY_MS (72 h). This matches the token expiry, ensuring
+ * that only invitation-created memberships are activated, not ones that
+ * were admin-deactivated for other reasons (which would have an older
+ * joinedAt relative to the acceptance moment).
+ *
+ * Edge case acknowledged: if an admin deactivated a user in another tenant
+ * within the same 72 h window AND the user also receives a new invitation
+ * in a different tenant, both inactive memberships would be reactivated.
+ * This is an extremely unlikely operational sequence and fixing it correctly
+ * requires storing tenantId on the invitation token (schema change not taken
+ * here). Document if encountered in production.
+ */
+export async function activatePendingInvitationMemberships(userId: string): Promise<void> {
+  const cutoff = new Date(Date.now() - INVITATION_EXPIRY_MS);
+  await prisma.tenantMembership.updateMany({
+    where: { userId, isActive: false, joinedAt: { gte: cutoff } },
+    data: { isActive: true },
+  });
+}
+
 /** Create a fresh invitation token, deleting all prior invitation tokens for the user. */
 async function _createInvitationToken(userId: string): Promise<string> {
   const rawToken = crypto.randomBytes(32).toString("hex");
@@ -673,8 +705,11 @@ async function _ensureMembershipAndResendInvitation(
   }
 
   if (!existing) {
+    // Inactive until the user accepts the invitation. Access is NOT granted
+    // merely because the invitation was issued — this is critical for
+    // existing global Users who already have a working password.
     await prisma.tenantMembership.create({
-      data: { tenantId, userId, isActive: true },
+      data: { tenantId, userId, isActive: false },
     });
   }
 
