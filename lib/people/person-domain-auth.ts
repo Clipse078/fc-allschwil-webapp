@@ -73,6 +73,10 @@ export type PersonDomainPermissions = {
   canViewDevelopment: boolean;
   /** people.development.manage */
   canManageDevelopment: boolean;
+  /** people.assessments.view — PERSON-UX-05 */
+  canViewAssessments: boolean;
+  /** people.assessments.manage — PERSON-UX-05 */
+  canManageAssessments: boolean;
   /** people.audit.view */
   canViewAudit: boolean;
 };
@@ -94,6 +98,8 @@ export const DOMAIN_PERMISSIONS_DENIED: PersonDomainPermissions = {
   canManagePrivateDocuments: false,
   canViewDevelopment: false,
   canManageDevelopment: false,
+  canViewAssessments: false,
+  canManageAssessments: false,
   canViewAudit: false,
 };
 
@@ -130,6 +136,8 @@ export async function resolvePersonDomainPermissions(
     canManagePrivateDocuments: has(PERMISSIONS.PEOPLE_PRIVATE_DOCUMENTS_MANAGE),
     canViewDevelopment:        has(PERMISSIONS.PEOPLE_DEVELOPMENT_VIEW),
     canManageDevelopment:      has(PERMISSIONS.PEOPLE_DEVELOPMENT_MANAGE),
+    canViewAssessments:        has(PERMISSIONS.PEOPLE_ASSESSMENTS_VIEW),
+    canManageAssessments:      has(PERMISSIONS.PEOPLE_ASSESSMENTS_MANAGE),
     canViewAudit:              has(PERMISSIONS.PEOPLE_AUDIT_VIEW),
   };
 }
@@ -180,6 +188,8 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     canManagePrivateDocuments,
     canViewDevelopment,
     canManageDevelopment,
+    canViewAssessments,
+    canManageAssessments,
     canViewAudit,
   ] = await Promise.all([
     check(PERMISSIONS.PEOPLE_FINANCE_VIEW),
@@ -190,6 +200,8 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     check(PERMISSIONS.PEOPLE_PRIVATE_DOCUMENTS_MANAGE),
     check(PERMISSIONS.PEOPLE_DEVELOPMENT_VIEW),
     check(PERMISSIONS.PEOPLE_DEVELOPMENT_MANAGE),
+    check(PERMISSIONS.PEOPLE_ASSESSMENTS_VIEW),
+    check(PERMISSIONS.PEOPLE_ASSESSMENTS_MANAGE),
     check(PERMISSIONS.PEOPLE_AUDIT_VIEW),
   ]);
 
@@ -202,6 +214,8 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     canManagePrivateDocuments,
     canViewDevelopment,
     canManageDevelopment,
+    canViewAssessments,
+    canManageAssessments,
     canViewAudit,
   };
 }

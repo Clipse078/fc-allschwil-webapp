@@ -66,7 +66,7 @@ import {
   FolderOpen,
   KeyRound,
 } from "lucide-react";
-import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord } from "@/lib/people/queries";
+import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
 import type { PersonAccessRole, PersonAccessLinkedUser } from "./PersonAccessRolesCard";
 import type { PersonDomainPermissions } from "@/lib/people/person-domain-auth";
 import { resolvePersonCapacities } from "@/lib/people/capacity";
@@ -119,6 +119,10 @@ type PersonDetailTabsProps = {
   domainPermissions?: PersonDomainPermissions;
   /** PERSON-UX-04: Club membership records, newest first. */
   memberships?: PersonMembershipRecord[];
+  /** PERSON-UX-05: Development assessments, newest first. Pre-fetched server-side. */
+  assessments?: PersonAssessmentRecord[];
+  /** PERSON-UX-05: Active criteria for assessment forms. */
+  criteria?: TenantCriterion[];
 };
 
 /**
@@ -155,6 +159,8 @@ export default function PersonDetailTabs({
   accessRolesCard,
   domainPermissions,
   memberships = [],
+  assessments = [],
+  criteria = [],
 }: PersonDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
 
@@ -172,6 +178,8 @@ export default function PersonDetailTabs({
   const canViewHealth            = domainPermissions?.canViewHealth ?? false;
   const canViewPrivateDocuments  = domainPermissions?.canViewPrivateDocuments ?? false;
   const canViewDevelopment       = domainPermissions?.canViewDevelopment ?? false;
+  const canViewAssessments       = domainPermissions?.canViewAssessments ?? false;
+  const canManageAssessments     = domainPermissions?.canManageAssessments ?? false;
 
   // ── Counts for badges ──────────────────────────────────────────────────────
   const activeAssignmentCount = person.assignments.filter(
@@ -402,10 +410,15 @@ export default function PersonDetailTabs({
           >
             {safeActiveTab === "sport" ? (
               <PersonSportTab
+                personId={person.id}
                 squadMemberships={person.squadMemberships}
                 trainerMemberships={person.trainerMemberships}
                 assignments={person.assignments}
                 canViewDevelopment={canViewDevelopment}
+                canViewAssessments={canViewAssessments}
+                canManageAssessments={canManageAssessments}
+                assessments={assessments}
+                criteria={criteria}
               />
             ) : null}
           </div>

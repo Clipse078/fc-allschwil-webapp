@@ -24,6 +24,8 @@ import {
   getPersonSquadMemberships,
   getPersonTrainerMemberships,
   getPersonMemberships,
+  getPersonAssessments,
+  getTenantActiveCriteria,
 } from "@/lib/people/queries";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
@@ -83,6 +85,20 @@ export default async function PersonDetailPage({ params }: PageProps) {
       getPersonMemberships(id),
     ]);
 
+  // PERSON-UX-03/05: Resolve sensitive domain permissions.
+  // domainPermissions is resolved below — assessment data is fetched only when authorized.
+  const domainPermissions = tenantId
+    ? await resolvePersonDomainPermissions(prisma, session.user.id, tenantId)
+    : DOMAIN_PERMISSIONS_DENIED;
+
+  // PERSON-UX-05: Fetch assessment data only when viewer is authorized.
+  const [personAssessments, tenantCriteria] = domainPermissions.canViewAssessments && tenantId
+    ? await Promise.all([
+        getPersonAssessments(id, tenantId),
+        getTenantActiveCriteria(tenantId),
+      ])
+    : [[], []];
+
   const fullName = person.displayName || `${person.firstName} ${person.lastName}`;
 
   // Resolve permissions
@@ -95,13 +111,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const canManage = allPerms.includes(PERMISSIONS.PEOPLE_MANAGE);
   const canDelete = allPerms.includes(PERMISSIONS.PEOPLE_DELETE);
 
-  // PERSON-UX-03: Resolve sensitive domain permissions for this viewer.
-  // Uses a single getEffectivePermissions call (via resolvePersonDomainPermissions)
-  // to avoid N extra DB round-trips. Fails closed when tenantId is absent.
-  // Server-side only — domain tabs are absent in the UI when the flag is false.
-  const domainPermissions = tenantId
-    ? await resolvePersonDomainPermissions(prisma, session.user.id, tenantId)
-    : DOMAIN_PERMISSIONS_DENIED;
+  // domainPermissions already resolved above (alongside assessment fetch).
 
   // ── Header badges: capacities from ALL sources ──────────────────────────────
   // PersonAssignment active functions
@@ -292,6 +302,8 @@ export default async function PersonDetailPage({ params }: PageProps) {
           accessRolesCard={accessRolesCard}
           domainPermissions={domainPermissions}
           memberships={personMemberships}
+          assessments={personAssessments}
+          criteria={tenantCriteria}
         />
       </DetailPagePattern>
     </PageShell>

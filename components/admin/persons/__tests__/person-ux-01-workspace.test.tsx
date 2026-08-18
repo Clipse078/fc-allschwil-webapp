@@ -477,6 +477,7 @@ describe("7. Season history — only persisted data, no fabrication", () => {
   it("shows empty state when no squad/trainer memberships exist", () => {
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[]}
         trainerMemberships={[]}
         assignments={[]}
@@ -488,6 +489,7 @@ describe("7. Season history — only persisted data, no fabrication", () => {
   it("renders only seasons that have persisted squad/trainer data", () => {
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[makeSquadMembership()]}
         trainerMemberships={[]}
         assignments={[]}
@@ -512,6 +514,7 @@ describe("7. Season history — only persisted data, no fabrication", () => {
     });
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[makeSquadMembership(), pastSquad]}
         trainerMemberships={[]}
         assignments={[]}
@@ -524,6 +527,7 @@ describe("7. Season history — only persisted data, no fabrication", () => {
   it("shows gap notice for active assignments without seasonId", () => {
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[]}
         trainerMemberships={[]}
         assignments={[makeAssignment()]} // no seasonId
@@ -539,6 +543,7 @@ describe("7. Season history — only persisted data, no fabrication", () => {
     });
     render(
       <PersonSportTab
+        personId="p-test"
         squadMemberships={[]}
         trainerMemberships={[]}
         assignments={[aWithSeason]}
@@ -605,6 +610,8 @@ describe("10. Responsive tab structure", () => {
       canManagePrivateDocuments: true,
       canViewDevelopment: true,
       canManageDevelopment: true,
+      canViewAssessments: true,
+      canManageAssessments: true,
       canViewAudit: true,
     };
     const person = makePerson({ isPlayer: false, isTrainer: false });
@@ -663,6 +670,8 @@ describe("10. Responsive tab structure", () => {
           canManagePrivateDocuments: false,
           canViewDevelopment: false,
           canManageDevelopment: false,
+          canViewAssessments: false,
+          canManageAssessments: false,
           canViewAudit: false,
         }}
       />,
@@ -811,6 +820,8 @@ describe("10. Responsive tab structure", () => {
           canManagePrivateDocuments: false,
           canViewDevelopment: false,
           canManageDevelopment: false,
+          canViewAssessments: false,
+          canManageAssessments: false,
           canViewAudit: false,
         }}
       />,
