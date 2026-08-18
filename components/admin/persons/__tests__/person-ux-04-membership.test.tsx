@@ -470,25 +470,25 @@ describe("19. PERSON-UX-03 sensitive tab authorization remains intact", () => {
 
 describe("validateDates service function", () => {
   it("returns ok:true when endsAt > startsAt", async () => {
-    const { validateDates } = await import("@/lib/people/membership-service");
+    const { validateDates } = await import("@/lib/people/membership-validation");
     const result = validateDates(new Date("2020-01-01"), new Date("2021-01-01"));
     expect(result.ok).toBe(true);
   });
 
   it("returns ok:false when endsAt < startsAt", async () => {
-    const { validateDates } = await import("@/lib/people/membership-service");
+    const { validateDates } = await import("@/lib/people/membership-validation");
     const result = validateDates(new Date("2021-01-01"), new Date("2020-01-01"));
     expect(result.ok).toBe(false);
   });
 
   it("returns ok:true when endsAt is null", async () => {
-    const { validateDates } = await import("@/lib/people/membership-service");
+    const { validateDates } = await import("@/lib/people/membership-validation");
     const result = validateDates(new Date("2020-01-01"), null);
     expect(result.ok).toBe(true);
   });
 
   it("returns ok:false when endsAt < existing startsAt (update scenario)", async () => {
-    const { validateDates } = await import("@/lib/people/membership-service");
+    const { validateDates } = await import("@/lib/people/membership-validation");
     const result = validateDates(undefined, new Date("2019-12-31"), new Date("2020-01-01"));
     expect(result.ok).toBe(false);
   });

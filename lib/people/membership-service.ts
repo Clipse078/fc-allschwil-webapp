@@ -17,6 +17,10 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { PersonMembershipStatus, PersonMembershipType } from "@prisma/client";
+import { validateDates } from "@/lib/people/membership-validation";
+
+export { validateDates };
+export type { MembershipValidationResult } from "@/lib/people/membership-validation";
 
 // ── Validation helpers ────────────────────────────────────────────────────────
 
@@ -92,31 +96,6 @@ export type UpdateMembershipInput = {
   endsAt?: Date | null;
   notes?: string | null;
 };
-
-/** Validation result type. */
-type ValidationResult = { ok: true } | { ok: false; message: string; status: 400 };
-
-/**
- * Validates that endsAt is not earlier than startsAt.
- * Also handles partial updates where only one date is changing.
- */
-export function validateDates(
-  startsAt: Date | undefined,
-  endsAt: Date | null | undefined,
-  existingStartsAt?: Date,
-): ValidationResult {
-  if (endsAt == null) return { ok: true };
-  const effectiveStartsAt = startsAt ?? existingStartsAt;
-  if (!effectiveStartsAt) return { ok: true };
-  if (endsAt < effectiveStartsAt) {
-    return {
-      ok: false,
-      message: "Austrittsdatum darf nicht vor dem Eintrittsdatum liegen.",
-      status: 400,
-    };
-  }
-  return { ok: true };
-}
 
 const MEMBERSHIP_SELECT = {
   id: true,
