@@ -115,6 +115,9 @@ function makeAssessment(overrides: Partial<PersonAssessmentRecord> = {}): Person
         normalizedScore: 75,
         criterionNameSnapshot: "Technik",
         criterionCategorySnapshot: "Technik",
+        ratingModeSnapshot: null,
+        rawValue: null,
+        rawLabelSnapshot: null,
         comment: null,
         createdAt: new Date("2024-10-15"),
       },
@@ -124,7 +127,11 @@ function makeAssessment(overrides: Partial<PersonAssessmentRecord> = {}): Person
 }
 
 const CRITERIA: TenantCriterion[] = [
-  { id: "c-1", name: "Technik", description: null, category: "Technik", sortOrder: 0 },
+  {
+    id: "c-1", name: "Technik", description: null, category: "Technik", sortOrder: 0,
+    ratingMode: "SCORE_0_100", qualitativeLabels: null,
+    showTeamBenchmark: false, showJahrgangBenchmark: false,
+  },
 ];
 
 const FULL_PERMISSIONS: PersonDomainPermissions = {
