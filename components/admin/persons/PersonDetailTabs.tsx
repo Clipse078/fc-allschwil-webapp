@@ -72,8 +72,6 @@ type TabDefinition = {
   label: string;
   icon: React.ReactNode;
   count?: number;
-  /** When true, shows a small indicator that the tab is deferred (not yet implemented) */
-  deferred?: boolean;
 };
 
 export default function PersonDetailTabs({
@@ -109,30 +107,10 @@ export default function PersonDetailTabs({
       icon: <Trophy className="h-3.5 w-3.5" />,
       count: sportCount,
     },
-    {
-      key: "mitgliedschaft",
-      label: "Mitgliedschaft",
-      icon: <CreditCard className="h-3.5 w-3.5" />,
-      deferred: true,
-    },
-    {
-      key: "finanzen",
-      label: "Finanzen",
-      icon: <DollarSign className="h-3.5 w-3.5" />,
-      deferred: true,
-    },
-    {
-      key: "gesundheit",
-      label: "Gesundheit",
-      icon: <HeartPulse className="h-3.5 w-3.5" />,
-      deferred: true,
-    },
-    {
-      key: "dokumente",
-      label: "Dokumente",
-      icon: <FolderOpen className="h-3.5 w-3.5" />,
-      deferred: true,
-    },
+    { key: "mitgliedschaft", label: "Mitgliedschaft", icon: <CreditCard className="h-3.5 w-3.5" /> },
+    { key: "finanzen", label: "Finanzen", icon: <DollarSign className="h-3.5 w-3.5" /> },
+    { key: "gesundheit", label: "Gesundheit", icon: <HeartPulse className="h-3.5 w-3.5" /> },
+    { key: "dokumente", label: "Dokumente", icon: <FolderOpen className="h-3.5 w-3.5" /> },
     { key: "zugang", label: "Zugang", icon: <KeyRound className="h-3.5 w-3.5" /> },
   ];
 
@@ -156,7 +134,7 @@ export default function PersonDetailTabs({
                 aria-controls={`tabpanel-${tab.key}`}
                 id={`tab-${tab.key}`}
                 onClick={() => setActiveTab(tab.key)}
-                className={`flex items-center gap-1.5 border-b-2 px-4 py-3 text-sm font-medium transition ${
+                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition ${
                   isActive
                     ? "border-[var(--sce-primary)] text-[var(--sce-primary)]"
                     : "border-transparent text-[var(--text-2)] hover:border-[var(--border-strong)] hover:text-[var(--foreground)]"
@@ -175,180 +153,81 @@ export default function PersonDetailTabs({
                     {tab.count}
                   </span>
                 ) : null}
-                {tab.deferred ? (
-                  <span className="h-1.5 w-1.5 rounded-full bg-[var(--border-strong)]" title="Geplant" />
-                ) : null}
               </button>
             );
           })}
         </nav>
       </div>
 
-      {/* Tab panels */}
-      <div className="pt-6">
-        {/* Übersicht */}
-        <div
-          role="tabpanel"
-          id="tabpanel-uebersicht"
-          aria-labelledby="tab-uebersicht"
-          hidden={activeTab !== "uebersicht"}
-        >
-          {activeTab === "uebersicht" ? (
-            <PersonWorkspaceOverviewTab
-              person={person}
-              activeSeason={activeSeason}
-            />
-          ) : null}
-        </div>
-
-        {/* Stammdaten */}
-        <div
-          role="tabpanel"
-          id="tabpanel-stammdaten"
-          aria-labelledby="tab-stammdaten"
-          hidden={activeTab !== "stammdaten"}
-        >
-          {activeTab === "stammdaten" ? (
-            <PersonContactTab
-              person={person}
-              canManage={canManage}
-              canDelete={canDelete}
-            />
-          ) : null}
-        </div>
-
-        {/* Organisation */}
-        <div
-          role="tabpanel"
-          id="tabpanel-organisation"
-          aria-labelledby="tab-organisation"
-          hidden={activeTab !== "organisation"}
-        >
-          {activeTab === "organisation" ? (
-            <PersonAssignmentsTab
-              personId={person.id}
-              assignments={person.assignments}
-              canManage={canManage}
-              orgUnits={orgUnits}
-              teams={teams}
-              activeSeason={activeSeason}
-            />
-          ) : null}
-        </div>
-
-        {/* Sport & Entwicklung */}
-        <div
-          role="tabpanel"
-          id="tabpanel-sport"
-          aria-labelledby="tab-sport"
-          hidden={activeTab !== "sport"}
-        >
-          {activeTab === "sport" ? (
-            <PersonSportTab
-              squadMemberships={person.squadMemberships}
-              trainerMemberships={person.trainerMemberships}
-              assignments={person.assignments}
-            />
-          ) : null}
-        </div>
-
-        {/* Mitgliedschaft — deferred */}
-        <div
-          role="tabpanel"
-          id="tabpanel-mitgliedschaft"
-          aria-labelledby="tab-mitgliedschaft"
-          hidden={activeTab !== "mitgliedschaft"}
-        >
-          {activeTab === "mitgliedschaft" ? (
-            <PersonDomainPlaceholder
-              icon={<CreditCard className="h-6 w-6" />}
-              title="Mitgliedschaft"
-              description="Mitgliedschaftslebenszyklus, -typ, Eintrittsdatum, Austrittsdatum und
-                Mitgliedschaftshistorie werden in einem späteren Modul implementiert."
-              plannedFor="PERSON-UX-02 (Mitgliedschaft)"
-            />
-          ) : null}
-        </div>
-
-        {/* Finanzen — deferred */}
-        <div
-          role="tabpanel"
-          id="tabpanel-finanzen"
-          aria-labelledby="tab-finanzen"
-          hidden={activeTab !== "finanzen"}
-        >
-          {activeTab === "finanzen" ? (
-            <PersonDomainPlaceholder
-              icon={<DollarSign className="h-6 w-6" />}
-              title="Finanzen"
-              description="Beitrags- und Rechnungsdaten folgen dem Pfad:
-                Person → Mitgliedschaft → Beitragspflicht → Rechnung → Zahlung.
-                Dieses Modul erfordert ein separates Buchhaltungssystem und wird
-                nicht direkt in die Person integriert."
-              plannedFor="PERSON-UX-0x (Finanzen)"
-            />
-          ) : null}
-        </div>
-
-        {/* Gesundheit — deferred, restricted access */}
-        <div
-          role="tabpanel"
-          id="tabpanel-gesundheit"
-          aria-labelledby="tab-gesundheit"
-          hidden={activeTab !== "gesundheit"}
-        >
-          {activeTab === "gesundheit" ? (
-            <PersonDomainPlaceholder
-              icon={<HeartPulse className="h-6 w-6" />}
-              title="Gesundheit"
-              description="Medizinische Informationen (Erkrankungen, Allergien, Notfallkontakte)
-                werden in einem späteren Modul mit dedizierter Feinabstufung der Zugriffsrechte
-                implementiert."
-              plannedFor="PERSON-UX-0x (Gesundheit)"
-              variant="restricted"
-              accessNote="Kritisch: Medizinische Informationen dürfen NICHT den allgemeinen
-                people.view-Berechtigungen erben. Sie erfordern eine dedizierte, eigenständige
-                Autorisierung. Allgemeiner Personenzugriff gewährt keinen Zugang zu diesem Modul."
-            />
-          ) : null}
-        </div>
-
-        {/* Dokumente — deferred, restricted access */}
-        <div
-          role="tabpanel"
-          id="tabpanel-dokumente"
-          aria-labelledby="tab-dokumente"
-          hidden={activeTab !== "dokumente"}
-        >
-          {activeTab === "dokumente" ? (
-            <PersonDomainPlaceholder
-              icon={<FolderOpen className="h-6 w-6" />}
-              title="Persönliche Dokumente"
-              description="Vereinbarungen, Formulare, Zertifikate und streng private Dokumente
-                dieser Person werden in einem späteren Modul implementiert."
-              plannedFor="PERSON-UX-0x (Dokumente)"
-              variant="restricted"
-              accessNote="Kritisch: Persönliche Dokumente werden NICHT Bestandteil generischer
-                Workspace-Dateien. Sie erfordern eigenständige Zugriffsrechte mit vollständiger
-                Protokollierung (Auditierbarkeit) und werden separat von people.view autorisiert."
-            />
-          ) : null}
-        </div>
-
-        {/* Zugang */}
-        <div
-          role="tabpanel"
-          id="tabpanel-zugang"
-          aria-labelledby="tab-zugang"
-          hidden={activeTab !== "zugang"}
-        >
-          {activeTab === "zugang" ? (
-            <PersonZugangTab
-              personId={person.id}
-              accessRolesCard={accessRolesCard}
-            />
-          ) : null}
-        </div>
+      {/* Tab panel — only the active tab is mounted; inactive tabs have zero DOM presence */}
+      <div
+        className="pt-6"
+        role="tabpanel"
+        id={`tabpanel-${activeTab}`}
+        aria-labelledby={`tab-${activeTab}`}
+      >
+        {activeTab === "uebersicht" && (
+          <PersonWorkspaceOverviewTab person={person} activeSeason={activeSeason} />
+        )}
+        {activeTab === "stammdaten" && (
+          <PersonContactTab person={person} canManage={canManage} canDelete={canDelete} />
+        )}
+        {activeTab === "organisation" && (
+          <PersonAssignmentsTab
+            personId={person.id}
+            assignments={person.assignments}
+            canManage={canManage}
+            orgUnits={orgUnits}
+            teams={teams}
+            activeSeason={activeSeason}
+          />
+        )}
+        {activeTab === "sport" && (
+          <PersonSportTab
+            squadMemberships={person.squadMemberships}
+            trainerMemberships={person.trainerMemberships}
+            assignments={person.assignments}
+          />
+        )}
+        {activeTab === "mitgliedschaft" && (
+          <PersonDomainPlaceholder
+            icon={<CreditCard className="h-6 w-6" />}
+            title="Mitgliedschaft"
+            description="Mitgliedschaftslebenszyklus, -typ, Eintrittsdatum, Austrittsdatum und Mitgliedschaftshistorie werden in einem späteren Modul implementiert."
+            plannedFor="PERSON-UX-02 (Mitgliedschaft)"
+          />
+        )}
+        {activeTab === "finanzen" && (
+          <PersonDomainPlaceholder
+            icon={<DollarSign className="h-6 w-6" />}
+            title="Finanzen"
+            description="Beitrags- und Rechnungsdaten folgen dem Pfad: Person → Mitgliedschaft → Beitragspflicht → Rechnung → Zahlung. Dieses Modul erfordert ein separates Buchhaltungssystem."
+            plannedFor="PERSON-UX-0x (Finanzen)"
+          />
+        )}
+        {activeTab === "gesundheit" && (
+          <PersonDomainPlaceholder
+            icon={<HeartPulse className="h-6 w-6" />}
+            title="Gesundheit"
+            description="Medizinische Informationen (Erkrankungen, Allergien, Notfallkontakte) werden in einem späteren Modul mit dedizierter Feinabstufung der Zugriffsrechte implementiert."
+            plannedFor="PERSON-UX-0x (Gesundheit)"
+            variant="restricted"
+            accessNote="Kritisch: Medizinische Informationen dürfen NICHT den allgemeinen people.view-Berechtigungen erben. Sie erfordern eine dedizierte, eigenständige Autorisierung. Allgemeiner Personenzugriff gewährt keinen Zugang zu diesem Modul."
+          />
+        )}
+        {activeTab === "dokumente" && (
+          <PersonDomainPlaceholder
+            icon={<FolderOpen className="h-6 w-6" />}
+            title="Persönliche Dokumente"
+            description="Vereinbarungen, Formulare, Zertifikate und streng private Dokumente dieser Person werden in einem späteren Modul implementiert."
+            plannedFor="PERSON-UX-0x (Dokumente)"
+            variant="restricted"
+            accessNote="Kritisch: Persönliche Dokumente werden NICHT Bestandteil generischer Workspace-Dateien. Sie erfordern eigenständige Zugriffsrechte mit vollständiger Protokollierung (Auditierbarkeit) und werden separat von people.view autorisiert."
+          />
+        )}
+        {activeTab === "zugang" && (
+          <PersonZugangTab personId={person.id} accessRolesCard={accessRolesCard} />
+        )}
       </div>
     </div>
   );

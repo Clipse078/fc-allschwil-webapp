@@ -129,6 +129,28 @@ export default async function PersonDetailPage({ params }: PageProps) {
   }
   const headerCapacities = capacityLabels.slice(0, 4);
 
+  // ── Active team names for header summary line ────────────────────────────────
+  const activeTeamIds = new Set<string>();
+  const activeTeamNames: string[] = [];
+  for (const sm of activeSquads) {
+    if (!activeTeamIds.has(sm.teamSeason.team.id)) {
+      activeTeamIds.add(sm.teamSeason.team.id);
+      activeTeamNames.push(sm.teamSeason.team.name);
+    }
+  }
+  for (const tm of activeTrainers) {
+    if (!activeTeamIds.has(tm.teamSeason.team.id)) {
+      activeTeamIds.add(tm.teamSeason.team.id);
+      activeTeamNames.push(tm.teamSeason.team.name);
+    }
+  }
+  for (const a of assignments.filter((x) => x.status === "ACTIVE" && x.team)) {
+    if (!activeTeamIds.has(a.team!.id)) {
+      activeTeamIds.add(a.team!.id);
+      activeTeamNames.push(a.team!.name);
+    }
+  }
+
   // ── AccessRolesCard data — moved to Zugang tab ──────────────────────────────
   let accessRolesCard: {
     linkedUser: { id: string; email: string } | null;
@@ -211,11 +233,11 @@ export default async function PersonDetailPage({ params }: PageProps) {
           </div>
         }
         summary={
-          <div className="flex flex-wrap items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-sm">
             <AdminAvatar name={fullName} imageSrc={person.imageUrl} size="md" />
             <div className="min-w-0 flex-1">
-              {/* Capacity badges */}
-              <div className="flex flex-wrap items-center gap-2">
+              {/* Status + capacity badges */}
+              <div className="flex flex-wrap items-center gap-1.5">
                 <StatusIndicator
                   variant={person.isActive ? "success" : "neutral"}
                   label={person.isActive ? "Aktiv" : "Inaktiv"}
@@ -223,35 +245,41 @@ export default async function PersonDetailPage({ params }: PageProps) {
                 {headerCapacities.map((cap) => (
                   <span
                     key={cap}
-                    className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2.5 py-1 text-xs font-semibold text-[var(--sce-primary)]"
+                    className="inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-xs font-semibold text-[var(--sce-primary)]"
                   >
                     {cap}
                   </span>
                 ))}
               </div>
-              {/* Contact info + age */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-4 text-sm text-[var(--muted)]">
+              {/* Current teams — readable at a glance without opening Übersicht */}
+              {activeTeamNames.length > 0 ? (
+                <p className="mt-0.5 text-xs text-[var(--muted)]">
+                  {activeTeamNames.join(" · ")}
+                </p>
+              ) : null}
+              {/* Contact row */}
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-[var(--muted)]">
                 {person.dateOfBirth ? (
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="h-3.5 w-3.5" />
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3 w-3" />
                     {formatDate(person.dateOfBirth)} ({calculateAge(person.dateOfBirth)} J.)
                   </span>
                 ) : null}
                 {person.email ? (
                   <a
                     href={`mailto:${person.email}`}
-                    className="flex items-center gap-1.5 hover:text-[var(--sce-primary)]"
+                    className="flex items-center gap-1 hover:text-[var(--sce-primary)]"
                   >
-                    <Mail className="h-3.5 w-3.5" />
+                    <Mail className="h-3 w-3" />
                     {person.email}
                   </a>
                 ) : null}
                 {person.phone ? (
                   <a
                     href={`tel:${person.phone}`}
-                    className="flex items-center gap-1.5 hover:text-[var(--sce-primary)]"
+                    className="flex items-center gap-1 hover:text-[var(--sce-primary)]"
                   >
-                    <Phone className="h-3.5 w-3.5" />
+                    <Phone className="h-3 w-3" />
                     {person.phone}
                   </a>
                 ) : null}
