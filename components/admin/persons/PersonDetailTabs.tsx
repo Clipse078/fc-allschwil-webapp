@@ -338,6 +338,7 @@ export default function PersonDetailTabs({
             <PersonWorkspaceOverviewTab
               person={person}
               activeSeason={activeSeason}
+              onNavigateToTab={setActiveTab}
             />
           ) : null}
         </div>
@@ -388,12 +389,15 @@ export default function PersonDetailTabs({
             {safeActiveTab === "spieler" ? (
               <PersonSpielerTab
                 squadMemberships={person.squadMemberships}
+                assignments={person.assignments}
+                activeSeason={activeSeason}
                 personId={person.id}
                 canViewDevelopment={canViewDevelopment}
                 canViewAssessments={canViewAssessments}
                 canManageAssessments={canManageAssessments}
                 assessments={assessments}
                 criteria={criteria}
+                onNavigateToTab={setActiveTab}
               />
             ) : null}
           </div>
@@ -408,7 +412,13 @@ export default function PersonDetailTabs({
             hidden={safeActiveTab !== "trainer"}
           >
             {safeActiveTab === "trainer" ? (
-              <PersonTrainerTab trainerMemberships={person.trainerMemberships} />
+              <PersonTrainerTab
+                trainerMemberships={person.trainerMemberships}
+                assignments={person.assignments}
+                activeSeason={activeSeason}
+                personFirstName={person.firstName}
+                onNavigateToTab={setActiveTab}
+              />
             ) : null}
           </div>
         ) : null}
@@ -432,6 +442,7 @@ export default function PersonDetailTabs({
                 canManageAssessments={canManageAssessments}
                 assessments={assessments}
                 criteria={criteria}
+                onNavigateToTab={setActiveTab}
               />
             ) : null}
           </div>
