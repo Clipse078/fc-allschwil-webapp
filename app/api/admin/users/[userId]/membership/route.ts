@@ -4,7 +4,8 @@
  * Toggles the `isActive` flag of the target user's TenantMembership within
  * the caller's active tenant.
  *
- * Authorization: requires users.manage (tenant-scoped).
+ * Authorization: requires users.manage (platform) OR users.manage_memberships (tenant).
+ * Club Admins hold users.manage_memberships; platform Super Admins hold users.manage.
  * Tenant isolation: tenantId resolved exclusively from session.activeTenantId.
  *
  * Request body: { isActive: boolean }
@@ -21,7 +22,7 @@
  * Permanently removes the target user's TenantMembership and all their
  * scoped UserRole rows for the caller's active tenant.
  *
- * Authorization: requires users.manage (tenant-scoped).
+ * Authorization: requires users.manage (platform) OR users.manage_memberships (tenant).
  *
  * Safety invariants delegated to removeTenantMembership():
  *   - Self-removal: actor cannot remove their own membership.
@@ -41,7 +42,7 @@
 
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requireAnyApiPermission } from "@/lib/permissions/require-any-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   setTenantMembershipActive,
@@ -55,7 +56,10 @@ type RouteContext = {
 };
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireAnyApiPermission([
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+  ]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -131,7 +135,10 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireAnyApiPermission([
+    PERMISSIONS.USERS_MANAGE,
+    PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+  ]);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

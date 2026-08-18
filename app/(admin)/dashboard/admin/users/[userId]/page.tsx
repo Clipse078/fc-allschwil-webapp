@@ -68,7 +68,10 @@ export default async function AdminUserDetailPage({ params }: Props) {
   const user = membership.user;
   const displayName = `${user.firstName} ${user.lastName}`;
 
-  const canManage = hasPermission(session, PERMISSIONS.USERS_MANAGE);
+  // Club Admins hold USERS_MANAGE_MEMBERSHIPS (TENANT); platform Super Admins hold USERS_MANAGE.
+  const canManage =
+    hasPermission(session, PERMISSIONS.USERS_MANAGE_MEMBERSHIPS) ||
+    hasPermission(session, PERMISSIONS.USERS_MANAGE);
   const canInvite = hasPermission(session, PERMISSIONS.USERS_INVITE);
   const currentUserId = session.user.effectiveUserId ?? session.user.id;
   const isSelf = currentUserId === userId;
