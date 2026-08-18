@@ -1,33 +1,34 @@
 "use client";
 
 /**
- * PERSON-UX-01 — Sport & Entwicklung tab.
+ * PERSON-UX-02 — Sport & Entwicklung tab.
  *
- * Shows the Person's season-by-season sporting biography, built from
- * trustworthy persisted data: PlayerSquadMember and TrainerTeamMember records
- * (each linked to a TeamSeason → Season chain that survives season rollovers).
+ * Visible iff the Person has any sporting evidence (player or trainer).
  *
- * Season-history capability report:
- * - PlayerSquadMember → TeamSeason → Season: TRUSTWORTHY. Each record is
- *   historically persisted; current season change does not alter past records.
- * - TrainerTeamMember → TeamSeason → Season: TRUSTWORTHY. Same chain.
- * - PersonAssignment.seasonId: PARTIAL. seasonId is optional; many assignments
- *   may have no season. Only assignments WITH a seasonId appear here.
+ * Purpose: cross-role season biography + development progression placeholder.
+ * Role-specific history (team detail, positions, roleLabel) lives in the
+ * dedicated Spieler / Trainer tabs. This tab provides:
  *
- * Gap for PERSON-UX-02: PersonAssignment records without seasonId cannot be
- * placed in a season timeline. Future work: either enforce seasonId on
- * PersonAssignment creation or introduce a separate season-snapshot model.
+ *   1. Saison-Biografie — all concurrent roles under each season in one view.
+ *      Useful when a Person holds multiple roles (player + trainer + function)
+ *      in the same season; the cross-role timeline is the canonical biography.
  *
- * Player development (0–100 north star):
- * - No assessment/rating model currently exists in the schema.
- * - The architectural integration point is established here as a placeholder.
- * - PERSON-UX-02 should introduce: AssessmentSnapshot → criteria → category
- *   scores → normalized 0–100 → season average → multi-season progression.
- * - Do NOT hard-code evaluation categories now; framework must be
- *   age/team-specific.
+ *   2. Entwicklungs-Profil — architectural placeholder.
+ *      North star (PERSON-UX-03+): assessment snapshots → criteria → normalized
+ *      0–100 → season average → multi-season progression.
+ *      Category framework must be age/team-specific; do not hard-code now.
+ *
+ * Season-trustworthiness:
+ *   PlayerSquadMember → TeamSeason → Season: TRUSTWORTHY (historically persisted)
+ *   TrainerTeamMember → TeamSeason → Season: TRUSTWORTHY (historically persisted)
+ *   PersonAssignment.seasonId: PARTIAL — only assignments WITH a seasonId appear
+ *   in the timeline. Gap notice is shown for active unseasoned assignments.
+ *
+ * External-only Persons (no sporting history) never see this tab — handled by
+ * the tab registry in PersonDetailTabs.
  */
 
-import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, TrendingUp } from "lucide-react";
+import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, TrendingUp, Building2 } from "lucide-react";
 import { useState } from "react";
 import type { PersonSquadMembership, PersonTrainerMembership, PersonAssignment } from "@/lib/people/queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
@@ -57,7 +58,6 @@ type SeasonSnapshot = {
   assignmentEntries: PersonAssignment[];
 };
 
-/** Build a season-grouped view from trustworthy persisted data. */
 function buildSeasonSnapshots(
   squads: PersonSquadMembership[],
   trainers: PersonTrainerMembership[],
@@ -65,7 +65,13 @@ function buildSeasonSnapshots(
 ): SeasonSnapshot[] {
   const bySeasonId = new Map<string, SeasonSnapshot>();
 
-  function getOrCreate(season: { id: string; name: string; key: string; isActive: boolean; startDate: Date }): SeasonSnapshot {
+  function getOrCreate(season: {
+    id: string;
+    name: string;
+    key: string;
+    isActive: boolean;
+    startDate: Date;
+  }): SeasonSnapshot {
     if (!bySeasonId.has(season.id)) {
       bySeasonId.set(season.id, {
         seasonId: season.id,
@@ -87,7 +93,6 @@ function buildSeasonSnapshots(
   for (const tr of trainers) {
     getOrCreate(tr.teamSeason.season).trainerEntries.push(tr);
   }
-  // Only include PersonAssignments that have an explicit seasonId
   for (const a of assignments) {
     if (a.season) {
       getOrCreate(a.season as { id: string; name: string; key: string; isActive: boolean; startDate: Date }).assignmentEntries.push(a);
@@ -121,7 +126,7 @@ function SeasonAccordion({ snapshot }: { snapshot: SeasonSnapshot }) {
           </span>
           {snapshot.isActive ? (
             <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-              Aktiv
+              Aktuell
             </span>
           ) : null}
         </div>
@@ -155,7 +160,7 @@ function SeasonAccordion({ snapshot }: { snapshot: SeasonSnapshot }) {
                     </span>
                   ) : null}
                 </div>
-                {(sq.positionLabel ?? sq.shirtNumber != null) ? (
+                {(sq.positionLabel != null || sq.shirtNumber != null) ? (
                   <p className="mt-0.5 text-xs text-[var(--muted)]">
                     {[sq.positionLabel, sq.shirtNumber != null ? `#${sq.shirtNumber}` : null]
                       .filter(Boolean)
@@ -184,7 +189,7 @@ function SeasonAccordion({ snapshot }: { snapshot: SeasonSnapshot }) {
 
           {snapshot.assignmentEntries.map((a) => (
             <div key={a.id} className="flex items-start gap-3 px-4 py-3">
-              <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" />
+              <Building2 className="mt-0.5 h-4 w-4 shrink-0 text-[var(--muted)]" />
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-medium text-[var(--foreground)]">
@@ -212,7 +217,6 @@ export default function PersonSportTab({
   const snapshots = buildSeasonSnapshots(squadMemberships, trainerMemberships, assignments);
   const hasSeasonData = snapshots.length > 0;
 
-  // Assignments without a seasonId — reported as a gap, not shown in timeline
   const unseasoned = assignments.filter((a) => a.status === "ACTIVE" && !a.season);
 
   return (
@@ -233,11 +237,10 @@ export default function PersonSportTab({
           <EmptyState
             icon={<Trophy className="h-8 w-8" />}
             heading="Noch keine Saison-Einträge"
-            description="Sobald diese Person einem Team zugeordnet wird, erscheinen hier die Saison-Einträge."
+            description="Sobald diese Person einem Team oder Kader zugeordnet wird, erscheinen hier die Saison-Einträge."
           />
         )}
 
-        {/* Gap notice for PersonAssignment records without seasonId */}
         {unseasoned.length > 0 ? (
           <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
             <p className="text-xs font-medium text-[var(--muted)]">
@@ -266,9 +269,10 @@ export default function PersonSportTab({
                 Entwicklungs-Bewertungen
               </p>
               <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--muted)]">
-                Dieses Modul ist für PERSON-UX-02 vorgesehen. Vorgesehen ist ein
+                Dieses Modul ist für PERSON-UX-03 vorgesehen. Geplant ist ein
                 Bewertungssystem: Einzelbewertungen → Kategorien → normierter 0–100
                 Gesamtwert → saisonaler Durchschnitt → saisonübergreifende Progression.
+                Das Kategorie-Framework wird alters- und teamspezifisch sein.
               </p>
             </div>
           </div>
