@@ -237,7 +237,7 @@ function renderOverview(opts: {
   squads?: ReturnType<typeof makeSquad>[];
   trainers?: ReturnType<typeof makeTrainer>[];
   assignments?: PersonAssignment[];
-  onNavigate?: (tab: "spieler" | "trainer" | "organisation") => void;
+  onNavigate?: (tab: "spieler" | "trainer" | "organisation" | "dokumente") => void;
 } = {}) {
   const person = makePerson(opts.person ?? {});
   render(

@@ -225,18 +225,19 @@ describe("6–9. Permission gates for view and manage", () => {
     expect(screen.getByRole("tab", { name: /Dokumente/ })).toBeTruthy();
   });
 
-  it("7. Manage permission allows upload button in PersonDocumentTab", () => {
+  it("7. Manage permission allows upload CTA in PersonDocumentTab empty state", () => {
     render(
       <PersonDocumentTab personId="p-1" initialDocuments={[]} canManage={true} />,
     );
-    expect(screen.getByText("Dokument hochladen")).toBeTruthy();
+    // PERSON-UX-08: CTA is "Dokument hinzufügen" in empty state action
+    expect(screen.getByText("Dokument hinzufügen")).toBeTruthy();
   });
 
-  it("8. Read-only viewer (canManage=false) sees no upload button", () => {
+  it("8. Read-only viewer (canManage=false) sees no upload CTA", () => {
     render(
       <PersonDocumentTab personId="p-1" initialDocuments={[]} canManage={false} />,
     );
-    expect(screen.queryByText("Dokument hochladen")).toBeNull();
+    expect(screen.queryByText("Dokument hinzufügen")).toBeNull();
   });
 
   it("9. Unauthorized viewer: Dokumente tab absent from DOM", () => {
@@ -285,11 +286,12 @@ describe("10. Cross-tenant isolation", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("11–12. Upload form and identity-document category", () => {
-  it("11. Upload form appears when canManage=true and button is clicked", () => {
+  it("11. Upload form appears when canManage=true and CTA is clicked", () => {
     render(
       <PersonDocumentTab personId="p-1" initialDocuments={[]} canManage={true} />,
     );
-    fireEvent.click(screen.getByText("Dokument hochladen"));
+    // PERSON-UX-08: empty state CTA is "Dokument hinzufügen"
+    fireEvent.click(screen.getByText("Dokument hinzufügen"));
     expect(screen.getByText("Ablaufdatum")).toBeTruthy();
     expect(screen.getByText("Kategorie")).toBeTruthy();
   });
@@ -298,7 +300,7 @@ describe("11–12. Upload form and identity-document category", () => {
     render(
       <PersonDocumentTab personId="p-1" initialDocuments={[]} canManage={true} />,
     );
-    fireEvent.click(screen.getByText("Dokument hochladen"));
+    fireEvent.click(screen.getByText("Dokument hinzufügen"));
     const content = document.body.textContent ?? "";
     expect(content).toContain("Identität");
   });
@@ -383,7 +385,9 @@ describe("18–19. Empty state and document list", () => {
     render(
       <PersonDocumentTab personId="p-1" initialDocuments={[]} canManage={false} />,
     );
-    expect(screen.getByText("Noch keine Dokumente hinterlegt")).toBeTruthy();
+    // PERSON-UX-08: heading is "Noch keine Dokumente" (compact)
+    expect(screen.getByText("Noch keine Dokumente")).toBeTruthy();
+    expect(screen.getByText("Für diese Person wurden noch keine Dokumente hinterlegt.")).toBeTruthy();
   });
 
   it("19. Multiple documents all rendered", () => {
@@ -443,7 +447,8 @@ describe("22–23. Permission wiring through PersonDetailTabs", () => {
     renderTabs({}, MANAGE_DOCS, []);
     // Navigate to Dokumente tab
     fireEvent.click(screen.getByRole("tab", { name: /Dokumente/ }));
-    expect(screen.getByText("Dokument hochladen")).toBeTruthy();
+    // PERSON-UX-08: empty state CTA for manage users
+    expect(screen.getByText("Dokument hinzufügen")).toBeTruthy();
   });
 });
 
