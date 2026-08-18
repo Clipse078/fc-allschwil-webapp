@@ -592,8 +592,9 @@ describe("8. Person with no sporting role", () => {
 // ── 10. Responsive structure — tab bar wraps ──────────────────────────────────
 
 describe("10. Responsive tab structure", () => {
-  it("renders all 9 tabs in the tab bar", () => {
-    const person = makePerson();
+  it("renders base tabs for a person with no sporting history (external/org-only)", () => {
+    // A person with no sports evidence: Spieler, Trainer, Sport & Entwicklung are hidden.
+    const person = makePerson({ isPlayer: false, isTrainer: false });
     render(
       <PersonDetailTabs
         person={{ ...person, assignments: [], squadMemberships: [], trainerMemberships: [] }}
@@ -606,10 +607,47 @@ describe("10. Responsive tab structure", () => {
       />,
     );
 
-    // All 9 tab labels must be present
+    // Base tabs always present
     expect(screen.getByText("Übersicht")).toBeTruthy();
     expect(screen.getByText("Stammdaten")).toBeTruthy();
     expect(screen.getByText("Organisation")).toBeTruthy();
+    expect(screen.getByText("Mitgliedschaft")).toBeTruthy();
+    expect(screen.getByText("Finanzen")).toBeTruthy();
+    expect(screen.getByText("Gesundheit")).toBeTruthy();
+    expect(screen.getByText("Dokumente")).toBeTruthy();
+    expect(screen.getByText("Zugang")).toBeTruthy();
+
+    // Sports tabs are hidden — zero DOM presence
+    expect(screen.queryByText("Spieler")).toBeNull();
+    expect(screen.queryByText("Trainer")).toBeNull();
+    expect(screen.queryByText("Sport & Entwicklung")).toBeNull();
+  });
+
+  it("renders all sports tabs for a person with both player and trainer history", () => {
+    const person = makePerson();
+    render(
+      <PersonDetailTabs
+        person={{
+          ...person,
+          assignments: [],
+          squadMemberships: [makeSquadMembership()],
+          trainerMemberships: [makeTrainerMembership()],
+        }}
+        canManage={true}
+        canDelete={true}
+        orgUnits={[]}
+        teams={[]}
+        activeSeason={null}
+        accessRolesCard={ACCESS_CARD_NO_USER}
+      />,
+    );
+
+    // All tabs including dynamic ones
+    expect(screen.getByText("Übersicht")).toBeTruthy();
+    expect(screen.getByText("Stammdaten")).toBeTruthy();
+    expect(screen.getByText("Organisation")).toBeTruthy();
+    expect(screen.getByText("Spieler")).toBeTruthy();
+    expect(screen.getByText("Trainer")).toBeTruthy();
     expect(screen.getByText("Sport & Entwicklung")).toBeTruthy();
     expect(screen.getByText("Mitgliedschaft")).toBeTruthy();
     expect(screen.getByText("Finanzen")).toBeTruthy();

@@ -1,18 +1,37 @@
 "use client";
 
 /**
- * PERSON-UX-01 — Person Workspace tab shell.
+ * PERSON-UX-02 — Person Workspace tab shell.
  *
- * Expands the original 3-tab layout into a 9-section workspace:
- *   Übersicht · Stammdaten · Organisation · Sport & Entwicklung ·
- *   Mitgliedschaft · Finanzen · Gesundheit · Dokumente · Zugang
+ * Evolves the PERSON-UX-01 9-tab layout into a permission-ready, capacity-aware
+ * workspace:
  *
- * Tabs backed by current data show live functionality.
- * Tabs for deferred domains show clean architectural placeholders.
- * No fake data is ever shown.
+ *   Übersicht · Stammdaten · Organisation
+ *   · [Spieler]   — visible iff Person has player evidence (current or historical)
+ *   · [Trainer]   — visible iff Person has trainer evidence (current or historical)
+ *   · [Sport & Entwicklung] — visible iff any sporting evidence exists
+ *   · Mitgliedschaft · Finanzen · Gesundheit · Dokumente · Zugang
  *
- * Responsive: tab bar wraps on small screens; each tab content is
- * mobile-ready without relying on desktop-only layout.
+ * Tab visibility contract:
+ *   Each tab definition carries a `hidden` boolean. A hidden tab is removed
+ *   from the DOM entirely — no layout/spacing cost, no empty-state clutter for
+ *   external/non-sporting Persons.
+ *
+ * Permission-ready architecture:
+ *   The tab registry is structured so future permission checks can be added
+ *   without a rewrite. Each tab can carry a `requiredPermission` string key.
+ *   IMPORTANT: Do NOT hardcode role names (e.g. "Club Admin", "Sportleitung").
+ *   Roles are configurable containers for permissions; only permission keys
+ *   (e.g. "people.view.assessments") must appear here in a future slice.
+ *   The current slice does not evaluate permissions for content tabs — that
+ *   is a server-side concern. The `requiredPermission` field is reserved for
+ *   the future tab-gating slice.
+ *
+ * Simultaneous roles are always first-class: a Person may hold Spieler +
+ * Trainer + Funktionär in the same season. No single "primary" role is selected.
+ *
+ * Responsive: tab bar wraps on small screens (flex-wrap, no overflow-x-scroll).
+ * Hidden tabs consume zero DOM space.
  */
 
 import { useState } from "react";
@@ -20,6 +39,8 @@ import {
   LayoutDashboard,
   User,
   Building2,
+  Users2,
+  UserCheck,
   Trophy,
   CreditCard,
   DollarSign,
@@ -29,9 +50,12 @@ import {
 } from "lucide-react";
 import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership } from "@/lib/people/queries";
 import type { PersonAccessRole, PersonAccessLinkedUser } from "./PersonAccessRolesCard";
+import { resolvePersonCapacities } from "@/lib/people/capacity";
 import PersonWorkspaceOverviewTab from "./PersonWorkspaceOverviewTab";
 import PersonAssignmentsTab from "./PersonAssignmentsTab";
 import PersonContactTab from "./PersonContactTab";
+import PersonSpielerTab from "./PersonSpielerTab";
+import PersonTrainerTab from "./PersonTrainerTab";
 import PersonSportTab from "./PersonSportTab";
 import PersonZugangTab from "./PersonZugangTab";
 import PersonDomainPlaceholder from "./PersonDomainPlaceholder";
@@ -40,6 +64,8 @@ type Tab =
   | "uebersicht"
   | "stammdaten"
   | "organisation"
+  | "spieler"
+  | "trainer"
   | "sport"
   | "mitgliedschaft"
   | "finanzen"
@@ -67,13 +93,31 @@ type PersonDetailTabsProps = {
   } | null;
 };
 
+/**
+ * Tab descriptor for the registry.
+ *
+ * hidden:
+ *   When true, the tab is not rendered at all (no DOM node, no empty space).
+ *   Computed from Person capacity (hasPlayerEvidence, etc.) and, in future,
+ *   viewer permissions.
+ *
+ * requiredPermission (reserved for future use):
+ *   A permission key string (e.g. "people.view.assessments") that a viewer
+ *   must hold for this tab to be shown. Do NOT put role names here.
+ *   Currently unused — the field is present so the registry shape is ready
+ *   for the future permission-gating slice without a structural rewrite.
+ */
 type TabDefinition = {
   key: Tab;
   label: string;
   icon: React.ReactNode;
   count?: number;
-  /** When true, shows a small indicator that the tab is deferred (not yet implemented) */
+  /** Deferred domain — placeholder content, not yet implemented. */
   deferred?: boolean;
+  /** Tab is hidden: not rendered in DOM. Zero layout cost. */
+  hidden?: boolean;
+  /** Reserved: future permission key required to show this tab. */
+  requiredPermission?: string;
 };
 
 export default function PersonDetailTabs({
@@ -87,16 +131,31 @@ export default function PersonDetailTabs({
 }: PersonDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
 
-  const activeAssignmentCount = person.assignments.filter((a) => a.status === "ACTIVE").length;
-  const activeSquadCount = person.squadMemberships.filter(
-    (m) => m.status === "ACTIVE" || m.status === "INJURED" || m.status === "ABSENT",
-  ).length;
-  const activeTrainerCount = person.trainerMemberships.filter((m) => m.status === "ACTIVE").length;
-  const sportCount = activeSquadCount + activeTrainerCount;
+  // ── Capacity resolution ────────────────────────────────────────────────────
+  // Derived from persisted relationship chains, not from isPlayer/isTrainer flags.
+  const capacities = resolvePersonCapacities(
+    person.squadMemberships,
+    person.trainerMemberships,
+  );
 
+  // ── Counts for badges ──────────────────────────────────────────────────────
+  const activeAssignmentCount = person.assignments.filter((a) => a.status === "ACTIVE").length;
+
+  // ── Tab registry ───────────────────────────────────────────────────────────
+  // Tab visibility = Person relevance + (future) viewer permission.
+  // Structural design: adding permission checks later requires only setting
+  // `hidden` based on a permission resolver — no structural rewrite.
   const TABS: TabDefinition[] = [
-    { key: "uebersicht", label: "Übersicht", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
-    { key: "stammdaten", label: "Stammdaten", icon: <User className="h-3.5 w-3.5" /> },
+    {
+      key: "uebersicht",
+      label: "Übersicht",
+      icon: <LayoutDashboard className="h-3.5 w-3.5" />,
+    },
+    {
+      key: "stammdaten",
+      label: "Stammdaten",
+      icon: <User className="h-3.5 w-3.5" />,
+    },
     {
       key: "organisation",
       label: "Organisation",
@@ -104,10 +163,26 @@ export default function PersonDetailTabs({
       count: activeAssignmentCount,
     },
     {
+      key: "spieler",
+      label: "Spieler",
+      icon: <Users2 className="h-3.5 w-3.5" />,
+      // Visible for current AND former players. Never shown for persons who were never players.
+      hidden: !capacities.hasPlayerEvidence,
+    },
+    {
+      key: "trainer",
+      label: "Trainer",
+      icon: <UserCheck className="h-3.5 w-3.5" />,
+      // Visible for current AND former trainers. Never shown for never-trainers.
+      hidden: !capacities.hasTrainerEvidence,
+    },
+    {
       key: "sport",
       label: "Sport & Entwicklung",
       icon: <Trophy className="h-3.5 w-3.5" />,
-      count: sportCount,
+      // Cross-role season biography + development placeholder.
+      // Hidden for external/non-sporting Persons: no sports-centric clutter.
+      hidden: !capacities.hasSportingEvidence,
     },
     {
       key: "mitgliedschaft",
@@ -133,19 +208,26 @@ export default function PersonDetailTabs({
       icon: <FolderOpen className="h-3.5 w-3.5" />,
       deferred: true,
     },
-    { key: "zugang", label: "Zugang", icon: <KeyRound className="h-3.5 w-3.5" /> },
+    {
+      key: "zugang",
+      label: "Zugang",
+      icon: <KeyRound className="h-3.5 w-3.5" />,
+    },
   ];
+
+  // Only render visible tabs
+  const visibleTabs = TABS.filter((t) => !t.hidden);
 
   return (
     <div className="space-y-0">
-      {/* Tab navigation — wraps on small screens */}
+      {/* Tab navigation — wraps on small screens; hidden tabs consume no space */}
       <div className="border-b border-[var(--border)]">
         <nav
           className="-mb-px flex flex-wrap gap-0"
           aria-label="Person Workspace Tabs"
           role="tablist"
         >
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
               <button
@@ -184,7 +266,7 @@ export default function PersonDetailTabs({
         </nav>
       </div>
 
-      {/* Tab panels */}
+      {/* Tab panels — only active tab content is mounted */}
       <div className="pt-6">
         {/* Übersicht */}
         <div
@@ -236,21 +318,51 @@ export default function PersonDetailTabs({
           ) : null}
         </div>
 
-        {/* Sport & Entwicklung */}
-        <div
-          role="tabpanel"
-          id="tabpanel-sport"
-          aria-labelledby="tab-sport"
-          hidden={activeTab !== "sport"}
-        >
-          {activeTab === "sport" ? (
-            <PersonSportTab
-              squadMemberships={person.squadMemberships}
-              trainerMemberships={person.trainerMemberships}
-              assignments={person.assignments}
-            />
-          ) : null}
-        </div>
+        {/* Spieler — only rendered when tab is visible */}
+        {!TABS.find((t) => t.key === "spieler")!.hidden ? (
+          <div
+            role="tabpanel"
+            id="tabpanel-spieler"
+            aria-labelledby="tab-spieler"
+            hidden={activeTab !== "spieler"}
+          >
+            {activeTab === "spieler" ? (
+              <PersonSpielerTab squadMemberships={person.squadMemberships} />
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Trainer — only rendered when tab is visible */}
+        {!TABS.find((t) => t.key === "trainer")!.hidden ? (
+          <div
+            role="tabpanel"
+            id="tabpanel-trainer"
+            aria-labelledby="tab-trainer"
+            hidden={activeTab !== "trainer"}
+          >
+            {activeTab === "trainer" ? (
+              <PersonTrainerTab trainerMemberships={person.trainerMemberships} />
+            ) : null}
+          </div>
+        ) : null}
+
+        {/* Sport & Entwicklung — only rendered when tab is visible */}
+        {!TABS.find((t) => t.key === "sport")!.hidden ? (
+          <div
+            role="tabpanel"
+            id="tabpanel-sport"
+            aria-labelledby="tab-sport"
+            hidden={activeTab !== "sport"}
+          >
+            {activeTab === "sport" ? (
+              <PersonSportTab
+                squadMemberships={person.squadMemberships}
+                trainerMemberships={person.trainerMemberships}
+                assignments={person.assignments}
+              />
+            ) : null}
+          </div>
+        ) : null}
 
         {/* Mitgliedschaft — deferred */}
         <div
@@ -265,7 +377,7 @@ export default function PersonDetailTabs({
               title="Mitgliedschaft"
               description="Mitgliedschaftslebenszyklus, -typ, Eintrittsdatum, Austrittsdatum und
                 Mitgliedschaftshistorie werden in einem späteren Modul implementiert."
-              plannedFor="PERSON-UX-02 (Mitgliedschaft)"
+              plannedFor="PERSON-UX-03 (Mitgliedschaft)"
             />
           ) : null}
         </div>
