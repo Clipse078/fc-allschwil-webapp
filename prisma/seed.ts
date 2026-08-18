@@ -123,6 +123,25 @@ async function main() {
     // people.manage — create/edit access must never implicitly grant permanent deletion.
     { key: "people.delete", name: "Permanently delete persons", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
+    // PERSON-UX-03: Granular Person-domain permissions.
+    // Sensitive domains require explicit, independent authorization.
+    // people.view alone does NOT grant access to any of the following.
+    // All are scope=TENANT, grantableByAdmin=true — Club Admins may assign
+    // them to any tenant role via Administration → Roles.
+    // No named role (Sportleitung, Koordinator, etc.) receives these
+    // automatically; every grant is a deliberate RolePermission row.
+    { key: "people.development.view",          name: "View person development data",      module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.development.manage",        name: "Manage person development data",    module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.assessments.view",          name: "View person assessments",           module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.assessments.manage",        name: "Manage person assessments",         module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.health.view",               name: "View person health data",           module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.health.manage",             name: "Manage person health data",         module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.finance.view",              name: "View person finance data",          module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.finance.manage",            name: "Manage person finance data",        module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.private_documents.view",   name: "View person private documents",     module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.private_documents.manage", name: "Manage person private documents",   module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.audit.view",               name: "View person audit history",         module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+
     { key: "events.view", name: "View events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.manage", name: "Manage events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.import", name: "Import events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },

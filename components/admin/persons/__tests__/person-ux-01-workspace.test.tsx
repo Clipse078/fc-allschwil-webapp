@@ -592,8 +592,21 @@ describe("8. Person with no sporting role", () => {
 // ── 10. Responsive structure — tab bar wraps ──────────────────────────────────
 
 describe("10. Responsive tab structure", () => {
-  it("renders base tabs for a person with no sporting history (external/org-only)", () => {
-    // A person with no sports evidence: Spieler, Trainer, Sport & Entwicklung are hidden.
+  it("renders base tabs for a person with no sporting history when viewer holds all domain permissions", () => {
+    // PERSON-UX-02: sports tabs are hidden when Person has no sporting evidence.
+    // PERSON-UX-03: sensitive domain tabs only appear with the corresponding
+    // domain permission. Pass all flags=true to assert the full domain workspace.
+    const allDomainPerms = {
+      canViewFinance: true,
+      canManageFinance: true,
+      canViewHealth: true,
+      canManageHealth: true,
+      canViewPrivateDocuments: true,
+      canManagePrivateDocuments: true,
+      canViewDevelopment: true,
+      canManageDevelopment: true,
+      canViewAudit: true,
+    };
     const person = makePerson({ isPlayer: false, isTrainer: false });
     render(
       <PersonDetailTabs
@@ -604,6 +617,7 @@ describe("10. Responsive tab structure", () => {
         teams={[]}
         activeSeason={null}
         accessRolesCard={ACCESS_CARD_NO_USER}
+        domainPermissions={allDomainPerms}
       />,
     );
 
@@ -617,13 +631,14 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getByText("Dokumente")).toBeTruthy();
     expect(screen.getByText("Zugang")).toBeTruthy();
 
-    // Sports tabs are hidden — zero DOM presence
+    // Sports tabs are hidden — zero DOM presence (no sporting evidence)
     expect(screen.queryByText("Spieler")).toBeNull();
     expect(screen.queryByText("Trainer")).toBeNull();
     expect(screen.queryByText("Sport & Entwicklung")).toBeNull();
   });
 
   it("renders all sports tabs for a person with both player and trainer history", () => {
+    // PERSON-UX-03: domain tabs require explicit viewer permissions.
     const person = makePerson();
     render(
       <PersonDetailTabs
@@ -639,6 +654,17 @@ describe("10. Responsive tab structure", () => {
         teams={[]}
         activeSeason={null}
         accessRolesCard={ACCESS_CARD_NO_USER}
+        domainPermissions={{
+          canViewFinance: true,
+          canManageFinance: false,
+          canViewHealth: true,
+          canManageHealth: false,
+          canViewPrivateDocuments: true,
+          canManagePrivateDocuments: false,
+          canViewDevelopment: false,
+          canManageDevelopment: false,
+          canViewAudit: false,
+        }}
       />,
     );
 
@@ -654,6 +680,45 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getByText("Gesundheit")).toBeTruthy();
     expect(screen.getByText("Dokumente")).toBeTruthy();
     expect(screen.getByText("Zugang")).toBeTruthy();
+  });
+
+  it("renders only non-sensitive tabs when no domain permissions are provided", () => {
+    // PERSON-UX-03: without domain permissions, sensitive tabs (Finanzen,
+    // Gesundheit, Dokumente) must be completely absent — no locked state or hint.
+    // PERSON-UX-02: sports tabs require sporting evidence; person with a squad
+    // membership gets Sport & Entwicklung, but person with no evidence does not.
+    const person = makePerson();
+    render(
+      <PersonDetailTabs
+        person={{
+          ...person,
+          assignments: [],
+          squadMemberships: [makeSquadMembership()],
+          trainerMemberships: [],
+        }}
+        canManage={true}
+        canDelete={true}
+        orgUnits={[]}
+        teams={[]}
+        activeSeason={null}
+        accessRolesCard={ACCESS_CARD_NO_USER}
+        // domainPermissions omitted — defaults to fail-closed
+      />,
+    );
+
+    // Non-sensitive tabs present
+    expect(screen.getByText("Übersicht")).toBeTruthy();
+    expect(screen.getByText("Stammdaten")).toBeTruthy();
+    expect(screen.getByText("Organisation")).toBeTruthy();
+    // Sport & Entwicklung is visible: person has squad membership (non-sensitive)
+    expect(screen.getByText("Sport & Entwicklung")).toBeTruthy();
+    expect(screen.getByText("Mitgliedschaft")).toBeTruthy();
+    expect(screen.getByText("Zugang")).toBeTruthy();
+
+    // Sensitive domain tabs absent — fail-closed
+    expect(screen.queryByText("Finanzen")).toBeNull();
+    expect(screen.queryByText("Gesundheit")).toBeNull();
+    expect(screen.queryByText("Dokumente")).toBeNull();
   });
 
   it("tab nav uses flex-wrap (not overflow-x-scroll) for responsive wrapping", () => {
@@ -723,7 +788,10 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getByText(SEASON_ACTIVE.name)).toBeTruthy();
   });
 
-  it("deferred tabs show placeholder content without fake data", () => {
+  it("deferred tabs show placeholder content without fake data when permissions are present", () => {
+    // PERSON-UX-03: Gesundheit and Dokumente are only rendered when the viewer
+    // holds the corresponding domain permission. Pass the flags to verify the
+    // placeholder content renders correctly (no fake data shown).
     const person = makePerson();
     render(
       <PersonDetailTabs
@@ -734,17 +802,26 @@ describe("10. Responsive tab structure", () => {
         teams={[]}
         activeSeason={null}
         accessRolesCard={null}
+        domainPermissions={{
+          canViewFinance: false,
+          canManageFinance: false,
+          canViewHealth: true,
+          canManageHealth: false,
+          canViewPrivateDocuments: true,
+          canManagePrivateDocuments: false,
+          canViewDevelopment: false,
+          canManageDevelopment: false,
+          canViewAudit: false,
+        }}
       />,
     );
 
     fireEvent.click(screen.getByRole("tab", { name: /Gesundheit/ }));
-    // Must show the restricted access warning (appears only in placeholder content, not tab label)
-    expect(screen.getByText(/Medizinische Informationen dürfen NICHT/)).toBeTruthy();
+    // Must show the health placeholder title (no restricted note in new placeholder)
     expect(screen.getAllByText("Gesundheit").length).toBeGreaterThanOrEqual(2); // tab + placeholder title
 
     fireEvent.click(screen.getByRole("tab", { name: /Dokumente/ }));
-    // "Persönliche Dokumente" appears in both the title and the access note
+    // "Persönliche Dokumente" appears as the placeholder title
     expect(screen.getAllByText(/Persönliche Dokumente/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/Zugriffsrechte mit vollständiger/)).toBeTruthy();
   });
 });

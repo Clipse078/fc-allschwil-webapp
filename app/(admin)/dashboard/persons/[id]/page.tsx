@@ -37,6 +37,7 @@ import PersonDeleteButton from "@/components/admin/persons/PersonDeleteButton";
 import { TENANT_ROLES_ASSIGN, TENANT_ROLES_VIEW } from "@/lib/roles/access";
 import { getTenantRoleAssignmentForUser, getTenantRolesOverview } from "@/lib/roles/tenant-queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
+import { resolvePersonDomainPermissions, DOMAIN_PERMISSIONS_DENIED } from "@/lib/people/person-domain-auth";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -91,6 +92,14 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const allPerms = [...platform, ...tenant];
   const canManage = allPerms.includes(PERMISSIONS.PEOPLE_MANAGE);
   const canDelete = allPerms.includes(PERMISSIONS.PEOPLE_DELETE);
+
+  // PERSON-UX-03: Resolve sensitive domain permissions for this viewer.
+  // Uses a single getEffectivePermissions call (via resolvePersonDomainPermissions)
+  // to avoid N extra DB round-trips. Fails closed when tenantId is absent.
+  // Server-side only — domain tabs are absent in the UI when the flag is false.
+  const domainPermissions = tenantId
+    ? await resolvePersonDomainPermissions(prisma, session.user.id, tenantId)
+    : DOMAIN_PERMISSIONS_DENIED;
 
   // ── Header badges: capacities from ALL sources ──────────────────────────────
   // PersonAssignment active functions
@@ -279,6 +288,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
           teams={teams.map((t) => ({ id: t.id, name: t.name, shortName: t.shortName }))}
           activeSeason={activeSeason}
           accessRolesCard={accessRolesCard}
+          domainPermissions={domainPermissions}
         />
       </DetailPagePattern>
     </PageShell>

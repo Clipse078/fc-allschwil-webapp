@@ -38,6 +38,13 @@ type PersonSportTabProps = {
   squadMemberships: PersonSquadMembership[];
   trainerMemberships: PersonTrainerMembership[];
   assignments: PersonAssignment[];
+  /**
+   * PERSON-UX-03: Whether the viewer holds people.development.view.
+   * The development/assessment section is only rendered when true — absent
+   * when false, leaving no hint about the domain's existence.
+   * Future individual ratings must NEVER be shown without this flag.
+   */
+  canViewDevelopment?: boolean;
 };
 
 type SeasonSnapshot = {
@@ -205,6 +212,7 @@ export default function PersonSportTab({
   squadMemberships,
   trainerMemberships,
   assignments,
+  canViewDevelopment = false,
 }: PersonSportTabProps) {
   const snapshots = buildSeasonSnapshots(squadMemberships, trainerMemberships, assignments);
   const hasSeasonData = snapshots.length > 0;
@@ -245,26 +253,31 @@ export default function PersonSportTab({
         ) : null}
       </div>
 
-      {/* ── Entwicklungs-Profil — Architektureller Platzhalter ────── */}
-      <div>
-        <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--muted)]">
-          Entwicklungs-Profil
-        </h3>
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-8 text-center">
-          <TrendingUp className="h-8 w-8 text-[var(--muted)]" />
-          <div>
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              Entwicklungs-Bewertungen
-            </p>
-            <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--muted)]">
-              Dieses Modul ist für PERSON-UX-03 vorgesehen. Geplant ist ein
-              Bewertungssystem: Einzelbewertungen → Kategorien → normierter 0–100
-              Gesamtwert → saisonaler Durchschnitt → saisonübergreifende Progression.
-              Das Kategorie-Framework wird alters- und teamspezifisch sein.
-            </p>
+      {/* ── Spieler-Entwicklung — gated by people.development.view ─── */}
+      {/* PERSON-UX-03: development section is absent when canViewDevelopment=false.
+          No locked state, no existence hint. Future ratings must NEVER inherit
+          generic people.view — this flag is the sole gate. */}
+      {canViewDevelopment ? (
+        <div>
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-[var(--muted)]">
+            Spieler-Entwicklung
+          </h3>
+          <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-8 text-center">
+            <TrendingUp className="h-8 w-8 text-[var(--muted)]" />
+            <div>
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                Entwicklungs-Bewertungen
+              </p>
+              <p className="mt-1 max-w-sm text-xs leading-relaxed text-[var(--muted)]">
+                Dieses Modul ist für PERSON-UX-03 vorgesehen. Geplant ist ein
+                Bewertungssystem: Einzelbewertungen → Kategorien → normierter 0–100
+                Gesamtwert → saisonaler Durchschnitt → saisonübergreifende Progression.
+                Das Kategorie-Framework wird alters- und teamspezifisch sein.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }
