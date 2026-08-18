@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { consumePasswordResetToken, validatePasswordResetToken } from "@/lib/auth/password-reset";
-import { activatePendingInvitationMemberships } from "@/lib/users/mutations";
+import { activateInvitationMembership } from "@/lib/users/mutations";
 
 const MIN_PASSWORD_LENGTH = 12;
 
@@ -59,11 +59,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Pre-validate to capture invitation context before consumption (atomic
-  // consumption re-validates internally; this read is safe).
+  // Pre-validate to capture invitation context before consumption.
+  // consumePasswordResetToken re-validates internally, so this is safe.
   const preValidated = await validatePasswordResetToken(prisma, token).catch(() => null);
   const isInvitationToken = preValidated?.isInvitation ?? false;
   const pendingUserId = preValidated?.userId;
+  const invitationTenantId = preValidated?.invitationTenantId ?? null;
 
   let success = false;
   try {
@@ -86,11 +87,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Invitation acceptance: activate the pending TenantMembership now that the
-  // user has set their password. Non-fatal — password is already saved.
-  if (isInvitationToken && pendingUserId) {
-    await activatePendingInvitationMemberships(pendingUserId).catch((err) => {
-      console.error("[reset-password] Failed to activate invitation memberships:", err);
+  // Invitation acceptance: activate exactly the membership for the invitation's
+  // tenant now that the user has set their password.
+  // Non-fatal — password is already saved; activation failure can be retried.
+  if (isInvitationToken && pendingUserId && invitationTenantId) {
+    await activateInvitationMembership(pendingUserId, invitationTenantId).catch((err) => {
+      console.error("[reset-password] Failed to activate invitation membership:", err);
     });
   }
 

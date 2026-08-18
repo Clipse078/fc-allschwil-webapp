@@ -398,8 +398,8 @@ export async function invitePersonToTenant(
     },
   });
 
-  // 7. Create invitation token.
-  const rawToken = await _createInvitationToken(newUser.id);
+  // 7. Create invitation token (stores tenantId for exact membership activation at acceptance).
+  const rawToken = await _createInvitationToken(newUser.id, tenantId);
 
   await logAction({
     actorUserId,
@@ -517,8 +517,8 @@ export async function createPersonAndInvite(
     data: { tenantId, userId: newUser.id, isActive: false },
   });
 
-  // 6. Create invitation token.
-  const rawToken = await _createInvitationToken(newUser.id);
+  // 6. Create invitation token (stores tenantId for exact membership activation at acceptance).
+  const rawToken = await _createInvitationToken(newUser.id, tenantId);
 
   await logAction({
     actorUserId,
@@ -557,7 +557,7 @@ export async function resendTenantInvitation(
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
 
-  const rawToken = await _createInvitationToken(userId);
+  const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
     actorUserId,
@@ -615,38 +615,43 @@ export async function revokeTenantInvitation(
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
-// ── Invitation acceptance: activate pending membership ────────────────────────
+// ── Invitation acceptance: activate exact tenant membership ──────────────────
 
 /**
- * Activate any invitation-pending TenantMembership rows for the user.
+ * Activate exactly the TenantMembership for `userId` in `tenantId`.
  *
  * Called by both acceptance paths after the invitation token is consumed:
  *   - New User: POST /api/auth/reset-password (password setup)
  *   - Existing User: POST /api/auth/invitation/accept
  *
- * Safety window: only activates memberships joined within the last
- * INVITATION_EXPIRY_MS (72 h). This matches the token expiry, ensuring
- * that only invitation-created memberships are activated, not ones that
- * were admin-deactivated for other reasons (which would have an older
- * joinedAt relative to the acceptance moment).
+ * Uses the `invitationTenantId` stored on the token to target the exact
+ * membership row — no timestamp heuristics, no collateral activation.
  *
- * Edge case acknowledged: if an admin deactivated a user in another tenant
- * within the same 72 h window AND the user also receives a new invitation
- * in a different tenant, both inactive memberships would be reactivated.
- * This is an extremely unlikely operational sequence and fixing it correctly
- * requires storing tenantId on the invitation token (schema change not taken
- * here). Document if encountered in production.
+ * Multi-tenant safety:
+ *   - Only the membership for `tenantId` is updated; other tenants unaffected.
+ *   - If the membership is already active (e.g. admin activated it manually),
+ *     updateMany is a no-op (idempotent).
  */
-export async function activatePendingInvitationMemberships(userId: string): Promise<void> {
-  const cutoff = new Date(Date.now() - INVITATION_EXPIRY_MS);
+export async function activateInvitationMembership(
+  userId: string,
+  tenantId: string,
+): Promise<void> {
   await prisma.tenantMembership.updateMany({
-    where: { userId, isActive: false, joinedAt: { gte: cutoff } },
+    where: { userId, tenantId, isActive: false },
     data: { isActive: true },
   });
 }
 
-/** Create a fresh invitation token, deleting all prior invitation tokens for the user. */
-async function _createInvitationToken(userId: string): Promise<string> {
+/**
+ * Create a fresh invitation token for `userId` issued on behalf of `tenantId`.
+ *
+ * Stores `invitationTenantId` on the token so that both acceptance paths can
+ * activate exactly the right TenantMembership without timestamp heuristics.
+ *
+ * All prior invitation tokens for this user are invalidated first (single
+ * active invitation invariant — one user, one outstanding invite token).
+ */
+async function _createInvitationToken(userId: string, tenantId: string): Promise<string> {
   const rawToken = crypto.randomBytes(32).toString("hex");
   const tokenHash = hashResetToken(rawToken);
   const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
@@ -657,7 +662,7 @@ async function _createInvitationToken(userId: string): Promise<string> {
   });
 
   await prisma.passwordResetToken.create({
-    data: { userId, tokenHash, expiresAt, isInvitation: true },
+    data: { userId, tokenHash, expiresAt, isInvitation: true, invitationTenantId: tenantId },
   });
 
   return rawToken;
@@ -692,7 +697,7 @@ async function _ensureMembershipAndResendInvitation(
       );
     }
     // Has a pending invitation — resend it.
-    const rawToken = await _createInvitationToken(userId);
+    const rawToken = await _createInvitationToken(userId, tenantId);
     await logAction({
       actorUserId,
       moduleKey: "users",
@@ -713,7 +718,7 @@ async function _ensureMembershipAndResendInvitation(
     });
   }
 
-  const rawToken = await _createInvitationToken(userId);
+  const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
     actorUserId,

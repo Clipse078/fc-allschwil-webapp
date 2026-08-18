@@ -678,13 +678,17 @@ model User {
 //     but use a 72 h window and drive the "Einladung ausstehend" UI state.
 // ---------------------------------------------------------------------------
 model PasswordResetToken {
-  id           String    @id @default(cuid())
-  userId       String
-  tokenHash    String    @unique
-  expiresAt    DateTime
-  usedAt       DateTime?
-  createdAt    DateTime  @default(now())
-  isInvitation Boolean   @default(false)
+  id                 String    @id @default(cuid())
+  userId             String
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  usedAt             DateTime?
+  createdAt          DateTime  @default(now())
+  isInvitation       Boolean   @default(false)
+  /// Non-null only for invitation tokens (isInvitation=true).
+  /// Stores the tenantId the invitation was issued for so that acceptance
+  /// can activate exactly that TenantMembership without timestamp heuristics.
+  invitationTenantId String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 

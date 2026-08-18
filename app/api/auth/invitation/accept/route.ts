@@ -20,7 +20,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { validatePasswordResetToken, hashResetToken } from "@/lib/auth/password-reset";
-import { activatePendingInvitationMemberships } from "@/lib/users/mutations";
+import { activateInvitationMembership } from "@/lib/users/mutations";
 
 export async function POST(req: NextRequest) {
   let token: string;
@@ -73,11 +73,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
   }
 
-  // Activate the pending TenantMembership now that the user has accepted.
-  // Non-fatal — token is already consumed.
-  await activatePendingInvitationMemberships(validated.userId).catch((err) => {
-    console.error("[invitation/accept] Failed to activate memberships:", err);
-  });
+  // Activate exactly the membership for the invitation's tenant.
+  // Non-fatal — token is already consumed; activation failure can be retried.
+  if (validated.invitationTenantId) {
+    await activateInvitationMembership(validated.userId, validated.invitationTenantId).catch(
+      (err) => {
+        console.error("[invitation/accept] Failed to activate invitation membership:", err);
+      },
+    );
+  }
 
   return NextResponse.json({ success: true });
 }

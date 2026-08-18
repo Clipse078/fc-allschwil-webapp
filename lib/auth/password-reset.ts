@@ -75,6 +75,12 @@ export type ValidatedToken = {
    * login rather than shown the password-setup form.
    */
   isExistingUser: boolean;
+  /**
+   * Non-null for invitation tokens: the tenantId the invitation was issued for.
+   * Used by both acceptance paths to activate exactly that TenantMembership,
+   * without timestamp heuristics.
+   */
+  invitationTenantId: string | null;
 };
 
 /**
@@ -113,6 +119,7 @@ export async function validatePasswordResetToken(
     userEmail: record.user.email,
     isInvitation: record.isInvitation,
     isExistingUser: record.user.lastLoginAt !== null,
+    invitationTenantId: record.invitationTenantId ?? null,
   };
 }
 

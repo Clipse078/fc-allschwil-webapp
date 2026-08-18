@@ -58,7 +58,7 @@ import {
   createPersonAndInvite,
   resendTenantInvitation,
   revokeTenantInvitation,
-  activatePendingInvitationMemberships,
+  activateInvitationMembership,
   InvitationDomainError,
 } from "../mutations";
 
@@ -633,7 +633,6 @@ describe("Access activation timing — PENDING must not grant access", () => {
       c[0]?.data?.tenantId === TENANT_ID,
     );
     expect(createCall).toBeDefined();
-    // Must be inactive — the session resolver excludes isActive=false memberships.
     expect(createCall![0].data.isActive).toBe(false);
   });
 
@@ -650,42 +649,22 @@ describe("Access activation timing — PENDING must not grant access", () => {
       c[0]?.data?.tenantId === TENANT_ID,
     );
     expect(createCall).toBeDefined();
-    // Critical: existing User must not gain access before acceptance.
     expect(createCall![0].data.isActive).toBe(false);
   });
 
-  it("ACCESS-3. revoke after pending invitation leaves membership isActive=false (no access granted)", async () => {
-    // Membership exists but is inactive (pending invitation state).
+  it("ACCESS-3. revoke leaves membership isActive=false — updateMany with isActive=true never called", async () => {
     mockMembershipFindUnique.mockResolvedValue({ isActive: false } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     mockTokenDeleteMany.mockResolvedValue({ count: 1 });
 
     await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
-    // Token deleted — invitation invalidated.
     expect(mockTokenDeleteMany).toHaveBeenCalled();
-    // Membership stays isActive=false (user never had access, still doesn't).
-    // updateMany must NOT be called to activate membership on revoke.
     expect(mockMembershipUpdateMany).not.toHaveBeenCalledWith(
       expect.objectContaining({ data: { isActive: true } }),
     );
   });
 
-  it("ACCESS-4. activatePendingInvitationMemberships uses recency window to avoid activating old admin-deactivated memberships", async () => {
-    await activatePendingInvitationMemberships(USER_ID);
-
-    expect(mockMembershipUpdateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          userId: USER_ID,
-          isActive: false,
-          joinedAt: expect.objectContaining({ gte: expect.any(Date) }),
-        }),
-        data: { isActive: true },
-      }),
-    );
-  });
-
-  it("ACCESS-5. createPersonAndInvite creates membership isActive=false for new User", async () => {
+  it("ACCESS-4. createPersonAndInvite creates membership isActive=false for new User", async () => {
     await createPersonAndInvite(
       TENANT_ID,
       { firstName: "Anna", lastName: "Müller", email: "anna@example.invalid" },
@@ -699,7 +678,7 @@ describe("Access activation timing — PENDING must not grant access", () => {
     expect(createCall![0].data.isActive).toBe(false);
   });
 
-  it("ACCESS-6. createPersonAndInvite with existing global User creates membership isActive=false", async () => {
+  it("ACCESS-5. createPersonAndInvite with existing global User creates membership isActive=false", async () => {
     mockUserFindUnique.mockResolvedValue({
       id: OTHER_USER_ID,
       firstName: "Anna",
@@ -718,7 +697,93 @@ describe("Access activation timing — PENDING must not grant access", () => {
       c[0]?.data?.tenantId === TENANT_ID,
     );
     expect(createCall).toBeDefined();
-    // Existing User must not gain new-tenant access before acceptance.
     expect(createCall![0].data.isActive).toBe(false);
+  });
+
+  it("ACCESS-6. invitation token stores invitationTenantId for exact membership activation", async () => {
+    await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
+
+    expect(mockTokenCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isInvitation: true,
+          invitationTenantId: TENANT_ID,
+        }),
+      }),
+    );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Exact tenant activation (INVITE-01 hardening)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Exact tenant activation — activateInvitationMembership", () => {
+  const TENANT_B = "tenant-B";
+  const TENANT_C = "tenant-C";
+
+  it("EXACT-1. activateInvitationMembership targets userId + tenantId exactly (no joinedAt window)", async () => {
+    await activateInvitationMembership(USER_ID, TENANT_B);
+
+    expect(mockMembershipUpdateMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID, tenantId: TENANT_B, isActive: false },
+      data: { isActive: true },
+    });
+    // Must target exactly tenantId — NOT a timestamp filter.
+    const whereArg = mockMembershipUpdateMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg).not.toHaveProperty("joinedAt");
+  });
+
+  it("EXACT-2. activateInvitationMembership for TenantB does NOT touch TenantC membership", async () => {
+    // User has pending membership in both TenantB and TenantC.
+    // Accepting TenantB invitation must leave TenantC unchanged.
+    await activateInvitationMembership(USER_ID, TENANT_B);
+
+    // updateMany was called with tenantId=TENANT_B only.
+    const calls = mockMembershipUpdateMany.mock.calls;
+    expect(calls).toHaveLength(1);
+    const callWhere = calls[0]?.[0]?.where;
+    expect(callWhere?.tenantId).toBe(TENANT_B);
+    expect(callWhere?.tenantId).not.toBe(TENANT_C);
+  });
+
+  it("EXACT-3. multi-tenant: TenantA active, TenantB accepted, TenantC pending — only TenantB activated", async () => {
+    // Simulates: activateInvitationMembership called with TenantB token.
+    await activateInvitationMembership(USER_ID, TENANT_B);
+
+    // Only one updateMany call, targeting TENANT_B.
+    expect(mockMembershipUpdateMany).toHaveBeenCalledOnce();
+    expect(mockMembershipUpdateMany).toHaveBeenCalledWith({
+      where: { userId: USER_ID, tenantId: TENANT_B, isActive: false },
+      data: { isActive: true },
+    });
+    // TenantA and TenantC are never passed to updateMany.
+    const whereArg = mockMembershipUpdateMany.mock.calls[0]?.[0]?.where;
+    expect(whereArg?.tenantId).toBe(TENANT_B);
+    expect(whereArg?.tenantId).not.toBe(TENANT_ID); // TenantA
+    expect(whereArg?.tenantId).not.toBe(TENANT_C);
+  });
+
+  it("EXACT-4. activateInvitationMembership is idempotent (already-active membership → no-op via isActive=false filter)", async () => {
+    // updateMany with isActive=false will match 0 rows if already active — no-op.
+    mockMembershipUpdateMany.mockResolvedValue({ count: 0 });
+
+    await expect(activateInvitationMembership(USER_ID, TENANT_B)).resolves.toBeUndefined();
+    expect(mockMembershipUpdateMany).toHaveBeenCalledOnce();
+  });
+
+  it("EXACT-5. _createInvitationToken stores invitationTenantId — resend preserves correct tenantId", async () => {
+    mockMembershipFindUnique.mockResolvedValue({ isActive: false } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+
+    await resendTenantInvitation(TENANT_B, USER_ID, ACTOR_ID);
+
+    expect(mockTokenCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          isInvitation: true,
+          invitationTenantId: TENANT_B,
+        }),
+      }),
+    );
   });
 });
