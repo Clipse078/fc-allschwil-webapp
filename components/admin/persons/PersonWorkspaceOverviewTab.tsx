@@ -40,6 +40,7 @@ import {
   KeyRound,
   Star,
   ExternalLink,
+  FolderOpen,
 } from "lucide-react";
 import type {
   PersonAssignment,
@@ -62,7 +63,14 @@ type PersonOverviewTabProps = {
   };
   activeSeason: { id: string; name: string; key: string } | null;
   /** Optional: callback to navigate to a different workspace tab. */
-  onNavigateToTab?: (tab: "spieler" | "trainer" | "organisation") => void;
+  onNavigateToTab?: (tab: "spieler" | "trainer" | "organisation" | "dokumente") => void;
+  /**
+   * PERSON-UX-08: Pre-computed document count for the Übersicht signal.
+   * Only passed when the viewer holds people.private_documents.view.
+   * null/undefined → no signal shown (viewer lacks permission or count unavailable).
+   * This prevents leaking document existence to unauthorized viewers.
+   */
+  documentCount?: number | null;
 };
 
 function formatDate(date: Date | string): string {
@@ -310,6 +318,7 @@ export default function PersonWorkspaceOverviewTab({
   person,
   activeSeason,
   onNavigateToTab,
+  documentCount = null,
 }: PersonOverviewTabProps) {
   const activeAssignments = person.assignments.filter((a) => a.status === "ACTIVE");
   const activeSquadMemberships = person.squadMemberships.filter(
@@ -623,6 +632,40 @@ export default function PersonWorkspaceOverviewTab({
           </div>
         )}
       </div>
+
+      {/* ── Dokumente signal ────────────────────────────────────────
+           PERSON-UX-08: Only shown to authorized viewers (documentCount is
+           only passed when viewer holds people.private_documents.view).
+           Intentionally absent for unauthorized viewers — no count/category
+           leakage. */}
+      {documentCount !== null && documentCount !== undefined ? (
+        <div>
+          <SectionHeader label="Dokumente" />
+          <button
+            type="button"
+            onClick={onNavigateToTab ? () => onNavigateToTab("dokumente") : undefined}
+            disabled={!onNavigateToTab}
+            className="flex w-full items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left transition hover:bg-[var(--surface-2)] disabled:cursor-default disabled:hover:bg-[var(--surface)]"
+          >
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[var(--surface-2)] text-[var(--muted)]">
+              <FolderOpen className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-sm font-medium text-[var(--foreground)]">
+                {documentCount === 0
+                  ? "Noch keine Dokumente"
+                  : `${documentCount} ${documentCount === 1 ? "Dokument" : "Dokumente"}`}
+              </span>
+              {onNavigateToTab ? (
+                <p className="text-xs text-[var(--muted)]">Zum Dokumente-Tab wechseln</p>
+              ) : null}
+            </div>
+            {onNavigateToTab ? (
+              <ExternalLink className="h-3.5 w-3.5 flex-shrink-0 text-[var(--muted)]" />
+            ) : null}
+          </button>
+        </div>
+      ) : null}
 
       {/* ── Zugang & Konto ────────────────────────────────────────── */}
       <div>

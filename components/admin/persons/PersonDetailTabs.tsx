@@ -5,6 +5,7 @@
  * PERSON-UX-02 — Capacity-aware tab visibility.
  * PERSON-UX-03 — Domain-permission-aware tab visibility.
  * PERSON-UX-07 — Profile & capacity flags drive role-specific workspace tabs.
+ * PERSON-UX-08 — Dokumente tab: fully implemented (no longer deferred).
  *
  * Workspace tabs:
  *   Übersicht · Stammdaten · Organisation
@@ -262,7 +263,6 @@ export default function PersonDetailTabs({
       key: "dokumente",
       label: "Dokumente",
       icon: <FolderOpen className="h-3.5 w-3.5" />,
-      deferred: true,
       // Absent entirely when viewer lacks people.private_documents.view — no hint about existence.
       hidden: !canViewPrivateDocuments,
     },
@@ -339,6 +339,7 @@ export default function PersonDetailTabs({
               person={person}
               activeSeason={activeSeason}
               onNavigateToTab={setActiveTab}
+              documentCount={canViewPrivateDocuments ? documents.length : null}
             />
           ) : null}
         </div>

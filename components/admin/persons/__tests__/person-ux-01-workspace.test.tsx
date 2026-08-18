@@ -648,13 +648,15 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getByText("Mitgliedschaft")).toBeTruthy();
     expect(screen.getByText("Finanzen")).toBeTruthy();
     expect(screen.getByText("Gesundheit")).toBeTruthy();
-    expect(screen.getByText("Dokumente")).toBeTruthy();
+    // PERSON-UX-08: "Dokumente" may appear as both a tab label and an overview
+    // section heading (when authorized); use role-based query to target the tab.
+    expect(screen.getByRole("tab", { name: /Dokumente/ })).toBeTruthy();
     expect(screen.getByText("Zugang")).toBeTruthy();
 
     // Sports tabs are hidden — zero DOM presence (no sporting evidence)
-    expect(screen.queryByText("Spieler")).toBeNull();
-    expect(screen.queryByText("Trainer")).toBeNull();
-    expect(screen.queryByText("Sport & Entwicklung")).toBeNull();
+    expect(screen.queryByRole("tab", { name: /Spieler/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /Trainer/ })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /Sport & Entwicklung/ })).toBeNull();
   });
 
   it("renders all sports tabs for a person with both player and trainer history", () => {
@@ -701,7 +703,8 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getByText("Mitgliedschaft")).toBeTruthy();
     expect(screen.getByText("Finanzen")).toBeTruthy();
     expect(screen.getByText("Gesundheit")).toBeTruthy();
-    expect(screen.getByText("Dokumente")).toBeTruthy();
+    // PERSON-UX-08: "Dokumente" may appear as both tab and overview section heading.
+    expect(screen.getByRole("tab", { name: /Dokumente/ })).toBeTruthy();
     expect(screen.getByText("Zugang")).toBeTruthy();
   });
 

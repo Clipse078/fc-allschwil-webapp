@@ -1,24 +1,23 @@
 "use client";
 
 /**
- * PERSON-UX-07 — Dokumente tab.
+ * PERSON-UX-08 — Dokumente tab (Person-bound private document workspace).
  *
- * Person-bound private document workspace.
- * ALWAYS visible (to authorized viewers) regardless of Person capacities.
- *
- * Requires:
- *   canViewPrivateDocuments  → render this tab at all
- *   canManagePrivateDocuments → upload / edit / delete controls
+ * Person-private documents: isolated from all capacity flags and from the
+ * global Dokumente module. Authorization:
+ *   canViewPrivateDocuments  → tab visible; list + download only
+ *   canManagePrivateDocuments → upload / edit metadata / delete
  *
  * Security:
- *   - This tab has zero documents data for unauthorized viewers (tab hidden
- *     in PersonDetailTabs when canViewPrivateDocuments=false).
+ *   - No storage URLs/keys exposed to client.
  *   - Downloads go through /api/people/[id]/documents/[documentId]/download
- *     (server-side authorized streaming; no direct storage URLs exposed).
- *   - Capacity flags do NOT affect what is shown here.
+ *     (server-side authorized streaming).
+ *   - Tab is hidden in PersonDetailTabs when canViewPrivateDocuments=false.
  *
- * Categories are extensible — add new enum members server-side; this
- * component maps them to labels with a safe fallback.
+ * Architecture note:
+ *   Person → Dokumente = private Person-bound documents (this tab).
+ *   Global Dokumente (sidebar) = wider organisational workspace documents.
+ *   Different authorization surfaces; document identity not shared.
  */
 
 import { useState } from "react";
@@ -29,6 +28,8 @@ import {
   Download,
   AlertCircle,
   X,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/page";
@@ -71,6 +72,11 @@ function formatDate(d: Date | string | null | undefined): string | null {
     month: "long",
     year: "numeric",
   });
+}
+
+function toInputDate(d: Date | string | null | undefined): string {
+  if (!d) return "";
+  return new Date(d).toISOString().slice(0, 10);
 }
 
 function isExpired(expiryDate: Date | string | null | undefined): boolean {
@@ -245,18 +251,157 @@ function UploadForm({ personId, onSuccess, onCancel }: UploadFormProps) {
   );
 }
 
+// ── Edit metadata form ─────────────────────────────────────────────────────
+
+type EditFormProps = {
+  doc: PersonDocumentItem;
+  personId: string;
+  onSuccess: (doc: PersonDocumentItem) => void;
+  onCancel: () => void;
+};
+
+function EditForm({ doc, personId, onSuccess, onCancel }: EditFormProps) {
+  const [title, setTitle] = useState(doc.title);
+  const [category, setCategory] = useState<string>(doc.category);
+  const [issueDate, setIssueDate] = useState(toInputDate(doc.issueDate));
+  const [expiryDate, setExpiryDate] = useState(toInputDate(doc.expiryDate));
+  const [notes, setNotes] = useState(doc.notes ?? "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const body: Record<string, string | null> = {
+        title: title.trim() || doc.originalFilename,
+        category,
+        issueDate: issueDate || null,
+        expiryDate: expiryDate || null,
+        notes: notes.trim() || null,
+      };
+
+      const res = await fetch(`/api/people/${personId}/documents/${doc.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(data?.error ?? "Speichern fehlgeschlagen.");
+        return;
+      }
+      onSuccess(data.document as PersonDocumentItem);
+    } catch {
+      setError("Netzwerkfehler. Bitte erneut versuchen.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] p-4 space-y-3"
+      aria-label="Metadaten bearbeiten"
+    >
+      {error ? (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-center gap-2">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          {error}
+        </div>
+      ) : null}
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <label className="fca-label block text-xs">Titel</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            className="fca-input text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="fca-label block text-xs">Kategorie</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="fca-input text-sm"
+          >
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="fca-label block text-xs">Ausstellungsdatum</label>
+          <input
+            type="date"
+            value={issueDate}
+            onChange={(e) => setIssueDate(e.target.value)}
+            className="fca-input text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="fca-label block text-xs">Ablaufdatum</label>
+          <input
+            type="date"
+            value={expiryDate}
+            onChange={(e) => setExpiryDate(e.target.value)}
+            className="fca-input text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="fca-label block text-xs">Notizen</label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Optionale interne Notiz"
+            maxLength={500}
+            className="fca-input text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-end gap-2 pt-1">
+        <Button variant="secondary" size="sm" type="button" onClick={onCancel} disabled={loading}>
+          <X className="h-3.5 w-3.5" />
+          Abbrechen
+        </Button>
+        <Button size="sm" type="submit" loading={loading}>
+          <Check className="h-3.5 w-3.5" />
+          Speichern
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // ── Document card ──────────────────────────────────────────────────────────
 
 type DocumentCardProps = {
   doc: PersonDocumentItem;
   personId: string;
   canManage: boolean;
+  onUpdated: (doc: PersonDocumentItem) => void;
   onDeleted: (id: string) => void;
 };
 
-function DocumentCard({ doc, personId, canManage, onDeleted }: DocumentCardProps) {
+function DocumentCard({ doc, personId, canManage, onUpdated, onDeleted }: DocumentCardProps) {
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const expired = isExpired(doc.expiryDate);
   const expiringSoon = !expired && isExpiringSoon(doc.expiryDate);
@@ -333,7 +478,18 @@ function DocumentCard({ doc, personId, canManage, onDeleted }: DocumentCardProps
           </a>
           {canManage ? (
             <>
-              {!confirmDelete ? (
+              {!editing && !confirmDelete ? (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-xs font-medium text-[var(--muted)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+                  title="Metadaten bearbeiten"
+                  aria-label="Bearbeiten"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              ) : null}
+              {!confirmDelete && !editing ? (
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
@@ -342,7 +498,7 @@ function DocumentCard({ doc, personId, canManage, onDeleted }: DocumentCardProps
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
-              ) : (
+              ) : confirmDelete ? (
                 <div className="flex items-center gap-1">
                   <button
                     type="button"
@@ -360,11 +516,26 @@ function DocumentCard({ doc, personId, canManage, onDeleted }: DocumentCardProps
                     <X className="h-3.5 w-3.5" />
                   </button>
                 </div>
-              )}
+              ) : null}
             </>
           ) : null}
         </div>
       </div>
+
+      {/* Inline edit form — shown below card header */}
+      {editing ? (
+        <div className="border-t border-[var(--border)] px-4 pb-4">
+          <EditForm
+            doc={doc}
+            personId={personId}
+            onSuccess={(updated) => {
+              setEditing(false);
+              onUpdated(updated);
+            }}
+            onCancel={() => setEditing(false)}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -390,6 +561,10 @@ export default function PersonDocumentTab({
     setShowUpload(false);
   }
 
+  function handleUpdated(updated: PersonDocumentItem) {
+    setDocuments((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+  }
+
   function handleDeleted(id: string) {
     setDocuments((prev) => prev.filter((d) => d.id !== id));
   }
@@ -405,7 +580,7 @@ export default function PersonDocumentTab({
               : `${documents.length} ${documents.length === 1 ? "Dokument" : "Dokumente"}`}
           </p>
         </div>
-        {canManage && !showUpload ? (
+        {canManage && !showUpload && documents.length > 0 ? (
           <Button
             variant="secondary"
             size="sm"
@@ -413,7 +588,7 @@ export default function PersonDocumentTab({
             onClick={() => setShowUpload(true)}
           >
             <Upload className="h-4 w-4" />
-            Dokument hochladen
+            Dokument hinzufügen
           </Button>
         ) : null}
       </div>
@@ -427,15 +602,24 @@ export default function PersonDocumentTab({
         />
       ) : null}
 
-      {/* Document list */}
+      {/* Empty state */}
       {documents.length === 0 && !showUpload ? (
         <EmptyState
           icon={<FileText className="h-8 w-8" />}
-          heading="Noch keine Dokumente hinterlegt"
-          description={
-            canManage
-              ? "Lade das erste Dokument dieser Person hoch."
-              : "Für diese Person wurden noch keine Dokumente hinterlegt."
+          heading="Noch keine Dokumente"
+          description="Für diese Person wurden noch keine Dokumente hinterlegt."
+          action={
+            canManage ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                type="button"
+                onClick={() => setShowUpload(true)}
+              >
+                <Upload className="h-4 w-4" />
+                Dokument hinzufügen
+              </Button>
+            ) : undefined
           }
         />
       ) : (
@@ -446,13 +630,14 @@ export default function PersonDocumentTab({
               doc={doc}
               personId={personId}
               canManage={canManage}
+              onUpdated={handleUpdated}
               onDeleted={handleDeleted}
             />
           ))}
         </div>
       )}
 
-      {/* Security notice */}
+      {/* Privacy notice */}
       <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
         <p className="text-[11px] text-[var(--muted)]">
           <strong>Datenschutz:</strong> Dokumente dieser Person sind vertraulich.
