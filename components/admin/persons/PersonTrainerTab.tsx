@@ -17,13 +17,18 @@
  * where available (visible in the Organisation tab for full detail).
  */
 
-import { UserCheck, Trophy, ChevronDown, ChevronRight } from "lucide-react";
+import { UserCheck, Trophy, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import type { PersonTrainerMembership } from "@/lib/people/queries";
 import { EmptyState } from "@/components/ui/page";
 
 type PersonTrainerTabProps = {
   trainerMemberships: PersonTrainerMembership[];
+  /**
+   * PERSON-UX-07 UX-ACCEPTANCE: optional callback to navigate to a sibling tab.
+   * Used for deep-link CTAs in empty/nudge states.
+   */
+  onNavigateToTab?: (tab: "organisation" | "spieler") => void;
 };
 
 type SeasonTrainerSnapshot = {
@@ -132,7 +137,7 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-export default function PersonTrainerTab({ trainerMemberships }: PersonTrainerTabProps) {
+export default function PersonTrainerTab({ trainerMemberships, onNavigateToTab }: PersonTrainerTabProps) {
   const activeTrainers = trainerMemberships.filter((m) => m.status === "ACTIVE");
   const snapshots = buildTrainerSeasonSnapshots(trainerMemberships);
 
@@ -148,10 +153,34 @@ export default function PersonTrainerTab({ trainerMemberships }: PersonTrainerTa
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-sm text-[var(--muted)]">
-              Kein aktiver Trainereinsatz in der laufenden Saison.
-            </p>
+          /* PERSON-UX-07 UX-ACCEPTANCE: Actionable nudge instead of passive message.
+           * The Trainerprofil exists (otherwise this tab would be hidden) but no
+           * current-season team assignment is present. Admin needs guidance. */
+          <div
+            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+            data-testid="trainer-unassigned-nudge"
+          >
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                Noch keinem Team als Trainer/in zugeordnet
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700">
+                Das Trainerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung.
+                Trainer-Zuordnungen werden über das Team-Management verwaltet.
+              </p>
+              {onNavigateToTab ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab("organisation")}
+                  className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                >
+                  Zur Organisation
+                </button>
+              ) : null}
+            </div>
           </div>
         )}
       </div>

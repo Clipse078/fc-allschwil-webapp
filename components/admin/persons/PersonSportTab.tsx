@@ -28,7 +28,7 @@
  * the tab registry in PersonDetailTabs.
  */
 
-import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, Building2 } from "lucide-react";
+import { Users2, UserCheck, ChevronDown, ChevronRight, Trophy, Building2, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import type { PersonSquadMembership, PersonTrainerMembership, PersonAssignment, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
@@ -58,6 +58,11 @@ type PersonSportTabProps = {
   assessments?: PersonAssessmentRecord[];
   /** PERSON-UX-05: Active criteria for assessment forms. */
   criteria?: TenantCriterion[];
+  /**
+   * PERSON-UX-07 UX-ACCEPTANCE: optional callback to navigate to a sibling tab.
+   * Used for deep-link CTAs in incomplete-season nudge states.
+   */
+  onNavigateToTab?: (tab: "organisation" | "spieler" | "trainer") => void;
 };
 
 type SeasonSnapshot = {
@@ -231,6 +236,7 @@ export default function PersonSportTab({
   canManageAssessments = false,
   assessments = [],
   criteria = [],
+  onNavigateToTab,
 }: PersonSportTabProps) {
   const snapshots = buildSeasonSnapshots(squadMemberships, trainerMemberships, assignments);
   const hasSeasonData = snapshots.length > 0;
@@ -259,14 +265,45 @@ export default function PersonSportTab({
           />
         )}
 
+        {/* PERSON-UX-07 UX-ACCEPTANCE: User-facing actionable warning for unseasoned assignments.
+         * Previous: generic technical notice. Now: identifies the affected assignment(s),
+         * explains the operational impact, and deep-links to the canonical management surface. */}
         {unseasoned.length > 0 ? (
-          <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-            <p className="text-xs font-medium text-[var(--muted)]">
-              Hinweis: {unseasoned.length}{" "}
-              {unseasoned.length === 1 ? "aktive Zuordnung hat" : "aktive Zuordnungen haben"}{" "}
-              keine Saison-Verknüpfung und {unseasoned.length === 1 ? "erscheint" : "erscheinen"}{" "}
-              nicht in der Saison-Biografie. Details unter &quot;Organisation&quot;.
-            </p>
+          <div
+            className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+            data-testid="unseasoned-assignment-warning"
+          >
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                {unseasoned.length === 1
+                  ? "Zuordnung unvollständig"
+                  : `${unseasoned.length} Zuordnungen unvollständig`}
+              </p>
+              <div className="mt-1 space-y-0.5">
+                {unseasoned.map((a) => (
+                  <p key={a.id} className="text-xs text-amber-700">
+                    {a.team?.name ?? a.orgUnit?.name ?? "Unbekannte Zuordnung"} – Saison-Verknüpfung fehlt.
+                    Dadurch erscheint {unseasoned.length === 1 ? "diese Funktion" : "diese Funktion"}
+                    {" "}nicht vollständig in der Saison-Biografie.
+                  </p>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-amber-700">
+                Ergänze die Saison-Verknüpfung, damit die Zuordnung in der Biografie erscheint.
+              </p>
+              {onNavigateToTab ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab("organisation")}
+                  className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                >
+                  Zuordnung vervollständigen
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
       </div>

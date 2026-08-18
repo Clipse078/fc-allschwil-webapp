@@ -3,22 +3,40 @@
 /**
  * PERSON-UX-01 — Person 360° Übersicht tab.
  * PERSON-UX-07 — Multi-capacity header: shows all active capacities compactly.
+ * PERSON-UX-07 UX-ACCEPTANCE — Aktuelle Funktionen section clearly distinguishes
+ *   capacity profile from actual team/season assignment.
  *
  * Shows the current canonical state of this Person across all simultaneously
  * held roles and relationships. A Person may have multiple capacities at once;
  * this tab never reduces a Person to a single "primary role".
  *
- * Header capacity row shows: Spieler/in, Trainer/in, Funktionär/in,
- * Schiedsrichter/in, Freiwillige/r, Sponsor-/Partner-Kontakt — compactly.
- * Custom functions (Weitere Funktion) shown in a separate "Profile & Funktionen" row.
+ * Aktuelle Funktionen section (key UX improvement):
+ *   For each capacity flag (isPlayer, isTrainer), the section shows:
+ *   • Current active team assignment(s) with team name, role, and season.
+ *   • An actionable nudge when the capacity profile exists but NO current-season
+ *     team assignment is present — distinguishing the two concepts clearly.
+ *   PersonAssignment functions (Organisation) shown as a separate group.
  *
  * Security principle: this tab shows only data visible under people.view.
  * Medical, financial, and private document domains require separate
  * authorization and are intentionally excluded here.
  */
 
-import { Building2, Users2, Calendar, UserCheck, ShieldCheck, KeyRound, Star } from "lucide-react";
-import type { PersonAssignment, PersonSquadMembership, PersonTrainerMembership } from "@/lib/people/queries";
+import {
+  Building2,
+  Users2,
+  Calendar,
+  UserCheck,
+  ShieldCheck,
+  KeyRound,
+  Star,
+  AlertCircle,
+} from "lucide-react";
+import type {
+  PersonAssignment,
+  PersonSquadMembership,
+  PersonTrainerMembership,
+} from "@/lib/people/queries";
 import type { PersonDetail } from "@/lib/people/queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
 import { EmptyState } from "@/components/ui/page";
@@ -30,6 +48,8 @@ type PersonOverviewTabProps = {
     trainerMemberships: PersonTrainerMembership[];
   };
   activeSeason: { id: string; name: string; key: string } | null;
+  /** Optional: callback to navigate to a different workspace tab. */
+  onNavigateToTab?: (tab: "spieler" | "trainer" | "organisation") => void;
 };
 
 function formatDate(date: Date | string): string {
@@ -58,19 +78,21 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-/** Card for an active role/function */
-function RoleCard({
+/** Card for an active team assignment under a specific capacity */
+function CapacityAssignmentCard({
   icon,
   title,
-  subtitle,
   badge,
   meta,
+  onTabLink,
+  onTabLinkLabel,
 }: {
   icon: React.ReactNode;
   title: string;
-  subtitle?: string | null;
   badge?: string | null;
   meta?: Array<{ icon?: React.ReactNode; text: string }>;
+  onTabLink?: () => void;
+  onTabLinkLabel?: string;
 }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
@@ -86,9 +108,6 @@ function RoleCard({
             </span>
           ) : null}
         </div>
-        {subtitle ? (
-          <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
-        ) : null}
         {meta && meta.length > 0 ? (
           <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-[var(--muted)]">
             {meta.map((m, i) => (
@@ -98,6 +117,55 @@ function RoleCard({
               </span>
             ))}
           </div>
+        ) : null}
+      </div>
+      {onTabLink && onTabLinkLabel ? (
+        <button
+          type="button"
+          onClick={onTabLink}
+          className="shrink-0 self-center rounded-md px-2 py-1 text-xs font-medium text-[var(--sce-primary)] hover:bg-[var(--sce-accent)] transition"
+        >
+          {onTabLinkLabel} →
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Nudge card shown when a capacity profile exists but no current team assignment.
+ * Clearly distinguishes "capacity profile present" from "actual assignment present".
+ */
+function UnassignedCapacityNudge({
+  capacityLabel,
+  explanation,
+  onTabLink,
+  onTabLinkLabel,
+}: {
+  capacityLabel: string;
+  explanation: string;
+  onTabLink?: () => void;
+  onTabLinkLabel?: string;
+}) {
+  return (
+    <div
+      className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3"
+      data-testid="unassigned-capacity-nudge"
+    >
+      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+        <AlertCircle className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-semibold text-amber-800">{capacityLabel}</p>
+        <p className="mt-0.5 text-xs text-amber-700">{explanation}</p>
+        {onTabLink && onTabLinkLabel ? (
+          <button
+            type="button"
+            onClick={onTabLink}
+            className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+          >
+            {onTabLinkLabel}
+          </button>
         ) : null}
       </div>
     </div>
@@ -166,6 +234,7 @@ function CapacitiesRow({ person }: { person: PersonOverviewTabProps["person"] })
 export default function PersonWorkspaceOverviewTab({
   person,
   activeSeason,
+  onNavigateToTab,
 }: PersonOverviewTabProps) {
   const activeAssignments = person.assignments.filter((a) => a.status === "ACTIVE");
   const activeSquadMemberships = person.squadMemberships.filter(
@@ -173,7 +242,15 @@ export default function PersonWorkspaceOverviewTab({
   );
   const activeTrainerMemberships = person.trainerMemberships.filter((m) => m.status === "ACTIVE");
 
-  // Collect all unique active teams from all sources
+  // Capacity flags (from PersonDetail)
+  const isPlayerProfile = person.isPlayer === true;
+  const isTrainerProfile = person.isTrainer === true;
+
+  // Whether actual current assignments exist
+  const hasCurrentPlayerAssignment = activeSquadMemberships.length > 0;
+  const hasCurrentTrainerAssignment = activeTrainerMemberships.length > 0;
+
+  // Collect all unique active teams from all sources (for identity section)
   const activeTeamIds = new Set<string>();
   const activeTeamNames: string[] = [];
   for (const sm of activeSquadMemberships) {
@@ -207,10 +284,10 @@ export default function PersonWorkspaceOverviewTab({
     }
   }
 
-  const hasAnything =
-    activeAssignments.length > 0 ||
-    activeSquadMemberships.length > 0 ||
-    activeTrainerMemberships.length > 0;
+  // For the "Aktuelle Funktionen" section: check if there is anything to show
+  const hasCapacityRows = isPlayerProfile || isTrainerProfile;
+  const hasAssignmentRows = activeAssignments.length > 0;
+  const hasSomething = hasCapacityRows || hasAssignmentRows;
 
   return (
     <div className="space-y-8">
@@ -248,60 +325,134 @@ export default function PersonWorkspaceOverviewTab({
         </div>
       </div>
 
-      {/* ── Aktuelle Rollen & Funktionen ──────────────────────────── */}
+      {/* ── Aktuelle Funktionen ────────────────────────────────────
+       * PERSON-UX-07 UX-ACCEPTANCE: This section answers:
+       *   "Where is this Person currently a player / trainer?"
+       *
+       * For each capacity flag, we show either:
+       *   (a) the concrete current team assignment(s), or
+       *   (b) an actionable nudge distinguishing "profile exists, not yet
+       *       assigned to a team for the current season."
+       *
+       * PersonAssignment functions (Organisation) shown below as a separate
+       * group. The two concepts (capacity profile vs. team assignment) are
+       * visually distinct. ──────────────────────────────────────── */}
       <div>
-        <SectionHeader label="Aktuelle Rollen & Funktionen" />
+        <SectionHeader label="Aktuelle Funktionen" />
 
-        {!hasAnything ? (
+        {!hasSomething ? (
           <EmptyState
             icon={<Users2 className="h-8 w-8" />}
             heading="Noch keine Zuordnung"
-            description="Diese Person hat noch keine aktiven Rollen oder Zuordnungen."
+            description="Diese Person hat noch keine aktiven Profile oder Zuordnungen."
           />
         ) : (
-          <div className="space-y-2">
-            {/* Squad (player) memberships */}
-            {activeSquadMemberships.map((sm) => (
-              <RoleCard
-                key={sm.id}
-                icon={<Users2 className="h-4 w-4" />}
-                title={sm.teamSeason.team.name}
-                badge="Spieler/in"
-                meta={[
-                  { icon: <Calendar className="h-3 w-3" />, text: sm.teamSeason.season.name },
-                  ...(sm.positionLabel ? [{ text: sm.positionLabel }] : []),
-                  ...(sm.shirtNumber != null ? [{ text: `#${sm.shirtNumber}` }] : []),
-                  ...(sm.isCaptain ? [{ icon: <Star className="h-3 w-3" />, text: "Captain" }] : []),
-                ]}
-              />
-            ))}
+          <div className="space-y-3">
+            {/* ─ Spieler/in capacity ─ */}
+            {isPlayerProfile ? (
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  Spieler/in
+                </p>
+                {hasCurrentPlayerAssignment ? (
+                  <div className="space-y-2">
+                    {activeSquadMemberships.map((sm) => (
+                      <CapacityAssignmentCard
+                        key={sm.id}
+                        icon={<Users2 className="h-4 w-4" />}
+                        title={sm.teamSeason.team.name}
+                        badge="Spieler/in"
+                        meta={[
+                          { icon: <Calendar className="h-3 w-3" />, text: sm.teamSeason.season.name },
+                          ...(sm.positionLabel ? [{ text: sm.positionLabel }] : []),
+                          ...(sm.shirtNumber != null ? [{ text: `#${sm.shirtNumber}` }] : []),
+                          ...(sm.isCaptain ? [{ icon: <Star className="h-3 w-3" />, text: "Captain" }] : []),
+                        ]}
+                        onTabLink={onNavigateToTab ? () => onNavigateToTab("spieler") : undefined}
+                        onTabLinkLabel="Zum Spieler-Tab"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <UnassignedCapacityNudge
+                    capacityLabel="Spielerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
+                    explanation="Das Spielerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Kader-Zuordnungen werden über das Team-Management verwaltet."
+                    onTabLink={onNavigateToTab ? () => onNavigateToTab("spieler") : undefined}
+                    onTabLinkLabel="Zum Spieler-Tab"
+                  />
+                )}
+              </div>
+            ) : null}
 
-            {/* Trainer memberships */}
-            {activeTrainerMemberships.map((tm) => (
-              <RoleCard
-                key={tm.id}
-                icon={<UserCheck className="h-4 w-4" />}
-                title={tm.teamSeason.team.name}
-                badge={tm.roleLabel ?? "Trainer/in"}
-                meta={[
-                  { icon: <Calendar className="h-3 w-3" />, text: tm.teamSeason.season.name },
-                ]}
-              />
-            ))}
+            {/* ─ Trainer/in capacity ─ */}
+            {isTrainerProfile ? (
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                  Trainer/in
+                </p>
+                {hasCurrentTrainerAssignment ? (
+                  <div className="space-y-2">
+                    {activeTrainerMemberships.map((tm) => (
+                      <CapacityAssignmentCard
+                        key={tm.id}
+                        icon={<UserCheck className="h-4 w-4" />}
+                        title={tm.teamSeason.team.name}
+                        badge={tm.roleLabel ?? "Trainer/in"}
+                        meta={[
+                          { icon: <Calendar className="h-3 w-3" />, text: tm.teamSeason.season.name },
+                        ]}
+                        onTabLink={onNavigateToTab ? () => onNavigateToTab("trainer") : undefined}
+                        onTabLinkLabel="Zum Trainer-Tab"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <UnassignedCapacityNudge
+                    capacityLabel="Trainerprofil vorhanden – noch keinem Team für die aktuelle Saison zugeordnet"
+                    explanation="Das Trainerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung. Trainer-Zuordnungen werden über das Team-Management verwaltet."
+                    onTabLink={onNavigateToTab ? () => onNavigateToTab("trainer") : undefined}
+                    onTabLinkLabel="Zum Trainer-Tab"
+                  />
+                )}
+              </div>
+            ) : null}
 
-            {/* PersonAssignment functions */}
-            {activeAssignments.map((a) => (
-              <RoleCard
-                key={a.id}
-                icon={a.team ? <Users2 className="h-4 w-4" /> : <Building2 className="h-4 w-4" />}
-                title={a.team?.name ?? a.orgUnit?.name ?? "—"}
-                badge={getPersonFunctionLabel(a.functionKey)}
-                subtitle={a.team && a.orgUnit ? a.orgUnit.name : undefined}
-                meta={[
-                  ...(a.season ? [{ icon: <Calendar className="h-3 w-3" />, text: a.season.name }] : []),
-                ]}
-              />
-            ))}
+            {/* ─ PersonAssignment functions (Organisation) ─ */}
+            {activeAssignments.length > 0 ? (
+              <div>
+                {(isPlayerProfile || isTrainerProfile) ? (
+                  <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
+                    Weitere Funktionen
+                  </p>
+                ) : null}
+                <div className="space-y-2">
+                  {activeAssignments.map((a) => (
+                    <CapacityAssignmentCard
+                      key={a.id}
+                      icon={
+                        a.team ? (
+                          <Users2 className="h-4 w-4" />
+                        ) : (
+                          <Building2 className="h-4 w-4" />
+                        )
+                      }
+                      title={a.team?.name ?? a.orgUnit?.name ?? "—"}
+                      badge={getPersonFunctionLabel(a.functionKey)}
+                      meta={[
+                        ...(a.team && a.orgUnit
+                          ? [{ icon: <Building2 className="h-3 w-3" />, text: a.orgUnit.name }]
+                          : []),
+                        ...(a.season
+                          ? [{ icon: <Calendar className="h-3 w-3" />, text: a.season.name }]
+                          : []),
+                      ]}
+                      onTabLink={onNavigateToTab ? () => onNavigateToTab("organisation") : undefined}
+                      onTabLinkLabel="Zur Organisation"
+                    />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         )}
       </div>

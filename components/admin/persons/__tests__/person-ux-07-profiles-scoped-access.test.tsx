@@ -571,26 +571,26 @@ describe("12. Trainer capacity ≠ Trainer authorization", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("13. Capacity ≠ Assignment", () => {
-  it("isPlayer=true without squad memberships shows empty Spieler tab (no auto-assignment)", () => {
+  it("isPlayer=true without squad memberships shows actionable nudge in Spieler tab (no auto-assignment)", () => {
     renderTabs({
       person: { isPlayer: true, isTrainer: false },
       squads: [], // no squad memberships
     });
     // Spieler tab is shown
     fireEvent.click(screen.getByRole("tab", { name: /Spieler/ }));
-    // Shows empty state — no auto-created squad entries
+    // Shows actionable nudge — no auto-created squad entries
     const content = document.body.textContent ?? "";
-    expect(content).toContain("Kein aktiver Spielereinsatz");
+    expect(content).toContain("Noch keinem Team als Spieler/in zugeordnet");
   });
 
-  it("isTrainer=true without trainer memberships shows empty Trainer tab", () => {
+  it("isTrainer=true without trainer memberships shows actionable nudge in Trainer tab", () => {
     renderTabs({
       person: { isPlayer: false, isTrainer: true },
       trainers: [],
     });
     fireEvent.click(screen.getByRole("tab", { name: /Trainer/ }));
     const content = document.body.textContent ?? "";
-    expect(content).toContain("Kein aktiver Trainereinsatz");
+    expect(content).toContain("Noch keinem Team als Trainer/in zugeordnet");
   });
 });
 

@@ -22,7 +22,7 @@
  * Removing isPlayer capacity does NOT affect assessment permissions.
  */
 
-import { Users2, Trophy, Star, ChevronDown, ChevronRight } from "lucide-react";
+import { Users2, Trophy, Star, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import { useState } from "react";
 import type { PersonSquadMembership, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
 import { EmptyState } from "@/components/ui/page";
@@ -42,6 +42,11 @@ type PersonSpielerTabProps = {
   assessments?: PersonAssessmentRecord[];
   /** PERSON-UX-05/07: active criteria */
   criteria?: TenantCriterion[];
+  /**
+   * PERSON-UX-07 UX-ACCEPTANCE: optional callback to navigate to a sibling tab.
+   * Used for deep-link CTAs in empty/nudge states.
+   */
+  onNavigateToTab?: (tab: "organisation" | "trainer") => void;
 };
 
 type SeasonPlayerSnapshot = {
@@ -183,6 +188,7 @@ export default function PersonSpielerTab({
   canManageAssessments = false,
   assessments = [],
   criteria = [],
+  onNavigateToTab,
 }: PersonSpielerTabProps) {
   const activeSquads = squadMemberships.filter(
     (m) => m.status === "ACTIVE" || m.status === "INJURED" || m.status === "ABSENT",
@@ -202,10 +208,34 @@ export default function PersonSpielerTab({
             ))}
           </div>
         ) : (
-          <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
-            <p className="text-sm text-[var(--muted)]">
-              Kein aktiver Spielereinsatz in der laufenden Saison.
-            </p>
+          /* PERSON-UX-07 UX-ACCEPTANCE: Actionable nudge instead of passive message.
+           * The Spielerprofil exists (otherwise this tab would be hidden) but no
+           * current-season team assignment is present. Admin needs guidance. */
+          <div
+            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
+            data-testid="spieler-unassigned-nudge"
+          >
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+              <AlertCircle className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-amber-800">
+                Noch keinem Team als Spieler/in zugeordnet
+              </p>
+              <p className="mt-0.5 text-xs text-amber-700">
+                Das Spielerprofil ist vorhanden, aber für die aktuelle Saison besteht keine Teamzuordnung.
+                Kader-Zuordnungen werden über das Team-Management verwaltet.
+              </p>
+              {onNavigateToTab ? (
+                <button
+                  type="button"
+                  onClick={() => onNavigateToTab("organisation")}
+                  className="mt-2 inline-flex items-center rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-50 transition"
+                >
+                  Zur Organisation
+                </button>
+              ) : null}
+            </div>
           </div>
         )}
       </div>
