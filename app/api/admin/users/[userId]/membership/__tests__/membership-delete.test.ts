@@ -17,12 +17,12 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
+  requireAnyApiPermission: vi.fn(),
   removeTenantMembership: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-any-api-permission", () => ({
+  requireAnyApiPermission: mocks.requireAnyApiPermission,
 }));
 
 vi.mock("@/lib/users/mutations", () => ({
@@ -56,19 +56,19 @@ beforeEach(() => vi.clearAllMocks());
 
 describe("DELETE /api/admin/users/[userId]/membership", () => {
   it("1. 401 no session", async () => {
-    mocks.requireApiPermission.mockResolvedValue({ ok: false, status: 401, error: "Unauthorized" });
+    mocks.requireAnyApiPermission.mockResolvedValue({ ok: false, status: 401, error: "Unauthorized" });
     const res = await DELETE(makeReq(), makeParams());
     expect(res.status).toBe(401);
   });
 
   it("2. 403 no permission", async () => {
-    mocks.requireApiPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden" });
+    mocks.requireAnyApiPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden" });
     const res = await DELETE(makeReq(), makeParams());
     expect(res.status).toBe(403);
   });
 
   it("3. 403 no tenant context", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requireAnyApiPermission.mockResolvedValue({
       ok: true, session: { user: { id: ACTOR_ID, activeTenantId: null } }
     });
     const res = await DELETE(makeReq(), makeParams());
@@ -76,7 +76,7 @@ describe("DELETE /api/admin/users/[userId]/membership", () => {
   });
 
   it("4. self-removal blocked → 400", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requireAnyApiPermission.mockResolvedValue({
       ok: true, session: { user: { id: ACTOR_ID, activeTenantId: TENANT_ID } }
     });
     mocks.removeTenantMembership.mockRejectedValue(new RemoveMembershipDomainError("SELF_REMOVAL"));
@@ -87,7 +87,7 @@ describe("DELETE /api/admin/users/[userId]/membership", () => {
   });
 
   it("5. last Club Admin blocked → 400", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requireAnyApiPermission.mockResolvedValue({
       ok: true, session: { user: { id: ACTOR_ID, activeTenantId: TENANT_ID } }
     });
     mocks.removeTenantMembership.mockRejectedValue(new RemoveMembershipDomainError("LAST_CLUB_ADMIN"));
@@ -96,7 +96,7 @@ describe("DELETE /api/admin/users/[userId]/membership", () => {
   });
 
   it("6. membership not found → 404", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requireAnyApiPermission.mockResolvedValue({
       ok: true, session: { user: { id: ACTOR_ID, activeTenantId: TENANT_ID } }
     });
     mocks.removeTenantMembership.mockRejectedValue(new RemoveMembershipDomainError("MEMBERSHIP_NOT_FOUND"));
@@ -105,7 +105,7 @@ describe("DELETE /api/admin/users/[userId]/membership", () => {
   });
 
   it("7. success: 200 + success true, global User not deleted", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requireAnyApiPermission.mockResolvedValue({
       ok: true, session: { user: { id: ACTOR_ID, activeTenantId: TENANT_ID } }
     });
     mocks.removeTenantMembership.mockResolvedValue(undefined);

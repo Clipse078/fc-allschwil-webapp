@@ -6,6 +6,7 @@ import { Mail, Search, UserPlus, Users, UserX } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { EmptyState } from "@/components/ui/page/EmptyState";
+import UserRowActionsMenu from "@/components/admin/users/UserRowActionsMenu";
 import type { TenantUserItem, TenantPersonWithoutUser } from "@/lib/users/queries";
 
 type Props = {
@@ -13,6 +14,10 @@ type Props = {
   personsWithoutUser: TenantPersonWithoutUser[];
   currentUserId: string;
   canInvite: boolean;
+  /** Club Admin or platform Super Admin may manage memberships for this tenant. */
+  canManage?: boolean;
+  /** Platform-only: may permanently delete global user accounts. */
+  canGlobalDelete?: boolean;
 };
 
 function getRoleBadgeClass(roleKey: string): string {
@@ -31,6 +36,8 @@ export default function TenantUsersSearchableList({
   personsWithoutUser,
   currentUserId,
   canInvite,
+  canManage = false,
+  canGlobalDelete = false,
 }: Props) {
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -246,15 +253,22 @@ export default function TenantUsersSearchableList({
             const isEffectivelyActive = user.membershipIsActive && user.userIsActive;
 
             return (
-              <Link
+              <div
                 key={user.userId}
-                href={`/dashboard/admin/users/${user.userId}`}
-                className={`flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_160px] md:items-center md:gap-4 hover:bg-[var(--surface-2)] transition-colors ${
+                className={`group relative flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_160px] md:items-center md:gap-4 hover:bg-[var(--surface-2)] transition-colors ${
                   !isLast ? "border-b border-[var(--border)]" : ""
                 }`}
               >
+                {/* Full-row link (behind content) */}
+                <Link
+                  href={`/dashboard/admin/users/${user.userId}`}
+                  className="absolute inset-0"
+                  aria-label={`${user.name} öffnen`}
+                  tabIndex={-1}
+                />
+
                 {/* Benutzer column */}
-                <div className="flex min-w-0 items-center gap-3">
+                <div className="relative flex min-w-0 items-center gap-3 pointer-events-none">
                   <AdminAvatar name={user.name} size="sm" />
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -277,7 +291,7 @@ export default function TenantUsersSearchableList({
                 </div>
 
                 {/* Status column */}
-                <div>
+                <div className="relative pointer-events-none">
                   {user.pendingInvitation ? (
                     <AdminStatusPill label="Einladung ausstehend" tone="warning" />
                   ) : (
@@ -289,7 +303,7 @@ export default function TenantUsersSearchableList({
                 </div>
 
                 {/* Rollen column */}
-                <div className="flex flex-wrap gap-1.5">
+                <div className="relative flex flex-wrap gap-1.5 pointer-events-none">
                   {user.roles.length > 0 ? (
                     user.roles.map((role) => (
                       <span key={role.id} className={getRoleBadgeClass(role.key)}>
@@ -303,21 +317,36 @@ export default function TenantUsersSearchableList({
                   )}
                 </div>
 
-                {/* Zugriff column */}
-                <div className="flex flex-wrap gap-1.5">
-                  {user.pendingInvitation ? (
-                    <AdminStatusPill label="Einladung" tone="warning" />
-                  ) : isEffectivelyActive ? (
-                    <AdminStatusPill label="Mitglied" tone="success" />
-                  ) : !user.membershipIsActive && user.userIsActive ? (
-                    <AdminStatusPill label="Zugriff gesperrt" tone="muted" />
-                  ) : user.membershipIsActive && !user.userIsActive ? (
-                    <AdminStatusPill label="Konto inaktiv" tone="warning" />
-                  ) : (
-                    <AdminStatusPill label="Inaktiv" tone="muted" />
-                  )}
+                {/* Zugriff / Aktionen column */}
+                <div className="relative flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1.5 pointer-events-none">
+                    {user.pendingInvitation ? (
+                      <AdminStatusPill label="Einladung" tone="warning" />
+                    ) : isEffectivelyActive ? (
+                      <AdminStatusPill label="Mitglied" tone="success" />
+                    ) : !user.membershipIsActive && user.userIsActive ? (
+                      <AdminStatusPill label="Zugriff gesperrt" tone="muted" />
+                    ) : user.membershipIsActive && !user.userIsActive ? (
+                      <AdminStatusPill label="Konto inaktiv" tone="warning" />
+                    ) : (
+                      <AdminStatusPill label="Inaktiv" tone="muted" />
+                    )}
+                  </div>
+
+                  {/* ••• actions menu — relative so it escapes the full-row link */}
+                  <UserRowActionsMenu
+                    userId={user.userId}
+                    userName={user.name}
+                    userEmail={user.email}
+                    pendingInvitation={user.pendingInvitation}
+                    canManageMembership={canManage}
+                    canGlobalDelete={canGlobalDelete}
+                    isSelf={isCurrentUser}
+                    linkedPersonName={user.linkedPersonName ?? null}
+                    tenantRoleNames={user.roles.map((r) => r.name)}
+                  />
                 </div>
-              </Link>
+              </div>
             );
           })}
 

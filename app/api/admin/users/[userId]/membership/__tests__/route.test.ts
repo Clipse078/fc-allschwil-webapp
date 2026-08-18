@@ -3,7 +3,7 @@
  *
  * Covers:
  *   - Authentication (unauthenticated → 401)
- *   - Manage permission required (users.manage)
+ *   - Manage permission required (users.manage OR users.manage_memberships)
  *   - Tenant context required
  *   - Valid body required
  *   - Tenant user detail loads (200 success)
@@ -14,14 +14,17 @@
  *   - Last Club Admin protected (400)
  *   - Mutation not called on auth failure
  *   - Internal error → 500
+ *
+ * ADMIN-HARD-DELETE: route now uses requireAnyApiPermission([users.manage, users.manage_memberships])
+ * so that Club Admins (who hold users.manage_memberships) can also invoke it.
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: vi.fn(),
+vi.mock("@/lib/permissions/require-any-api-permission", () => ({
+  requireAnyApiPermission: vi.fn(),
 }));
 
 vi.mock("@/lib/users/mutations", async (importOriginal) => {
@@ -33,10 +36,10 @@ vi.mock("@/lib/users/mutations", async (importOriginal) => {
 });
 
 // Import modules after mock declarations
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requireAnyApiPermission } from "@/lib/permissions/require-any-api-permission";
 import { setTenantMembershipActive, MembershipDomainError } from "@/lib/users/mutations";
 
-const mockRequireApiPermission = vi.mocked(requireApiPermission);
+const mockRequireAnyApiPermission = vi.mocked(requireAnyApiPermission);
 const mockSetTenantMembershipActive = vi.mocked(setTenantMembershipActive);
 
 // Import route after mocks
@@ -108,7 +111,7 @@ function makeContext(userId = USER_ID) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockRequireApiPermission.mockResolvedValue(AUTH_OK as Awaited<ReturnType<typeof requireApiPermission>>);
+  mockRequireAnyApiPermission.mockResolvedValue(AUTH_OK as Awaited<ReturnType<typeof requireAnyApiPermission>>);
   mockSetTenantMembershipActive.mockResolvedValue(undefined);
 });
 
@@ -122,7 +125,7 @@ afterEach(() => {
 
 describe("PATCH /api/admin/users/[userId]/membership — authentication", () => {
   it("AUTH-1. returns 401 when unauthenticated", async () => {
-    mockRequireApiPermission.mockResolvedValue(UNAUTHENTICATED as Awaited<ReturnType<typeof requireApiPermission>>);
+    mockRequireAnyApiPermission.mockResolvedValue(UNAUTHENTICATED as Awaited<ReturnType<typeof requireAnyApiPermission>>);
 
     const res = await PATCH(makeRequest({ isActive: false }), makeContext());
 
@@ -130,17 +133,19 @@ describe("PATCH /api/admin/users/[userId]/membership — authentication", () => 
   });
 
   it("AUTH-2. mutation not called when unauthenticated", async () => {
-    mockRequireApiPermission.mockResolvedValue(UNAUTHENTICATED as Awaited<ReturnType<typeof requireApiPermission>>);
+    mockRequireAnyApiPermission.mockResolvedValue(UNAUTHENTICATED as Awaited<ReturnType<typeof requireAnyApiPermission>>);
 
     await PATCH(makeRequest({ isActive: false }), makeContext());
 
     expect(mockSetTenantMembershipActive).not.toHaveBeenCalled();
   });
 
-  it("AUTH-3. passes users.manage to the permission gate", async () => {
+  it("AUTH-3. passes users.manage and users.manage_memberships to the permission gate", async () => {
     await PATCH(makeRequest({ isActive: false }), makeContext());
 
-    expect(mockRequireApiPermission).toHaveBeenCalledWith("users.manage");
+    expect(mockRequireAnyApiPermission).toHaveBeenCalledWith(
+      expect.arrayContaining(["users.manage", "users.manage_memberships"]),
+    );
   });
 });
 
@@ -150,7 +155,7 @@ describe("PATCH /api/admin/users/[userId]/membership — authentication", () => 
 
 describe("PATCH /api/admin/users/[userId]/membership — authorization", () => {
   it("AUTHZ-1. returns 403 when permission denied", async () => {
-    mockRequireApiPermission.mockResolvedValue(FORBIDDEN as Awaited<ReturnType<typeof requireApiPermission>>);
+    mockRequireAnyApiPermission.mockResolvedValue(FORBIDDEN as Awaited<ReturnType<typeof requireAnyApiPermission>>);
 
     const res = await PATCH(makeRequest({ isActive: false }), makeContext());
 
@@ -158,7 +163,7 @@ describe("PATCH /api/admin/users/[userId]/membership — authorization", () => {
   });
 
   it("AUTHZ-2. mutation not called when forbidden", async () => {
-    mockRequireApiPermission.mockResolvedValue(FORBIDDEN as Awaited<ReturnType<typeof requireApiPermission>>);
+    mockRequireAnyApiPermission.mockResolvedValue(FORBIDDEN as Awaited<ReturnType<typeof requireAnyApiPermission>>);
 
     await PATCH(makeRequest({ isActive: false }), makeContext());
 
@@ -172,7 +177,7 @@ describe("PATCH /api/admin/users/[userId]/membership — authorization", () => {
 
 describe("PATCH /api/admin/users/[userId]/membership — tenant isolation", () => {
   it("ISO-1. returns 403 when session has no activeTenantId", async () => {
-    mockRequireApiPermission.mockResolvedValue(AUTH_OK_NO_TENANT as Awaited<ReturnType<typeof requireApiPermission>>);
+    mockRequireAnyApiPermission.mockResolvedValue(AUTH_OK_NO_TENANT as Awaited<ReturnType<typeof requireAnyApiPermission>>);
 
     const res = await PATCH(makeRequest({ isActive: false }), makeContext());
 

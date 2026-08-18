@@ -185,7 +185,7 @@ export default function MembershipAccessControl({
                 className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-red-200 bg-transparent px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                Zugriff dauerhaft entfernen
+                Aus Verein entfernen
               </button>
             </div>
           </div>
@@ -205,7 +205,7 @@ export default function MembershipAccessControl({
       <Dialog
         open={showRemoveDialog}
         onClose={() => !removing && setShowRemoveDialog(false)}
-        title="Zugriff dauerhaft entfernen"
+        title="Aus Verein entfernen"
         description={`„${userName}" (${userEmail}) dauerhaft aus diesem Club entfernen.`}
         footer={
           <div className="flex flex-col gap-2">
@@ -221,7 +221,7 @@ export default function MembershipAccessControl({
                 Abbrechen
               </Button>
               <Button variant="danger" onClick={doRemoveMembership} loading={removing}>
-                Dauerhaft entfernen
+                Aus Verein entfernen
               </Button>
             </div>
           </div>

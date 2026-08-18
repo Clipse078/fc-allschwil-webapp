@@ -17,6 +17,12 @@ export default async function AdminUsersPage() {
 
   const currentUserId = session.user.effectiveUserId ?? session.user.id;
   const canInvite = hasPermission(session, PERMISSIONS.USERS_INVITE);
+  // Club Admins hold USERS_MANAGE_MEMBERSHIPS (TENANT); platform Super Admins hold USERS_MANAGE.
+  const canManage =
+    hasPermission(session, PERMISSIONS.USERS_MANAGE_MEMBERSHIPS) ||
+    hasPermission(session, PERMISSIONS.USERS_MANAGE);
+  // Global hard-delete is platform-only (USERS_DELETE, scope=PLATFORM).
+  const canGlobalDelete = hasPermission(session, PERMISSIONS.USERS_DELETE);
 
   const [users, personsWithoutUser] = await Promise.all([
     getTenantUsersListData(tenantId).catch(() => []),
@@ -35,6 +41,8 @@ export default async function AdminUsersPage() {
         personsWithoutUser={personsWithoutUser}
         currentUserId={currentUserId}
         canInvite={canInvite}
+        canManage={canManage}
+        canGlobalDelete={canGlobalDelete}
       />
     </div>
   );
