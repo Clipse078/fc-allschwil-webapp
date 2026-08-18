@@ -37,6 +37,32 @@ export const PERMISSIONS = {
   // "<module>.delete" convention established by TEAMS_DELETE (ADMIN-DELETE-01A).
   PEOPLE_DELETE: "people.delete",
 
+  // PERSON-UX-03: Granular Person-domain permissions.
+  // Sensitive domains require explicit authorization — people.view alone does
+  // NOT imply any of the following. Each is independently assignable by a
+  // Club Admin through the role-management UI (all are grantableByAdmin=true,
+  // scope=TENANT). No named role receives these automatically; assignment is
+  // always via configurable RolePermission rows.
+  //
+  // Canonical domain-to-permission mapping (reused by AUDIT-01):
+  //   Development / assessments → PEOPLE_DEVELOPMENT_VIEW / _MANAGE
+  //   Assessments sub-type      → PEOPLE_ASSESSMENTS_VIEW / _MANAGE
+  //   Health / medical          → PEOPLE_HEALTH_VIEW / _MANAGE
+  //   Finance                   → PEOPLE_FINANCE_VIEW / _MANAGE
+  //   Private documents         → PEOPLE_PRIVATE_DOCUMENTS_VIEW / _MANAGE
+  //   Audit history             → PEOPLE_AUDIT_VIEW
+  PEOPLE_DEVELOPMENT_VIEW: "people.development.view",
+  PEOPLE_DEVELOPMENT_MANAGE: "people.development.manage",
+  PEOPLE_ASSESSMENTS_VIEW: "people.assessments.view",
+  PEOPLE_ASSESSMENTS_MANAGE: "people.assessments.manage",
+  PEOPLE_HEALTH_VIEW: "people.health.view",
+  PEOPLE_HEALTH_MANAGE: "people.health.manage",
+  PEOPLE_FINANCE_VIEW: "people.finance.view",
+  PEOPLE_FINANCE_MANAGE: "people.finance.manage",
+  PEOPLE_PRIVATE_DOCUMENTS_VIEW: "people.private_documents.view",
+  PEOPLE_PRIVATE_DOCUMENTS_MANAGE: "people.private_documents.manage",
+  PEOPLE_AUDIT_VIEW: "people.audit.view",
+
   EVENTS_VIEW: "events.view",
   EVENTS_MANAGE: "events.manage",
   EVENTS_IMPORT: "events.import",
