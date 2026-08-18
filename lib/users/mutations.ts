@@ -597,8 +597,10 @@ export async function revokeTenantInvitation(
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
 
+  // Delete only the invitation token for this specific tenant — never touch
+  // tokens issued for other tenants or normal password-reset tokens.
   const deleted = await prisma.passwordResetToken.deleteMany({
-    where: { userId, isInvitation: true, usedAt: null },
+    where: { userId, isInvitation: true, invitationTenantId: tenantId, usedAt: null },
   });
 
   if (deleted.count === 0) throw new InvitationDomainError("NO_ACTIVE_INVITATION");
@@ -656,9 +658,11 @@ async function _createInvitationToken(userId: string, tenantId: string): Promise
   const tokenHash = hashResetToken(rawToken);
   const expiresAt = new Date(Date.now() + INVITATION_EXPIRY_MS);
 
-  // Invalidate all prior invitation tokens (not reset tokens — those are separate).
+  // Invalidate prior invitation tokens for this user+tenant only.
+  // Tokens for other tenants are deliberately left untouched so a simultaneous
+  // invitation to Tenant C is never cancelled when issuing one to Tenant B.
   await prisma.passwordResetToken.deleteMany({
-    where: { userId, isInvitation: true },
+    where: { userId, isInvitation: true, invitationTenantId: tenantId },
   });
 
   await prisma.passwordResetToken.create({
@@ -686,7 +690,7 @@ async function _ensureMembershipAndResendInvitation(
     // Check if there's already a pending invitation token; if so, resend.
     // If they're fully active (have logged in), reject to avoid confusion.
     const hasActiveInvite = await prisma.passwordResetToken.findFirst({
-      where: { userId, isInvitation: true, usedAt: null, expiresAt: { gt: new Date() } },
+      where: { userId, isInvitation: true, invitationTenantId: tenantId, usedAt: null, expiresAt: { gt: new Date() } },
       select: { id: true },
     });
     if (!hasActiveInvite) {

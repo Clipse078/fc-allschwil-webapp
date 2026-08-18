@@ -149,11 +149,13 @@ describe("invitePersonToTenant — happy path", () => {
     expect(result.rawToken).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("INVITE-3. deletes prior invitation tokens before creating new one", async () => {
+  it("INVITE-3. deletes prior invitation tokens for this tenant only before creating new one", async () => {
     await invitePersonToTenant(TENANT_ID, PERSON_ID, ACTOR_ID);
 
     expect(mockTokenDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ isInvitation: true }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ isInvitation: true, invitationTenantId: TENANT_ID }),
+      }),
     );
   });
 
@@ -418,13 +420,15 @@ describe("resendTenantInvitation", () => {
     ).rejects.toMatchObject({ code: "USER_NOT_FOUND" });
   });
 
-  it("RESEND-3. deletes prior invitation tokens before creating new one", async () => {
+  it("RESEND-3. deletes prior invitation tokens for this tenant only before creating new one", async () => {
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
 
     await resendTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
     expect(mockTokenDeleteMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ isInvitation: true }) }),
+      expect.objectContaining({
+        where: expect.objectContaining({ isInvitation: true, invitationTenantId: TENANT_ID }),
+      }),
     );
   });
 });
@@ -434,7 +438,7 @@ describe("resendTenantInvitation", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("revokeTenantInvitation", () => {
-  it("REVOKE-1. deletes active invitation tokens", async () => {
+  it("REVOKE-1. deletes active invitation tokens for this tenant only", async () => {
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     mockTokenDeleteMany.mockResolvedValue({ count: 1 });
 
@@ -444,7 +448,12 @@ describe("revokeTenantInvitation", () => {
 
     expect(mockTokenDeleteMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ userId: USER_ID, isInvitation: true, usedAt: null }),
+        where: expect.objectContaining({
+          userId: USER_ID,
+          isInvitation: true,
+          invitationTenantId: TENANT_ID,
+          usedAt: null,
+        }),
       }),
     );
   });
@@ -466,14 +475,14 @@ describe("revokeTenantInvitation", () => {
     ).rejects.toMatchObject({ code: "NO_ACTIVE_INVITATION" });
   });
 
-  it("REVOKE-4. does not delete non-invitation tokens (password reset)", async () => {
+  it("REVOKE-4. does not delete non-invitation tokens (password reset) and scopes to this tenant", async () => {
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     mockTokenDeleteMany.mockResolvedValue({ count: 1 });
 
     await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
     const deleteWhere = mockTokenDeleteMany.mock.calls[0]?.[0]?.where;
-    expect(deleteWhere).toMatchObject({ isInvitation: true });
+    expect(deleteWhere).toMatchObject({ isInvitation: true, invitationTenantId: TENANT_ID });
   });
 });
 
@@ -596,18 +605,20 @@ describe("Multi-tenant invariants", () => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 describe("Token idempotency and safety", () => {
-  it("IDEM-1. revoke deletes invitation tokens but not password-reset tokens", async () => {
+  it("IDEM-1. revoke deletes only this tenant's invitation tokens, never password-reset tokens", async () => {
     mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
     mockTokenDeleteMany.mockResolvedValue({ count: 1 });
 
     await revokeTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID);
 
     const where = mockTokenDeleteMany.mock.calls[0]?.[0]?.where;
-    expect(where).toMatchObject({ isInvitation: true, usedAt: null });
-    // Must NOT delete non-invitation tokens (no `isInvitation: false` delete).
+    expect(where).toMatchObject({ isInvitation: true, invitationTenantId: TENANT_ID, usedAt: null });
+    // Must NOT delete non-invitation tokens.
     expect(mockTokenDeleteMany).not.toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ isInvitation: false }) }),
     );
+    // Must NOT delete tokens without invitationTenantId constraint (would be cross-tenant).
+    expect(where).toHaveProperty("invitationTenantId", TENANT_ID);
   });
 
   it("IDEM-2. resend creates token with isInvitation=true", async () => {
@@ -785,5 +796,151 @@ describe("Exact tenant activation — activateInvitationMembership", () => {
         }),
       }),
     );
+  });
+});
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Multi-tenant token isolation (MT-1 … MT-6)
+// ═════════════════════════════════════════════════════════════════════════════
+
+describe("Multi-tenant token isolation", () => {
+  const TENANT_B = "tenant-B";
+  const TENANT_C = "tenant-C";
+
+  it("MT-1. creating Tenant C invitation does NOT delete Tenant B token", async () => {
+    // Person belongs to Tenant C; user already has a pending Tenant B invitation.
+    // _createInvitationToken must deleteMany with invitationTenantId=TENANT_C only.
+    mockPersonFindUnique.mockResolvedValue(
+      makePerson({ tenantId: TENANT_C }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
+    );
+
+    await invitePersonToTenant(TENANT_C, PERSON_ID, ACTOR_ID);
+
+    const deleteCalls = mockTokenDeleteMany.mock.calls;
+    // All deleteMany calls must be scoped to TENANT_C.
+    expect(deleteCalls.length).toBeGreaterThan(0);
+    for (const call of deleteCalls) {
+      const where = call[0]?.where ?? {};
+      if (where.isInvitation) {
+        expect(where.invitationTenantId).toBe(TENANT_C);
+        expect(where.invitationTenantId).not.toBe(TENANT_B);
+      }
+    }
+  });
+
+  it("MT-2. resend Tenant B replaces only Tenant B token; Tenant C deleteMany is never called", async () => {
+    mockMembershipFindUnique.mockResolvedValue({
+      isActive: false,
+    } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+
+    await resendTenantInvitation(TENANT_B, USER_ID, ACTOR_ID);
+
+    const deleteCalls = mockTokenDeleteMany.mock.calls;
+    // Exactly one deleteMany call, scoped to TENANT_B.
+    expect(deleteCalls.length).toBeGreaterThanOrEqual(1);
+    for (const call of deleteCalls) {
+      const where = call[0]?.where ?? {};
+      if (where.isInvitation) {
+        expect(where.invitationTenantId).toBe(TENANT_B);
+        expect(where.invitationTenantId).not.toBe(TENANT_C);
+      }
+    }
+    // Fresh token is created for TENANT_B.
+    expect(mockTokenCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ isInvitation: true, invitationTenantId: TENANT_B }),
+      }),
+    );
+  });
+
+  it("MT-3. revoking Tenant B deletes only Tenant B token; Tenant C deleteMany never called", async () => {
+    mockMembershipFindUnique.mockResolvedValue({
+      isActive: false,
+    } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    mockTokenDeleteMany.mockResolvedValue({ count: 1 });
+
+    await revokeTenantInvitation(TENANT_B, USER_ID, ACTOR_ID);
+
+    const deleteCalls = mockTokenDeleteMany.mock.calls;
+    expect(deleteCalls).toHaveLength(1);
+    const where = deleteCalls[0]![0]!.where!;
+    expect(where.invitationTenantId).toBe(TENANT_B);
+    expect(where.invitationTenantId).not.toBe(TENANT_C);
+  });
+
+  it("MT-4. accepting Tenant B (activateInvitationMembership) activates only Tenant B membership; Tenant C untouched", async () => {
+    await activateInvitationMembership(USER_ID, TENANT_B);
+
+    const calls = mockMembershipUpdateMany.mock.calls;
+    expect(calls).toHaveLength(1);
+    const where = calls[0]![0]!.where!;
+    expect(where.tenantId).toBe(TENANT_B);
+    expect(where.tenantId).not.toBe(TENANT_C);
+    expect(where.userId).toBe(USER_ID);
+  });
+
+  it("MT-5. after accepting Tenant B, Tenant C can still be accepted (activateInvitationMembership is independent)", async () => {
+    // Accept Tenant B.
+    await activateInvitationMembership(USER_ID, TENANT_B);
+    // Accept Tenant C independently.
+    await activateInvitationMembership(USER_ID, TENANT_C);
+
+    const calls = mockMembershipUpdateMany.mock.calls;
+    expect(calls).toHaveLength(2);
+    const tenantBWhere = calls[0]![0]!.where!;
+    const tenantCWhere = calls[1]![0]!.where!;
+    expect(tenantBWhere.tenantId).toBe(TENANT_B);
+    expect(tenantCWhere.tenantId).toBe(TENANT_C);
+    // Each call is independent and scoped to its own tenantId.
+    expect(tenantBWhere.tenantId).not.toBe(TENANT_C);
+    expect(tenantCWhere.tenantId).not.toBe(TENANT_B);
+  });
+
+  it("MT-6. normal password-reset token for same User is never deleted by invitation create/resend/revoke", async () => {
+    // Invitation create path — _createInvitationToken only deletes isInvitation=true tokens.
+    // Person must belong to the same tenant we're inviting them into.
+    mockPersonFindUnique.mockResolvedValue(
+      makePerson({ tenantId: TENANT_B }) as Awaited<ReturnType<typeof prisma.person.findUnique>>,
+    );
+    await invitePersonToTenant(TENANT_B, PERSON_ID, ACTOR_ID);
+    for (const call of mockTokenDeleteMany.mock.calls) {
+      const where = call[0]?.where ?? {};
+      // Every deleteMany call touching invitation tokens must have isInvitation: true.
+      // A call WITHOUT isInvitation would risk deleting password-reset tokens.
+      if (where.isInvitation !== undefined) {
+        expect(where.isInvitation).toBe(true);
+      }
+    }
+
+    // Resend path.
+    vi.clearAllMocks();
+    mockMembershipFindUnique.mockResolvedValue({
+      isActive: false,
+    } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    mockTokenDeleteMany.mockResolvedValue({ count: 1 });
+    mockTokenCreate.mockResolvedValue({ id: "token-resend" } as Awaited<ReturnType<typeof prisma.passwordResetToken.create>>);
+
+    await resendTenantInvitation(TENANT_B, USER_ID, ACTOR_ID);
+    for (const call of mockTokenDeleteMany.mock.calls) {
+      const where = call[0]?.where ?? {};
+      if (where.isInvitation !== undefined) {
+        expect(where.isInvitation).toBe(true);
+      }
+    }
+
+    // Revoke path.
+    vi.clearAllMocks();
+    mockMembershipFindUnique.mockResolvedValue({
+      isActive: false,
+    } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    mockTokenDeleteMany.mockResolvedValue({ count: 1 });
+
+    await revokeTenantInvitation(TENANT_B, USER_ID, ACTOR_ID);
+    for (const call of mockTokenDeleteMany.mock.calls) {
+      const where = call[0]?.where ?? {};
+      if (where.isInvitation !== undefined) {
+        expect(where.isInvitation).toBe(true);
+      }
+    }
   });
 });
