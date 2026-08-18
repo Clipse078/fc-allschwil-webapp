@@ -52,7 +52,7 @@ import {
   FolderOpen,
   KeyRound,
 } from "lucide-react";
-import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
+import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord, PersonAssessmentRecord, PersonDocumentItem, TenantCriterion } from "@/lib/people/queries";
 import type { PersonAccessRole, PersonAccessLinkedUser } from "./PersonAccessRolesCard";
 import type { PersonDomainPermissions } from "@/lib/people/person-domain-auth";
 import { resolvePersonCapacities } from "@/lib/people/capacity";
@@ -65,6 +65,7 @@ import PersonSportTab from "./PersonSportTab";
 import PersonZugangTab from "./PersonZugangTab";
 import PersonDomainPlaceholder from "./PersonDomainPlaceholder";
 import PersonMembershipTab from "./PersonMembershipTab";
+import PersonDocumentTab from "./PersonDocumentTab";
 
 type Tab =
   | "uebersicht"
@@ -112,6 +113,11 @@ type PersonDetailTabsProps = {
   assessments?: PersonAssessmentRecord[];
   /** PERSON-UX-05: Active criteria for assessment forms. */
   criteria?: TenantCriterion[];
+  /**
+   * PERSON-UX-07: Pre-fetched PersonDocuments (metadata only; no storage URLs).
+   * Only populated when viewer holds people.private_documents.view permission.
+   */
+  documents?: PersonDocumentItem[];
 };
 
 /**
@@ -150,6 +156,7 @@ export default function PersonDetailTabs({
   memberships = [],
   assessments = [],
   criteria = [],
+  documents = [],
 }: PersonDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
 
@@ -172,12 +179,13 @@ export default function PersonDetailTabs({
   // ── Domain permission flags ─────────────────────────────────────────────
   // Fail-closed: if domainPermissions is not provided, all sensitive tabs
   // are hidden. This matches the fail-closed design of the RPERM system.
-  const canViewFinance           = domainPermissions?.canViewFinance ?? false;
-  const canViewHealth            = domainPermissions?.canViewHealth ?? false;
-  const canViewPrivateDocuments  = domainPermissions?.canViewPrivateDocuments ?? false;
-  const canViewDevelopment       = domainPermissions?.canViewDevelopment ?? false;
-  const canViewAssessments       = domainPermissions?.canViewAssessments ?? false;
-  const canManageAssessments     = domainPermissions?.canManageAssessments ?? false;
+  const canViewFinance              = domainPermissions?.canViewFinance ?? false;
+  const canViewHealth               = domainPermissions?.canViewHealth ?? false;
+  const canViewPrivateDocuments     = domainPermissions?.canViewPrivateDocuments ?? false;
+  const canManagePrivateDocuments   = domainPermissions?.canManagePrivateDocuments ?? false;
+  const canViewDevelopment          = domainPermissions?.canViewDevelopment ?? false;
+  const canViewAssessments          = domainPermissions?.canViewAssessments ?? false;
+  const canManageAssessments        = domainPermissions?.canManageAssessments ?? false;
 
   // ── Counts for badges ──────────────────────────────────────────────────────
   const activeAssignmentCount = person.assignments.filter(
@@ -488,7 +496,8 @@ export default function PersonDetailTabs({
           </div>
         ) : null}
 
-        {/* Dokumente — rendered only when viewer holds people.private_documents.view */}
+        {/* Dokumente — Person-bound. Visible iff viewer holds people.private_documents.view. */}
+        {/* PERSON-UX-07: tab is ALWAYS person-bound (not capacity-dependent). */}
         {canViewPrivateDocuments ? (
           <div
             role="tabpanel"
@@ -497,12 +506,10 @@ export default function PersonDetailTabs({
             hidden={safeActiveTab !== "dokumente"}
           >
             {safeActiveTab === "dokumente" ? (
-              <PersonDomainPlaceholder
-                icon={<FolderOpen className="h-6 w-6" />}
-                title="Persönliche Dokumente"
-                description="Vereinbarungen, Formulare, Zertifikate und streng private Dokumente
-                  dieser Person werden in einem späteren Modul implementiert."
-                plannedFor="PERSON-UX-0x (Dokumente)"
+              <PersonDocumentTab
+                personId={person.id}
+                initialDocuments={documents}
+                canManage={canManagePrivateDocuments}
               />
             ) : null}
           </div>

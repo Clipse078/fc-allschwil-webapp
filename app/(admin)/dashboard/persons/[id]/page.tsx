@@ -25,6 +25,7 @@ import {
   getPersonTrainerMemberships,
   getPersonMemberships,
   getPersonAssessments,
+  getPersonDocuments,
   getTenantActiveCriteria,
 } from "@/lib/people/queries";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
@@ -98,6 +99,11 @@ export default async function PersonDetailPage({ params }: PageProps) {
         getTenantActiveCriteria(tenantId),
       ])
     : [[], []];
+
+  // PERSON-UX-07: Fetch documents only when viewer holds people.private_documents.view.
+  const personDocuments = domainPermissions.canViewPrivateDocuments && tenantId
+    ? await getPersonDocuments(id, tenantId)
+    : [];
 
   const fullName = person.displayName || `${person.firstName} ${person.lastName}`;
 
@@ -304,6 +310,7 @@ export default async function PersonDetailPage({ params }: PageProps) {
           memberships={personMemberships}
           assessments={personAssessments}
           criteria={tenantCriteria}
+          documents={personDocuments}
         />
       </DetailPagePattern>
     </PageShell>

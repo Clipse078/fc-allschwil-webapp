@@ -846,7 +846,9 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getAllByText("Gesundheit").length).toBeGreaterThanOrEqual(2); // tab + placeholder title
 
     fireEvent.click(screen.getByRole("tab", { name: /Dokumente/ }));
-    // "Persönliche Dokumente" appears as the placeholder title
-    expect(screen.getAllByText(/Persönliche Dokumente/).length).toBeGreaterThan(0);
+    // PERSON-UX-07: Dokumente tab now renders real PersonDocumentTab (not a placeholder).
+    // Verify the real tab renders (empty state or security notice).
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Datenschutz");
   });
 });
