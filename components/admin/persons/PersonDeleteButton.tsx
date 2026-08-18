@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Trash2, User } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
@@ -23,6 +23,18 @@ type PersonDeleteButtonProps = {
   /** Called after successful deletion. If omitted, navigates to /dashboard/persons. */
   onSuccess?: () => void;
   /**
+   * When true the confirmation dialog opens (and the impact preview fetch fires)
+   * immediately on mount. Use together with `key` to create a fresh instance per
+   * person. Intended for list-row usage where the trigger lives outside this
+   * component (e.g. a DropdownMenu).
+   */
+  autoOpen?: boolean;
+  /**
+   * Called when the dialog is dismissed without confirming (cancel button, X,
+   * Escape, backdrop click). Not called on successful deletion.
+   */
+  onCancel?: () => void;
+  /**
    * Custom trigger renderer. When provided, replaces the default red-bordered button.
    * Call the supplied `onClick` to open the confirmation dialog.
    */
@@ -37,13 +49,16 @@ type PersonDeleteButtonProps = {
  * Clicking "Endgültig löschen" sends DELETE ?confirm=true to permanently
  * remove the Person. Global User account is explicitly shown as preserved.
  */
-export default function PersonDeleteButton({ personId, personName, onSuccess, renderTrigger }: PersonDeleteButtonProps) {
+export default function PersonDeleteButton({ personId, personName, onSuccess, onCancel, autoOpen, renderTrigger }: PersonDeleteButtonProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loadingImpact, setLoadingImpact] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [impact, setImpact] = useState<PersonDeletionImpact | null>(null);
+
+  // Stable ref so the effect below doesn't need openConfirmation in its deps.
+  const openConfirmationRef = useRef<() => void>(null!);
 
   async function openConfirmation() {
     setOpen(true);
@@ -68,6 +83,16 @@ export default function PersonDeleteButton({ personId, personName, onSuccess, re
       setLoadingImpact(false);
     }
   }
+
+  // Keep the ref in sync so the mount effect always calls the latest version.
+  openConfirmationRef.current = openConfirmation;
+
+  // When the component is mounted with autoOpen=true (list-row usage) trigger
+  // the preview immediately. Using a ref avoids adding openConfirmation to deps.
+  useEffect(() => {
+    if (autoOpen) openConfirmationRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleConfirmDelete() {
     setDeleting(true);
@@ -119,7 +144,12 @@ export default function PersonDeleteButton({ personId, personName, onSuccess, re
 
       <Dialog
         open={open}
-        onClose={() => !deleting && setOpen(false)}
+        onClose={() => {
+          if (!deleting) {
+            setOpen(false);
+            onCancel?.();
+          }
+        }}
         title="Person endgültig löschen"
         description={`„${personName}" dauerhaft und unwiderruflich aus dem System entfernen.`}
         footer={
@@ -130,7 +160,10 @@ export default function PersonDeleteButton({ personId, personName, onSuccess, re
             <div className="flex items-center justify-end gap-3">
               <Button
                 variant="secondary"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  onCancel?.();
+                }}
                 disabled={deleting || loadingImpact}
               >
                 Abbrechen

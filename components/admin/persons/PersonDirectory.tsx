@@ -105,6 +105,7 @@ export default function PersonDirectory({
   const [showFilters, setShowFilters] = useState(false);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [personToDelete, setPersonToDelete] = useState<{ id: string; name: string } | null>(null);
 
   const hasActiveFilters =
     filterOrgUnitId !== "" || filterTeamId !== "" || filterStatus !== "";
@@ -439,7 +440,7 @@ export default function PersonDirectory({
                     <AdminStatusPill label="Inaktiv" tone="muted" />
                   ) : null}
                   <ChevronRight className="h-4 w-4 text-[var(--muted)] transition group-hover:translate-x-0.5 group-hover:text-[var(--blue)]" />
-                  {canDelete && (
+                    {canDelete && (
                     <div className="relative">
                       <button
                         type="button"
@@ -459,29 +460,18 @@ export default function PersonDirectory({
                             onClick={() => setOpenMenuId(null)}
                           />
                           <div className="absolute right-0 top-8 z-20 min-w-[190px] rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-lg">
-                            <PersonDeleteButton
-                              personId={person.id}
-                              personName={person.name}
-                              onSuccess={() => {
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 setOpenMenuId(null);
-                                setDeletedIds((prev) => new Set([...prev, person.id]));
-                                router.refresh();
+                                setPersonToDelete({ id: person.id, name: person.name });
                               }}
-                              renderTrigger={({ onClick }) => (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(null);
-                                    onClick();
-                                  }}
-                                  className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[0.8rem] text-red-600 hover:bg-red-50"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                  Endgültig löschen
-                                </button>
-                              )}
-                            />
+                              className="flex w-full items-center gap-2.5 px-3.5 py-2 text-[0.8rem] text-red-600 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              Endgültig löschen
+                            </button>
                           </div>
                         </>
                       )}
@@ -501,6 +491,23 @@ export default function PersonDirectory({
           {filtered.length === 1 ? "Person" : "Personen"} angezeigt
         </p>
       ) : null}
+
+      {/* Confirmation dialog for list-row hard-delete — mounted outside the
+          transient dropdown so React cannot unmount it before the Dialog opens. */}
+      {personToDelete && (
+        <PersonDeleteButton
+          key={personToDelete.id}
+          personId={personToDelete.id}
+          personName={personToDelete.name}
+          autoOpen
+          onCancel={() => setPersonToDelete(null)}
+          onSuccess={() => {
+            setDeletedIds((prev) => new Set([...prev, personToDelete.id]));
+            setPersonToDelete(null);
+            router.refresh();
+          }}
+        />
+      )}
     </div>
   );
 }
