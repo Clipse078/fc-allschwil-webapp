@@ -60,6 +60,11 @@ type PersonFixture = {
   isActive: boolean;
   isPlayer: boolean;
   isTrainer: boolean;
+  isFunctionary: boolean;
+  isVolunteer: boolean;
+  isReferee: boolean;
+  isSponsorContact: boolean;
+  customFunctions: string[];
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -89,6 +94,11 @@ const BASE_PERSON: PersonFixture = {
   isActive: true,
   isPlayer: true,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [],
   tenantId: "tenant-1",
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2024-01-01"),
@@ -256,10 +266,13 @@ describe("5 & 6. Dokumente tab — private-document permission gate", () => {
     expect(screen.queryByText("Dokumente")).toBeNull();
   });
 
-  it("6b. Dokumente placeholder renders when permission present and tab clicked", () => {
+  it("6b. Dokumente tab renders real PersonDocumentTab when permission present", () => {
+    // PERSON-UX-07: Dokumente is now a real workspace, not a placeholder.
     renderTabs(BASE_PERSON, { ...NO_DOMAIN_PERMS, canViewPrivateDocuments: true });
     fireEvent.click(screen.getByRole("tab", { name: /Dokumente/ }));
-    expect(screen.getAllByText(/Persönliche Dokumente/).length).toBeGreaterThan(0);
+    // Verify the real PersonDocumentTab renders (security notice always shown)
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Datenschutz");
   });
 });
 

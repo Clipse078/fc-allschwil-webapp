@@ -46,6 +46,11 @@ const BASE_PERSON = {
   isActive: true,
   isPlayer: true,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [] as string[],
   tenantId: "tenant-1",
   createdAt: new Date("2020-01-01"),
   updatedAt: new Date("2024-01-01"),
@@ -173,12 +178,17 @@ function makePersonDetailTabsProps(
     ...DOMAIN_PERMISSIONS_DENIED,
     ...(overrides.domainPermissions ?? {}),
   };
+  const squadMemberships = overrides.squadMemberships ?? [makeSquad()];
+  const trainerMemberships = overrides.trainerMemberships ?? [];
   return {
     person: {
       ...BASE_PERSON,
+      // PERSON-UX-07: tab visibility uses flags; auto-set from evidence in tests.
+      isPlayer: BASE_PERSON.isPlayer || squadMemberships.length > 0,
+      isTrainer: BASE_PERSON.isTrainer || trainerMemberships.length > 0,
       assignments: [],
-      squadMemberships: overrides.squadMemberships ?? [makeSquad()],
-      trainerMemberships: overrides.trainerMemberships ?? [],
+      squadMemberships,
+      trainerMemberships,
     } as PersonDetailTabsTestProps["person"],
     canManage: false,
     canDelete: false,

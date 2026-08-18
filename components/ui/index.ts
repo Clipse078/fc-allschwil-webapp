@@ -51,3 +51,7 @@ export type { ToastContextValue } from "./ToastProvider";
 // ── Slice 7 ────────────────────────────────────────────────────────────────
 export { ValidationSummary } from "./ValidationSummary";
 export type { ValidationSummaryProps } from "./ValidationSummary";
+
+// ── PERSON-UX-07: SCE-standard toggle switch ───────────────────────────────
+export { SwitchToggle, SwitchThumb } from "./SwitchToggle";
+export type { SwitchToggleProps2 as SwitchToggleProps } from "./SwitchToggle";

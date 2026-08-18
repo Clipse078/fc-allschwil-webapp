@@ -1,28 +1,47 @@
 "use client";
 
 /**
- * PERSON-UX-02 — Spieler tab.
+ * PERSON-UX-02 — Spieler tab (squad memberships by season).
+ * PERSON-UX-07 — Integrates player development/assessment from PERSON-UX-05/06.
  *
- * Rendered iff the Person has current OR historical player evidence
- * (PlayerSquadMember records exist, any status, any season).
+ * Rendered iff person.isPlayer === true (PERSON-UX-07 flag-based visibility).
  *
  * Shows:
  * - Current active squad memberships (Aktuell section)
  * - Full historical player career by season (accordion, newest first)
+ * - Player development / assessments (when viewer holds permission)
  *
- * Data source: PlayerSquadMember → TeamSeason → Season (fully persisted,
- * historically stable chain). No fabrication from isPlayer flag.
+ * Data source: PlayerSquadMember → TeamSeason → Season (persisted chain).
+ * Assessment data from DevelopmentAssessment (PERSON-UX-05/06).
  *
- * No assessment/rating content — deferred to PERSON-UX-03.
+ * Historical data is preserved even when isPlayer=false (the tab is hidden
+ * but no data is deleted). Removing the capacity flag changes profile
+ * classification only.
+ *
+ * Authorization: assessment section gated by canViewAssessments.
+ * Removing isPlayer capacity does NOT affect assessment permissions.
  */
 
 import { Users2, Trophy, Star, ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import type { PersonSquadMembership } from "@/lib/people/queries";
+import type { PersonSquadMembership, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
 import { EmptyState } from "@/components/ui/page";
+import PersonAssessmentSection from "./PersonAssessmentSection";
 
 type PersonSpielerTabProps = {
   squadMemberships: PersonSquadMembership[];
+  /** PERSON-UX-07: person id for assessment actions */
+  personId?: string;
+  /** PERSON-UX-05/07: viewer holds people.development.view */
+  canViewDevelopment?: boolean;
+  /** PERSON-UX-05/07: viewer holds people.assessments.view */
+  canViewAssessments?: boolean;
+  /** PERSON-UX-05/07: viewer holds people.assessments.manage */
+  canManageAssessments?: boolean;
+  /** PERSON-UX-05/07: pre-fetched assessments */
+  assessments?: PersonAssessmentRecord[];
+  /** PERSON-UX-05/07: active criteria */
+  criteria?: TenantCriterion[];
 };
 
 type SeasonPlayerSnapshot = {
@@ -156,7 +175,15 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
-export default function PersonSpielerTab({ squadMemberships }: PersonSpielerTabProps) {
+export default function PersonSpielerTab({
+  squadMemberships,
+  personId,
+  canViewDevelopment = false,
+  canViewAssessments = false,
+  canManageAssessments = false,
+  assessments = [],
+  criteria = [],
+}: PersonSpielerTabProps) {
   const activeSquads = squadMemberships.filter(
     (m) => m.status === "ACTIVE" || m.status === "INJURED" || m.status === "ABSENT",
   );
@@ -200,6 +227,19 @@ export default function PersonSpielerTab({ squadMemberships }: PersonSpielerTabP
           />
         )}
       </div>
+
+      {/* ── Entwicklung & Assessments (PERSON-UX-05/06/07) ────── */}
+      {(canViewDevelopment || canViewAssessments) && personId ? (
+        <div>
+          <SectionHeader label="Entwicklung & Assessments" />
+          <PersonAssessmentSection
+            personId={personId}
+            canManage={canManageAssessments}
+            assessments={assessments}
+            criteria={criteria}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

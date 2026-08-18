@@ -2,54 +2,40 @@
 
 /**
  * PERSON-UX-01 — Person Workspace tab shell.
- * PERSON-UX-02 — Capacity-aware tab visibility (Spieler / Trainer / Sport & Entwicklung).
- * PERSON-UX-03 — Domain-permission-aware tab visibility (Finanzen / Gesundheit / Dokumente / Entwicklung).
+ * PERSON-UX-02 — Capacity-aware tab visibility.
+ * PERSON-UX-03 — Domain-permission-aware tab visibility.
+ * PERSON-UX-07 — Profile & capacity flags drive role-specific workspace tabs.
  *
- * Workspace with up to 11 sections:
+ * Workspace tabs:
  *   Übersicht · Stammdaten · Organisation
- *   · [Spieler]             — visible iff Person has player evidence (current or historical)
- *   · [Trainer]             — visible iff Person has trainer evidence (current or historical)
- *   · [Sport & Entwicklung] — visible iff any sporting evidence exists
+ *   · [Spieler]             — visible iff person.isPlayer is true
+ *   · [Trainer]             — visible iff person.isTrainer is true
+ *   · [Sport & Entwicklung] — visible iff isPlayer OR isTrainer (OR relationship evidence)
  *   · Mitgliedschaft
  *   · [Finanzen]            — visible iff viewer holds people.finance.view
  *   · [Gesundheit]          — visible iff viewer holds people.health.view
  *   · [Dokumente]           — visible iff viewer holds people.private_documents.view
  *   · Zugang
  *
- * Capacity model (PERSON-UX-02):
- *   Spieler / Trainer / Sport tabs are shown based on evidence from persisted
- *   relationship chains (squadMemberships, trainerMemberships), NOT from isPlayer/isTrainer flags.
- *   A Person may hold simultaneous capacities: player of one team + trainer of another.
- *   Former players/trainers retain their respective tabs. External/non-sporting Persons
- *   have no sports-centric tabs or empty-state noise.
+ * PERSON-UX-07 Capacity model:
+ *   Tab visibility for Spieler and Trainer is driven by the explicit capacity
+ *   flags (person.isPlayer, person.isTrainer), NOT solely by membership evidence.
+ *   Removing a capacity flag hides the tab but does NOT delete historical data.
+ *   Multiple capacities may be true simultaneously — tabs for each are shown.
+ *   Custom functions (Weitere Funktion) do NOT generate dedicated tabs.
  *
  * Authorization model (PERSON-UX-03):
- *   Sensitive domain tabs are only rendered when the viewer holds the corresponding
- *   domain permission. If the permission is absent the tab is completely absent —
- *   no locked state, no "access denied" placeholder, no hint about the domain's existence.
+ *   Sensitive domain tabs require viewer domain permissions. Absent → no tab,
+ *   no placeholder, no hint about the domain's existence. Fail-closed.
  *
- *   Tab → required permission:
- *     Finanzen    → people.finance.view
- *     Gesundheit  → people.health.view
- *     Dokumente   → people.private_documents.view
- *
- *   Sport & Entwicklung is shown when the Person has sporting evidence (non-sensitive),
- *   but the development/assessment section within it is gated by people.development.view.
- *
- *   Mitgliedschaft has no dedicated sensitive-domain permission in this slice;
- *   it remains an always-visible deferred placeholder.
- *
- * Permission flags are computed server-side by resolvePersonDomainPermissions()
- * and passed here as `domainPermissions`. The client component performs no
- * additional authorization — it only uses the pre-resolved booleans.
+ * Capacity ≠ Assignment ≠ Authorization:
+ *   isPlayer=true means "this Person has a player profile".
+ *   It does NOT grant team assignment or assessment permissions automatically.
  *
  * IMPORTANT: Do NOT hardcode role names. Only permission keys may appear here.
  *
- * Simultaneous roles are always first-class: a Person may hold Spieler +
- * Trainer + Funktionär in the same season. No single "primary" role is selected.
- *
- * Responsive: tab bar wraps on small screens; each tab content is mobile-ready.
- * Hidden tabs consume zero DOM space.
+ * Simultaneous capacities are always first-class: a Person may hold Spieler +
+ * Trainer + Funktionär at once. No single "primary" capacity is selected.
  */
 
 import { useState } from "react";
@@ -66,7 +52,7 @@ import {
   FolderOpen,
   KeyRound,
 } from "lucide-react";
-import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord, PersonAssessmentRecord, TenantCriterion } from "@/lib/people/queries";
+import type { PersonAssignment, PersonDetail, PersonSquadMembership, PersonTrainerMembership, PersonMembershipRecord, PersonAssessmentRecord, PersonDocumentItem, TenantCriterion } from "@/lib/people/queries";
 import type { PersonAccessRole, PersonAccessLinkedUser } from "./PersonAccessRolesCard";
 import type { PersonDomainPermissions } from "@/lib/people/person-domain-auth";
 import { resolvePersonCapacities } from "@/lib/people/capacity";
@@ -79,6 +65,7 @@ import PersonSportTab from "./PersonSportTab";
 import PersonZugangTab from "./PersonZugangTab";
 import PersonDomainPlaceholder from "./PersonDomainPlaceholder";
 import PersonMembershipTab from "./PersonMembershipTab";
+import PersonDocumentTab from "./PersonDocumentTab";
 
 type Tab =
   | "uebersicht"
@@ -98,6 +85,9 @@ type PersonDetailTabsProps = {
     assignments: PersonAssignment[];
     squadMemberships: PersonSquadMembership[];
     trainerMemberships: PersonTrainerMembership[];
+    // PERSON-UX-07: capacity flags must be present on person object
+    isPlayer: boolean;
+    isTrainer: boolean;
   };
   canManage: boolean;
   canDelete: boolean;
@@ -123,6 +113,11 @@ type PersonDetailTabsProps = {
   assessments?: PersonAssessmentRecord[];
   /** PERSON-UX-05: Active criteria for assessment forms. */
   criteria?: TenantCriterion[];
+  /**
+   * PERSON-UX-07: Pre-fetched PersonDocuments (metadata only; no storage URLs).
+   * Only populated when viewer holds people.private_documents.view permission.
+   */
+  documents?: PersonDocumentItem[];
 };
 
 /**
@@ -161,25 +156,36 @@ export default function PersonDetailTabs({
   memberships = [],
   assessments = [],
   criteria = [],
+  documents = [],
 }: PersonDetailTabsProps) {
   const [activeTab, setActiveTab] = useState<Tab>("uebersicht");
 
   // ── Capacity resolution ────────────────────────────────────────────────────
-  // Derived from persisted relationship chains, not from isPlayer/isTrainer flags.
+  // PERSON-UX-07: Spieler / Trainer tab visibility is driven by explicit
+  // capacity flags. Membership evidence is used as a secondary signal for the
+  // Sport & Entwicklung cross-view tab and for content within the Spieler/Trainer tabs.
   const capacities = resolvePersonCapacities(
     person.squadMemberships,
     person.trainerMemberships,
   );
 
+  // Primary capacity flags (PERSON-UX-07)
+  const showSpielerTab = person.isPlayer === true;
+  const showTrainerTab = person.isTrainer === true;
+  // Sport & Entwicklung: visible when either capacity is active OR there is
+  // any sporting membership evidence (preserves cross-role biography value).
+  const showSportTab = showSpielerTab || showTrainerTab || capacities.hasSportingEvidence;
+
   // ── Domain permission flags ─────────────────────────────────────────────
   // Fail-closed: if domainPermissions is not provided, all sensitive tabs
   // are hidden. This matches the fail-closed design of the RPERM system.
-  const canViewFinance           = domainPermissions?.canViewFinance ?? false;
-  const canViewHealth            = domainPermissions?.canViewHealth ?? false;
-  const canViewPrivateDocuments  = domainPermissions?.canViewPrivateDocuments ?? false;
-  const canViewDevelopment       = domainPermissions?.canViewDevelopment ?? false;
-  const canViewAssessments       = domainPermissions?.canViewAssessments ?? false;
-  const canManageAssessments     = domainPermissions?.canManageAssessments ?? false;
+  const canViewFinance              = domainPermissions?.canViewFinance ?? false;
+  const canViewHealth               = domainPermissions?.canViewHealth ?? false;
+  const canViewPrivateDocuments     = domainPermissions?.canViewPrivateDocuments ?? false;
+  const canManagePrivateDocuments   = domainPermissions?.canManagePrivateDocuments ?? false;
+  const canViewDevelopment          = domainPermissions?.canViewDevelopment ?? false;
+  const canViewAssessments          = domainPermissions?.canViewAssessments ?? false;
+  const canManageAssessments        = domainPermissions?.canManageAssessments ?? false;
 
   // ── Counts for badges ──────────────────────────────────────────────────────
   const activeAssignmentCount = person.assignments.filter(
@@ -211,24 +217,23 @@ export default function PersonDetailTabs({
       key: "spieler",
       label: "Spieler",
       icon: <Users2 className="h-3.5 w-3.5" />,
-      // Visible for current AND former players. Never shown for persons who were never players.
-      hidden: !capacities.hasPlayerEvidence,
+      // PERSON-UX-07: tab driven by isPlayer capacity flag, not membership evidence.
+      // Removing the flag hides the tab; historical data is preserved.
+      hidden: !showSpielerTab,
     },
     {
       key: "trainer",
       label: "Trainer",
       icon: <UserCheck className="h-3.5 w-3.5" />,
-      // Visible for current AND former trainers. Never shown for never-trainers.
-      hidden: !capacities.hasTrainerEvidence,
+      // PERSON-UX-07: tab driven by isTrainer capacity flag, not membership evidence.
+      hidden: !showTrainerTab,
     },
     {
       key: "sport",
       label: "Sport & Entwicklung",
       icon: <Trophy className="h-3.5 w-3.5" />,
-      // Cross-role season biography + development placeholder.
-      // Hidden for external/non-sporting Persons: no sports-centric clutter.
-      hidden: !capacities.hasSportingEvidence,
-      // Badge shows count of currently active sporting roles (squad + trainer).
+      // Cross-role season biography visible when any sporting capacity or evidence exists.
+      hidden: !showSportTab,
       count: activeSportingRoleCount > 0 ? activeSportingRoleCount : undefined,
     },
     {
@@ -372,8 +377,8 @@ export default function PersonDetailTabs({
           ) : null}
         </div>
 
-        {/* Spieler — only rendered when Person has player evidence */}
-        {capacities.hasPlayerEvidence ? (
+        {/* Spieler — only rendered when isPlayer capacity is active (PERSON-UX-07) */}
+        {showSpielerTab ? (
           <div
             role="tabpanel"
             id="tabpanel-spieler"
@@ -381,13 +386,21 @@ export default function PersonDetailTabs({
             hidden={safeActiveTab !== "spieler"}
           >
             {safeActiveTab === "spieler" ? (
-              <PersonSpielerTab squadMemberships={person.squadMemberships} />
+              <PersonSpielerTab
+                squadMemberships={person.squadMemberships}
+                personId={person.id}
+                canViewDevelopment={canViewDevelopment}
+                canViewAssessments={canViewAssessments}
+                canManageAssessments={canManageAssessments}
+                assessments={assessments}
+                criteria={criteria}
+              />
             ) : null}
           </div>
         ) : null}
 
-        {/* Trainer — only rendered when Person has trainer evidence */}
-        {capacities.hasTrainerEvidence ? (
+        {/* Trainer — only rendered when isTrainer capacity is active (PERSON-UX-07) */}
+        {showTrainerTab ? (
           <div
             role="tabpanel"
             id="tabpanel-trainer"
@@ -400,8 +413,8 @@ export default function PersonDetailTabs({
           </div>
         ) : null}
 
-        {/* Sport & Entwicklung — only rendered when Person has any sporting evidence */}
-        {capacities.hasSportingEvidence ? (
+        {/* Sport & Entwicklung — cross-role biography visible when any sporting capacity/evidence */}
+        {showSportTab ? (
           <div
             role="tabpanel"
             id="tabpanel-sport"
@@ -483,7 +496,8 @@ export default function PersonDetailTabs({
           </div>
         ) : null}
 
-        {/* Dokumente — rendered only when viewer holds people.private_documents.view */}
+        {/* Dokumente — Person-bound. Visible iff viewer holds people.private_documents.view. */}
+        {/* PERSON-UX-07: tab is ALWAYS person-bound (not capacity-dependent). */}
         {canViewPrivateDocuments ? (
           <div
             role="tabpanel"
@@ -492,12 +506,10 @@ export default function PersonDetailTabs({
             hidden={safeActiveTab !== "dokumente"}
           >
             {safeActiveTab === "dokumente" ? (
-              <PersonDomainPlaceholder
-                icon={<FolderOpen className="h-6 w-6" />}
-                title="Persönliche Dokumente"
-                description="Vereinbarungen, Formulare, Zertifikate und streng private Dokumente
-                  dieser Person werden in einem späteren Modul implementiert."
-                plannedFor="PERSON-UX-0x (Dokumente)"
+              <PersonDocumentTab
+                personId={person.id}
+                initialDocuments={documents}
+                canManage={canManagePrivateDocuments}
               />
             ) : null}
           </div>

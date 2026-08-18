@@ -624,6 +624,8 @@ model Tenant {
   // PERSON-UX-05: development assessment foundation
   developmentCriteria   DevelopmentCriterion[]   @relation("TenantDevelopmentCriteria")
   developmentAssessments DevelopmentAssessment[] @relation("TenantDevelopmentAssessments")
+  // PERSON-UX-07: person-bound private documents
+  personDocuments PersonDocument[] @relation("TenantPersonDocuments")
 
   @@index([status])
   @@index([name])
@@ -676,6 +678,8 @@ model User {
   createdWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentCreatedBy")
   updatedWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentUpdatedBy")
   createdWorkspaceDocumentVersions WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersionCreatedBy")
+  // PERSON-UX-07: person-bound documents uploaded by this user
+  uploadedPersonDocuments PersonDocument[] @relation("PersonDocumentUploadedBy")
 
   /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
   /// every User that isn't the linked application account of a Person.
@@ -1087,6 +1091,25 @@ model Person {
   isActive    Boolean   @default(true)
   isPlayer    Boolean   @default(false)
   isTrainer   Boolean   @default(false)
+
+  /// PERSON-UX-07: standard capacities — "What is this Person?"
+  /// These are profile classifications set by club administrators.
+  /// They determine which workspace domains exist for this Person.
+  /// They are INDEPENDENT of authorization (no automatic permissions)
+  /// and INDEPENDENT of assignment (no automatic team/org placement).
+  /// Multiple capacities may be true simultaneously.
+  isFunctionary   Boolean  @default(false) // Funktionär/in
+  isVolunteer     Boolean  @default(false) // Freiwillige/r
+  isReferee       Boolean  @default(false) // Schiedsrichter/in
+  isSponsorContact Boolean @default(false) // Sponsor-/Partner-Kontakt
+
+  /// PERSON-UX-07: club-specific custom functions ("Weitere Funktion").
+  /// Tenant-defined labels (e.g. "Materialverantwortlicher", "Fotograf/in").
+  /// Stored as a list; each entry is a free-text label (max 100 chars each).
+  /// NOT automatically converted to authorization roles or assignments.
+  /// Empty array = no custom functions active.
+  customFunctions String[] @default([])
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -1165,11 +1188,85 @@ model Person {
   @@index([isActive])
   @@index([isPlayer])
   @@index([isTrainer])
+  @@index([isFunctionary])
+  @@index([isVolunteer])
+  @@index([isReferee])
+  @@index([isSponsorContact])
   @@index([createdRegistrationId])
   @@index([tenantId])
   @@index([tenantId, isActive])
   @@index([tenantId, lastName, firstName])
+
+  /// PERSON-UX-07: private person-bound documents (SEPARATE from WorkspaceDocument)
+  personDocuments PersonDocument[] @relation("PersonDocuments")
 }
+
+// ---------------------------------------------------------------------------
+// PersonDocument — PERSON-UX-07: Person-bound private document
+// ---------------------------------------------------------------------------
+// SECURITY CLASSIFICATION: highly sensitive.
+//   - Requires people.private_documents.view to list/download.
+//   - Requires people.private_documents.manage to upload/edit/delete.
+//   - Authorization is document-domain-specific; capacity flags (isPlayer etc.)
+//     do NOT imply document access.
+//   - File binary is stored in the private Vercel Blob store under the
+//     "person-docs/" prefix. No public URL is ever returned to clients;
+//     all downloads stream through an authorized server-side API endpoint.
+//   - Cross-tenant isolation: personId + tenantId are BOTH validated on every
+//     read/write. A document belonging to tenantA is never visible from tenantB.
+//   - Identity documents (passports, ID cards) are NEVER visible to team-scoped
+//     roles (e.g. team trainers) regardless of team-scope grants.
+// ---------------------------------------------------------------------------
+
+enum PersonDocumentCategory {
+  IDENTITY_DOCUMENT   // Reisepass, Ausweis
+  CONSENT             // Einwilligungserklärung
+  CERTIFICATE         // Bescheinigung, Urkunde
+  QUALIFICATION       // Qualifikation, Lizenz
+  CONTRACT            // Vertrag
+  PERMIT              // Genehmigung, Bewilligung
+  CORRESPONDENCE      // Korrespondenz
+  OTHER               // Sonstiges
+}
+
+model PersonDocument {
+  id       String @id @default(cuid())
+  tenantId String
+  personId String
+
+  category PersonDocumentCategory @default(OTHER)
+  title    String                 // Display name (e.g. "Reisepass")
+
+  /// Opaque storage key in the private Vercel Blob store.
+  /// Never expose this directly to clients.
+  storageKey       String
+  /// Blob URL (internal reference only; never returned to client as download URL).
+  storageUrl       String?
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+
+  issueDate  DateTime?
+  expiryDate DateTime?
+  notes      String?
+
+  uploadedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  person        Person  @relation("PersonDocuments", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant        Tenant  @relation("TenantPersonDocuments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedByUser User?  @relation("PersonDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([personId])
+  @@index([tenantId, personId])
+  @@index([tenantId, personId, category])
+  @@index([expiryDate])
+  @@index([uploadedByUserId])
+}
+
 model Team {
   id               String       @id @default(cuid())
   // ── TEAM-IDENTITY-01: canonical tenant-owned naming ───────────────────────

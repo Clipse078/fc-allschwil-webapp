@@ -44,6 +44,11 @@ type PersonFixture = {
   isActive: boolean;
   isPlayer: boolean;
   isTrainer: boolean;
+  isFunctionary: boolean;
+  isVolunteer: boolean;
+  isReferee: boolean;
+  isSponsorContact: boolean;
+  customFunctions: string[];
   tenantId: string;
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +82,11 @@ const BASE_PERSON: PersonFixture = {
   isActive: true,
   isPlayer: true,
   isTrainer: false,
+  isFunctionary: false,
+  isVolunteer: false,
+  isReferee: false,
+  isSponsorContact: false,
+  customFunctions: [],
   tenantId: "tenant-1",
   createdAt: new Date("2023-01-01"),
   updatedAt: new Date("2024-01-01"),
@@ -252,8 +262,10 @@ describe("2. Multiple simultaneous roles — all render, none collapsed", () => 
     );
 
     // All three roles must be visible — none collapsed to a single "primary"
-    expect(screen.getByText("Spieler/in")).toBeTruthy();
-    expect(screen.getByText("Trainer/in")).toBeTruthy();
+    // Note: "Spieler/in" may appear in both the CapacitiesRow (profile badge) AND
+    // the role card (active assignment). Use getAllByText for multi-occurrence labels.
+    expect(screen.getAllByText("Spieler/in").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Trainer/in").length).toBeGreaterThan(0);
     expect(screen.getByText("Koordinator/in")).toBeTruthy();
   });
 
@@ -274,11 +286,12 @@ describe("2. Multiple simultaneous roles — all render, none collapsed", () => 
       />,
     );
 
-    expect(screen.getByText("Spieler/in")).toBeTruthy();
+    // "Spieler/in" may appear in CapacitiesRow (profile) AND role card (assignment)
+    expect(screen.getAllByText("Spieler/in").length).toBeGreaterThan(0);
     expect(screen.getByText("Koordinator/in")).toBeTruthy();
     expect(screen.getByText("Vorstandsmitglied")).toBeTruthy();
 
-    // Must have at least 3 role cards
+    // Must have at least 3 role cards (sce-accent badges)
     const roleBadges = container.querySelectorAll(".rounded-full.bg-\\[var\\(--sce-accent\\)\\]");
     expect(roleBadges.length).toBeGreaterThanOrEqual(3);
   });
@@ -646,7 +659,8 @@ describe("10. Responsive tab structure", () => {
 
   it("renders all sports tabs for a person with both player and trainer history", () => {
     // PERSON-UX-03: domain tabs require explicit viewer permissions.
-    const person = makePerson();
+    // PERSON-UX-07: Spieler/Trainer tabs driven by isPlayer/isTrainer flags.
+    const person = makePerson({ isPlayer: true, isTrainer: true });
     render(
       <PersonDetailTabs
         person={{
@@ -832,7 +846,9 @@ describe("10. Responsive tab structure", () => {
     expect(screen.getAllByText("Gesundheit").length).toBeGreaterThanOrEqual(2); // tab + placeholder title
 
     fireEvent.click(screen.getByRole("tab", { name: /Dokumente/ }));
-    // "Persönliche Dokumente" appears as the placeholder title
-    expect(screen.getAllByText(/Persönliche Dokumente/).length).toBeGreaterThan(0);
+    // PERSON-UX-07: Dokumente tab now renders real PersonDocumentTab (not a placeholder).
+    // Verify the real tab renders (empty state or security notice).
+    const content = document.body.textContent ?? "";
+    expect(content).toContain("Datenschutz");
   });
 });

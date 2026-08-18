@@ -1,9 +1,39 @@
 "use client";
 
+/**
+ * PERSON-UX-07 — Person create/edit form.
+ *
+ * "Profile & Funktionen" section replaces the former "Rollen & Status".
+ *
+ * Capacity model:
+ *   STATUS
+ *     [toggle] Person ist aktiv
+ *
+ *   PROFILE & FUNCTIONS
+ *     [toggle] Spieler/in
+ *     [toggle] Trainer/in
+ *     [toggle] Funktionär/in
+ *     [toggle] Schiedsrichter/in
+ *     [toggle] Freiwillige/r
+ *     [toggle] Sponsor-/Partner-Kontakt
+ *     [toggle] Weitere Funktion  → expands chip-based multi-value input
+ *
+ * Rules:
+ *   - All boolean settings use SwitchToggle (no checkboxes here).
+ *   - Multiple capacities may be active simultaneously.
+ *   - Custom functions are free-text labels; they DO NOT create permissions.
+ *   - Create and edit use the same canonical representation.
+ */
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, X } from "lucide-react";
 import { Button, FormSection, ValidationSummary } from "@/components/ui";
+import { SwitchToggle } from "@/components/ui/SwitchToggle";
 import { FormPagePattern } from "@/components/ui/patterns";
+
+const MAX_CUSTOM_FUNCTION_LENGTH = 100;
+const MAX_CUSTOM_FUNCTIONS = 20;
 
 type PersonFormProps = {
   mode: "create" | "edit";
@@ -19,6 +49,11 @@ type PersonFormProps = {
     isActive?: boolean;
     isPlayer?: boolean;
     isTrainer?: boolean;
+    isFunctionary?: boolean;
+    isVolunteer?: boolean;
+    isReferee?: boolean;
+    isSponsorContact?: boolean;
+    customFunctions?: string[];
   };
 };
 
@@ -32,12 +67,48 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
   const [phone, setPhone] = useState(defaultValues?.phone ?? "");
   const [dateOfBirth, setDateOfBirth] = useState(defaultValues?.dateOfBirth ?? "");
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
+
+  // Capacities
   const [isActive, setIsActive] = useState(defaultValues?.isActive ?? true);
   const [isPlayer, setIsPlayer] = useState(defaultValues?.isPlayer ?? false);
   const [isTrainer, setIsTrainer] = useState(defaultValues?.isTrainer ?? false);
+  const [isFunctionary, setIsFunctionary] = useState(defaultValues?.isFunctionary ?? false);
+  const [isVolunteer, setIsVolunteer] = useState(defaultValues?.isVolunteer ?? false);
+  const [isReferee, setIsReferee] = useState(defaultValues?.isReferee ?? false);
+  const [isSponsorContact, setIsSponsorContact] = useState(defaultValues?.isSponsorContact ?? false);
+
+  // Weitere Funktion toggle + multi-value chip list
+  const [hasCustomFunctions, setHasCustomFunctions] = useState(
+    (defaultValues?.customFunctions ?? []).length > 0,
+  );
+  const [customFunctions, setCustomFunctions] = useState<string[]>(
+    defaultValues?.customFunctions ?? [],
+  );
+  const [customFunctionInput, setCustomFunctionInput] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function handleAddCustomFunction() {
+    const val = customFunctionInput.trim();
+    if (!val) return;
+    if (val.length > MAX_CUSTOM_FUNCTION_LENGTH) return;
+    if (customFunctions.includes(val)) return;
+    if (customFunctions.length >= MAX_CUSTOM_FUNCTIONS) return;
+    setCustomFunctions((prev) => [...prev, val]);
+    setCustomFunctionInput("");
+  }
+
+  function handleRemoveCustomFunction(label: string) {
+    setCustomFunctions((prev) => prev.filter((f) => f !== label));
+  }
+
+  function handleCustomFunctionKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter" || e.key === ",") {
+      e.preventDefault();
+      handleAddCustomFunction();
+    }
+  }
 
   function validate(): string | null {
     if (!firstName.trim()) return "Vorname ist erforderlich.";
@@ -59,6 +130,11 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
       if (dobNorm > today) return "Geburtsdatum darf nicht in der Zukunft liegen.";
     }
     if (notes.trim().length > 1000) return "Notizen dürfen maximal 1000 Zeichen lang sein.";
+    for (const fn of customFunctions) {
+      if (fn.length > MAX_CUSTOM_FUNCTION_LENGTH) {
+        return `Funktion «${fn}» darf maximal ${MAX_CUSTOM_FUNCTION_LENGTH} Zeichen lang sein.`;
+      }
+    }
     return null;
   }
 
@@ -78,6 +154,9 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
         mode === "edit" && personId ? `/api/people/${personId}` : "/api/people";
       const method = mode === "edit" ? "PUT" : "POST";
 
+      // When "Weitere Funktion" toggle is off, send empty array
+      const effectiveCustomFunctions = hasCustomFunctions ? customFunctions : [];
+
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -92,6 +171,11 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
           isActive,
           isPlayer,
           isTrainer,
+          isFunctionary,
+          isVolunteer,
+          isReferee,
+          isSponsorContact,
+          customFunctions: effectiveCustomFunctions,
         }),
       });
 
@@ -131,7 +215,7 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
         description={
           mode === "create"
             ? "Lege einen neuen Personendatensatz im System an."
-            : "Stammdaten, Kontakt, Rollen und Status dieser Person anpassen."
+            : "Stammdaten, Kontakt, Profile und Status dieser Person anpassen."
         }
         breadcrumbs={breadcrumbs}
         validationSummary={
@@ -235,29 +319,149 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
           </div>
         </FormSection>
 
+        {/* ── Profile & Funktionen ──────────────────────────────────────── */}
         <FormSection
-          title="Rollen & Status"
-          description="Aktiv-Status und Rollen der Person im Verein."
+          title="Profile & Funktionen"
+          description="Welche Profile hat diese Person im Verein? Mehrere Profile sind möglich."
         >
-          <div className="space-y-2">
-            <Toggle
+          {/* STATUS */}
+          <div className="mb-5">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--muted)]">
+              Status
+            </p>
+            <SwitchToggle
               id="isActive"
               label="Person ist aktiv"
+              description="Inaktive Personen erscheinen in Filtern und Auswahllisten nicht mehr."
               checked={isActive}
               onChange={setIsActive}
             />
-            <Toggle
-              id="isPlayer"
-              label="Spieler"
-              checked={isPlayer}
-              onChange={setIsPlayer}
-            />
-            <Toggle
-              id="isTrainer"
-              label="Trainer"
-              checked={isTrainer}
-              onChange={setIsTrainer}
-            />
+          </div>
+
+          {/* STANDARD CAPACITIES */}
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-widest text-[var(--muted)]">
+              Profile & Funktionen
+            </p>
+            <div className="space-y-2">
+              <SwitchToggle
+                id="isPlayer"
+                label="Spieler/in"
+                description="Aktiviert den Spieler-Workspace (Kader, Entwicklung, Assessments)."
+                checked={isPlayer}
+                onChange={setIsPlayer}
+              />
+              <SwitchToggle
+                id="isTrainer"
+                label="Trainer/in"
+                description="Aktiviert den Trainer-Workspace (Teameinsätze, Trainerkarriere)."
+                checked={isTrainer}
+                onChange={setIsTrainer}
+              />
+              <SwitchToggle
+                id="isFunctionary"
+                label="Funktionär/in"
+                description="Person bekleidet ein Vereinsamt (Vorstand, Ausschuss, o.ä.)."
+                checked={isFunctionary}
+                onChange={setIsFunctionary}
+              />
+              <SwitchToggle
+                id="isReferee"
+                label="Schiedsrichter/in"
+                description="Person ist als Schiedsrichter/in aktiv."
+                checked={isReferee}
+                onChange={setIsReferee}
+              />
+              <SwitchToggle
+                id="isVolunteer"
+                label="Freiwillige/r"
+                description="Person engagiert sich freiwillig ohne feste Funktion."
+                checked={isVolunteer}
+                onChange={setIsVolunteer}
+              />
+              <SwitchToggle
+                id="isSponsorContact"
+                label="Sponsor-/Partner-Kontakt"
+                description="Person ist Ansprechpartner/in für Sponsoring oder Partnerschaften."
+                checked={isSponsorContact}
+                onChange={setIsSponsorContact}
+              />
+
+              {/* Weitere Funktion — expands to chip-based input when ON */}
+              <SwitchToggle
+                id="hasCustomFunctions"
+                label="Weitere Funktion"
+                description="Vereinsspezifische Funktion (z.B. Materialwart, Fotograf/in)."
+                checked={hasCustomFunctions}
+                onChange={(v) => {
+                  setHasCustomFunctions(v);
+                  if (!v) {
+                    setCustomFunctionInput("");
+                  }
+                }}
+              />
+
+              {hasCustomFunctions ? (
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+                  {/* Existing chips */}
+                  {customFunctions.length > 0 ? (
+                    <div className="mb-3 flex flex-wrap gap-2">
+                      {customFunctions.map((fn) => (
+                        <span
+                          key={fn}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-xs font-medium text-[var(--foreground)]"
+                        >
+                          {fn}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomFunction(fn)}
+                            aria-label={`${fn} entfernen`}
+                            className="flex h-4 w-4 items-center justify-center rounded-full text-[var(--muted)] transition hover:bg-[var(--surface-3)] hover:text-[var(--foreground)]"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {/* Add new function */}
+                  {customFunctions.length < MAX_CUSTOM_FUNCTIONS ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={customFunctionInput}
+                        onChange={(e) => setCustomFunctionInput(e.target.value)}
+                        onKeyDown={handleCustomFunctionKeyDown}
+                        placeholder="Funktion hinzufügen…"
+                        maxLength={MAX_CUSTOM_FUNCTION_LENGTH}
+                        className="fca-input flex-1 text-sm"
+                        aria-label="Neue Funktion eingeben"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleAddCustomFunction}
+                        disabled={!customFunctionInput.trim()}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Hinzufügen
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[var(--muted)]">
+                      Maximale Anzahl ({MAX_CUSTOM_FUNCTIONS}) an Funktionen erreicht.
+                    </p>
+                  )}
+
+                  <p className="mt-2 text-[11px] text-[var(--muted)]">
+                    Drücke Enter oder Komma, um eine Funktion hinzuzufügen.
+                    Diese Funktionen erzeugen keine Berechtigungen.
+                  </p>
+                </div>
+              ) : null}
+            </div>
           </div>
         </FormSection>
 
@@ -282,33 +486,5 @@ export default function PersonForm({ mode, personId, defaultValues }: PersonForm
         </FormSection>
       </FormPagePattern>
     </form>
-  );
-}
-
-function Toggle({
-  id,
-  label,
-  checked,
-  onChange,
-}: {
-  id: string;
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label
-      htmlFor={id}
-      className="flex cursor-pointer items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3"
-    >
-      <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
-      <input
-        type="checkbox"
-        id={id}
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-[var(--border)] accent-[var(--sce-primary)]"
-      />
-    </label>
   );
 }

@@ -167,6 +167,12 @@ export async function getPersonById(id: string) {
       isActive: true,
       isPlayer: true,
       isTrainer: true,
+      // PERSON-UX-07: standard capacity flags
+      isFunctionary: true,
+      isVolunteer: true,
+      isReferee: true,
+      isSponsorContact: true,
+      customFunctions: true,
       tenantId: true,
       createdAt: true,
       updatedAt: true,
@@ -541,6 +547,36 @@ export async function getTenantAllCriteria(tenantId: string) {
   });
 }
 
+// ── PersonDocument ─────────────────────────────────────────────────────────
+// PERSON-UX-07: server-side pre-fetch for the Dokumente tab.
+// Only called when viewer holds people.private_documents.view.
+// storageKey and storageUrl are NOT returned here; those fields
+// are only accessed internally by the document service.
+
+export async function getPersonDocuments(personId: string, tenantId: string) {
+  return prisma.personDocument.findMany({
+    where: { personId, tenantId },
+    orderBy: [{ category: "asc" }, { createdAt: "desc" }],
+    select: {
+      id: true,
+      personId: true,
+      tenantId: true,
+      category: true,
+      title: true,
+      originalFilename: true,
+      mimeType: true,
+      sizeBytes: true,
+      issueDate: true,
+      expiryDate: true,
+      notes: true,
+      uploadedByUserId: true,
+      createdAt: true,
+      updatedAt: true,
+      // storageKey and storageUrl intentionally excluded — never sent to client
+    },
+  });
+}
+
 export type PersonListItem = Awaited<ReturnType<typeof getPersons>>[number];
 export type PersonDetail = NonNullable<Awaited<ReturnType<typeof getPersonById>>>;
 export type PersonDirectoryItem = Awaited<ReturnType<typeof getPersonsForDirectory>>[number];
@@ -549,5 +585,6 @@ export type PersonSquadMembership = Awaited<ReturnType<typeof getPersonSquadMemb
 export type PersonTrainerMembership = Awaited<ReturnType<typeof getPersonTrainerMemberships>>[number];
 export type PersonMembershipRecord = Awaited<ReturnType<typeof getPersonMemberships>>[number];
 export type PersonAssessmentRecord = Awaited<ReturnType<typeof getPersonAssessments>>[number];
+export type PersonDocumentItem = Awaited<ReturnType<typeof getPersonDocuments>>[number];
 export type TenantCriterion = Awaited<ReturnType<typeof getTenantActiveCriteria>>[number];
 export type TenantCriterionAdmin = Awaited<ReturnType<typeof getTenantAllCriteria>>[number];
