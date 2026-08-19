@@ -32,7 +32,7 @@
  *   - No countdown text (IN X MIN.); temporal labels are JETZT or ALS NÄCHSTES.
  */
 
-import type { ReactElement } from "react";
+import type { ReactElement, CSSProperties } from "react";
 import type {
   InfoboardScreen1Feed,
   InfoboardScreen1Event,
@@ -50,6 +50,7 @@ import {
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
+import { InfoboardPageRotator } from "./InfoboardPageRotator";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -103,6 +104,72 @@ export type InfoboardScreen1Props = {
 /** Prototype max events rendered before showing overflow warning. */
 const PROTOTYPE_CAPACITY = 12;
 
+// ── Content-demand layout model ───────────────────────────────────────────────
+//
+// Each card receives flex-grow proportional to its semantic content demand.
+// Denser cards (e.g. 6-row training groups) get proportionally more of the
+// available viewport height. This replaces the old fragile count-specific
+// flex-grow rules (training-count=4/5/6, tournament fixed grow, etc.).
+//
+// Exported for regression testing.
+
+/** Base demand for any training-group card (regardless of row count). */
+export const CARD_DEMAND_TRAINING_BASE = 1.0;
+/** Added demand per training row — drives proportional height growth. */
+export const CARD_DEMAND_TRAINING_ROW = 0.55;
+/** Fixed demand for a match card (structurally consistent content). */
+export const CARD_DEMAND_MATCH = 1.5;
+/** Base demand for a tournament card. */
+export const CARD_DEMAND_TOURNAMENT_BASE = 1.5;
+/** Added demand per known participant allocation row in a tournament. */
+export const CARD_DEMAND_TOURNAMENT_PARTICIPANT = 0.3;
+/**
+ * Maximum total demand per rendered page.
+ * When the visible set exceeds this threshold the display list is split
+ * into pages and rotated automatically. Normal days produce a single page.
+ */
+export const CARD_DEMAND_PAGE_MAX = 12.0;
+
+/**
+ * Demand for a training-group card with `rowCount` simultaneous training rows.
+ * Exported for regression testing.
+ */
+export function computeTrainingGroupDemand(rowCount: number): number {
+  return CARD_DEMAND_TRAINING_BASE + Math.max(1, rowCount) * CARD_DEMAND_TRAINING_ROW;
+}
+
+/**
+ * Demand for a non-training event card.
+ * For TOURNAMENT, pass the number of resolved participant allocation rows.
+ * For MATCH and other types, participantCount is ignored.
+ * Exported for regression testing.
+ */
+export function computeEventDemand(
+  type: string,
+  participantCount: number = 0,
+): number {
+  if (type === "TOURNAMENT") {
+    return CARD_DEMAND_TOURNAMENT_BASE + participantCount * CARD_DEMAND_TOURNAMENT_PARTICIPANT;
+  }
+  return CARD_DEMAND_MATCH;
+}
+
+/**
+ * Maps total page demand to an adaptive internal-spacing tier.
+ * Each tier applies progressively tighter padding/row-height via CSS.
+ *
+ *   normal — generous spacing for low-density displays.
+ *   dense  — modestly tightened for moderate-density displays.
+ *   ultra  — significantly tightened when approaching the page limit.
+ *
+ * Exported for regression testing.
+ */
+export function densityTier(totalDemand: number): "normal" | "dense" | "ultra" {
+  if (totalDemand > 11) return "ultra";
+  if (totalDemand > 8) return "dense";
+  return "normal";
+}
+
 // ── Event-type labels (presentation-only, German) ─────────────────────────────
 
 const EVENT_TYPE_LABELS: Record<PublishingEventType, string> = {
@@ -117,7 +184,7 @@ const EVENT_TYPE_LABELS: Record<PublishingEventType, string> = {
 
 type TemporalBucket = "current" | "next" | "later";
 
-type FlatEvent = {
+export type FlatEvent = {
   event: InfoboardScreen1Event;
   temporal: TemporalBucket;
 };
@@ -129,10 +196,46 @@ type FlatEvent = {
  *                      unique start time), rendered with the standard EventCard.
  *   "training-group" — two or more TRAINING events sharing the same startAt,
  *                      collapsed into one aggregate TrainingGroupCard.
+ *
+ * Exported for regression testing of demand computation and pagination.
  */
-type DisplayItem =
+export type DisplayItem =
   | { kind: "event"; item: FlatEvent }
   | { kind: "training-group"; items: FlatEvent[]; temporal: TemporalBucket };
+
+/**
+ * Splits a display list into pages whose total content demand does not exceed
+ * `maxDemand`. Never splits a card in the middle. Current/next activities
+ * appear first (input order preserved).
+ *
+ * Returns a single-element array on normal days. Returns an empty array when
+ * `items` is empty.
+ *
+ * Exported for regression testing.
+ */
+export function paginateDisplayList(
+  items: readonly DisplayItem[],
+  demands: readonly number[],
+  maxDemand: number = CARD_DEMAND_PAGE_MAX,
+): DisplayItem[][] {
+  if (items.length === 0) return [];
+  const pages: DisplayItem[][] = [];
+  let currentPage: DisplayItem[] = [];
+  let currentDemand = 0;
+  for (let i = 0; i < items.length; i++) {
+    const d = demands[i] ?? 1.0;
+    if (currentPage.length > 0 && currentDemand + d > maxDemand) {
+      pages.push(currentPage);
+      currentPage = [items[i]];
+      currentDemand = d;
+    } else {
+      currentPage.push(items[i]);
+      currentDemand += d;
+    }
+  }
+  if (currentPage.length > 0) pages.push(currentPage);
+  return pages;
+}
 
 // ── Time / date formatting ────────────────────────────────────────────────────
 
@@ -515,7 +618,8 @@ function TournamentDestination({
 type TrainingGroupCardProps = {
   items: FlatEvent[];
   timeZone: string;
-  cardCount: number;
+  /** Content-demand value driving flex-grow on this card. */
+  demand: number;
   /** Club name for prefix stripping from team display names. */
   clubName: string;
 };
@@ -538,7 +642,7 @@ type TrainingGroupCardProps = {
 function TrainingGroupCard({
   items,
   timeZone,
-  cardCount,
+  demand,
   clubName,
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
@@ -562,8 +666,9 @@ function TrainingGroupCard({
       data-type="TRAINING"
       data-temporal={temporal}
       data-stripe={stripe}
-      data-event-count={cardCount}
       data-training-count={items.length}
+      data-card-demand={demand.toFixed(2)}
+      style={{ "--ib-card-demand": demand } as CSSProperties}
     >
       {/* TIME */}
       <div className={styles.cardTimeZone}>
@@ -707,17 +812,16 @@ function TrainingGroupCard({
 type EventCardProps = {
   item: FlatEvent;
   timeZone: string;
-  clubLogoSrc: string | null;
   participantAllocations: readonly InfoboardTeamAllocationPresentation[] | undefined;
-  eventCount: number;
+  /** Content-demand value driving flex-grow on this card. */
+  demand: number;
 };
 
 function EventCard({
   item,
   timeZone,
-  clubLogoSrc,
   participantAllocations,
-  eventCount,
+  demand,
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
@@ -743,7 +847,8 @@ function EventCard({
       data-type={event.type}
       data-temporal={temporal}
       data-stripe={stripe}
-      data-event-count={eventCount}
+      data-card-demand={demand.toFixed(2)}
+      style={{ "--ib-card-demand": demand } as CSSProperties}
     >
       {/* ── LEFT ZONE: Status + Time ─────────────────────────────────── */}
       <div className={styles.cardTimeZone}>
@@ -891,6 +996,72 @@ export function InfoboardScreen1({
   const staticDateLine =
     currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
 
+  // ── Content-demand pre-computation ───────────────────────────────────────
+  // Compute per-item demands before pagination. Tournament participant counts
+  // require the extension lookup, so we resolve them here once.
+  const itemDemands: number[] = visibleDisplayList.map((item) => {
+    if (item.kind === "training-group") {
+      return computeTrainingGroupDemand(item.items.length);
+    }
+    const ext = findEventExtension(item.item.event.id, eventPresentation);
+    const rawAllocCount = ext?.participantAllocations?.length ?? 0;
+    // Only count participants when there are enough for the allocation block
+    const allocCount = rawAllocCount >= 3 ? rawAllocCount : 0;
+    return computeEventDemand(item.item.event.type, allocCount);
+  });
+
+  // Split into pages based on demand. Normal days: single page (no rotation).
+  const pages = paginateDisplayList(visibleDisplayList, itemDemands);
+
+  // ── Page renderer (used for each page in the rotator) ────────────────────
+  function renderPage(pageItems: DisplayItem[], pageIndex: number): ReactElement {
+    // Collect per-item demands for this page's subset
+    const pageStartIndex = visibleDisplayList.indexOf(pageItems[0]);
+    const pageDemands = pageItems.map((_, j) => itemDemands[pageStartIndex + j] ?? 1.0);
+    const pageTotalDemand = pageDemands.reduce((sum, d) => sum + d, 0);
+    const pageDensity = densityTier(pageTotalDemand);
+
+    return (
+      <ul
+        key={pageIndex}
+        className={styles.eventList}
+        role="list"
+        data-testid={pageIndex === 0 ? "event-list" : `event-list-page-${pageIndex}`}
+        data-count={pageItems.length}
+        data-density={pageDensity}
+      >
+        {pageItems.map((displayItem, j) => {
+          const demand = pageDemands[j];
+          if (displayItem.kind === "training-group") {
+            return (
+              <TrainingGroupCard
+                key={displayItem.items.map((it) => it.event.id).join(":")}
+                items={displayItem.items}
+                timeZone={timeZone}
+                demand={demand}
+                clubName={clubNameUpper}
+              />
+            );
+          }
+          const { item } = displayItem;
+          const extension = findEventExtension(item.event.id, eventPresentation);
+          const allocs = extension?.participantAllocations;
+          const participantAllocations =
+            allocs !== undefined && allocs.length >= 3 ? allocs : undefined;
+          return (
+            <EventCard
+              key={item.event.id}
+              item={item}
+              timeZone={timeZone}
+              participantAllocations={participantAllocations}
+              demand={demand}
+            />
+          );
+        })}
+      </ul>
+    );
+  }
+
   return (
     <div
       className={styles.root}
@@ -911,7 +1082,7 @@ export function InfoboardScreen1({
         subtitleEnabled={subtitleEnabled}
       />
 
-      {/* ── Main: event list ─────────────────────────────────────────────── */}
+      {/* ── Main: event list (demand-paginated, rotated when multi-page) ── */}
       <main className={styles.main}>
         {feed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">
@@ -923,41 +1094,9 @@ export function InfoboardScreen1({
           </div>
         ) : (
           <>
-            <ul
-              className={styles.eventList}
-              role="list"
-              data-testid="event-list"
-              data-count={visibleDisplayList.length}
-            >
-              {visibleDisplayList.map((displayItem) => {
-                if (displayItem.kind === "training-group") {
-                  return (
-                    <TrainingGroupCard
-                      key={displayItem.items.map((it) => it.event.id).join(":")}
-                      items={displayItem.items}
-                      timeZone={timeZone}
-                      cardCount={visibleDisplayList.length}
-                      clubName={clubNameUpper}
-                    />
-                  );
-                }
-                const { item } = displayItem;
-                const extension = findEventExtension(item.event.id, eventPresentation);
-                const allocs = extension?.participantAllocations;
-                const participantAllocations =
-                  allocs !== undefined && allocs.length >= 3 ? allocs : undefined;
-                return (
-                  <EventCard
-                    key={item.event.id}
-                    item={item}
-                    timeZone={timeZone}
-                    clubLogoSrc={clubLogoSrc}
-                    participantAllocations={participantAllocations}
-                    eventCount={visibleDisplayList.length}
-                  />
-                );
-              })}
-            </ul>
+            <InfoboardPageRotator intervalMs={12_000}>
+              {pages.map((pageItems, pageIndex) => renderPage(pageItems, pageIndex))}
+            </InfoboardPageRotator>
 
             {overflowCount > 0 && (
               <p

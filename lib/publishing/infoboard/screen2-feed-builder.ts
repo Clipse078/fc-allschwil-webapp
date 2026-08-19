@@ -261,8 +261,9 @@ function classifyForResource(
  * has both an active event and a further upcoming one within the rolling
  * horizon, both are returned together (never collapsed to one or the
  * other). When multiple current events share the same pitch (an allocation
- * conflict), the first (by startAt) is used as currentEvent and
- * `hasAllocationConflict` is set.
+ * conflict), the first (by startAt) is used as currentEvent,
+ * `hasAllocationConflict` is set, and ALL current events are returned in
+ * `currentEvents` so callers can derive the true multi-activity count.
  */
 function resolvePitchOccupancy(
   pitch: ConfiguredPitch,
@@ -276,7 +277,8 @@ function resolvePitchOccupancy(
   const { current, next } = classifyForResource(candidates, nowMs, horizonMs);
   const hasConflict = current.length > 1;
 
-  const currentEvent = current.length > 0 ? mapToPitchEventSummary(current[0], "current") : null;
+  const currentEvents = current.map((e) => mapToPitchEventSummary(e, "current"));
+  const currentEvent = currentEvents.length > 0 ? currentEvents[0] : null;
   const nextEvent = next.length > 0 ? mapToPitchEventSummary(next[0], "next") : null;
 
   let state: PitchOccupancyState;
@@ -296,6 +298,7 @@ function resolvePitchOccupancy(
     resourceType: pitch.resourceType,
     state,
     currentEvent,
+    currentEvents,
     nextEvent,
     hasAllocationConflict: hasConflict,
   };

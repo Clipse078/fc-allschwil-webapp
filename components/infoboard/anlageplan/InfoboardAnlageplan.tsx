@@ -31,14 +31,12 @@
 
 import type { ReactElement, CSSProperties } from "react";
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
-import type { PitchEventSummary } from "@/lib/publishing/event-types";
 import { groupFacilityPitches } from "@/lib/publishing/infoboard/facility-group";
 import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
-import { NextActivityRow } from "./AnlageplanMapElements";
 
 // ── Component props ───────────────────────────────────────────────────────────
 
@@ -77,23 +75,6 @@ export function InfoboardAnlageplan({
 
   // Build pitch occupancy lookup from VISIBLE pitches only.
   const pitchMap = new Map(visiblePitches.map((p) => [p.code, p]));
-
-  // Collect NEXT activities for the right rail from VISIBLE pitches only
-  // (de-duplicate by event id). Suppressed resources never appear in the rail.
-  const seenIds = new Set<string>();
-  const nextActivities: Array<{ event: PitchEventSummary; resourceLabel: string }> = [];
-  for (const pitch of visiblePitches) {
-    const label = pitch.displayLabel ?? pitch.code;
-    if (pitch.nextEvent && !seenIds.has(pitch.nextEvent.eventId)) {
-      seenIds.add(pitch.nextEvent.eventId);
-      nextActivities.push({ event: pitch.nextEvent, resourceLabel: label });
-    }
-  }
-  nextActivities.sort((a, b) => a.event.startAt.localeCompare(b.event.startAt));
-
-  const hasContent =
-    visiblePitches.some((p) => p.currentEvent || p.nextEvent) ||
-    nextActivities.length > 0;
 
   return (
     <div
@@ -139,21 +120,20 @@ export function InfoboardAnlageplan({
         showDate
       />
 
-      {/* ── BODY: map canvas + activity rail ──────────────────────────── */}
+      {/* ── BODY: full-width map canvas ────────────────────────────────── */}
       <div
         style={{
           flex: 1,
           display: "flex",
           minHeight: 0,
           padding: "0.6vh 0.9vw",
-          gap: "0.8vw",
         }}
       >
-        {/* ── MAP CANVAS (~78%) ─────────────────────────────────────────── */}
+        {/* ── MAP CANVAS (full width — Nächste Aktivitäten removed) ─── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
-            flex: "1 1 80%",
+            flex: 1,
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",
             overflow: "hidden",
@@ -175,78 +155,6 @@ export function InfoboardAnlageplan({
             richEventCards={richEventCards}
           />
         </div>
-
-        {/* ── ACTIVITY RAIL (~22%) ──────────────────────────────────────── */}
-        <aside
-          data-testid="anlageplan-activity-rail"
-          style={{
-            flex: "0 0 20%",
-            maxWidth: "20%",
-            display: "flex",
-            flexDirection: "column",
-            gap: "0.6vh",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "clamp(13px, 1.5vh, 19px)",
-              letterSpacing: "0.18em",
-              color: "rgba(255,255,255,0.50)",
-              textTransform: "uppercase",
-              marginBottom: "0.4vh",
-              flexShrink: 0,
-              fontWeight: 600,
-            }}
-          >
-            NÄCHSTE AKTIVITÄTEN
-          </div>
-
-          {nextActivities.length > 0 ? (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "0.5vh",
-                overflow: "hidden",
-                flex: 1,
-              }}
-            >
-              {nextActivities.map(({ event, resourceLabel }) => (
-                <NextActivityRow
-                  key={event.eventId}
-                  event={event}
-                  resourceLabel={resourceLabel}
-                  tz={tz}
-                />
-              ))}
-            </div>
-          ) : (
-            <div
-              style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-start",
-                justifyContent: "flex-start",
-                paddingTop: "1.5vh",
-                gap: "0.6vh",
-              }}
-            >
-              <span
-                style={{
-                  fontSize: "clamp(11px, 1.4vh, 18px)",
-                  color: "rgba(255,255,255,0.30)",
-                  letterSpacing: "0.08em",
-                  fontWeight: 500,
-                  lineHeight: 1.3,
-                }}
-              >
-                {hasContent ? "Aktuell keine weiteren Aktivitäten" : "Keine Aktivitäten heute"}
-              </span>
-            </div>
-          )}
-        </aside>
       </div>
 
       {/* ── SHARED FOOTER ─────────────────────────────────────────────── */}

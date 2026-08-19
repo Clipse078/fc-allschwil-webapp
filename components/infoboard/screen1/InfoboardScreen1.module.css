@@ -105,10 +105,10 @@
   --ib-radius:          8px;
   --ib-radius-sm:       4px;
 
-  /* Card gap */
-  --ib-card-gap:        clamp(6px, 0.8vh, 12px);
-  --ib-card-pad-v:      clamp(10px, 1.4vh, 20px);
-  --ib-card-pad-h:      clamp(16px, 1.8vw, 28px);
+  /* Card gap — reduced for physical-TV fit */
+  --ib-card-gap:        clamp(4px, 0.5vh, 8px);
+  --ib-card-pad-v:      clamp(8px, 1.1vh, 14px);
+  --ib-card-pad-h:      clamp(14px, 1.6vw, 24px);
 }
 
 /* ─── Light theme palette (INFOBOARD-INTEGRATION-01B) ───────────────────────
@@ -316,7 +316,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--ib-sp-4) var(--ib-sp-8) var(--ib-sp-4);
+  padding: var(--ib-sp-3) var(--ib-sp-8) var(--ib-sp-3);
 }
 
 .eventList {
@@ -340,7 +340,14 @@
   border: 1px solid var(--ib-border);
   border-left: var(--ib-stripe-width) solid transparent;
   border-radius: var(--ib-radius);
-  flex: 1;
+  /* Content-aware flex-grow: each card gets space proportional to its
+     semantic content demand (set via --ib-card-demand CSS custom property).
+     Denser cards (e.g. 6-row training groups) receive proportionally more
+     of the available viewport height than compact cards (1-row training,
+     match). Falls back to flex: 1 when no demand is set. */
+  flex-grow: var(--ib-card-demand, 1);
+  flex-shrink: 1;
+  flex-basis: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -905,8 +912,8 @@
 
 /* 3 events — generous */
 .eventList[data-count="3"] {
-  --ib-card-pad-v:  clamp(16px, 2.8vh, 32px);
-  --ib-card-pad-h:  clamp(20px, 2.2vw, 32px);
+  --ib-card-pad-v:  clamp(14px, 2.4vh, 28px);
+  --ib-card-pad-h:  clamp(18px, 2vw, 30px);
   --ib-fs-event-time:  clamp(2.4rem, 3.2vw, 4.2rem);
   --ib-fs-event-team:  clamp(1.6rem, 2.1vw, 2.8rem);
   --ib-fs-dest-pitch:  clamp(1.8rem, 2.4vw, 3.2rem);
@@ -915,22 +922,33 @@
 
 /* 4 events — compact premium */
 .eventList[data-count="4"] {
-  --ib-card-pad-v:  clamp(12px, 1.8vh, 22px);
-  --ib-card-pad-h:  clamp(18px, 2vw, 28px);
-  --ib-fs-event-time:  clamp(2.2rem, 2.8vw, 3.8rem);
-  --ib-fs-event-team:  clamp(1.4rem, 1.9vw, 2.6rem);
-  --ib-fs-dest-pitch:  clamp(1.6rem, 2.2vw, 3rem);
-  --ib-fs-dest-room:   clamp(1.1rem, 1.5vw, 2rem);
-}
-
-/* 5 events — readable compact */
-.eventList[data-count="5"] {
-  --ib-card-pad-v:  clamp(10px, 1.4vh, 18px);
+  --ib-card-pad-v:  clamp(10px, 1.6vh, 20px);
   --ib-card-pad-h:  clamp(16px, 1.8vw, 26px);
   --ib-fs-event-time:  clamp(2rem, 2.6vw, 3.4rem);
   --ib-fs-event-team:  clamp(1.3rem, 1.7vw, 2.3rem);
   --ib-fs-dest-pitch:  clamp(1.5rem, 2vw, 2.7rem);
   --ib-fs-dest-room:   clamp(1rem, 1.35vw, 1.8rem);
+}
+
+/* 5 events — readable compact */
+.eventList[data-count="5"] {
+  --ib-card-pad-v:  clamp(8px, 1.1vh, 14px);
+  --ib-card-pad-h:  clamp(14px, 1.6vw, 22px);
+  --ib-fs-event-time:  clamp(1.8rem, 2.3vw, 3rem);
+  --ib-fs-event-team:  clamp(1.2rem, 1.55vw, 2.1rem);
+  --ib-fs-dest-pitch:  clamp(1.4rem, 1.8vw, 2.4rem);
+  --ib-fs-dest-room:   clamp(0.9rem, 1.2vw, 1.6rem);
+}
+
+/* 6 events — tight but legible */
+.eventList[data-count="6"] {
+  --ib-card-pad-v:  clamp(6px, 0.9vh, 12px);
+  --ib-card-pad-h:  clamp(12px, 1.4vw, 20px);
+  --ib-card-gap:    clamp(3px, 0.4vh, 6px);
+  --ib-fs-event-time:  clamp(1.6rem, 2vw, 2.6rem);
+  --ib-fs-event-team:  clamp(1.1rem, 1.4vw, 1.9rem);
+  --ib-fs-dest-pitch:  clamp(1.3rem, 1.6vw, 2.1rem);
+  --ib-fs-dest-room:   clamp(0.85rem, 1.1vw, 1.45rem);
 }
 
 /* ─── Responsive: 1280×720 ───────────────────────────────────────────────── */
@@ -941,7 +959,7 @@
     --ib-zone-event:  42%;
     --ib-zone-room:   24%;
     --ib-zone-pitch:  18%;
-    --ib-card-gap:    4px;
+    --ib-card-gap:    3px;
   }
 
   .eventCard {
@@ -949,12 +967,22 @@
   }
 
   .eventList[data-count="5"] {
-    --ib-card-pad-v: 8px;
-    --ib-card-pad-h: 12px;
-    --ib-fs-event-time:  clamp(1.7rem, 2.2vw, 2.8rem);
-    --ib-fs-event-team:  clamp(1.1rem, 1.4vw, 1.9rem);
-    --ib-fs-dest-pitch:  clamp(1.3rem, 1.7vw, 2.2rem);
-    --ib-fs-dest-room:   clamp(0.85rem, 1.1vw, 1.5rem);
+    --ib-card-pad-v: 7px;
+    --ib-card-pad-h: 10px;
+    --ib-fs-event-time:  clamp(1.6rem, 2vw, 2.6rem);
+    --ib-fs-event-team:  clamp(1rem, 1.3vw, 1.7rem);
+    --ib-fs-dest-pitch:  clamp(1.2rem, 1.5vw, 2rem);
+    --ib-fs-dest-room:   clamp(0.8rem, 1vw, 1.3rem);
+  }
+
+  .eventList[data-count="6"] {
+    --ib-card-pad-v: 5px;
+    --ib-card-pad-h: 8px;
+    --ib-card-gap:   2px;
+    --ib-fs-event-time:  clamp(1.4rem, 1.7vw, 2.2rem);
+    --ib-fs-event-team:  clamp(0.9rem, 1.15vw, 1.5rem);
+    --ib-fs-dest-pitch:  clamp(1.1rem, 1.35vw, 1.8rem);
+    --ib-fs-dest-room:   clamp(0.75rem, 0.95vw, 1.25rem);
   }
 }
 
@@ -971,40 +999,55 @@
 .trainingGroupZone {
   min-width: 0;
 }
-/*
- * Dense simultaneous-training groups need more vertical capacity.
+
+/* ─── Adaptive density tiers ────────────────────────────────────────────────
  *
- * Keep canonical primary typography intact; instead allocate more of the
- * available board height to the Training card and tighten only internal
- * vertical spacing. Match/Tournament retain normal proportions.
+ * When total content demand on a page is high, the density tier is set via
+ * the data-density attribute on the event list. Each tier applies modest
+ * tightening to internal padding and row heights — never to typography.
+ *
+ * Tiers:
+ *   normal — generous spacing (low-demand displays, 1–2 items)
+ *   dense  — modestly tightened (3–5 items with medium demand)
+ *   ultra  — significantly tightened (approaching page limit)
+ *
+ * NOTE: these rules supersede the removed per-training-count flex-grow and
+ * padding rules. Demand-proportional flex-grow (via --ib-card-demand) now
+ * drives card height; density tiers tune only internal row/padding spacing.
  */
-.eventCard[data-type="TRAINING"][data-training-count="5"] {
-  flex-grow: 1.22;
+
+/* dense tier */
+.eventList[data-density="dense"] .cardTimeZone,
+.eventList[data-density="dense"] .cardEventZone,
+.eventList[data-density="dense"] .cardDressingRoomZone,
+.eventList[data-density="dense"] .cardPitchZone {
+  padding-top: clamp(6px, 0.75vh, 11px);
+  padding-bottom: clamp(6px, 0.75vh, 11px);
 }
 
-.eventCard[data-type="TRAINING"][data-training-count="6"] {
-  flex-grow: 1.38;
+.eventList[data-density="dense"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(26px, 2.9vh, 38px), auto);
 }
 
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardTimeZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardEventZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardDressingRoomZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardPitchZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardTimeZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardEventZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardDressingRoomZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardPitchZone {
-  padding-top: clamp(6px, 0.7vh, 10px);
-  padding-bottom: clamp(6px, 0.7vh, 10px);
+.eventList[data-density="dense"] .trainingGroupAlignedRow {
+  padding-top: 1px;
+  padding-bottom: 1px;
 }
 
-.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupRows,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupRows {
-  grid-auto-rows: minmax(clamp(27px, 3vh, 38px), auto);
+/* ultra tier */
+.eventList[data-density="ultra"] .cardTimeZone,
+.eventList[data-density="ultra"] .cardEventZone,
+.eventList[data-density="ultra"] .cardDressingRoomZone,
+.eventList[data-density="ultra"] .cardPitchZone {
+  padding-top: clamp(5px, 0.65vh, 9px);
+  padding-bottom: clamp(5px, 0.65vh, 9px);
 }
 
-.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupAlignedRow,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupAlignedRow {
+.eventList[data-density="ultra"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(24px, 2.7vh, 36px), auto);
+}
+
+.eventList[data-density="ultra"] .trainingGroupAlignedRow {
   padding-top: 1px;
   padding-bottom: 1px;
 }
@@ -1163,6 +1206,12 @@
   margin: 0;
   padding: 0;
   line-height: 1;
+  /* Force single-line labels — ensures MEISTERSCHAFT/TURNIER, KABINE, PLATZ
+   * all start at the same vertical position across adjacent cards. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* Values begin from one common second-row origin. */
@@ -1193,14 +1242,8 @@
   align-items: flex-start;
 }
 
-/* Tournament needs slightly more of the available list height so participant
- * and allocation content cannot be clipped at the card bottom.
- */
-.eventCard[data-type="TOURNAMENT"] {
-  flex-grow: 1.16;
-}
-
-/* Tournament identity may use its full content height inside the enlarged card. */
+/* Tournament identity may use its full content height inside the card.
+ * (flex-grow is now driven by --ib-card-demand, not a fixed per-type override.) */
 .eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
 .eventCard[data-type="TOURNAMENT"] .tournamentParticipants,
 .eventCard[data-type="TOURNAMENT"] .participantAllocationBlock {
