@@ -56,6 +56,8 @@ const NO_PERMS: PersonDomainPermissions = {
   canViewDevelopment: false, canManageDevelopment: false,
   canViewAssessments: false, canManageAssessments: false,
   canViewAudit: false,
+      canViewContact: false,
+      canManageContact: false,
 };
 
 const VIEW_DOCS_ONLY: PersonDomainPermissions = {

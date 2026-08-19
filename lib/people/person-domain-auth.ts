@@ -79,6 +79,10 @@ export type PersonDomainPermissions = {
   canManageAssessments: boolean;
   /** people.audit.view */
   canViewAudit: boolean;
+  /** people.contact.view — PERSON-UX-10 */
+  canViewContact: boolean;
+  /** people.contact.manage — PERSON-UX-10 */
+  canManageContact: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -101,6 +105,8 @@ export const DOMAIN_PERMISSIONS_DENIED: PersonDomainPermissions = {
   canViewAssessments: false,
   canManageAssessments: false,
   canViewAudit: false,
+  canViewContact: false,
+  canManageContact: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -139,6 +145,8 @@ export async function resolvePersonDomainPermissions(
     canViewAssessments:        has(PERMISSIONS.PEOPLE_ASSESSMENTS_VIEW),
     canManageAssessments:      has(PERMISSIONS.PEOPLE_ASSESSMENTS_MANAGE),
     canViewAudit:              has(PERMISSIONS.PEOPLE_AUDIT_VIEW),
+    canViewContact:            has(PERMISSIONS.PEOPLE_CONTACT_VIEW),
+    canManageContact:          has(PERMISSIONS.PEOPLE_CONTACT_MANAGE),
   };
 }
 
@@ -191,6 +199,8 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     canViewAssessments,
     canManageAssessments,
     canViewAudit,
+    canViewContact,
+    canManageContact,
   ] = await Promise.all([
     check(PERMISSIONS.PEOPLE_FINANCE_VIEW),
     check(PERMISSIONS.PEOPLE_FINANCE_MANAGE),
@@ -203,6 +213,8 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     check(PERMISSIONS.PEOPLE_ASSESSMENTS_VIEW),
     check(PERMISSIONS.PEOPLE_ASSESSMENTS_MANAGE),
     check(PERMISSIONS.PEOPLE_AUDIT_VIEW),
+    check(PERMISSIONS.PEOPLE_CONTACT_VIEW),
+    check(PERMISSIONS.PEOPLE_CONTACT_MANAGE),
   ]);
 
   return {
@@ -217,5 +229,7 @@ export async function resolvePersonDomainPermissionsForOrgUnit(
     canViewAssessments,
     canManageAssessments,
     canViewAudit,
+    canViewContact,
+    canManageContact,
   };
 }

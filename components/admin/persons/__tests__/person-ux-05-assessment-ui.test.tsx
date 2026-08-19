@@ -151,6 +151,8 @@ const FULL_PERMISSIONS: PersonDomainPermissions = {
   canViewAssessments: true,
   canManageAssessments: true,
   canViewAudit: true,
+      canViewContact: false,
+      canManageContact: false,
 };
 
 function makeTrainer(): PersonTrainerMembership {

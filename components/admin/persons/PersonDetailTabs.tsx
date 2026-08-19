@@ -187,6 +187,8 @@ export default function PersonDetailTabs({
   const canViewDevelopment          = domainPermissions?.canViewDevelopment ?? false;
   const canViewAssessments          = domainPermissions?.canViewAssessments ?? false;
   const canManageAssessments        = domainPermissions?.canManageAssessments ?? false;
+  const canViewContact              = domainPermissions?.canViewContact ?? false;
+  const canManageContact            = domainPermissions?.canManageContact ?? false;
 
   // ── Counts for badges ──────────────────────────────────────────────────────
   const activeAssignmentCount = person.assignments.filter(
@@ -357,6 +359,8 @@ export default function PersonDetailTabs({
               person={person}
               canManage={canManage}
               canDelete={canDelete}
+              canViewContact={canViewContact}
+              canManageContact={canManageContact}
             />
           ) : null}
         </div>

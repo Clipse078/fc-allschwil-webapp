@@ -626,6 +626,8 @@ describe("10. Responsive tab structure", () => {
       canViewAssessments: true,
       canManageAssessments: true,
       canViewAudit: true,
+      canViewContact: false,
+      canManageContact: false,
     };
     const person = makePerson({ isPlayer: false, isTrainer: false });
     render(
@@ -689,6 +691,8 @@ describe("10. Responsive tab structure", () => {
           canViewAssessments: false,
           canManageAssessments: false,
           canViewAudit: false,
+      canViewContact: false,
+      canManageContact: false,
         }}
       />,
     );
@@ -840,6 +844,8 @@ describe("10. Responsive tab structure", () => {
           canViewAssessments: false,
           canManageAssessments: false,
           canViewAudit: false,
+      canViewContact: false,
+      canManageContact: false,
         }}
       />,
     );

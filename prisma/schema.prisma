@@ -626,6 +626,9 @@ model Tenant {
   developmentAssessments DevelopmentAssessment[] @relation("TenantDevelopmentAssessments")
   // PERSON-UX-07: person-bound private documents
   personDocuments PersonDocument[] @relation("TenantPersonDocuments")
+  // PERSON-UX-10: canonical guardian relationships and emergency contacts
+  guardianRelationships   GuardianRelationship[]    @relation("TenantGuardianRelationships")
+  personEmergencyContacts PersonEmergencyContact[]  @relation("TenantPersonEmergencyContacts")
 
   @@index([status])
   @@index([name])
@@ -1199,6 +1202,15 @@ model Person {
 
   /// PERSON-UX-07: private person-bound documents (SEPARATE from WorkspaceDocument)
   personDocuments PersonDocument[] @relation("PersonDocuments")
+
+  // PERSON-UX-10: canonical guardian relationships.
+  // This Person is the CHILD in these relationships.
+  // INVARIANT: These relations carry NO authorization/access implications.
+  guardianRelationshipsAsChild    GuardianRelationship[] @relation("PersonAsChild")
+  // This Person is the GUARDIAN in these relationships.
+  guardianRelationshipsAsGuardian GuardianRelationship[] @relation("PersonAsGuardian")
+  // PERSON-UX-10: standalone emergency contacts (NOT Person records)
+  emergencyContacts PersonEmergencyContact[] @relation("PersonEmergencyContacts")
 }
 
 // ---------------------------------------------------------------------------
@@ -4880,4 +4892,100 @@ model DevelopmentAssessmentRating {
   @@unique([assessmentId, criterionId])
   @@index([assessmentId])
   @@index([criterionId])
+}
+
+// ---------------------------------------------------------------------------
+// PERSON-UX-10: GuardianRelationship — canonical Person↔Person guardian link
+// ---------------------------------------------------------------------------
+//
+// ARCHITECTURAL INVARIANT (PERSON-UX-10):
+//   A GuardianRelationship represents a REAL-WORLD parental/guardian link
+//   between two Person records. It carries ZERO authorization implications:
+//
+//     - Does NOT create a User account
+//     - Does NOT create a TenantMembership
+//     - Does NOT grant any Role or RolePermission
+//     - Does NOT imply mobile/web access for the guardian Person
+//     - Does NOT send any invitation
+//
+//   Guardian relationships and system access (INVITE-01) are wholly separate
+//   domains. Never conflate them.
+//
+// Tenant isolation:
+//   Both childPersonId and guardianPersonId MUST belong to the same tenant
+//   as tenantId. This is enforced at the service layer before any DB write.
+//
+// Self-link prevention:
+//   childPersonId != guardianPersonId is enforced at the service layer.
+//
+// Uniqueness:
+//   @@unique([childPersonId, guardianPersonId]) — one relationship per pair.
+//   The same Person may be guardian to multiple children and vice versa.
+
+enum GuardianRelationshipType {
+  MOTHER
+  FATHER
+  LEGAL_GUARDIAN
+  FOSTER_GUARDIAN
+  OTHER
+}
+
+model GuardianRelationship {
+  id               String                  @id @default(cuid())
+  tenantId         String
+  childPersonId    String
+  guardianPersonId String
+  relationshipType GuardianRelationshipType @default(OTHER)
+  isPrimary        Boolean                 @default(false)
+  notes            String?                 @db.VarChar(500)
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  tenant          Tenant @relation("TenantGuardianRelationships", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  childPerson     Person @relation("PersonAsChild", fields: [childPersonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  guardianPerson  Person @relation("PersonAsGuardian", fields: [guardianPersonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([childPersonId, guardianPersonId])
+  @@index([tenantId])
+  @@index([childPersonId])
+  @@index([guardianPersonId])
+}
+
+// ---------------------------------------------------------------------------
+// PERSON-UX-10: PersonEmergencyContact — standalone 1:n emergency contacts
+// ---------------------------------------------------------------------------
+//
+// Emergency contacts are operational contact records ONLY.
+// They are NOT Person records and carry NO authorization implications.
+//
+// INVARIANT: Deleting a PersonEmergencyContact deletes ONLY that record.
+//   The associated Person is never touched.
+//   No User, TenantMembership, Role, or permission is affected.
+//
+// SECURITY: phone is required; all fields are strictly private operational
+//   data and MUST NOT appear in public serializers, website, infoboard, or
+//   mobile APIs.
+//
+// Ordering: priority ASC, then createdAt ASC for deterministic display.
+
+model PersonEmergencyContact {
+  id           String   @id @default(cuid())
+  tenantId     String
+  personId     String
+  firstName    String   @db.VarChar(100)
+  lastName     String   @db.VarChar(100)
+  relationship String?  @db.VarChar(100)
+  phone        String   @db.VarChar(50)
+  email        String?  @db.VarChar(254)
+  priority     Int      @default(0)
+  notes        String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant Tenant @relation("TenantPersonEmergencyContacts", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person Person @relation("PersonEmergencyContacts", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([personId])
+  @@index([personId, priority])
 }

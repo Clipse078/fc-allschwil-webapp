@@ -63,6 +63,16 @@ export const PERMISSIONS = {
   PEOPLE_PRIVATE_DOCUMENTS_MANAGE: "people.private_documents.manage",
   PEOPLE_AUDIT_VIEW: "people.audit.view",
 
+  // PERSON-UX-10: Guardian relationships and emergency contacts.
+  // These cover privacy-sensitive operational contact data:
+  //   - GuardianRelationship (Person↔Person links)
+  //   - PersonEmergencyContact (standalone contact records)
+  // VIEW alone grants read; MANAGE covers create/update/delete.
+  // Both are grantableByAdmin=true, scope=TENANT — club admins
+  // receive them automatically via the RPERM-04 seeding policy.
+  PEOPLE_CONTACT_VIEW: "people.contact.view",
+  PEOPLE_CONTACT_MANAGE: "people.contact.manage",
+
   EVENTS_VIEW: "events.view",
   EVENTS_MANAGE: "events.manage",
   EVENTS_IMPORT: "events.import",
