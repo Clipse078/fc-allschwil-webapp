@@ -340,7 +340,14 @@
   border: 1px solid var(--ib-border);
   border-left: var(--ib-stripe-width) solid transparent;
   border-radius: var(--ib-radius);
-  flex: 1;
+  /* Content-aware flex-grow: each card gets space proportional to its
+     semantic content demand (set via --ib-card-demand CSS custom property).
+     Denser cards (e.g. 6-row training groups) receive proportionally more
+     of the available viewport height than compact cards (1-row training,
+     match). Falls back to flex: 1 when no demand is set. */
+  flex-grow: var(--ib-card-demand, 1);
+  flex-shrink: 1;
+  flex-basis: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -992,54 +999,55 @@
 .trainingGroupZone {
   min-width: 0;
 }
-/*
- * Dense simultaneous-training groups need more vertical capacity.
+
+/* ─── Adaptive density tiers ────────────────────────────────────────────────
  *
- * Keep canonical primary typography intact; instead allocate more of the
- * available board height to the Training card and tighten only internal
- * vertical spacing. Match/Tournament retain normal proportions.
+ * When total content demand on a page is high, the density tier is set via
+ * the data-density attribute on the event list. Each tier applies modest
+ * tightening to internal padding and row heights — never to typography.
  *
- * Physical-TV target (1920×1080): training-count 2 and 3 fit without
- * adjustment, but 4+ rows can clip the bottom row when multiple display
- * items compete for height. The flex-grow overrides below give the dense
- * training card a proportionally larger share of available board height.
- * Padding and row height are tightened in concert to maximise visible
- * row space while retaining strong TV readability.
+ * Tiers:
+ *   normal — generous spacing (low-demand displays, 1–2 items)
+ *   dense  — modestly tightened (3–5 items with medium demand)
+ *   ultra  — significantly tightened (approaching page limit)
+ *
+ * NOTE: these rules supersede the removed per-training-count flex-grow and
+ * padding rules. Demand-proportional flex-grow (via --ib-card-demand) now
+ * drives card height; density tiers tune only internal row/padding spacing.
  */
 
-/* flex-grow: progressively larger share for denser training blocks */
-.eventCard[data-type="TRAINING"][data-training-count="4"] { flex-grow: 1.14; }
-.eventCard[data-type="TRAINING"][data-training-count="5"] { flex-grow: 1.22; }
-.eventCard[data-type="TRAINING"][data-training-count="6"] { flex-grow: 1.38; }
-
-/* Reduce zone vertical padding for 4-6 row training cards */
-.eventCard[data-type="TRAINING"][data-training-count="4"] .cardTimeZone,
-.eventCard[data-type="TRAINING"][data-training-count="4"] .cardEventZone,
-.eventCard[data-type="TRAINING"][data-training-count="4"] .cardDressingRoomZone,
-.eventCard[data-type="TRAINING"][data-training-count="4"] .cardPitchZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardTimeZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardEventZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardDressingRoomZone,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .cardPitchZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardTimeZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardEventZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardDressingRoomZone,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .cardPitchZone {
-  padding-top: clamp(6px, 0.7vh, 10px);
-  padding-bottom: clamp(6px, 0.7vh, 10px);
+/* dense tier */
+.eventList[data-density="dense"] .cardTimeZone,
+.eventList[data-density="dense"] .cardEventZone,
+.eventList[data-density="dense"] .cardDressingRoomZone,
+.eventList[data-density="dense"] .cardPitchZone {
+  padding-top: clamp(6px, 0.75vh, 11px);
+  padding-bottom: clamp(6px, 0.75vh, 11px);
 }
 
-/* Tighten grid row min-height for 4-6 row training blocks */
-.eventCard[data-type="TRAINING"][data-training-count="4"] .trainingGroupRows,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupRows,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupRows {
-  grid-auto-rows: minmax(clamp(27px, 3vh, 38px), auto);
+.eventList[data-density="dense"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(26px, 2.9vh, 38px), auto);
 }
 
-/* Tighten row vertical padding for 4-6 row training blocks */
-.eventCard[data-type="TRAINING"][data-training-count="4"] .trainingGroupAlignedRow,
-.eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupAlignedRow,
-.eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupAlignedRow {
+.eventList[data-density="dense"] .trainingGroupAlignedRow {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+/* ultra tier */
+.eventList[data-density="ultra"] .cardTimeZone,
+.eventList[data-density="ultra"] .cardEventZone,
+.eventList[data-density="ultra"] .cardDressingRoomZone,
+.eventList[data-density="ultra"] .cardPitchZone {
+  padding-top: clamp(5px, 0.65vh, 9px);
+  padding-bottom: clamp(5px, 0.65vh, 9px);
+}
+
+.eventList[data-density="ultra"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(24px, 2.7vh, 36px), auto);
+}
+
+.eventList[data-density="ultra"] .trainingGroupAlignedRow {
   padding-top: 1px;
   padding-bottom: 1px;
 }
@@ -1234,14 +1242,8 @@
   align-items: flex-start;
 }
 
-/* Tournament needs slightly more of the available list height so participant
- * and allocation content cannot be clipped at the card bottom.
- */
-.eventCard[data-type="TOURNAMENT"] {
-  flex-grow: 1.16;
-}
-
-/* Tournament identity may use its full content height inside the enlarged card. */
+/* Tournament identity may use its full content height inside the card.
+ * (flex-grow is now driven by --ib-card-demand, not a fixed per-type override.) */
 .eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
 .eventCard[data-type="TOURNAMENT"] .tournamentParticipants,
 .eventCard[data-type="TOURNAMENT"] .participantAllocationBlock {
