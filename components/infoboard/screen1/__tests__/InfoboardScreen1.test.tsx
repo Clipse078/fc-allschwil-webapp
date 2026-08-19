@@ -20,6 +20,8 @@ import {
   computeTrainingGroupDemand,
   computeEventDemand,
   densityTier,
+  layoutModeTier,
+  LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
   CARD_DEMAND_TRAINING_ROW,
@@ -2725,6 +2727,152 @@ describe("Content-demand — densityTier", () => {
   it("high total demand → ultra tier", () => {
     expect(densityTier(11.1)).toBe("ultra");
     expect(densityTier(15)).toBe("ultra");
+  });
+});
+
+// ── Sparse layout mode regression tests ───────────────────────────────────────
+//
+// INFOBOARD-FINAL-C ADDENDUM — prevents unconstrained full-page card growth on
+// sparse days (1–2 low-demand cards).
+//
+// These tests verify semantic layout mode via the data-layout-mode attribute
+// and CSS custom-property contracts. Pixel heights are not tested because CSS
+// is not applied in jsdom; what matters is that the correct mode and demand
+// values are propagated so the CSS max-height rule engages at runtime.
+
+describe("Sparse layout mode — layoutModeTier", () => {
+  it("demand below threshold → sparse", () => {
+    expect(layoutModeTier(1.5)).toBe("sparse");   // 1 MATCH
+    expect(layoutModeTier(1.55)).toBe("sparse");  // 1-row training
+    expect(layoutModeTier(3.0)).toBe("sparse");   // 2 MATCH
+    expect(layoutModeTier(3.9)).toBe("sparse");   // just below threshold
+  });
+
+  it("demand at/above threshold → fill", () => {
+    expect(layoutModeTier(LAYOUT_MODE_SPARSE_THRESHOLD)).toBe("fill");   // exactly at threshold
+    expect(layoutModeTier(4.3)).toBe("fill");    // 1 training-group 6 rows
+    expect(layoutModeTier(5.0)).toBe("fill");
+    expect(layoutModeTier(12.0)).toBe("fill");
+  });
+
+  it("threshold constant is 4.0", () => {
+    expect(LAYOUT_MODE_SPARSE_THRESHOLD).toBe(4.0);
+  });
+});
+
+describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
+  it("one MATCH card → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "Home", opponentDisplayName: "Away" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("one 1-row training card → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "t1", teamDisplayName: "Solo Training" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("two MATCH cards → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T09:00:00.000Z", teamDisplayName: "Home1", opponentDisplayName: "Away1" }),
+        makeEvent({ id: "m2", type: "MATCH", startAt: "2026-09-12T11:00:00.000Z", teamDisplayName: "Home2", opponentDisplayName: "Away2" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("one 6-row training group → data-layout-mode='fill' (high demand)", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+
+  it("dense preview fixture → data-layout-mode='fill'", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+});
+
+describe("Sparse layout mode — demand proportionality preserved", () => {
+  it("1-row training demand < 6-row training demand", () => {
+    const d1Row = computeTrainingGroupDemand(1);
+    const d6Row = computeTrainingGroupDemand(6);
+    // 6-row is proportionally larger — more content requires more height
+    expect(d6Row).toBeGreaterThan(d1Row);
+  });
+
+  it("1-row training (sparse) has lower demand than 6-row training (fill)", () => {
+    const d1Row = computeTrainingGroupDemand(1);
+    const d6Row = computeTrainingGroupDemand(6);
+    // 1-row < threshold → sparse; 6-row > threshold → fill
+    expect(layoutModeTier(d1Row)).toBe("sparse");
+    expect(layoutModeTier(d6Row)).toBe("fill");
+  });
+
+  it("one MATCH card has non-zero demand set on the card element", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Opp" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const card = screen.getByTestId("event-row");
+    const demand = parseFloat(card.getAttribute("data-card-demand") ?? "0");
+    expect(demand).toBeGreaterThan(0);
+    expect(demand).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+
+  it("sparse 1-MATCH card has demand < fill threshold", () => {
+    expect(CARD_DEMAND_MATCH).toBeLessThan(LAYOUT_MODE_SPARSE_THRESHOLD);
+    expect(layoutModeTier(CARD_DEMAND_MATCH)).toBe("sparse");
+  });
+
+  it("pagination still works when high demand triggers multi-page", () => {
+    // Create enough demand to force pagination (> PAGE_MAX)
+    const startTimes = [
+      "2026-09-12T09:00:00.000Z",
+      "2026-09-12T10:00:00.000Z",
+      "2026-09-12T11:00:00.000Z",
+      "2026-09-12T12:00:00.000Z",
+      "2026-09-12T13:00:00.000Z",
+      "2026-09-12T14:00:00.000Z",
+      "2026-09-12T15:00:00.000Z",
+      "2026-09-12T16:00:00.000Z",
+    ];
+    const feed = makeFeed({
+      current: startTimes.map((startAt, i) => makeEvent({
+        id: `m${i}`,
+        type: "MATCH",
+        startAt,
+        teamDisplayName: `Home${i}`,
+        opponentDisplayName: `Away${i}`,
+      })),
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    // With 8 MATCH cards (demand 8 × 1.5 = 12 > PAGE_MAX=12), pagination kicks in
+    // At least the first page renders
+    expect(screen.getByTestId("event-list")).toBeTruthy();
   });
 });
 

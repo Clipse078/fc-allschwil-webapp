@@ -1000,6 +1000,37 @@
   min-width: 0;
 }
 
+/* ─── Sparse layout mode ─────────────────────────────────────────────────────
+ *
+ * When total page demand is LOW (data-layout-mode="sparse"), cards must NOT
+ * absorb all remaining viewport height. A single low-demand MATCH or 1-row
+ * TRAINING card should appear substantial and readable — but not stretched
+ * to fill the entire screen with empty interior.
+ *
+ * Fix:
+ *   max-height: calc(var(--ib-card-demand, 1) * 25vh)
+ *
+ * This cap is demand-proportional so:
+ *   - 1 MATCH (demand 1.5): max ≈ 405px at 1080p (≈43% of content area) ✓
+ *   - 2 MATCH (demand 1.5 each): each ≈ 405px, background visible below ✓
+ *   - 1 TRAINING 1-row (demand 1.55): max ≈ 419px — comfortable ✓
+ *
+ * As demand approaches the fill threshold (4.0), max-height approaches
+ * 100vh — becoming equivalent to no constraint. Continuity is preserved.
+ *
+ * The event list itself (flex: 1) still fills main; only the cards are
+ * bounded. Unused space within the list shows the dark board background
+ * anchored below the activity stack, never centring the cards.
+ *
+ * FILL mode (data-layout-mode="fill") restores unconstrained flex-grow
+ * for dense / ultra pages where every pixel of viewport must be used.
+ * No rule is needed — the default .eventCard behaviour applies.
+ */
+
+.eventList[data-layout-mode="sparse"] .eventCard {
+  max-height: calc(var(--ib-card-demand, 1) * 25vh);
+}
+
 /* ─── Adaptive density tiers ────────────────────────────────────────────────
  *
  * When total content demand on a page is high, the density tier is set via

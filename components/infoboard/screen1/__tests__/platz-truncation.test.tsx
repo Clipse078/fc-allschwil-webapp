@@ -52,10 +52,10 @@ function makeTrainingEvent(
     organizerDisplayName: null,
     competitionLabel: null,
     meetingTime: null,
-    status: "PLANNED",
+    status: "SCHEDULED",
     resultLabel: null,
     intermediateResultLabel: null,
-    temporalBucket: "CURRENT",
+    temporalBucket: "current",
     seasonKey: "2024-25",
     allocation: {
       homeDressingRoomLabel: "KA 1",
