@@ -28,7 +28,6 @@ import {
   Pencil,
   Trash2,
   X,
-  Check,
   ExternalLink,
   Loader2,
   AlertCircle,
@@ -39,6 +38,7 @@ import {
 import Link from "next/link";
 import type { PersonDetail } from "@/lib/people/queries";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
+import { SwitchToggle } from "@/components/ui/SwitchToggle";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -323,23 +323,12 @@ function GuardianAddSheet({
           </div>
 
           {/* Primary toggle */}
-          <label className="flex cursor-pointer items-center gap-3">
-            <div
-              role="checkbox"
-              aria-checked={isPrimary}
-              onClick={() => setIsPrimary((v) => !v)}
-              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition ${
-                isPrimary
-                  ? "border-[var(--sce-primary)] bg-[var(--sce-primary)] text-white"
-                  : "border-[var(--border)] bg-[var(--surface)]"
-              }`}
-            >
-              {isPrimary && <Check className="h-3 w-3" />}
-            </div>
-            <span className="text-sm text-[var(--foreground)]">
-              Primärer Kontakt
-            </span>
-          </label>
+          <SwitchToggle
+            id="guardian-add-isPrimary"
+            label="Primärer Kontakt"
+            checked={isPrimary}
+            onChange={setIsPrimary}
+          />
 
           {/* Notes */}
           <div>
@@ -484,23 +473,12 @@ function GuardianEditSheet({
             </select>
           </div>
 
-          <label className="flex cursor-pointer items-center gap-3">
-            <div
-              role="checkbox"
-              aria-checked={isPrimary}
-              onClick={() => setIsPrimary((v) => !v)}
-              className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border transition ${
-                isPrimary
-                  ? "border-[var(--sce-primary)] bg-[var(--sce-primary)] text-white"
-                  : "border-[var(--border)] bg-[var(--surface)]"
-              }`}
-            >
-              {isPrimary && <Check className="h-3 w-3" />}
-            </div>
-            <span className="text-sm text-[var(--foreground)]">
-              Primärer Kontakt
-            </span>
-          </label>
+          <SwitchToggle
+            id="guardian-edit-isPrimary"
+            label="Primärer Kontakt"
+            checked={isPrimary}
+            onChange={setIsPrimary}
+          />
 
           <div>
             <label className="mb-1.5 block text-xs font-medium text-[var(--muted)]">
