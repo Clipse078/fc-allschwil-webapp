@@ -171,9 +171,10 @@ describe("Header — club name", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Header — no SportClubEvo logo in header", () => {
-  it("renders header-center zone", () => {
+  it("renders header-time-zone and header-date-zone", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
-    expect(screen.getByTestId("header-center")).toBeTruthy();
+    expect(screen.getByTestId("header-time-zone")).toBeTruthy();
+    expect(screen.getByTestId("header-date-zone")).toBeTruthy();
   });
 
   it("no product logo image appears inside header when productLogoSrc is provided", () => {
@@ -220,7 +221,7 @@ describe("Header — current time", () => {
         currentTimeIso="2026-09-12T08:30:00.000Z"
       />,
     );
-    const center = screen.getByTestId("header-center");
+    const center = screen.getByTestId("header-time-zone");
     // 08:30Z → 10:30 Europe/Zurich (UTC+2 in summer)
     expect(center.textContent).toContain("10:30");
   });
@@ -233,21 +234,21 @@ describe("Header — current time", () => {
         currentTimeIso="2026-09-12T09:00:00.000Z"
       />,
     );
-    const center = screen.getByTestId("header-center");
+    const center = screen.getByTestId("header-time-zone");
     expect(center.textContent).toContain("11:00");
     expect(center.textContent).not.toContain("09:00");
   });
 
   it("renders no clock element when currentTimeIso is missing", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
-    const center = screen.getByTestId("header-center");
-    expect(center.querySelector("time")).toBeNull();
+    const timeZone = screen.getByTestId("header-time-zone");
+    expect(timeZone.querySelector("time")).toBeNull();
   });
 
   it("renders no clock element when currentTimeIso is null", () => {
     render(<InfoboardScreen1 feed={makeFeed()} currentTimeIso={null} />);
-    const center = screen.getByTestId("header-center");
-    expect(center.querySelector("time")).toBeNull();
+    const timeZone = screen.getByTestId("header-time-zone");
+    expect(timeZone.querySelector("time")).toBeNull();
   });
 });
 
@@ -269,7 +270,7 @@ describe("Header — date", () => {
         currentTimeIso="2026-09-12T08:30:00.000Z"
       />,
     );
-    const center = screen.getByTestId("header-center");
+    const center = screen.getByTestId("header-date-zone");
     expect(center.textContent).toMatch(/[Ss]eptember/);
   });
 
@@ -280,7 +281,7 @@ describe("Header — date", () => {
         currentTimeIso="2026-09-12T08:30:00.000Z"
       />,
     );
-    const center = screen.getByTestId("header-center");
+    const center = screen.getByTestId("header-date-zone");
     expect(center.textContent).toMatch(/12/);
     expect(center.textContent).toMatch(/[Ss]eptember/);
   });
@@ -293,7 +294,7 @@ describe("Header — date", () => {
         currentTimeIso="2026-09-12T08:30:00.000Z"
       />,
     );
-    const center = screen.getByTestId("header-center");
+    const center = screen.getByTestId("header-date-zone");
     expect(center.textContent).toMatch(/[Ss]amstag/);
   });
 });
@@ -634,7 +635,9 @@ describe("Training row", () => {
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.getByText("Kabine A")).toBeTruthy();
+    // KABINE is the column label; room value is stripped of the "Kabine " prefix
+    expect(screen.getAllByText("KABINE").length).toBeGreaterThan(0);
+    expect(screen.getByText("A")).toBeTruthy();
   });
 
   it("does not render GARDEROBE label", () => {
@@ -754,7 +757,8 @@ describe("Match row", () => {
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.getByText("Kabine E1")).toBeTruthy();
+    // Room values are stripped of the "Kabine " prefix; "E1" is the home room value
+    expect(screen.getByText("E1")).toBeTruthy();
   });
 
   it("renders away dressing room", () => {
@@ -763,7 +767,8 @@ describe("Match row", () => {
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.getByText("Kabine E2")).toBeTruthy();
+    // Room values are stripped of the "Kabine " prefix; "E2" is the away room value
+    expect(screen.getByText("E2")).toBeTruthy();
   });
 
   it("home and away rooms appear in correct order (home before away)", () => {
@@ -774,8 +779,11 @@ describe("Match row", () => {
     render(<InfoboardScreen1 feed={feed} />);
     const matchAlloc = screen.getByTestId("match-allocation");
     const text = matchAlloc.textContent ?? "";
-    const homeIdx = text.indexOf("Kabine HOME");
-    const awayIdx = text.indexOf("Kabine AWAY");
+    // "Kabine HOME" → stripped to "HOME"; "Kabine AWAY" → stripped to "AWAY"
+    const homeIdx = text.indexOf("HOME");
+    const awayIdx = text.indexOf("AWAY");
+    expect(homeIdx).not.toBe(-1);
+    expect(awayIdx).not.toBe(-1);
     expect(homeIdx).toBeLessThan(awayIdx);
   });
 
@@ -808,8 +816,10 @@ describe("Match row", () => {
     const row = screen.getByTestId("event-row");
     expect(row.textContent).not.toContain("SCHIRI");
     expect(row.textContent).not.toContain("Kabine C");
-    expect(row.textContent).toContain("Kabine E1");
-    expect(row.textContent).toContain("Kabine E2");
+    // Room values are stripped of the "Kabine " prefix — verify home/away rooms are present
+    const matchAlloc = screen.getByTestId("match-allocation");
+    expect(matchAlloc.textContent).toContain("E1");
+    expect(matchAlloc.textContent).toContain("E2");
   });
 
   it("does not render HEIM label", () => {
@@ -897,10 +907,11 @@ describe("4-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
       />,
     );
-    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil E2")).toBeTruthy();
-    expect(screen.getByText("FC Binningen")).toBeTruthy();
-    expect(screen.getByText("FC Aesch")).toBeTruthy();
+    // Team names appear in both tournament-participants and participant-allocation-block
+    expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Binningen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Aesch").length).toBeGreaterThan(0);
   });
 
   it("renders all four dressing rooms", () => {
@@ -911,10 +922,11 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("Kabine A");
-    expect(block.textContent).toContain("Kabine B");
-    expect(block.textContent).toContain("Kabine C");
-    expect(block.textContent).toContain("Kabine D");
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    expect(within(block).getByText("A")).toBeTruthy();
+    expect(within(block).getByText("B")).toBeTruthy();
+    expect(within(block).getByText("C")).toBeTruthy();
+    expect(within(block).getByText("D")).toBeTruthy();
   });
 
   it("each team and its dressing room appear in the same text block (room code before team name)", () => {
@@ -946,9 +958,10 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    // Block contains team names and room codes — header row not required in new card design
+    // Block contains team names and room values — header row not required in new card design
     expect(block.textContent).toContain("FC Allschwil E1");
-    expect(block.textContent).toContain("Kabine A");
+    // Room value "A" (stripped from "Kabine A") is in a standalone span within the block
+    expect(within(block).getByText("A")).toBeTruthy();
   });
 
   it("does not render a standard match-allocation or training-allocation block", () => {
@@ -979,8 +992,9 @@ describe("4-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
       />,
     );
-    expect(screen.getByText("FC Allschwil E1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil E2")).toBeTruthy();
+    // Team names appear in both tournament-participants and participant-allocation-block
+    expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
 });
 
@@ -996,12 +1010,13 @@ describe("6-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS}
       />,
     );
-    expect(screen.getByText("FC Allschwil F1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil F2")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil F3")).toBeTruthy();
-    expect(screen.getByText("FC Binningen")).toBeTruthy();
-    expect(screen.getByText("FC Reinach")).toBeTruthy();
-    expect(screen.getByText("FC Aesch")).toBeTruthy();
+    // Team names appear in both tournament-participants and participant-allocation-block
+    expect(screen.getAllByText("FC Allschwil F1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil F2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil F3").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Binningen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Reinach").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Aesch").length).toBeGreaterThan(0);
   });
 
   it("renders all six dressing rooms", () => {
@@ -1012,12 +1027,13 @@ describe("6-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("Kabine A");
-    expect(block.textContent).toContain("Kabine B");
-    expect(block.textContent).toContain("Kabine C");
-    expect(block.textContent).toContain("Kabine D");
-    expect(block.textContent).toContain("Kabine E");
-    expect(block.textContent).toContain("Kabine F");
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    expect(within(block).getByText("A")).toBeTruthy();
+    expect(within(block).getByText("B")).toBeTruthy();
+    expect(within(block).getByText("C")).toBeTruthy();
+    expect(within(block).getByText("D")).toBeTruthy();
+    expect(within(block).getByText("E")).toBeTruthy();
+    expect(within(block).getByText("F")).toBeTruthy();
   });
 
   it("no allocation row is omitted — all 6 teams visible", () => {
@@ -1044,9 +1060,10 @@ describe("6-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS}
       />,
     );
-    expect(screen.getByText("FC Binningen")).toBeTruthy();
-    expect(screen.getByText("FC Reinach")).toBeTruthy();
-    expect(screen.getByText("FC Aesch")).toBeTruthy();
+    // Teams appear in both tournament-participants and participant-allocation-block
+    expect(screen.getAllByText("FC Binningen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Reinach").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Aesch").length).toBeGreaterThan(0);
   });
 
   it("participant-allocation-block contains all 6 team names and room codes without TEAM/GARDEROBE column headers", () => {
@@ -1068,9 +1085,10 @@ describe("6-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS}
       />,
     );
-    expect(screen.getByText("FC Allschwil F1")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil F2")).toBeTruthy();
-    expect(screen.getByText("FC Allschwil F3")).toBeTruthy();
+    // Teams appear in both tournament-participants and participant-allocation-block
+    expect(screen.getAllByText("FC Allschwil F1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil F2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Allschwil F3").length).toBeGreaterThan(0);
   });
 });
 
@@ -1106,11 +1124,12 @@ describe("Target 5-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    expect(block.textContent).toContain("Kabine 01");
-    expect(block.textContent).toContain("Kabine 02");
-    expect(block.textContent).toContain("Kabine 03");
-    expect(block.textContent).toContain("Kabine 04");
-    expect(block.textContent).toContain("Kabine 05");
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    expect(within(block).getByText("01")).toBeTruthy();
+    expect(within(block).getByText("02")).toBeTruthy();
+    expect(within(block).getByText("03")).toBeTruthy();
+    expect(within(block).getByText("04")).toBeTruthy();
+    expect(within(block).getByText("05")).toBeTruthy();
   });
 });
 
@@ -1142,12 +1161,13 @@ describe("High-density — 6 simultaneous trainings (flat list)", () => {
 
   it("all 6 dressing rooms remain visible", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
-    expect(screen.getByText("Kabine A")).toBeTruthy();
-    expect(screen.getByText("Kabine B")).toBeTruthy();
-    expect(screen.getByText("Kabine C")).toBeTruthy();
-    expect(screen.getByText("Kabine D")).toBeTruthy();
-    expect(screen.getByText("Kabine E")).toBeTruthy();
-    expect(screen.getByText("Kabine F")).toBeTruthy();
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.getByText("B")).toBeTruthy();
+    expect(screen.getByText("C")).toBeTruthy();
+    expect(screen.getByText("D")).toBeTruthy();
+    expect(screen.getByText("E")).toBeTruthy();
+    expect(screen.getByText("F")).toBeTruthy();
   });
 
   it("renders 1 aggregated group card (6 simultaneous trainings → 1 card)", () => {
@@ -1194,10 +1214,11 @@ describe("High-density — 4 simultaneous events visibility", () => {
 
   it("all 4 dressing rooms remain visible", () => {
     render(<InfoboardScreen1 feed={FOUR_TEAM_FEED} />);
-    expect(screen.getByText("Kabine A")).toBeTruthy();
-    expect(screen.getByText("Kabine B")).toBeTruthy();
-    expect(screen.getByText("Kabine C")).toBeTruthy();
-    expect(screen.getByText("Kabine D")).toBeTruthy();
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    expect(screen.getByText("A")).toBeTruthy();
+    expect(screen.getByText("B")).toBeTruthy();
+    expect(screen.getByText("C")).toBeTruthy();
+    expect(screen.getByText("D")).toBeTruthy();
   });
 });
 
@@ -1466,8 +1487,9 @@ describe("Referee removal — no SCHIRI anywhere", () => {
     });
     render(<InfoboardScreen1 feed={feed} />);
     expect(screen.queryByText("Kabine C")).toBeNull();
-    expect(screen.getByText("Kabine E1")).toBeTruthy();
-    expect(screen.getByText("Kabine E2")).toBeTruthy();
+    // Room values are stripped of "Kabine " prefix — verify home/away rooms visible
+    expect(screen.getByText("E1")).toBeTruthy();
+    expect(screen.getByText("E2")).toBeTruthy();
   });
 });
 
@@ -1813,7 +1835,8 @@ describe("Unassigned dressing-room warning (training)", () => {
     });
     render(<InfoboardScreen1 feed={feed} />);
     expect(screen.queryByTestId("dressing-room-unassigned-warning")).toBeNull();
-    expect(screen.getByText("Kabine A")).toBeTruthy();
+    // Room value "A" (stripped from "Kabine A") is visible in the KABINE column
+    expect(screen.getByText("A")).toBeTruthy();
   });
 });
 
@@ -1897,8 +1920,8 @@ describe("Missing and optional data safety", () => {
         ])}
       />,
     );
-    expect(screen.getByText("Team A")).toBeTruthy();
-    expect(screen.getByText("Team C")).toBeTruthy();
+    expect(screen.getAllByText("Team A").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Team C").length).toBeGreaterThan(0);
     expect(screen.queryByText("null")).toBeNull();
   });
 });
@@ -2174,9 +2197,12 @@ describe("Training aggregation — team, pitch, and kabine remain individually v
 
   it("all kabine values are visible inside group rows", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
-    const root = screen.getByTestId("infoboard-screen1-root");
-    expect(root.textContent).toContain("Kabine 3");
-    expect(root.textContent).toContain("Kabine 4");
+    // Room values are stripped of "Kabine " prefix — rendered as standalone spans in the KABINE zone
+    // event-rows[0] is the first training group (D7 D1, D7 D2, Junioren E1)
+    // with rooms "3" (stripped from "Kabine 3") and "4" (stripped from "Kabine 4")
+    const rows = screen.getAllByTestId("event-row");
+    expect(within(rows[0]).getByText("3")).toBeTruthy();
+    expect(within(rows[0]).getByText("4")).toBeTruthy();
   });
 
   it("group card data-testid=training-group is present for each aggregated time slot", () => {
