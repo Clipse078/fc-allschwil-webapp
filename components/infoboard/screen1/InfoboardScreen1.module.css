@@ -1096,15 +1096,26 @@
 
 .trainingGroupPitchValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-dest-pitch);
+  /*
+   * PLATZ TRUNCATION FIX — physical STAGE TV acceptance defect:
+   * Long canonical pitch designations such as "KR 3 – FELD A" were silently
+   * truncated to "KR 3 – F…" when the pitch zone (18% card width) was too
+   * narrow at the kiosk font size. The physical label is a product invariant
+   * and must never be ellipsized.
+   *
+   * Fix: allow the value to wrap (word-break if needed) instead of clipping.
+   * The font size scales with the zone via the existing --ib-fs-dest-pitch
+   * token so shorter values (STADION, KR 1) remain visually unchanged.
+   */
+  font-size: clamp(1.1rem, 1.6vw, var(--ib-fs-dest-pitch));
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ib-text);
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.05;
+  white-space: normal;
+  overflow-wrap: break-word;
+  max-width: 100%;
 }
 
 .trainingGroupRoomValue {

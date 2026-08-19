@@ -36,6 +36,7 @@ import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
+import type { SharedBoardShellConfig } from "@/lib/infoboard/board-config";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
 
 // ── Component props ───────────────────────────────────────────────────────────
@@ -50,6 +51,13 @@ export type InfoboardAnlageplanProps = {
     clubName?: string | null;
     facilityName?: string | null;
   };
+  /**
+   * Per-board shared shell configuration. When provided, overrides the
+   * defaults for subtitle visibility/text, time, date, weather, and the
+   * announcement bar. When absent the component falls back to the
+   * physically-accepted defaults (subtitle ON, "ANLAGENÜBERSICHT").
+   */
+  shellConfig?: SharedBoardShellConfig | null;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -59,10 +67,38 @@ export function InfoboardAnlageplan({
   weather,
   richEventCards = false,
   branding,
+  shellConfig,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
+
+  // ── Resolve shared shell settings (with backward-compat defaults) ────────
+  // Default subtitle: ON with "ANLAGENÜBERSICHT" — matches the physically
+  // accepted visual before per-board configuration was introduced.
+  const subtitleEnabled = shellConfig != null
+    ? shellConfig.headerSubtitleEnabled
+    : true;
+  const subtitleText = shellConfig != null
+    ? (shellConfig.headerSubtitleText ?? "ANLAGENÜBERSICHT")
+    : "ANLAGENÜBERSICHT";
+  const showTime = shellConfig?.headerShowTime ?? true;
+  const showDate = shellConfig?.headerShowDate ?? true;
+
+  const announcementEnabled =
+    shellConfig != null &&
+    shellConfig.announcementEnabled &&
+    typeof shellConfig.announcementText === "string" &&
+    shellConfig.announcementText.trim().length > 0;
+
+  const announcement = announcementEnabled && shellConfig
+    ? {
+        enabled: true,
+        text: shellConfig.announcementText,
+        backgroundColor: shellConfig.announcementBgColor ?? undefined,
+        textColor: shellConfig.announcementTextColor ?? undefined,
+      }
+    : null;
 
   // ── Apply canonical facility hierarchy (groupFacilityPitches) ────────────
   // This is the SINGLE canonical call — do not apply hierarchy again in the
@@ -111,13 +147,13 @@ export function InfoboardAnlageplan({
         clubLogoSrc={branding.clubLogoSrc}
         clubName={branding.clubName ?? "FC ALLSCHWIL"}
         facilityLine={branding.facilityName ?? undefined}
-        subtitle="ANLAGENÜBERSICHT"
-        subtitleEnabled
+        subtitle={subtitleText}
+        subtitleEnabled={subtitleEnabled}
         initialTimeIso={currentTimeIso}
         timezone={tz}
         weather={weather}
-        showTime
-        showDate
+        showTime={showTime}
+        showDate={showDate}
       />
 
       {/* ── BODY: full-width map canvas ────────────────────────────────── */}
@@ -160,7 +196,15 @@ export function InfoboardAnlageplan({
       {/* ── SHARED FOOTER ─────────────────────────────────────────────── */}
       <KioskShellFooter
         productLogoSrc={branding.productLogoSrc}
-        leftLabel={branding.facilityName ?? "SPORTANLAGE"}
+        leftLabel={announcement ? undefined : (branding.facilityName ?? "SPORTANLAGE")}
+        announcement={announcement
+          ? {
+              enabled: true,
+              text: announcement.text,
+              backgroundColor: announcement.backgroundColor ?? null,
+              textColor: announcement.textColor ?? null,
+            }
+          : undefined}
       />
     </div>
   );

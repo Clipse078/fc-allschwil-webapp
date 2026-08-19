@@ -71,6 +71,7 @@ import {
 } from "@/lib/publishing/infoboard/display-theme";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
+import type { SharedBoardShellConfig } from "@/lib/infoboard/board-config";
 import styles from "./InfoboardScreen2.module.css";
 
 // ── Public component props ────────────────────────────────────────────────────
@@ -103,6 +104,13 @@ export type InfoboardScreen2Props = {
    * Tenant.infoboardDisplayTheme → resolver pipeline as Screen 1.
    */
   theme?: InfoboardDisplayTheme;
+  /**
+   * Per-board shared shell configuration. When provided, overrides the
+   * defaults for subtitle visibility/text, time, date, weather, and the
+   * announcement bar. When absent, falls back to the physically-accepted
+   * defaults (subtitle ON with "ANLAGENÜBERSICHT", no announcement).
+   */
+  shellConfig?: SharedBoardShellConfig | null;
 };
 
 // ── Time / date formatting ────────────────────────────────────────────────────
@@ -461,6 +469,7 @@ export function InfoboardScreen2({
   weather,
   currentTimeIso,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
+  shellConfig,
 }: InfoboardScreen2Props): ReactElement {
   const { tenant, pitches, dressingRooms, unallocated } = feed;
   const timeZone = tenant.timezone;
@@ -472,6 +481,24 @@ export function InfoboardScreen2({
   const staticDateFallback = formatDisplayDate(feed.displayDate);
 
   const hasPitches = pitches.length > 0;
+
+  // ── Resolve shared shell settings (with backward-compat defaults) ────────
+  // Default subtitle: ON with "ANLAGENÜBERSICHT" — matches the physically
+  // accepted visual before per-board configuration was introduced.
+  const subtitleEnabled = shellConfig != null
+    ? shellConfig.headerSubtitleEnabled
+    : true;
+  const subtitleText = shellConfig != null
+    ? (shellConfig.headerSubtitleText ?? "ANLAGENÜBERSICHT")
+    : "ANLAGENÜBERSICHT";
+  const showTime = shellConfig?.headerShowTime ?? true;
+  const showDate = shellConfig?.headerShowDate ?? true;
+
+  const announcementEnabled =
+    shellConfig != null &&
+    shellConfig.announcementEnabled &&
+    typeof shellConfig.announcementText === "string" &&
+    shellConfig.announcementText.trim().length > 0;
 
   return (
     <div
@@ -486,11 +513,11 @@ export function InfoboardScreen2({
         facilityLine={feed.facilityName ?? undefined}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
-        showTime={true}
-        showDate={true}
+        showTime={showTime}
+        showDate={showDate}
         staticDateFallback={staticDateFallback}
-        subtitle="ANLAGENÜBERSICHT"
-        subtitleEnabled={true}
+        subtitle={subtitleText}
+        subtitleEnabled={subtitleEnabled}
         rightContent={<HeaderWeather weather={weather} />}
       />
 
@@ -541,7 +568,15 @@ export function InfoboardScreen2({
       {/* ── Shared kiosk footer (canonical — identical to Screen 1) ─────── */}
       <KioskShellFooter
         productLogoSrc={productLogoSrc}
-        leftLabel={feed.facilityName ?? undefined}
+        leftLabel={announcementEnabled ? undefined : (feed.facilityName ?? undefined)}
+        announcement={announcementEnabled && shellConfig
+          ? {
+              enabled: true,
+              text: shellConfig.announcementText,
+              backgroundColor: shellConfig.announcementBgColor ?? null,
+              textColor: shellConfig.announcementTextColor ?? null,
+            }
+          : undefined}
       />
     </div>
   );
