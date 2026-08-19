@@ -52,7 +52,7 @@ export function activityTypeTokens(type: string, isCurrent: boolean): ActivityTy
   switch (type) {
     case "MATCH":
       return {
-        label: "SPIEL",
+        label: "MATCH",
         accentColor: isCurrent ? "#f87171" : "#ef4444",
         accentBg: isCurrent ? "rgba(239,68,68,0.12)" : "rgba(239,68,68,0.06)",
         badgeBg: "rgba(239,68,68,0.20)",
@@ -121,56 +121,103 @@ export function PremiumResourceCard({
           pointerEvents: "none",
         }}
       >
-        <div
-          style={{
-            background: "rgba(10,16,28,0.75)",
-            backdropFilter: "blur(6px)",
-            borderRadius: "clamp(4px, 0.5vh, 8px)",
-            padding: "clamp(4px, 0.55vh, 8px) clamp(6px, 0.75vw, 12px)",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-start",
-            gap: "clamp(2px, 0.25vh, 4px)",
-            border: "1px solid rgba(74,222,128,0.20)",
-            borderLeft: "3px solid rgba(74,222,128,0.70)",
-          }}
-        >
-          {freeLabel !== null && (
-            <span
-              style={{
-                fontSize: "clamp(8px, 1.05vh, 14px)",
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                color: "rgba(255,255,255,0.85)",
-                textTransform: "uppercase",
-                lineHeight: 1,
-              }}
-            >
-              {freeLabel}
-            </span>
-          )}
+        {richEventCards ? (
+          /* Rich-cards path: keep original compact FREI card */
           <div
             style={{
+              background: "rgba(10,16,28,0.75)",
+              backdropFilter: "blur(6px)",
+              borderRadius: "clamp(4px, 0.5vh, 8px)",
+              padding: "clamp(4px, 0.55vh, 8px) clamp(6px, 0.75vw, 12px)",
               display: "flex",
-              alignItems: "center",
-              gap: "clamp(3px, 0.4vw, 6px)",
+              flexDirection: "column",
+              alignItems: "flex-start",
+              gap: "clamp(2px, 0.25vh, 4px)",
+              border: "1px solid rgba(74,222,128,0.20)",
+              borderLeft: "3px solid rgba(74,222,128,0.70)",
             }}
           >
-            <span
+            {freeLabel !== null && (
+              <span
+                style={{
+                  fontSize: "clamp(8px, 1.05vh, 14px)",
+                  fontWeight: 700,
+                  letterSpacing: "0.08em",
+                  color: "rgba(255,255,255,0.85)",
+                  textTransform: "uppercase",
+                  lineHeight: 1,
+                }}
+              >
+                {freeLabel}
+              </span>
+            )}
+            <div
               style={{
-                width: "clamp(6px, 0.7vh, 9px)",
-                height: "clamp(6px, 0.7vh, 9px)",
-                borderRadius: "50%",
-                background: "rgba(74,222,128,0.7)",
-                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "clamp(3px, 0.4vw, 6px)",
               }}
-            />
+            >
+              <span
+                style={{
+                  width: "clamp(6px, 0.7vh, 9px)",
+                  height: "clamp(6px, 0.7vh, 9px)",
+                  borderRadius: "50%",
+                  background: "rgba(74,222,128,0.7)",
+                  flexShrink: 0,
+                }}
+              />
+              <span
+                style={{
+                  fontSize: "clamp(9px, 1.2vh, 16px)",
+                  fontWeight: 700,
+                  letterSpacing: "0.18em",
+                  color: "rgba(74,222,128,0.90)",
+                  textTransform: "uppercase",
+                  lineHeight: 1,
+                }}
+              >
+                FREI
+              </span>
+            </div>
+          </div>
+        ) : (
+          /* Simplified status-only path (production Screen 2): prominent FREI indicator */
+          <div
+            style={{
+              background: "rgba(10,16,28,0.88)",
+              backdropFilter: "blur(8px)",
+              borderRadius: "clamp(6px, 0.8vh, 14px)",
+              border: "2px solid rgba(74,222,128,0.55)",
+              padding: "clamp(8px, 1.2vh, 20px) clamp(10px, 1.2vw, 20px)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "clamp(4px, 0.6vh, 10px)",
+              textAlign: "center",
+            }}
+          >
+            {freeLabel !== null && (
+              <span
+                style={{
+                  fontSize: "clamp(11px, 1.7vh, 26px)",
+                  fontWeight: 800,
+                  letterSpacing: "0.07em",
+                  color: "rgba(255,255,255,0.92)",
+                  textTransform: "uppercase",
+                  lineHeight: 1,
+                }}
+              >
+                {freeLabel}
+              </span>
+            )}
             <span
+              data-testid="resource-card-status-label"
               style={{
-                fontSize: "clamp(9px, 1.2vh, 16px)",
-                fontWeight: 700,
-                letterSpacing: "0.18em",
-                color: "rgba(74,222,128,0.90)",
+                fontSize: "clamp(13px, 2.1vh, 32px)",
+                fontWeight: 800,
+                letterSpacing: "0.14em",
+                color: "rgba(74,222,128,0.88)",
                 textTransform: "uppercase",
                 lineHeight: 1,
               }}
@@ -178,7 +225,7 @@ export function PremiumResourceCard({
               FREI
             </span>
           </div>
-        </div>
+        )}
       </div>
     );
   }
@@ -196,12 +243,13 @@ export function PremiumResourceCard({
   }
 
   const tokens = activityTypeTokens(activeEvent.type, isCurrent);
-  const startTime = fmtTime(activeEvent.startAt, tz);
-  const endTime = activeEvent.endAt ? fmtTime(activeEvent.endAt, tz) : null;
-  const primaryDr = activeEvent.dressingRooms[0];
   const resourceDisplay = zone.label ?? zone.resourceCode ?? "";
+
+  // Rich-cards path needs time formatting and detailed data
+  const startTime = richEventCards ? fmtTime(activeEvent.startAt, tz) : "";
+  const endTime = richEventCards && activeEvent.endAt ? fmtTime(activeEvent.endAt, tz) : null;
   const richTournamentTeams =
-    activeEvent.type === "TOURNAMENT"
+    richEventCards && activeEvent.type === "TOURNAMENT"
       ? (activeEvent.participantTeamNames ?? [])
       : [];
 
@@ -219,74 +267,71 @@ export function PremiumResourceCard({
             : activeEvent.type === "MATCH"
               ? "clamp(250px, 20vw, 390px)"
               : "clamp(170px, 12vw, 230px)"
-          : "clamp(80px, 10vw, 180px)",
+          : "clamp(100px, 12vw, 220px)",
         transform: zone.rect.rotation ? `rotate(${zone.rect.rotation}deg)` : undefined,
         transformOrigin: "top left",
         pointerEvents: "none",
         zIndex: isCurrent ? 2 : 1,
       }}
     >
-      <div
-        style={{
-          background: "rgba(8,14,26,0.90)",
-          backdropFilter: "blur(8px)",
-          borderRadius: "clamp(5px, 0.65vh, 10px)",
-          border: `1px solid ${tokens.accentColor}40`,
-          borderLeft: `4px solid ${tokens.accentColor}`,
-          overflow: "hidden",
-          boxShadow: isCurrent
-            ? `0 3px 16px ${tokens.accentColor}28`
-            : "0 2px 8px rgba(0,0,0,0.5)",
-        }}
-      >
-        {/* Resource name + type badge */}
+      {richEventCards ? (
+        /* ── Rich-cards path: full detail (used by screen-2-preview) ─── */
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "clamp(3px, 0.45vh, 7px) clamp(5px, 0.65vw, 10px)",
-            background: "rgba(255,255,255,0.05)",
-            gap: "0.5vw",
+            background: "rgba(8,14,26,0.90)",
+            backdropFilter: "blur(8px)",
+            borderRadius: "clamp(5px, 0.65vh, 10px)",
+            border: `1px solid ${tokens.accentColor}40`,
+            borderLeft: `4px solid ${tokens.accentColor}`,
+            overflow: "hidden",
+            boxShadow: isCurrent
+              ? `0 3px 16px ${tokens.accentColor}28`
+              : "0 2px 8px rgba(0,0,0,0.5)",
           }}
         >
-          <span
+          {/* Resource name + type badge */}
+          <div
             style={{
-              fontSize: richEventCards
-                ? "clamp(10px, 1.25vh, 17px)"
-                : "clamp(8px, 1.05vh, 14px)",
-              fontWeight: 700,
-              letterSpacing: "0.10em",
-              color: "rgba(255,255,255,0.90)",
-              textTransform: "uppercase",
-              whiteSpace: richEventCards ? "normal" : "nowrap",
-              overflow: richEventCards ? "visible" : "hidden",
-              textOverflow: richEventCards ? "clip" : "ellipsis",
-              overflowWrap: richEventCards ? "anywhere" : undefined,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "clamp(3px, 0.45vh, 7px) clamp(5px, 0.65vw, 10px)",
+              background: "rgba(255,255,255,0.05)",
+              gap: "0.5vw",
             }}
           >
-            {resourceDisplay}
-          </span>
-          <span
-            style={{
-              flexShrink: 0,
-              fontSize: richEventCards
-                ? "clamp(8px, 0.95vh, 12px)"
-                : "clamp(6px, 0.75vh, 10px)",
-              fontWeight: 700,
-              letterSpacing: "0.10em",
-              background: tokens.badgeBg,
-              color: tokens.badgeColor,
-              borderRadius: "clamp(2px, 0.3vh, 5px)",
-              padding: "clamp(1px, 0.12vh, 2px) clamp(3px, 0.35vw, 6px)",
-              textTransform: "uppercase",
-            }}
-          >
-            {tokens.label}
-          </span>
-        </div>
+            <span
+              style={{
+                fontSize: "clamp(10px, 1.25vh, 17px)",
+                fontWeight: 700,
+                letterSpacing: "0.10em",
+                color: "rgba(255,255,255,0.90)",
+                textTransform: "uppercase",
+                whiteSpace: "normal",
+                overflow: "visible",
+                textOverflow: "clip",
+                overflowWrap: "anywhere",
+              }}
+            >
+              {resourceDisplay}
+            </span>
+            <span
+              style={{
+                flexShrink: 0,
+                fontSize: "clamp(8px, 0.95vh, 12px)",
+                fontWeight: 700,
+                letterSpacing: "0.10em",
+                background: tokens.badgeBg,
+                color: tokens.badgeColor,
+                borderRadius: "clamp(2px, 0.3vh, 5px)",
+                padding: "clamp(1px, 0.12vh, 2px) clamp(3px, 0.35vw, 6px)",
+                textTransform: "uppercase",
+              }}
+            >
+              {tokens.label}
+            </span>
+          </div>
 
-        {richEventCards ? (
           <div
             data-testid="resource-card-rich-body"
             style={{
@@ -428,57 +473,57 @@ export function PremiumResourceCard({
             >
               {startTime}{endTime ? `–${endTime}` : ""}
             </div>
-
-
           </div>
-        ) : (
-          <>
-            {/* Canonical existing compact body */}
-            <div
-              style={{
-                padding: "clamp(3px, 0.4vh, 6px) clamp(5px, 0.65vw, 10px) clamp(2px, 0.3vh, 4px)",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "clamp(10px, 1.3vh, 18px)",
-                  fontWeight: isCurrent ? 700 : 500,
-                  color: isCurrent ? "#ffffff" : "rgba(255,255,255,0.72)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
-                  letterSpacing: "0.02em",
-                }}
-              >
-                {activeEvent.teamDisplayName ?? activeEvent.displayTitle}
-              </div>
-              <div
-                style={{
-                  fontSize: "clamp(7px, 0.95vh, 13px)",
-                  color: "rgba(255,255,255,0.60)",
-                  marginTop: "clamp(1px, 0.18vh, 3px)",
-                  fontWeight: 600,
-                  letterSpacing: "0.04em",
-                }}
-              >
-                {startTime}{endTime ? `–${endTime}` : ""}
-              </div>
-              {primaryDr && (
-                <div
-                  style={{
-                    fontSize: "clamp(5px, 0.7vh, 9px)",
-                    color: "rgba(255,255,255,0.38)",
-                    marginTop: "clamp(1px, 0.12vh, 2px)",
-                    paddingBottom: "clamp(2px, 0.25vh, 3px)",
-                  }}
-                >
-                  {primaryDr.displayLabel}
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* ── Simplified status-only path (production Screen 2) ───────── */
+        <div
+          data-testid="resource-card-simple-body"
+          style={{
+            background: "rgba(8,14,26,0.90)",
+            backdropFilter: "blur(8px)",
+            borderRadius: "clamp(6px, 0.8vh, 14px)",
+            border: `2px solid ${tokens.accentColor}`,
+            padding: "clamp(8px, 1.2vh, 20px) clamp(10px, 1.2vw, 20px)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: "clamp(4px, 0.6vh, 10px)",
+            textAlign: "center",
+            boxShadow: isCurrent
+              ? `0 4px 20px ${tokens.accentColor}30`
+              : "0 2px 12px rgba(0,0,0,0.60)",
+          }}
+        >
+          {/* Facility name — large and prominent */}
+          <span
+            style={{
+              fontSize: "clamp(11px, 1.7vh, 26px)",
+              fontWeight: 800,
+              letterSpacing: "0.07em",
+              color: "rgba(255,255,255,0.92)",
+              textTransform: "uppercase",
+              lineHeight: 1,
+            }}
+          >
+            {resourceDisplay}
+          </span>
+          {/* Status label — very prominent */}
+          <span
+            data-testid="resource-card-status-label"
+            style={{
+              fontSize: "clamp(13px, 2.1vh, 32px)",
+              fontWeight: 800,
+              letterSpacing: "0.14em",
+              color: tokens.accentColor,
+              textTransform: "uppercase",
+              lineHeight: 1,
+            }}
+          >
+            {tokens.label}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
