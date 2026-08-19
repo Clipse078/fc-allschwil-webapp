@@ -340,6 +340,7 @@ export default function PersonDetailTabs({
               activeSeason={activeSeason}
               onNavigateToTab={setActiveTab}
               documentCount={canViewPrivateDocuments ? documents.length : null}
+              canManage={canManage}
             />
           ) : null}
         </div>

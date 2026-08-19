@@ -3,7 +3,9 @@
 /**
  * PERSON-UX-01 — Person 360° Übersicht tab.
  * PERSON-UX-07 — Multi-capacity header: shows all active capacities compactly.
- * PERSON-UX-07 UX-ACCEPTANCE — Aktuelle Funktionen section distinguishes three
+ * PERSON-UX-09 — Current function removal with confirmation dialog.
+ *
+ * PERSON-UX-07 UX-ACCEPTANCE: Aktuelle Funktionen section distinguishes three
  *   semantically distinct assignment states per capacity:
  *
  *   A. NO RELATIONSHIP
@@ -26,11 +28,20 @@
  * not already surfaced in the incomplete (State B) section — preventing the
  * same team/role from appearing twice in conflicting contexts.
  *
+ * PERSON-UX-09 removal semantics:
+ *   - Squad membership (State C Spieler):      DELETE /api/people/[id]/squad-memberships/[sid]
+ *   - Trainer membership (State C Trainer):    DELETE /api/people/[id]/trainer-memberships/[tid]
+ *   - PersonAssignment (State B / Weitere):    DELETE /api/people/[id]/assignments/[aid]
+ *   Each removal is confirmed via a Dialog before the request is sent.
+ *   After success, router.refresh() reloads the server-rendered data.
+ *
  * Security principle: this tab shows only data visible under people.view.
  * Medical, financial, and private document domains require separate
  * authorization and are intentionally excluded here.
  */
 
+import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Building2,
   Users2,
@@ -41,6 +52,7 @@ import {
   Star,
   ExternalLink,
   FolderOpen,
+  Trash2,
 } from "lucide-react";
 import type {
   PersonAssignment,
@@ -50,6 +62,8 @@ import type {
 import type { PersonDetail } from "@/lib/people/queries";
 import { getPersonFunctionLabel, PERSON_FUNCTION_GROUPS } from "@/lib/people/functions";
 import { EmptyState } from "@/components/ui/page";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
 
 /** functionKey sets for player and trainer capacities */
 const PLAYER_FUNCTION_KEYS = new Set<string>(PERSON_FUNCTION_GROUPS.SPIELER);
@@ -68,9 +82,13 @@ type PersonOverviewTabProps = {
    * PERSON-UX-08: Pre-computed document count for the Übersicht signal.
    * Only passed when the viewer holds people.private_documents.view.
    * null/undefined → no signal shown (viewer lacks permission or count unavailable).
-   * This prevents leaking document existence to unauthorized viewers.
    */
   documentCount?: number | null;
+  /**
+   * PERSON-UX-09: Whether the current viewer holds people.manage.
+   * Controls visibility of removal affordances.
+   */
+  canManage?: boolean;
 };
 
 function formatDate(date: Date | string): string {
@@ -99,6 +117,31 @@ function SectionHeader({ label }: { label: string }) {
   );
 }
 
+/**
+ * PERSON-UX-09: Discreet remove button for a current function card.
+ * Renders only for authorized managers.
+ */
+function RemoveButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="shrink-0 self-center rounded-md p-1.5 text-[var(--muted)] hover:bg-red-50 hover:text-red-600 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
+      data-testid="remove-function-button"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+    </button>
+  );
+}
+
 /** Card for an active team assignment under a specific capacity (State C) */
 function CapacityAssignmentCard({
   icon,
@@ -107,6 +150,8 @@ function CapacityAssignmentCard({
   meta,
   onTabLink,
   onTabLinkLabel,
+  onRemove,
+  removeLabel,
 }: {
   icon: React.ReactNode;
   title: string;
@@ -114,6 +159,8 @@ function CapacityAssignmentCard({
   meta?: Array<{ icon?: React.ReactNode; text: string }>;
   onTabLink?: () => void;
   onTabLinkLabel?: string;
+  onRemove?: () => void;
+  removeLabel?: string;
 }) {
   return (
     <div className="flex items-start gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
@@ -148,6 +195,9 @@ function CapacityAssignmentCard({
         >
           {onTabLinkLabel} →
         </button>
+      ) : null}
+      {onRemove && removeLabel ? (
+        <RemoveButton label={removeLabel} onClick={onRemove} />
       ) : null}
     </div>
   );
@@ -191,10 +241,6 @@ function UnassignedCapacityNudge({
 /**
  * State B card: a PersonAssignment exists for a team but the canonical
  * current-season squad/trainer membership is missing.
- *
- * Operational UX: team name + role are PRIMARY. "Zuordnung unvollständig"
- * is a secondary amber status badge. The CTA deep-links directly to the
- * relevant section on the Team page (spielerkader / trainerteam).
  */
 function IncompleteAssignmentCard({
   teamName,
@@ -205,6 +251,8 @@ function IncompleteAssignmentCard({
   ctaLabel,
   anchor,
   icon,
+  onRemove,
+  removeLabel,
 }: {
   teamName: string;
   roleLabel: string;
@@ -214,6 +262,8 @@ function IncompleteAssignmentCard({
   ctaLabel: string;
   anchor: "spielerkader" | "trainerteam";
   icon: React.ReactNode;
+  onRemove?: () => void;
+  removeLabel?: string;
 }) {
   return (
     <div
@@ -251,6 +301,9 @@ function IncompleteAssignmentCard({
           </a>
         ) : null}
       </div>
+      {onRemove && removeLabel ? (
+        <RemoveButton label={removeLabel} onClick={onRemove} />
+      ) : null}
     </div>
   );
 }
@@ -269,9 +322,6 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 
 /**
  * PERSON-UX-07: Compact capacity badge row for the Identity & Status section.
- * Shows all active standard capacities as inline badges.
- * Custom functions (Weitere Funktion) rendered in a separate line below.
- * When no capacities are active, renders nothing (zero DOM cost).
  */
 function CapacitiesRow({ person }: { person: PersonOverviewTabProps["person"] }) {
   const standardCapacities: string[] = [];
@@ -314,27 +364,58 @@ function CapacitiesRow({ person }: { person: PersonOverviewTabProps["person"] })
   );
 }
 
+// ── Removal confirmation dialog ───────────────────────────────────────────────
+
+type RemovalTarget =
+  | { type: "squad"; squadMemberId: string; teamName: string; seasonName: string }
+  | { type: "trainer"; trainerMemberId: string; teamName: string; seasonName: string }
+  | { type: "assignment"; assignmentId: string; label: string };
+
+function buildConfirmTitle(target: RemovalTarget): string {
+  if (target.type === "squad") {
+    return `Spieler-Zuordnung zu ${target.teamName} entfernen?`;
+  }
+  if (target.type === "trainer") {
+    return `Trainer-Zuordnung zu ${target.teamName} entfernen?`;
+  }
+  return `Zuordnung entfernen?`;
+}
+
+function buildConfirmDescription(target: RemovalTarget, personFirstName: string): string {
+  if (target.type === "squad") {
+    return `Nur die Kader-Zuordnung zu ${target.teamName} (${target.seasonName}) wird entfernt. ${personFirstName} bleibt als Person erhalten. Andere Teams, Trainer-Zuordnungen und historische Saisons bleiben unberührt.`;
+  }
+  if (target.type === "trainer") {
+    return `Nur die Trainer-Zuordnung zu ${target.teamName} (${target.seasonName}) wird entfernt. ${personFirstName} bleibt als Person erhalten. Andere Teams, Spieler-Zuordnungen und historische Saisons bleiben unberührt.`;
+  }
+  return `Nur diese Zuordnung (${target.label}) wird entfernt. ${personFirstName} bleibt als Person erhalten. Andere Zuordnungen, Team-Mitgliedschaften und historische Saisons bleiben unberührt.`;
+}
+
 export default function PersonWorkspaceOverviewTab({
   person,
   activeSeason,
   onNavigateToTab,
   documentCount = null,
+  canManage = false,
 }: PersonOverviewTabProps) {
+  const router = useRouter();
+
+  const [removalTarget, setRemovalTarget] = useState<RemovalTarget | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const [removalError, setRemovalError] = useState<string | null>(null);
+
   const activeAssignments = person.assignments.filter((a) => a.status === "ACTIVE");
   const activeSquadMemberships = person.squadMemberships.filter(
     (m) => m.status === "ACTIVE" || m.status === "INJURED" || m.status === "ABSENT",
   );
   const activeTrainerMemberships = person.trainerMemberships.filter((m) => m.status === "ACTIVE");
 
-  // Capacity flags (from PersonDetail)
   const isPlayerProfile = person.isPlayer === true;
   const isTrainerProfile = person.isTrainer === true;
 
-  // Team IDs with complete current-season memberships
   const playerCompleteTeamIds = new Set(activeSquadMemberships.map((sm) => sm.teamSeason.team.id));
   const trainerCompleteTeamIds = new Set(activeTrainerMemberships.map((tm) => tm.teamSeason.team.id));
 
-  // State B: active PersonAssignment with player/trainer function but no matching canonical membership
   const incompletePlayerAssignments = activeAssignments.filter(
     (a) =>
       a.functionKey !== null &&
@@ -352,7 +433,6 @@ export default function PersonWorkspaceOverviewTab({
       !trainerCompleteTeamIds.has(a.team.id),
   );
 
-  // Assignments to suppress from "Weitere Funktionen" (already surfaced as State B)
   const suppressedFromWeitere = new Set<string>([
     ...incompletePlayerAssignments.map((a) => a.id),
     ...incompleteTrainerAssignments.map((a) => a.id),
@@ -360,22 +440,15 @@ export default function PersonWorkspaceOverviewTab({
 
   const weitereAssignments = activeAssignments.filter((a) => !suppressedFromWeitere.has(a.id));
 
-  // Collect all unique active teams from all sources (for identity section)
   const activeTeamIds = new Set<string>();
   const activeTeamNames: string[] = [];
   for (const sm of activeSquadMemberships) {
     const id = sm.teamSeason.team.id;
-    if (!activeTeamIds.has(id)) {
-      activeTeamIds.add(id);
-      activeTeamNames.push(sm.teamSeason.team.name);
-    }
+    if (!activeTeamIds.has(id)) { activeTeamIds.add(id); activeTeamNames.push(sm.teamSeason.team.name); }
   }
   for (const tm of activeTrainerMemberships) {
     const id = tm.teamSeason.team.id;
-    if (!activeTeamIds.has(id)) {
-      activeTeamIds.add(id);
-      activeTeamNames.push(tm.teamSeason.team.name);
-    }
+    if (!activeTeamIds.has(id)) { activeTeamIds.add(id); activeTeamNames.push(tm.teamSeason.team.name); }
   }
   for (const a of activeAssignments) {
     if (a.team && !activeTeamIds.has(a.team.id)) {
@@ -384,7 +457,6 @@ export default function PersonWorkspaceOverviewTab({
     }
   }
 
-  // Collect all unique OrgUnit names from assignments
   const orgUnitIds = new Set<string>();
   const orgUnitNames: string[] = [];
   for (const a of activeAssignments) {
@@ -394,15 +466,91 @@ export default function PersonWorkspaceOverviewTab({
     }
   }
 
-  // For the "Aktuelle Funktionen" section: check if there is anything to show
   const hasCapacityRows = isPlayerProfile || isTrainerProfile;
   const hasWeitereRows = weitereAssignments.length > 0;
   const hasSomething = hasCapacityRows || hasWeitereRows;
-
   const seasonName = activeSeason?.name ?? null;
+
+  // ── Removal handlers ────────────────────────────────────────────────────────
+
+  const openRemoval = useCallback((target: RemovalTarget) => {
+    setRemovalError(null);
+    setRemovalTarget(target);
+  }, []);
+
+  const closeRemoval = useCallback(() => {
+    if (!removing) setRemovalTarget(null);
+  }, [removing]);
+
+  const handleConfirmRemoval = useCallback(async () => {
+    if (!removalTarget) return;
+    setRemoving(true);
+    setRemovalError(null);
+
+    try {
+      let url: string;
+      if (removalTarget.type === "squad") {
+        url = `/api/people/${encodeURIComponent(person.id)}/squad-memberships/${encodeURIComponent(removalTarget.squadMemberId)}`;
+      } else if (removalTarget.type === "trainer") {
+        url = `/api/people/${encodeURIComponent(person.id)}/trainer-memberships/${encodeURIComponent(removalTarget.trainerMemberId)}`;
+      } else {
+        url = `/api/people/${encodeURIComponent(person.id)}/assignments/${encodeURIComponent(removalTarget.assignmentId)}`;
+      }
+
+      const res = await fetch(url, { method: "DELETE" });
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        setRemovalError(data?.error ?? "Entfernen nicht möglich.");
+        return;
+      }
+
+      setRemovalTarget(null);
+      router.refresh();
+    } catch {
+      setRemovalError("Netzwerkfehler. Bitte erneut versuchen.");
+    } finally {
+      setRemoving(false);
+    }
+  }, [removalTarget, person.id, router]);
+
+  const personFirstName = person.firstName;
 
   return (
     <div className="space-y-8">
+      {/* ── Removal confirmation dialog ────────────────────────────── */}
+      {removalTarget ? (
+        <Dialog
+          open
+          onClose={closeRemoval}
+          title={buildConfirmTitle(removalTarget)}
+          size="sm"
+          footer={
+            <div className="flex flex-col gap-2 w-full">
+              {removalError ? (
+                <p className="text-sm text-red-600">{removalError}</p>
+              ) : null}
+              <div className="flex items-center justify-end gap-3">
+                <Button variant="secondary" onClick={closeRemoval} disabled={removing}>
+                  Abbrechen
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={handleConfirmRemoval}
+                  loading={removing}
+                >
+                  Entfernen
+                </Button>
+              </div>
+            </div>
+          }
+        >
+          <p className="text-sm text-[var(--text-2)]">
+            {buildConfirmDescription(removalTarget, personFirstName)}
+          </p>
+        </Dialog>
+      ) : null}
+
       {/* ── Identity & Status ─────────────────────────────────────── */}
       <div>
         <SectionHeader label="Identität & Status" />
@@ -417,19 +565,12 @@ export default function PersonWorkspaceOverviewTab({
               value={`${formatDate(person.dateOfBirth)} (${calculateAge(person.dateOfBirth)} Jahre)`}
             />
           ) : null}
-          {/* PERSON-UX-07: Multi-capacity row — shows all active profile capacities compactly */}
           <CapacitiesRow person={person} />
           {activeTeamNames.length > 0 ? (
-            <InfoRow
-              label="Aktuelle Teams"
-              value={activeTeamNames.join(", ")}
-            />
+            <InfoRow label="Aktuelle Teams" value={activeTeamNames.join(", ")} />
           ) : null}
           {orgUnitNames.length > 0 ? (
-            <InfoRow
-              label="Organisationseinheiten"
-              value={orgUnitNames.join(", ")}
-            />
+            <InfoRow label="Organisationseinheiten" value={orgUnitNames.join(", ")} />
           ) : null}
           {activeSeason ? (
             <InfoRow label="Aktuelle Saison" value={activeSeason.name} />
@@ -437,18 +578,9 @@ export default function PersonWorkspaceOverviewTab({
         </div>
       </div>
 
-      {/* ── Aktuelle Funktionen ────────────────────────────────────
-       * PERSON-UX-07 UX-ACCEPTANCE: Operational first — shows WHERE this
-       * person is a player/trainer, with incomplete status as secondary.
-       *
-       * Three states per capacity:
-       *   A. No relationship → compact neutral nudge ("Noch kein Team")
-       *   B. Relationship exists but incomplete → team+role as primary,
-       *      "Zuordnung unvollständig" badge, precision CTA to team section
-       *   C. Complete current-season membership → assignment card
-       *
-       * PersonAssignment functions NOT already surfaced in State B are shown
-       * as "Weitere Funktionen". ────────────────────────────────── */}
+      {/* ── Aktuelle Funktionen ──────────────────────────────────────
+       * PERSON-UX-07 UX-ACCEPTANCE: three states per capacity.
+       * PERSON-UX-09: removal affordance for authorized managers. */}
       <div>
         <SectionHeader label="Aktuelle Funktionen" />
 
@@ -466,7 +598,6 @@ export default function PersonWorkspaceOverviewTab({
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
                   Spieler/in
                 </p>
-                {/* State C: complete squad memberships */}
                 {activeSquadMemberships.length > 0 ? (
                   <div className="space-y-2">
                     {activeSquadMemberships.map((sm) => (
@@ -483,9 +614,15 @@ export default function PersonWorkspaceOverviewTab({
                         ]}
                         onTabLink={onNavigateToTab ? () => onNavigateToTab("spieler") : undefined}
                         onTabLinkLabel="Zum Spieler-Tab"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "squad",
+                          squadMemberId: sm.id,
+                          teamName: sm.teamSeason.team.name,
+                          seasonName: sm.teamSeason.season.name,
+                        }) : undefined}
+                        removeLabel={canManage ? `Spieler-Zuordnung zu ${sm.teamSeason.team.name} entfernen` : undefined}
                       />
                     ))}
-                    {/* State B: additional incomplete assignments alongside complete ones */}
                     {incompletePlayerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
@@ -497,11 +634,16 @@ export default function PersonWorkspaceOverviewTab({
                         incompleteDescription={`Das Spielerprofil ist vorhanden, aber für die Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
                         ctaLabel="Jetzt Kaderzuordnung ergänzen"
                         anchor="spielerkader"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "assignment",
+                          assignmentId: a.id,
+                          label: `${a.team!.name} (${getPersonFunctionLabel(a.functionKey)})`,
+                        }) : undefined}
+                        removeLabel={canManage ? `Zuordnung zu ${a.team!.name} entfernen` : undefined}
                       />
                     ))}
                   </div>
                 ) : incompletePlayerAssignments.length > 0 ? (
-                  /* State B only: relationship exists but canonical membership is missing */
                   <div className="space-y-2">
                     {incompletePlayerAssignments.map((a) => (
                       <IncompleteAssignmentCard
@@ -514,11 +656,16 @@ export default function PersonWorkspaceOverviewTab({
                         incompleteDescription={`Das Spielerprofil ist vorhanden, aber für die Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
                         ctaLabel="Jetzt Kaderzuordnung ergänzen"
                         anchor="spielerkader"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "assignment",
+                          assignmentId: a.id,
+                          label: `${a.team!.name} (${getPersonFunctionLabel(a.functionKey)})`,
+                        }) : undefined}
+                        removeLabel={canManage ? `Zuordnung zu ${a.team!.name} entfernen` : undefined}
                       />
                     ))}
                   </div>
                 ) : (
-                  /* State A: no relationship at all */
                   <UnassignedCapacityNudge
                     explanation={`Das Spielerprofil ist vorhanden, aber für die Saison ${seasonName ?? "die aktuelle Saison"} besteht noch keine Kaderzuordnung.`}
                     onTabLink={onNavigateToTab ? () => onNavigateToTab("spieler") : undefined}
@@ -534,7 +681,6 @@ export default function PersonWorkspaceOverviewTab({
                 <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--muted)]">
                   Trainer & Staff
                 </p>
-                {/* State C: complete trainer memberships */}
                 {activeTrainerMemberships.length > 0 ? (
                   <div className="space-y-2">
                     {activeTrainerMemberships.map((tm) => (
@@ -548,9 +694,15 @@ export default function PersonWorkspaceOverviewTab({
                         ]}
                         onTabLink={onNavigateToTab ? () => onNavigateToTab("trainer") : undefined}
                         onTabLinkLabel="Zum Trainer-Tab"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "trainer",
+                          trainerMemberId: tm.id,
+                          teamName: tm.teamSeason.team.name,
+                          seasonName: tm.teamSeason.season.name,
+                        }) : undefined}
+                        removeLabel={canManage ? `Trainer-Zuordnung zu ${tm.teamSeason.team.name} entfernen` : undefined}
                       />
                     ))}
-                    {/* State B: additional incomplete assignments alongside complete ones */}
                     {incompleteTrainerAssignments.map((a) => (
                       <IncompleteAssignmentCard
                         key={a.id}
@@ -562,11 +714,16 @@ export default function PersonWorkspaceOverviewTab({
                         incompleteDescription={`${person.firstName} ist bereits dem Team ${a.team!.name} zugeordnet, aber noch nicht im Trainerteam der Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} hinterlegt.`}
                         ctaLabel="Trainer-Zuordnung vervollständigen"
                         anchor="trainerteam"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "assignment",
+                          assignmentId: a.id,
+                          label: `${a.team!.name} (${getPersonFunctionLabel(a.functionKey)})`,
+                        }) : undefined}
+                        removeLabel={canManage ? `Zuordnung zu ${a.team!.name} entfernen` : undefined}
                       />
                     ))}
                   </div>
                 ) : incompleteTrainerAssignments.length > 0 ? (
-                  /* State B only: relationship exists but canonical membership is missing */
                   <div className="space-y-2">
                     {incompleteTrainerAssignments.map((a) => (
                       <IncompleteAssignmentCard
@@ -579,11 +736,16 @@ export default function PersonWorkspaceOverviewTab({
                         incompleteDescription={`${person.firstName} ist bereits dem Team ${a.team!.name} zugeordnet, aber noch nicht im Trainerteam der Saison ${a.season?.name ?? seasonName ?? "die aktuelle Saison"} hinterlegt.`}
                         ctaLabel="Trainer-Zuordnung vervollständigen"
                         anchor="trainerteam"
+                        onRemove={canManage ? () => openRemoval({
+                          type: "assignment",
+                          assignmentId: a.id,
+                          label: `${a.team!.name} (${getPersonFunctionLabel(a.functionKey)})`,
+                        }) : undefined}
+                        removeLabel={canManage ? `Zuordnung zu ${a.team!.name} entfernen` : undefined}
                       />
                     ))}
                   </div>
                 ) : (
-                  /* State A: no relationship at all */
                   <UnassignedCapacityNudge
                     explanation={`Das Trainerprofil ist vorhanden, aber für die Saison ${seasonName ?? "die aktuelle Saison"} besteht noch keine Trainer-Zuordnung.`}
                     onTabLink={onNavigateToTab ? () => onNavigateToTab("trainer") : undefined}
@@ -593,7 +755,7 @@ export default function PersonWorkspaceOverviewTab({
               </div>
             ) : null}
 
-            {/* ─ Weitere Funktionen (PersonAssignment functions not already shown above) ─ */}
+            {/* ─ Weitere Funktionen ─ */}
             {weitereAssignments.length > 0 ? (
               <div>
                 {(isPlayerProfile || isTrainerProfile) ? (
@@ -624,6 +786,12 @@ export default function PersonWorkspaceOverviewTab({
                       ]}
                       onTabLink={onNavigateToTab ? () => onNavigateToTab("organisation") : undefined}
                       onTabLinkLabel="Zur Organisation"
+                      onRemove={canManage ? () => openRemoval({
+                        type: "assignment",
+                        assignmentId: a.id,
+                        label: `${a.team?.name ?? a.orgUnit?.name ?? "Zuordnung"} (${getPersonFunctionLabel(a.functionKey)})`,
+                      }) : undefined}
+                      removeLabel={canManage ? `Zuordnung ${getPersonFunctionLabel(a.functionKey)} entfernen` : undefined}
                     />
                   ))}
                 </div>
@@ -634,10 +802,7 @@ export default function PersonWorkspaceOverviewTab({
       </div>
 
       {/* ── Dokumente signal ────────────────────────────────────────
-           PERSON-UX-08: Only shown to authorized viewers (documentCount is
-           only passed when viewer holds people.private_documents.view).
-           Intentionally absent for unauthorized viewers — no count/category
-           leakage. */}
+           PERSON-UX-08: Only shown to authorized viewers. */}
       {documentCount !== null && documentCount !== undefined ? (
         <div>
           <SectionHeader label="Dokumente" />

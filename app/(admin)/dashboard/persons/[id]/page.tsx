@@ -35,7 +35,7 @@ import { PageShell } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
 import { Badge, StatusIndicator } from "@/components/ui";
 import { MetadataCard } from "@/components/ui/MetadataCard";
-import AdminAvatar from "@/components/admin/shared/AdminAvatar";
+import PersonHeaderPhotoAdmin from "@/components/admin/persons/PersonHeaderPhotoAdmin";
 import PersonDetailTabs from "@/components/admin/persons/PersonDetailTabs";
 import PersonDeleteButton from "@/components/admin/persons/PersonDeleteButton";
 import { TENANT_ROLES_ASSIGN, TENANT_ROLES_VIEW } from "@/lib/roles/access";
@@ -239,7 +239,12 @@ export default async function PersonDetailPage({ params }: PageProps) {
         }
         summary={
           <div className="flex flex-wrap items-center gap-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-5 py-4 shadow-sm">
-            <AdminAvatar name={fullName} imageSrc={person.imageUrl} size="md" />
+            <PersonHeaderPhotoAdmin
+              personId={person.id}
+              personName={fullName}
+              initialImageUrl={person.imageUrl}
+              canManage={canManage}
+            />
             <div className="min-w-0 flex-1">
               {/* Capacity badges */}
               <div className="flex flex-wrap items-center gap-2">
