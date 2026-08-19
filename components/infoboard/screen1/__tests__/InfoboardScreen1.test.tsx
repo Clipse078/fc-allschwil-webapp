@@ -15,7 +15,19 @@
 
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import {
+  InfoboardScreen1,
+  computeTrainingGroupDemand,
+  computeEventDemand,
+  densityTier,
+  paginateDisplayList,
+  CARD_DEMAND_TRAINING_BASE,
+  CARD_DEMAND_TRAINING_ROW,
+  CARD_DEMAND_MATCH,
+  CARD_DEMAND_TOURNAMENT_BASE,
+  CARD_DEMAND_PAGE_MAX,
+} from "@/components/infoboard/screen1/InfoboardScreen1";
+import type { DisplayItem, FlatEvent } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
   PREVIEW_FIXTURE,
   PREVIEW_FIXTURE_EMPTY,
@@ -2600,6 +2612,13 @@ describe("Header/Footer regression — kiosk shell unchanged", () => {
     expect(screen.getByTestId("product-branding").textContent).toContain("POWERED BY");
   });
 
+  it("Header/Footer — kiosk shell headers/footers not changed by demand engine", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} currentTimeIso={PREVIEW_CURRENT_TIME_ISO} />);
+    // Header and footer still present, unchanged
+    expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();
+    expect(screen.getByTestId("kiosk-shell-footer")).toBeTruthy();
+  });
+
   it("InfoboardScreen1 header has board-title when subtitle enabled", () => {
     render(
       <InfoboardScreen1
@@ -2623,6 +2642,371 @@ describe("Header/Footer regression — kiosk shell unchanged", () => {
     for (const img of Array.from(imgs)) {
       expect(img.getAttribute("alt")).not.toBe("SportClubEvo");
     }
+  });
+});
+
+// ── Content-demand layout engine — unit tests ─────────────────────────────────
+
+describe("Content-demand — computeTrainingGroupDemand", () => {
+  it("1-row training demand = base + 1×row", () => {
+    expect(computeTrainingGroupDemand(1)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 1 * CARD_DEMAND_TRAINING_ROW);
+  });
+
+  it("2-row training demand = base + 2×row", () => {
+    expect(computeTrainingGroupDemand(2)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 2 * CARD_DEMAND_TRAINING_ROW);
+  });
+
+  it("4-row training demand = base + 4×row", () => {
+    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * CARD_DEMAND_TRAINING_ROW);
+  });
+
+  it("5-row training demand = base + 5×row", () => {
+    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * CARD_DEMAND_TRAINING_ROW);
+  });
+
+  it("6-row training demand = base + 6×row", () => {
+    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW);
+  });
+
+  it("demand grows monotonically with row count", () => {
+    const demands = [1, 2, 3, 4, 5, 6].map(computeTrainingGroupDemand);
+    for (let i = 1; i < demands.length; i++) {
+      expect(demands[i]).toBeGreaterThan(demands[i - 1]);
+    }
+  });
+
+  it("6-row demand is significantly larger than 1-row demand", () => {
+    expect(computeTrainingGroupDemand(6)).toBeGreaterThan(computeTrainingGroupDemand(1) * 1.5);
+  });
+
+  it("edge case: 0-row treated as 1-row minimum", () => {
+    expect(computeTrainingGroupDemand(0)).toBeCloseTo(computeTrainingGroupDemand(1));
+  });
+});
+
+describe("Content-demand — computeEventDemand", () => {
+  it("match demand equals CARD_DEMAND_MATCH constant", () => {
+    expect(computeEventDemand("MATCH")).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+
+  it("tournament with 0 participants = base", () => {
+    expect(computeEventDemand("TOURNAMENT", 0)).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE);
+  });
+
+  it("tournament with 4 participants > base", () => {
+    expect(computeEventDemand("TOURNAMENT", 4)).toBeGreaterThan(CARD_DEMAND_TOURNAMENT_BASE);
+  });
+
+  it("tournament demand grows with participant count", () => {
+    const d0 = computeEventDemand("TOURNAMENT", 0);
+    const d4 = computeEventDemand("TOURNAMENT", 4);
+    const d6 = computeEventDemand("TOURNAMENT", 6);
+    expect(d4).toBeGreaterThan(d0);
+    expect(d6).toBeGreaterThan(d4);
+  });
+
+  it("TRAINING type (solo event) returns CARD_DEMAND_MATCH as fallback", () => {
+    // Solo trainings rendered as EventCard also use computeEventDemand via the demand path
+    expect(computeEventDemand("TRAINING")).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+});
+
+describe("Content-demand — densityTier", () => {
+  it("low total demand → normal tier", () => {
+    expect(densityTier(4)).toBe("normal");
+    expect(densityTier(8)).toBe("normal");
+  });
+
+  it("moderate total demand → dense tier", () => {
+    expect(densityTier(8.1)).toBe("dense");
+    expect(densityTier(11)).toBe("dense");
+  });
+
+  it("high total demand → ultra tier", () => {
+    expect(densityTier(11.1)).toBe("ultra");
+    expect(densityTier(15)).toBe("ultra");
+  });
+});
+
+describe("Content-demand — paginateDisplayList", () => {
+  function makeTrainingItem(rowCount: number): DisplayItem {
+    const items: FlatEvent[] = Array.from({ length: rowCount }, (_, i) => ({
+      event: {
+        id: `tr-${i}`,
+        type: "TRAINING" as const,
+        displayTitle: `Training ${i}`,
+        teamDisplayName: `Team ${i}`,
+        opponentDisplayName: null,
+        opponentLogoUrl: null,
+        organizerDisplayName: null,
+        competitionLabel: null,
+        startAt: "2026-09-12T16:00:00.000Z",
+        endAt: "2026-09-12T17:30:00.000Z",
+        meetingTime: null,
+        status: "LIVE" as const,
+        resultLabel: null,
+        intermediateResultLabel: null,
+        temporalBucket: "current" as const,
+        seasonKey: "2026-27",
+        allocation: {
+          pitchLabel: null,
+          homeDressingRoomLabel: null,
+          awayDressingRoomLabel: null,
+          refereeDressingRoomLabel: null,
+        },
+      },
+      temporal: "current" as const,
+    }));
+    return { kind: "training-group", items, temporal: "current" };
+  }
+
+  it("empty list → empty result", () => {
+    expect(paginateDisplayList([], [])).toHaveLength(0);
+  });
+
+  it("single item fitting on one page → 1 page", () => {
+    const item = makeTrainingItem(1);
+    const demand = [computeTrainingGroupDemand(1)];
+    const pages = paginateDisplayList([item], demand, CARD_DEMAND_PAGE_MAX);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toHaveLength(1);
+  });
+
+  it("items within page limit → 1 page", () => {
+    const items = [
+      makeTrainingItem(3),
+      makeTrainingItem(2),
+    ];
+    const demands = items.map((item) =>
+      item.kind === "training-group" ? computeTrainingGroupDemand(item.items.length) : CARD_DEMAND_MATCH,
+    );
+    // Total: 2.65 + 2.10 = 4.75 << 12
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toHaveLength(2);
+  });
+
+  it("high-demand set exceeds page limit → 2 pages", () => {
+    // 3 × 6-row = 3 × 4.30 = 12.90 > PAGE_MAX(12)
+    const items = [
+      makeTrainingItem(6),
+      makeTrainingItem(6),
+      makeTrainingItem(6),
+    ];
+    const demands = items.map(() => computeTrainingGroupDemand(6));
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    expect(pages.length).toBeGreaterThanOrEqual(2);
+    // No single page should exceed PAGE_MAX
+    for (const page of pages) {
+      const pageDemand = page.reduce((sum, item) =>
+        sum + (item.kind === "training-group" ? computeTrainingGroupDemand(item.items.length) : CARD_DEMAND_MATCH), 0);
+      expect(pageDemand).toBeLessThanOrEqual(CARD_DEMAND_PAGE_MAX + 0.01);
+    }
+  });
+
+  it("never splits a card between pages", () => {
+    const items = Array.from({ length: 4 }, () => makeTrainingItem(6));
+    const demands = items.map(() => computeTrainingGroupDemand(6));
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    // Total items preserved across all pages
+    const totalItems = pages.reduce((sum, page) => sum + page.length, 0);
+    expect(totalItems).toBe(items.length);
+  });
+});
+
+describe("Content-demand — rendered data-card-demand attributes", () => {
+  it("training-group card has data-card-demand attribute", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Team A" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const row = screen.getByTestId("event-row");
+    expect(row.getAttribute("data-card-demand")).toBeTruthy();
+  });
+
+  it("6-row training group has higher data-card-demand than 1-row training", () => {
+    const feed6 = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T1" }),
+        makeEvent({ id: "t2", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T2" }),
+        makeEvent({ id: "t3", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T3" }),
+        makeEvent({ id: "t4", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T4" }),
+        makeEvent({ id: "t5", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T5" }),
+        makeEvent({ id: "t6", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "T6" }),
+      ],
+      isEmpty: false,
+    });
+    const feed1 = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T15:15:00.000Z", teamDisplayName: "Solo" }),
+      ],
+      isEmpty: false,
+    });
+
+    const { unmount } = render(<InfoboardScreen1 feed={feed6} />);
+    const row6 = screen.getByTestId("event-row");
+    const demand6 = parseFloat(row6.getAttribute("data-card-demand") ?? "0");
+    unmount();
+
+    render(<InfoboardScreen1 feed={feed1} />);
+    const row1 = screen.getByTestId("event-row");
+    const demand1 = parseFloat(row1.getAttribute("data-card-demand") ?? "0");
+
+    expect(demand6).toBeGreaterThan(demand1);
+  });
+
+  it("denser Training card has greater layout demand than 1-row training card", () => {
+    // Exercises the core content-aware requirement
+    const demand1 = computeTrainingGroupDemand(1);
+    const demand4 = computeTrainingGroupDemand(4);
+    const demand6 = computeTrainingGroupDemand(6);
+    expect(demand4).toBeGreaterThan(demand1);
+    expect(demand6).toBeGreaterThan(demand4);
+  });
+
+  it("match card has data-card-demand equal to CARD_DEMAND_MATCH", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "Team A", opponentDisplayName: "Team B" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const row = screen.getByTestId("event-row");
+    const demand = parseFloat(row.getAttribute("data-card-demand") ?? "0");
+    expect(demand).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+
+  it("cards in mixed list are not all assigned identical demand", () => {
+    // Dense training + match → different demands
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T1" }),
+        makeEvent({ id: "t2", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T2" }),
+        makeEvent({ id: "t3", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T3" }),
+        makeEvent({ id: "t4", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T4" }),
+        makeEvent({ id: "t5", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T5" }),
+      ],
+      next: [
+        makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T10:00:00.000Z", teamDisplayName: "M1", opponentDisplayName: "M2" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const rows = screen.getAllByTestId("event-row");
+    const demands = rows.map((r) => parseFloat(r.getAttribute("data-card-demand") ?? "0"));
+    // At least two distinct demand values
+    const unique = new Set(demands.map((d) => d.toFixed(2)));
+    expect(unique.size).toBeGreaterThan(1);
+  });
+
+  it("event-list carries data-density attribute", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    const density = list.getAttribute("data-density");
+    expect(["normal", "dense", "ultra"]).toContain(density);
+  });
+
+  it("HIGH_DENSITY_6 fixture: all 6 training rows carry non-zero demand", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
+    const row = screen.getByTestId("event-row");
+    const demand = parseFloat(row.getAttribute("data-card-demand") ?? "0");
+    // 6-row training: demand = 1.0 + 6×0.55 = 4.30
+    expect(demand).toBeCloseTo(computeTrainingGroupDemand(6), 1);
+    expect(demand).toBeGreaterThan(3);
+  });
+});
+
+describe("Content-demand — layout contract (MATCH / TOURNAMENT unchanged)", () => {
+  it("MATCH content remains visible under demand model", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "m1",
+          type: "MATCH",
+          teamDisplayName: "FC Demand Home",
+          opponentDisplayName: "FC Demand Away",
+          competitionLabel: "Meisterschaft",
+          allocation: { pitchLabel: "Stadion", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByText("Meisterschaft")).toBeTruthy();
+    expect(screen.getAllByText("FC Demand Home").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("FC Demand Away").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("KABINE").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PLATZ").length).toBeGreaterThan(0);
+  });
+
+  it("TOURNAMENT content remains visible under demand model", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
+        eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
+      />,
+    );
+    expect(screen.getByText("TURNIER")).toBeTruthy();
+    expect(screen.getByTestId("participant-allocation-block")).toBeTruthy();
+    expect(screen.getAllByText("KABINE").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("PLATZ").length).toBeGreaterThan(0);
+  });
+
+  it("dense training + compact training + match all present in DOM", () => {
+    const feed = makeFeed({
+      current: [
+        // 4-row training (dense)
+        makeEvent({ id: "d1", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "DA1" }),
+        makeEvent({ id: "d2", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "DA2" }),
+        makeEvent({ id: "d3", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "DA3" }),
+        makeEvent({ id: "d4", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "DA4" }),
+        // 1-row training (compact, different start time)
+        makeEvent({ id: "s1", startAt: "2026-09-12T09:00:00.000Z", teamDisplayName: "Solo" }),
+        // match
+        makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T10:00:00.000Z", teamDisplayName: "Home", opponentDisplayName: "Away" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    // All three cards visible
+    expect(screen.getAllByTestId("event-row")).toHaveLength(3);
+    // Dense training rows all in DOM
+    expect(screen.getByText("DA1")).toBeTruthy();
+    expect(screen.getByText("DA4")).toBeTruthy();
+    // Compact training
+    expect(screen.getByText("Solo")).toBeTruthy();
+    // Match
+    expect(screen.getByText("Home")).toBeTruthy();
+    expect(screen.getByText("Away")).toBeTruthy();
+  });
+
+  it("training + tournament: both visible, different demand values", () => {
+    const trainingFeed = makeFeed({
+      current: [
+        makeEvent({ id: "t1", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "Train1" }),
+        makeEvent({ id: "t2", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "Train2" }),
+        makeEvent({ id: "t3", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "Train3" }),
+      ],
+      next: [
+        makeEvent({ id: "tour1", type: "TOURNAMENT", startAt: "2026-09-12T09:00:00.000Z", displayTitle: "Sommer Cup", teamDisplayName: "FC Test" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={trainingFeed} />);
+    const rows = screen.getAllByTestId("event-row");
+    expect(rows).toHaveLength(2);
+    const demands = rows.map((r) => parseFloat(r.getAttribute("data-card-demand") ?? "0"));
+    // 3-row training has higher demand than tournament card
+    expect(demands[0]).toBeGreaterThan(demands[1]);
   });
 });
 
