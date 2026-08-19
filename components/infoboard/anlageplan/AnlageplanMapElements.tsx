@@ -103,6 +103,13 @@ export function PremiumResourceCard({
   const activeEvent = occupancy?.currentEvent ?? occupancy?.nextEvent;
   const isCurrent = hasCurrent;
 
+  // Derive multi-training count from canonical currentEvents list.
+  // Falls back to [currentEvent] when currentEvents is absent (legacy fixtures).
+  const allCurrentEvents =
+    occupancy?.currentEvents ??
+    (occupancy?.currentEvent != null ? [occupancy.currentEvent] : []);
+  const currentTrainings = allCurrentEvents.filter((e) => e.type === "TRAINING");
+
   if (isFree) {
     const freeLabel = zone.label ?? zone.resourceCode ?? null;
     return (
@@ -244,6 +251,15 @@ export function PremiumResourceCard({
 
   const tokens = activityTypeTokens(activeEvent.type, isCurrent);
   const resourceDisplay = zone.label ?? zone.resourceCode ?? "";
+
+  // Multi-training count label for the simplified status-only path.
+  // When two or more TRAINING activities coexist on the same pitch,
+  // display "N TRAININGS" derived from the canonical currentEvents list.
+  // Only applies to the non-rich (production Anlageplan) path.
+  const multiTrainingLabel =
+    !richEventCards && currentTrainings.length > 1
+      ? `${currentTrainings.length} TRAININGS`
+      : null;
 
   // Rich-cards path needs time formatting and detailed data
   const startTime = richEventCards ? fmtTime(activeEvent.startAt, tz) : "";
@@ -508,7 +524,8 @@ export function PremiumResourceCard({
           >
             {resourceDisplay}
           </span>
-          {/* Status label — very prominent */}
+          {/* Status label — very prominent.
+              Shows "N TRAININGS" when multiple training activities coexist. */}
           <span
             data-testid="resource-card-status-label"
             style={{
@@ -520,7 +537,7 @@ export function PremiumResourceCard({
               lineHeight: 1,
             }}
           >
-            {tokens.label}
+            {multiTrainingLabel ?? tokens.label}
           </span>
         </div>
       )}

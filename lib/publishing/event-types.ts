@@ -221,7 +221,24 @@ export type PitchOccupancy = {
    */
   resourceType: "FULL_PITCH" | "HALF_PITCH";
   state: PitchOccupancyState;
+  /**
+   * The first (by startAt) currently-active event on this pitch, or null when
+   * no event is active now. Kept for backward compatibility; prefer
+   * `currentEvents` when you need the full multi-activity picture.
+   */
   currentEvent: PitchEventSummary | null;
+  /**
+   * All currently-active events on this pitch, ordered by startAt ascending.
+   * Empty when no event is active now. This is the canonical source for
+   * multi-training count display (Anlageplan "N TRAININGS" label).
+   *
+   * When `currentEvents.length > 1`, `hasAllocationConflict` is true and
+   * `currentEvent` points to `currentEvents[0]`.
+   *
+   * Optional for backward compatibility with manually-constructed fixtures;
+   * always populated by `resolvePitchOccupancy` in production.
+   */
+  currentEvents?: PitchEventSummary[];
   /**
    * Next scheduled activity within the shared Screen 1 4-hour rolling
    * operational horizon. Populated alongside `currentEvent` when both
