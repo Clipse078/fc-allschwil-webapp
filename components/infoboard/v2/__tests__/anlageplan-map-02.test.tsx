@@ -859,3 +859,375 @@ describe("Screen-2 Anlageplan — Feld A/B logic and whole-pitch behavior", () =
     expect(currentCards.length).toBe(2);
   });
 });
+
+// ── Multi-training occupancy on same pitch/half ───────────────────────────────
+
+/**
+ * Builds a payload with a single FULL_PITCH zone and N simultaneous
+ * training events assigned to it. The currentEvents array is the canonical
+ * source for the multi-training count label.
+ */
+function makeMultiTrainingPayload(trainingCount: number): AnlageplanLivePayload {
+  const baseEvent = {
+    displayTitle: "Event on KR2",
+    teamDisplayName: "Team",
+    opponentDisplayName: null as null,
+    startAt: "2026-09-12T16:00:00.000Z",
+    endAt: "2026-09-12T17:30:00.000Z",
+    status: "LIVE" as const,
+    type: "TRAINING" as const,
+    temporalRelation: "current" as const,
+    dressingRooms: [] as [],
+  };
+
+  const currentEvents = Array.from({ length: trainingCount }, (_, i) => ({
+    ...baseEvent,
+    eventId: `evt-training-${i}`,
+    teamDisplayName: `Team ${i + 1}`,
+  }));
+
+  const pitch: PitchOccupancy = {
+    code: "KR2",
+    displayLabel: "Kunstrasen 2",
+    facilityName: "Testanlage",
+    facilityId: "fac-test",
+    resourceType: "FULL_PITCH",
+    state: "OCCUPIED_NOW",
+    hasAllocationConflict: trainingCount > 1,
+    currentEvent: currentEvents[0],
+    currentEvents,
+    nextEvent: null,
+  };
+
+  const anlageplanConfig = {
+    version: 1 as const,
+    elements: [
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "zone-kr2",
+        rect: { x: 0.1, y: 0.1, width: 0.4, height: 0.4 },
+        resourceCode: "KR2",
+        label: "Kunstrasen 2",
+        zoneType: "FULL_PITCH" as const,
+        showNextActivity: false,
+      },
+    ],
+  };
+
+  const screen2 = {
+    feed: {
+      generatedAt: "2026-09-12T16:00:00.000Z",
+      tenant: { id: "t1", key: "fc-test", name: "FC Test", timezone: "Europe/Zurich" },
+      displayDate: "2026-09-12",
+      isStale: false,
+      facilityName: "Testanlage",
+      pitches: [pitch],
+      dressingRooms: [],
+      unallocated: [],
+    },
+    branding: { clubLogoSrc: null, productLogoSrc: null },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+    theme: "DARK" as const,
+  };
+
+  return {
+    screen2,
+    anlageplanConfig,
+    backgroundUrl: null,
+    backgroundTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+  };
+}
+
+/**
+ * Builds a half-pitch payload with multiple simultaneous trainings on one or
+ * both halves (Feld A and/or Feld B).
+ */
+function makeMultiTrainingHalfPayload(
+  feldATrainingCount: number,
+  feldBTrainingCount: number,
+): AnlageplanLivePayload {
+  const FACILITY_ID = "fac-kr2";
+
+  const makeHalfEvents = (code: string, count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      eventId: `evt-${code}-${i}`,
+      displayTitle: `Event on ${code}`,
+      teamDisplayName: `Team ${code} ${i + 1}`,
+      opponentDisplayName: null as null,
+      startAt: "2026-09-12T16:00:00.000Z",
+      endAt: "2026-09-12T17:30:00.000Z",
+      status: "LIVE" as const,
+      type: "TRAINING" as const,
+      temporalRelation: "current" as const,
+      dressingRooms: [] as [],
+    }));
+
+  const feldAEvents = makeHalfEvents("KR2-A", feldATrainingCount);
+  const feldBEvents = makeHalfEvents("KR2-B", feldBTrainingCount);
+
+  const pitches: PitchOccupancy[] = [
+    {
+      code: "KR2-FULL",
+      displayLabel: "Kunstrasen 2",
+      facilityName: "Testanlage",
+      facilityId: FACILITY_ID,
+      resourceType: "FULL_PITCH",
+      state: "FREE_NOW",
+      hasAllocationConflict: false,
+      currentEvent: null,
+      currentEvents: [],
+      nextEvent: null,
+    },
+    {
+      code: "KR2-A",
+      displayLabel: "Feld A",
+      facilityName: "Testanlage",
+      facilityId: FACILITY_ID,
+      resourceType: "HALF_PITCH",
+      state: feldATrainingCount > 0 ? "OCCUPIED_NOW" : "FREE_NOW",
+      hasAllocationConflict: feldATrainingCount > 1,
+      currentEvent: feldAEvents[0] ?? null,
+      currentEvents: feldAEvents,
+      nextEvent: null,
+    },
+    {
+      code: "KR2-B",
+      displayLabel: "Feld B",
+      facilityName: "Testanlage",
+      facilityId: FACILITY_ID,
+      resourceType: "HALF_PITCH",
+      state: feldBTrainingCount > 0 ? "OCCUPIED_NOW" : "FREE_NOW",
+      hasAllocationConflict: feldBTrainingCount > 1,
+      currentEvent: feldBEvents[0] ?? null,
+      currentEvents: feldBEvents,
+      nextEvent: null,
+    },
+  ];
+
+  const anlageplanConfig = {
+    version: 1 as const,
+    elements: [
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "zone-full",
+        rect: { x: 0.1, y: 0.1, width: 0.4, height: 0.4 },
+        resourceCode: "KR2-FULL",
+        label: "Kunstrasen 2",
+        zoneType: "FULL_PITCH" as const,
+        showNextActivity: false,
+      },
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "zone-a",
+        rect: { x: 0.1, y: 0.1, width: 0.2, height: 0.4 },
+        resourceCode: "KR2-A",
+        label: "Feld A",
+        zoneType: "HALF_PITCH" as const,
+        showNextActivity: false,
+      },
+      {
+        kind: "RESOURCE_ZONE" as const,
+        id: "zone-b",
+        rect: { x: 0.3, y: 0.1, width: 0.2, height: 0.4 },
+        resourceCode: "KR2-B",
+        label: "Feld B",
+        zoneType: "HALF_PITCH" as const,
+        showNextActivity: false,
+      },
+    ],
+  };
+
+  const screen2 = {
+    feed: {
+      generatedAt: "2026-09-12T16:00:00.000Z",
+      tenant: { id: "t1", key: "fc-test", name: "FC Test", timezone: "Europe/Zurich" },
+      displayDate: "2026-09-12",
+      isStale: false,
+      facilityName: "Testanlage",
+      pitches,
+      dressingRooms: [],
+      unallocated: [],
+    },
+    branding: { clubLogoSrc: null, productLogoSrc: null },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+    theme: "DARK" as const,
+  };
+
+  return {
+    screen2,
+    anlageplanConfig,
+    backgroundUrl: null,
+    backgroundTransform: { scale: 1, offsetX: 0, offsetY: 0 },
+    currentTimeIso: "2026-09-12T16:00:00.000Z",
+  };
+}
+
+describe("Screen-2 Anlageplan — multi-training occupancy on same pitch", () => {
+  it("one training on a full pitch: shows TRAINING (not 1 TRAININGS)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(1)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    expect(labels[0].textContent).toBe("TRAINING");
+  });
+
+  it("two simultaneous trainings on the same pitch: shows 2 TRAININGS", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(2)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    expect(labels[0].textContent).toBe("2 TRAININGS");
+  });
+
+  it("three simultaneous trainings on the same pitch: shows 3 TRAININGS", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(3)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    expect(labels[0].textContent).toBe("3 TRAININGS");
+  });
+
+  it("count is derived from currentEvents array, not rendered labels", () => {
+    // 2 trainings: currentEvents has 2 entries → label must be "2 TRAININGS"
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(2)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("2 TRAININGS");
+    // Must NOT show plain TRAINING (which would be a rendered-label inference)
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    expect(labels[0].textContent).not.toBe("TRAINING");
+  });
+
+  it("multiple trainings on Feld A while Feld B is free: A shows N TRAININGS, B shows FREI", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingHalfPayload(2, 0)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    // Feld A has 2 trainings → 2 TRAININGS
+    expect(root.textContent).toContain("2 TRAININGS");
+    // Feld B is free → FREI
+    expect(root.textContent).toContain("FREI");
+    // FULL_PITCH suppressed (any half occupied)
+    expect(screen.getAllByTestId("resource-card-free").length).toBeGreaterThan(0);
+  });
+
+  it("multiple trainings independently on A and B: both show N TRAININGS", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingHalfPayload(2, 3)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    const labelTexts = labels.map((el) => el.textContent);
+    expect(labelTexts).toContain("2 TRAININGS");
+    expect(labelTexts).toContain("3 TRAININGS");
+    // No FREI (both halves occupied)
+    expect(screen.queryAllByTestId("resource-card-free")).toHaveLength(0);
+  });
+
+  it("A and B both TRAINING but backed by different single activities: each shows TRAINING", () => {
+    // Single training on each half → no multi-count label
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingHalfPayload(1, 1)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    const labelTexts = labels.map((el) => el.textContent);
+    // Both show TRAINING (not "1 TRAININGS")
+    expect(labelTexts.filter((t) => t === "TRAINING").length).toBe(2);
+    expect(labelTexts).not.toContain("1 TRAININGS");
+  });
+});
+
+describe("Screen-2 Anlageplan — multi-training: FREI/MATCH/TURNIER unchanged", () => {
+  it("FREI pitch still shows FREI (multi-training logic does not affect free pitches)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const freeCards = screen.getAllByTestId("resource-card-free");
+    expect(freeCards.length).toBeGreaterThan(0);
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent).toContain("FREI");
+    // No TRAININGS label on a free pitch
+    expect(root.textContent).not.toContain("TRAININGS");
+  });
+
+  it("single MATCH pitch still shows MATCH (not N MATCHS)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload(undefined, [{ code: "KR2", currentType: "MATCH" }])}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    const matchLabel = labels.find((el) => el.textContent?.includes("MATCH"));
+    expect(matchLabel).toBeTruthy();
+    expect(matchLabel!.textContent).toBe("MATCH");
+    expect(matchLabel!.textContent).not.toContain("MATCHS");
+  });
+
+  it("single TOURNAMENT pitch still shows TURNIER (not N TURNIERS)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload(undefined, [{ code: "KR2", currentType: "TOURNAMENT" }])}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    const labels = screen.getAllByTestId("resource-card-status-label");
+    const tournLabel = labels.find((el) => el.textContent?.includes("TURNIER"));
+    expect(tournLabel).toBeTruthy();
+    expect(tournLabel!.textContent).toBe("TURNIER");
+  });
+});
+
+describe("Screen-2 Anlageplan — multi-training: no metadata reintroduced", () => {
+  it("multi-training card does not show team names (status-only)", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(2)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    // Team names from fixture: "Team 1", "Team 2"
+    expect(screen.queryByText("Team 1")).toBeNull();
+    expect(screen.queryByText("Team 2")).toBeNull();
+    // No rich-body detail
+    expect(screen.queryAllByTestId("resource-card-rich-body")).toHaveLength(0);
+  });
+
+  it("multi-training card does not reintroduce the Nächste Aktivitäten rail", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeMultiTrainingPayload(2)}
+        branding={DEFAULT_BRANDING}
+      />,
+    );
+    expect(screen.queryByTestId("anlageplan-activity-rail")).toBeNull();
+    expect(screen.queryAllByTestId("next-activity-row")).toHaveLength(0);
+    const root = screen.getByTestId("infoboard-anlageplan-root");
+    expect(root.textContent?.toUpperCase()).not.toContain("NÄCHSTE AKTIVITÄTEN");
+  });
+});

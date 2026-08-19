@@ -511,6 +511,105 @@ describe("Allocation conflict", () => {
   });
 });
 
+// ── currentEvents — multi-activity canonical count ────────────────────────────
+
+describe("currentEvents — multi-training occupancy", () => {
+  it("single training on a pitch: currentEvents has length 1", async () => {
+    const startAt = new Date(NOW_UTC.getTime() - 10 * 60_000);
+    const endAt = new Date(NOW_UTC.getTime() + 80 * 60_000);
+    const evt = makeEvent({ id: "e1", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [makePitch("P-1", "Platz 1")],
+      loader: makeLoader([evt]),
+    });
+    expect(feed.pitches[0].currentEvents).toHaveLength(1);
+    expect(feed.pitches[0].currentEvents?.[0].eventId).toBe("e1");
+  });
+
+  it("two simultaneous trainings on same pitch: currentEvents has length 2", async () => {
+    const startAt = new Date(NOW_UTC.getTime() - 10 * 60_000);
+    const endAt = new Date(NOW_UTC.getTime() + 80 * 60_000);
+    const evt1 = makeEvent({ id: "e1", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const evt2 = makeEvent({ id: "e2", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [makePitch("P-1", "Platz 1")],
+      loader: makeLoader([evt1, evt2]),
+    });
+    expect(feed.pitches[0].currentEvents).toHaveLength(2);
+    expect(feed.pitches[0].hasAllocationConflict).toBe(true);
+  });
+
+  it("three simultaneous trainings on same pitch: currentEvents has length 3", async () => {
+    const startAt = new Date(NOW_UTC.getTime() - 10 * 60_000);
+    const endAt = new Date(NOW_UTC.getTime() + 80 * 60_000);
+    const evt1 = makeEvent({ id: "e1", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const evt2 = makeEvent({ id: "e2", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const evt3 = makeEvent({ id: "e3", pitchCode: "P-1", startAt, endAt, type: "TRAINING" });
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [makePitch("P-1", "Platz 1")],
+      loader: makeLoader([evt1, evt2, evt3]),
+    });
+    expect(feed.pitches[0].currentEvents).toHaveLength(3);
+  });
+
+  it("free pitch: currentEvents is empty", async () => {
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [makePitch("P-1", "Platz 1")],
+      loader: makeLoader([]),
+    });
+    expect(feed.pitches[0].currentEvents).toHaveLength(0);
+    expect(feed.pitches[0].currentEvent).toBeNull();
+  });
+
+  it("currentEvent is the first of currentEvents (ordered by startAt)", async () => {
+    const startAt1 = new Date(NOW_UTC.getTime() - 20 * 60_000);
+    const startAt2 = new Date(NOW_UTC.getTime() - 10 * 60_000);
+    const endAt = new Date(NOW_UTC.getTime() + 60 * 60_000);
+    const evt1 = makeEvent({ id: "e-first", pitchCode: "P-1", startAt: startAt1, endAt, type: "TRAINING" });
+    const evt2 = makeEvent({ id: "e-second", pitchCode: "P-1", startAt: startAt2, endAt, type: "TRAINING" });
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [makePitch("P-1", "Platz 1")],
+      loader: makeLoader([evt2, evt1]), // supply in reverse order
+    });
+    expect(feed.pitches[0].currentEvent?.eventId).toBe("e-first");
+    expect(feed.pitches[0].currentEvents?.[0].eventId).toBe("e-first");
+  });
+
+  it("multiple trainings on pitch A, pitch B free: A has currentEvents length 2, B has length 0", async () => {
+    const startAt = new Date(NOW_UTC.getTime() - 10 * 60_000);
+    const endAt = new Date(NOW_UTC.getTime() + 80 * 60_000);
+    const evtA1 = makeEvent({ id: "a1", pitchCode: "P-A", startAt, endAt, type: "TRAINING" });
+    const evtA2 = makeEvent({ id: "a2", pitchCode: "P-A", startAt, endAt, type: "TRAINING" });
+    const feed = await buildInfoboardScreen2Feed({
+      tenant: TEST_TENANT,
+      timeZone: ZURICH_TZ,
+      now: NOW_UTC,
+      pitches: [
+        makePitch("P-A", "Platz A"),
+        makePitch("P-B", "Platz B"),
+      ],
+      loader: makeLoader([evtA1, evtA2]),
+    });
+    expect(feed.pitches[0].currentEvents).toHaveLength(2); // P-A
+    expect(feed.pitches[1].currentEvents).toHaveLength(0); // P-B free
+  });
+});
+
 // ── Feed metadata ─────────────────────────────────────────────────────────────
 
 describe("Feed metadata", () => {
