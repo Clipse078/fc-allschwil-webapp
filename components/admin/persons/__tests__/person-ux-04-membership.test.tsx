@@ -149,6 +149,8 @@ const ALL_DOMAIN_PERMS: PersonDomainPermissions = {
   canViewAssessments: true,
   canManageAssessments: true,
   canViewAudit: true,
+      canViewContact: false,
+      canManageContact: false,
 };
 
 function renderTabs(

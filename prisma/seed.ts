@@ -141,6 +141,11 @@ async function main() {
     { key: "people.private_documents.view",   name: "View person private documents",     module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.private_documents.manage", name: "Manage person private documents",   module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "people.audit.view",               name: "View person audit history",         module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    // PERSON-UX-10: Guardian relationships and emergency contacts.
+    // Both cover privacy-sensitive operational contact data. Club admins
+    // receive these automatically via RPERM-04 (scope=TENANT filter).
+    { key: "people.contact.view",             name: "View person contact relationships", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
+    { key: "people.contact.manage",           name: "Manage person contact relationships", module: PermissionModule.PEOPLE, scope: PermissionScope.TENANT, grantableByAdmin: true },
 
     { key: "events.view", name: "View events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },
     { key: "events.manage", name: "Manage events", module: PermissionModule.EVENTS, scope: PermissionScope.TENANT, grantableByAdmin: true },

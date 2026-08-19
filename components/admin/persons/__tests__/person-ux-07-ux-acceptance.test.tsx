@@ -51,6 +51,8 @@ const NO_DOMAIN_PERMS: PersonDomainPermissions = {
   canViewAssessments: false,
   canManageAssessments: false,
   canViewAudit: false,
+      canViewContact: false,
+      canManageContact: false,
 };
 
 const SEASON_ACTIVE = {
