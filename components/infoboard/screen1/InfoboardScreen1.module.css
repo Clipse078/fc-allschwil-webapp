@@ -998,15 +998,25 @@
  * Keep canonical primary typography intact; instead allocate more of the
  * available board height to the Training card and tighten only internal
  * vertical spacing. Match/Tournament retain normal proportions.
+ *
+ * Physical-TV target (1920×1080): training-count 2 and 3 fit without
+ * adjustment, but 4+ rows can clip the bottom row when multiple display
+ * items compete for height. The flex-grow overrides below give the dense
+ * training card a proportionally larger share of available board height.
+ * Padding and row height are tightened in concert to maximise visible
+ * row space while retaining strong TV readability.
  */
-.eventCard[data-type="TRAINING"][data-training-count="5"] {
-  flex-grow: 1.22;
-}
 
-.eventCard[data-type="TRAINING"][data-training-count="6"] {
-  flex-grow: 1.38;
-}
+/* flex-grow: progressively larger share for denser training blocks */
+.eventCard[data-type="TRAINING"][data-training-count="4"] { flex-grow: 1.14; }
+.eventCard[data-type="TRAINING"][data-training-count="5"] { flex-grow: 1.22; }
+.eventCard[data-type="TRAINING"][data-training-count="6"] { flex-grow: 1.38; }
 
+/* Reduce zone vertical padding for 4-6 row training cards */
+.eventCard[data-type="TRAINING"][data-training-count="4"] .cardTimeZone,
+.eventCard[data-type="TRAINING"][data-training-count="4"] .cardEventZone,
+.eventCard[data-type="TRAINING"][data-training-count="4"] .cardDressingRoomZone,
+.eventCard[data-type="TRAINING"][data-training-count="4"] .cardPitchZone,
 .eventCard[data-type="TRAINING"][data-training-count="5"] .cardTimeZone,
 .eventCard[data-type="TRAINING"][data-training-count="5"] .cardEventZone,
 .eventCard[data-type="TRAINING"][data-training-count="5"] .cardDressingRoomZone,
@@ -1019,11 +1029,15 @@
   padding-bottom: clamp(6px, 0.7vh, 10px);
 }
 
+/* Tighten grid row min-height for 4-6 row training blocks */
+.eventCard[data-type="TRAINING"][data-training-count="4"] .trainingGroupRows,
 .eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupRows,
 .eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupRows {
   grid-auto-rows: minmax(clamp(27px, 3vh, 38px), auto);
 }
 
+/* Tighten row vertical padding for 4-6 row training blocks */
+.eventCard[data-type="TRAINING"][data-training-count="4"] .trainingGroupAlignedRow,
 .eventCard[data-type="TRAINING"][data-training-count="5"] .trainingGroupAlignedRow,
 .eventCard[data-type="TRAINING"][data-training-count="6"] .trainingGroupAlignedRow {
   padding-top: 1px;
