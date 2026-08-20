@@ -44,7 +44,8 @@ import { DEFAULT_TENANT_KEY } from "@/lib/tenants/queries";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
-import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { InfoboardAnlageplan, type InfoboardAnlageplanShellConfig } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import {
   buildScreen2LivePayload,
   type Screen2SourceDatabase,
@@ -144,9 +145,27 @@ export default async function InfoboardScreen2Page() {
         ? FC_ALLSCHWIL_LOGO_SRC
         : null;
 
+    const boardConfig = buildBoardConfig(board);
+    const shellConfig: InfoboardAnlageplanShellConfig = {
+      subtitleEnabled: boardConfig.headerSubtitleEnabled,
+      subtitleText: boardConfig.headerSubtitleText,
+      showTime: boardConfig.headerShowTime,
+      showDate: boardConfig.headerShowDate,
+      showWeather: boardConfig.headerShowWeather,
+      announcement: boardConfig.announcement
+        ? {
+            enabled: boardConfig.announcement.enabled,
+            text: boardConfig.announcement.text,
+            backgroundColor: boardConfig.announcement.backgroundColor,
+            textColor: boardConfig.announcement.textColor,
+          }
+        : null,
+    };
+
     return (
       <InfoboardAnlageplan weather={weather}
         payload={payload}
+        shellConfig={shellConfig}
         branding={{
           clubLogoSrc,
           productLogoSrc: PRODUCT_LOGO_SRC,

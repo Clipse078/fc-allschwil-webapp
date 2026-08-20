@@ -195,6 +195,7 @@ export function InboardDesignerClient({
     subtitleText: headerSettings?.subtitleText,
     showTime: headerSettings?.showTime,
     showDate: headerSettings?.showDate,
+    showWeather: headerSettings?.showWeather,
   };
 
   const previewAnnouncement =
@@ -233,6 +234,7 @@ export function InboardDesignerClient({
       headerSubtitleText: hSettings?.subtitleText ?? null,
       headerShowTime: hSettings?.showTime ?? true,
       headerShowDate: hSettings?.showDate ?? true,
+      headerShowWeather: hSettings?.showWeather ?? false,
       announcementEnabled,
       announcementText: announcementEnabled ? (aSettings?.text ?? null) : null,
       announcementBgColor: announcementEnabled
@@ -605,6 +607,7 @@ export function InboardDesignerClient({
                     subtitleText: board.headerSubtitleText,
                     showTime: board.headerShowTime,
                     showDate: board.headerShowDate,
+                    showWeather: board.headerShowWeather,
                   }
                 }
                 tenantName={tenantName}

@@ -140,6 +140,7 @@ export type InfoboardScreen1LivePayload = {
     readonly subtitleText: string | null;
     readonly showTime: boolean;
     readonly showDate: boolean;
+    readonly showWeather: boolean;
   } | null;
 };
 
@@ -247,6 +248,7 @@ export async function buildScreen1LivePayload(params: {
           subtitleText: boardConfig.headerSubtitleText ?? null,
           showTime: boardConfig.headerShowTime !== false,
           showDate: boardConfig.headerShowDate !== false,
+          showWeather: boardConfig.headerShowWeather === true,
         }
       : null;
 

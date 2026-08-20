@@ -96,6 +96,7 @@ export type InfoboardScreen1Props = {
     readonly subtitleText?: string | null;
     readonly showTime?: boolean;
     readonly showDate?: boolean;
+    readonly showWeather?: boolean;
   };
 };
 
@@ -168,6 +169,36 @@ export function densityTier(totalDemand: number): "normal" | "dense" | "ultra" {
   if (totalDemand > 11) return "ultra";
   if (totalDemand > 8) return "dense";
   return "normal";
+}
+
+/**
+ * Maps total page demand to a layout distribution mode.
+ *
+ * SPARSE days (1–2 low-demand cards) must not absorb all remaining
+ * viewport height. Cards should appear comfortably sized with the
+ * unused board background visible below the activity stack.
+ *
+ * FILL days (multiple or high-demand cards) distribute the full
+ * available viewport proportionally via flex-grow so the content
+ * cannot be clipped.
+ *
+ * The threshold (4.0) is placed above the maximum demand any single
+ * low-content card can produce (~1.55 for a 1-row training, 1.5 for
+ * a match) so solo cards and 2-card sparse pages use the bounded mode.
+ * A 1-training-group with 6 rows produces demand ≥ 4.3 and therefore
+ * correctly uses FILL mode.
+ *
+ *   sparse — bounded: max-height capped at demand × 25vh per card.
+ *            Unused space shows as dark board background below cards.
+ *   fill   — proportional: flex-grow distributes full viewport height
+ *            (existing behaviour; preserves no-clipping guarantee).
+ *
+ * Exported for regression testing.
+ */
+export const LAYOUT_MODE_SPARSE_THRESHOLD = 4.0;
+
+export function layoutModeTier(totalDemand: number): "sparse" | "fill" {
+  return totalDemand < LAYOUT_MODE_SPARSE_THRESHOLD ? "sparse" : "fill";
 }
 
 // ── Event-type labels (presentation-only, German) ─────────────────────────────
@@ -971,6 +1002,7 @@ export function InfoboardScreen1({
   // Header visibility settings (per-board config or defaults)
   const showTime = headerConfig?.showTime !== false;
   const showDate = headerConfig?.showDate !== false;
+  const showWeather = headerConfig?.showWeather === true;
   const subtitleEnabled = headerConfig?.subtitleEnabled !== false;
   const subtitleText =
     headerConfig?.subtitleText?.trim() ||
@@ -1020,6 +1052,7 @@ export function InfoboardScreen1({
     const pageDemands = pageItems.map((_, j) => itemDemands[pageStartIndex + j] ?? 1.0);
     const pageTotalDemand = pageDemands.reduce((sum, d) => sum + d, 0);
     const pageDensity = densityTier(pageTotalDemand);
+    const pageLayoutMode = layoutModeTier(pageTotalDemand);
 
     return (
       <ul
@@ -1029,6 +1062,7 @@ export function InfoboardScreen1({
         data-testid={pageIndex === 0 ? "event-list" : `event-list-page-${pageIndex}`}
         data-count={pageItems.length}
         data-density={pageDensity}
+        data-layout-mode={pageLayoutMode}
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];
@@ -1074,7 +1108,7 @@ export function InfoboardScreen1({
         clubName={tenant.name}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
-        weather={weather}
+        weather={showWeather ? weather : null}
         showTime={showTime}
         showDate={showDate}
         staticDateFallback={staticDateLine}

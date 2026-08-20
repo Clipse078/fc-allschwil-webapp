@@ -225,10 +225,12 @@ describe("Header", () => {
     expect(header.contains(safe)).toBe(true);
   });
 
-  it("weather renders inside the canonical right slot (alexa-safe-zone) when provided", () => {
+  it("weather renders inside the canonical weather-zone (not alexa-safe-zone) when provided", () => {
     render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    const weatherZone = screen.getByTestId("weather-zone");
+    expect(within(weatherZone).getByTestId("header-weather-temperature")).toBeTruthy();
     const safe = screen.getByTestId("alexa-safe-zone");
-    expect(within(safe).getByTestId("header-weather-temperature")).toBeTruthy();
+    expect(safe.textContent?.trim()).toBe("");
   });
 
   it("renders club logo when branding.clubLogoSrc provided", () => {

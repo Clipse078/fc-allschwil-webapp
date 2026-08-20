@@ -282,65 +282,72 @@ export function KioskShellHeader({
           </div>
         </div>
 
-        {/* TIME */}
-        <div
-          data-testid="header-time-zone"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            alignSelf: "center",
-            height: "72%",
-            paddingLeft: "clamp(18px, 1.5vw, 28px)",
-            paddingRight: "clamp(18px, 1.5vw, 28px)",
-            borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
-          }}
-        >
-          {initialTimeIso != null && showTime ? (
-            <LiveClockScreen1
-              initialTimeIso={initialTimeIso}
-              timezone={timezone}
-              showTime={true}
-              showDate={false}
-              mode="time"
-            />
-          ) : null}
-        </div>
+        {/*
+         * TIME + DATE — wrapped in a display:contents container so the grid
+         * treats TIME and DATE as direct grid items while the wrapper element
+         * remains in the DOM for tests (data-testid="header-center").
+         */}
+        <div data-testid="header-center" style={{ display: "contents" }}>
+          {/* TIME */}
+          <div
+            data-testid="header-time-zone"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "center",
+              height: "72%",
+              paddingLeft: "clamp(18px, 1.5vw, 28px)",
+              paddingRight: "clamp(18px, 1.5vw, 28px)",
+              borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
+            }}
+          >
+            {initialTimeIso != null && showTime ? (
+              <LiveClockScreen1
+                initialTimeIso={initialTimeIso}
+                timezone={timezone}
+                showTime={true}
+                showDate={false}
+                mode="time"
+              />
+            ) : null}
+          </div>
 
-        {/* DATE */}
-        <div
-          data-testid="header-date-zone"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            alignSelf: "center",
-            height: "72%",
-            paddingLeft: "clamp(18px, 1.5vw, 28px)",
-            paddingRight: "clamp(18px, 1.5vw, 28px)",
-            borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
-          }}
-        >
-          {initialTimeIso != null && showDate ? (
-            <LiveClockScreen1
-              initialTimeIso={initialTimeIso}
-              timezone={timezone}
-              showTime={false}
-              showDate={true}
-              mode="date"
-            />
-          ) : staticDateFallback != null && showDate ? (
-            <span
-              style={{
-                fontSize: "clamp(0.7rem, 0.9vw, 1rem)",
-                letterSpacing: "0.06em",
-                color: "rgba(255,255,255,0.55)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {staticDateFallback}
-            </span>
-          ) : null}
+          {/* DATE */}
+          <div
+            data-testid="header-date-zone"
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              alignSelf: "center",
+              height: "72%",
+              paddingLeft: "clamp(18px, 1.5vw, 28px)",
+              paddingRight: "clamp(18px, 1.5vw, 28px)",
+              borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
+            }}
+          >
+            {initialTimeIso != null && showDate ? (
+              <LiveClockScreen1
+                initialTimeIso={initialTimeIso}
+                timezone={timezone}
+                showTime={false}
+                showDate={true}
+                mode="date"
+              />
+            ) : staticDateFallback != null && showDate ? (
+              <span
+                style={{
+                  fontSize: "clamp(0.7rem, 0.9vw, 1rem)",
+                  letterSpacing: "0.06em",
+                  color: "rgba(255,255,255,0.55)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {staticDateFallback}
+              </span>
+            ) : null}
+          </div>
         </div>
         {/* WEATHER — never overlaps Alexa */}
         <div

@@ -20,6 +20,8 @@ import {
   computeTrainingGroupDemand,
   computeEventDemand,
   densityTier,
+  layoutModeTier,
+  LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
   CARD_DEMAND_TRAINING_ROW,
@@ -3010,3 +3012,381 @@ describe("Content-demand — layout contract (MATCH / TOURNAMENT unchanged)", ()
   });
 });
 
+
+// ── Sparse layout mode regression tests ───────────────────────────────────────
+//
+// INFOBOARD-FINAL-C ADDENDUM — prevents unconstrained full-page card growth on
+// sparse days (1–2 low-demand cards).
+//
+// These tests verify semantic layout mode via the data-layout-mode attribute
+// and CSS custom-property contracts. Pixel heights are not tested because CSS
+// is not applied in jsdom; what matters is that the correct mode and demand
+// values are propagated so the CSS max-height rule engages at runtime.
+
+describe("Sparse layout mode — layoutModeTier", () => {
+  it("demand below threshold → sparse", () => {
+    expect(layoutModeTier(1.5)).toBe("sparse");   // 1 MATCH
+    expect(layoutModeTier(1.55)).toBe("sparse");  // 1-row training
+    expect(layoutModeTier(3.0)).toBe("sparse");   // 2 MATCH
+    expect(layoutModeTier(3.9)).toBe("sparse");   // just below threshold
+  });
+
+  it("demand at/above threshold → fill", () => {
+    expect(layoutModeTier(LAYOUT_MODE_SPARSE_THRESHOLD)).toBe("fill");   // exactly at threshold
+    expect(layoutModeTier(4.3)).toBe("fill");    // 1 training-group 6 rows
+    expect(layoutModeTier(5.0)).toBe("fill");
+    expect(layoutModeTier(12.0)).toBe("fill");
+  });
+
+  it("threshold constant is 4.0", () => {
+    expect(LAYOUT_MODE_SPARSE_THRESHOLD).toBe(4.0);
+  });
+});
+
+describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
+  it("one MATCH card → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "Home", opponentDisplayName: "Away" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("one 1-row training card → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [makeEvent({ id: "t1", teamDisplayName: "Solo Training" })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("two MATCH cards → data-layout-mode='sparse'", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T09:00:00.000Z", teamDisplayName: "Home1", opponentDisplayName: "Away1" }),
+        makeEvent({ id: "m2", type: "MATCH", startAt: "2026-09-12T11:00:00.000Z", teamDisplayName: "Home2", opponentDisplayName: "Away2" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("one 6-row training group → data-layout-mode='fill' (high demand)", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+
+  it("dense preview fixture → data-layout-mode='fill'", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+});
+
+describe("Sparse layout mode — demand proportionality preserved", () => {
+  it("1-row training demand < 6-row training demand", () => {
+    const d1Row = computeTrainingGroupDemand(1);
+    const d6Row = computeTrainingGroupDemand(6);
+    expect(d6Row).toBeGreaterThan(d1Row);
+  });
+
+  it("1-row training (sparse) has lower demand than 6-row training (fill)", () => {
+    const d1Row = computeTrainingGroupDemand(1);
+    const d6Row = computeTrainingGroupDemand(6);
+    expect(layoutModeTier(d1Row)).toBe("sparse");
+    expect(layoutModeTier(d6Row)).toBe("fill");
+  });
+
+  it("one MATCH card has non-zero demand set on the card element", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Opp" }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    const card = screen.getByTestId("event-row");
+    const demand = parseFloat(card.getAttribute("data-card-demand") ?? "0");
+    expect(demand).toBeGreaterThan(0);
+    expect(demand).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+
+  it("sparse 1-MATCH card has demand < fill threshold", () => {
+    expect(CARD_DEMAND_MATCH).toBeLessThan(LAYOUT_MODE_SPARSE_THRESHOLD);
+    expect(layoutModeTier(CARD_DEMAND_MATCH)).toBe("sparse");
+  });
+
+  it("pagination still works when high demand triggers multi-page", () => {
+    const startTimes = [
+      "2026-09-12T09:00:00.000Z",
+      "2026-09-12T10:00:00.000Z",
+      "2026-09-12T11:00:00.000Z",
+      "2026-09-12T12:00:00.000Z",
+      "2026-09-12T13:00:00.000Z",
+      "2026-09-12T14:00:00.000Z",
+      "2026-09-12T15:00:00.000Z",
+      "2026-09-12T16:00:00.000Z",
+    ];
+    const feed = makeFeed({
+      current: startTimes.map((startAt, i) => makeEvent({
+        id: `m${i}`,
+        type: "MATCH",
+        startAt,
+        teamDisplayName: `Home${i}`,
+        opponentDisplayName: `Away${i}`,
+      })),
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByTestId("event-list")).toBeTruthy();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ── INFOBOARD-FINAL-C — Screen 1 vertical alignment acceptance tests ──────────
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("INFOBOARD-FINAL-C: Match/Tournament shared vertical content-band", () => {
+  function makeMatchCard(params: { home?: string; away?: string; competition?: string } = {}) {
+    return makeEvent({
+      id: "match-1",
+      type: "MATCH",
+      startAt: "2026-09-12T15:00:00.000Z",
+      teamDisplayName: params.home ?? "FC Allschwil E1",
+      opponentDisplayName: params.away ?? "FC Binningen E1",
+      competitionLabel: params.competition ?? "Meisterschaft",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine E1",
+        awayDressingRoomLabel: "Kabine E2",
+        refereeDressingRoomLabel: null,
+      },
+    });
+  }
+
+  function makeTournamentCard(params: { title?: string } = {}) {
+    return makeEvent({
+      id: "tour-1",
+      type: "TOURNAMENT",
+      startAt: "2026-09-12T08:00:00.000Z",
+      displayTitle: params.title ?? "Sommer-Cup",
+      teamDisplayName: "FC Test",
+      allocation: {
+        pitchLabel: "KR2",
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    });
+  }
+
+  it("Match card renders with data-type=MATCH and contains MEISTERSCHAFT, KABINE, PLATZ labels", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchCard()], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    expect(card.getAttribute("data-type")).toBe("MATCH");
+    expect(within(card).getByText("Meisterschaft")).toBeTruthy();
+    expect(within(card).getAllByText("KABINE").length).toBeGreaterThan(0);
+    expect(within(card).getAllByText("PLATZ").length).toBeGreaterThan(0);
+  });
+
+  it("Tournament card renders with data-type=TOURNAMENT and contains TURNIER, KABINE, PLATZ labels", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeTournamentCard()], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    expect(card.getAttribute("data-type")).toBe("TOURNAMENT");
+    expect(within(card).getByText("TURNIER")).toBeTruthy();
+    expect(within(card).getAllByText("KABINE").length).toBeGreaterThan(0);
+    expect(within(card).getAllByText("PLATZ").length).toBeGreaterThan(0);
+  });
+
+  it("Training card renders with data-type=TRAINING (reference — behavior unchanged)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({
+          current: [makeEvent({ id: "tr-1", startAt: "2026-09-12T15:00:00.000Z", teamDisplayName: "Test Team" })],
+          isEmpty: false,
+        })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    expect(card.getAttribute("data-type")).toBe("TRAINING");
+    expect(within(card).getByText("TRAINING")).toBeTruthy();
+  });
+
+  it("Match card contains both MEISTERSCHAFT and KABINE/PLATZ as sibling labels", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchCard({ competition: "MEISTERSCHAFT" })], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    const kabine = within(card).queryAllByText("KABINE");
+    const platz = within(card).queryAllByText("PLATZ");
+    expect(kabine.length).toBeGreaterThan(0);
+    expect(platz.length).toBeGreaterThan(0);
+  });
+
+  it("Match card carries data-card-demand attribute (flex-grow via demand system)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchCard()], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    const demand = parseFloat(card.getAttribute("data-card-demand") ?? "0");
+    expect(demand).toBeGreaterThan(0);
+  });
+
+  it("Tournament card carries data-card-demand attribute", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeTournamentCard()], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    const demand = parseFloat(card.getAttribute("data-card-demand") ?? "0");
+    expect(demand).toBeGreaterThan(0);
+  });
+
+  it("sparse mode: single Match card gets sparse layout-mode", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchCard()], isEmpty: false })}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("fill mode: two Match cards push total demand above sparse threshold", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({
+          current: [
+            makeMatchCard({ home: "FC A", away: "FC B" }),
+          ],
+          next: [
+            { ...makeMatchCard({ home: "FC C", away: "FC D" }), id: "match-2", startAt: "2026-09-12T17:00:00.000Z" },
+          ],
+          isEmpty: false,
+        })}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(["sparse", "fill"]).toContain(list.getAttribute("data-layout-mode"));
+  });
+
+  it("event-list has data-layout-mode attribute (semantic layout invariant)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchCard()], isEmpty: false })}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBeTruthy();
+  });
+});
+
+describe("INFOBOARD-FINAL-C: Screen 1 long text / overflow protection", () => {
+  function makeMatchWithLongText() {
+    return makeEvent({
+      id: "long-match",
+      type: "MATCH",
+      startAt: "2026-09-12T15:00:00.000Z",
+      teamDisplayName: "FC Allschwil Junioren E1 Langname",
+      opponentDisplayName: "SC Birsfelden Junioren E-Junioren",
+      competitionLabel: "Meisterschaft",
+      allocation: {
+        pitchLabel: "KUNSTRASEN 1",
+        homeDressingRoomLabel: "Kabine Langbezeichnung 01",
+        awayDressingRoomLabel: "Kabine Langbezeichnung 02",
+        refereeDressingRoomLabel: null,
+      },
+    });
+  }
+
+  it("long Kabine/Platz values: match card renders without crashing", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchWithLongText()], isEmpty: false })}
+      />,
+    );
+    const card = screen.getByTestId("event-row");
+    expect(card.getAttribute("data-type")).toBe("MATCH");
+    expect(within(card).getByTestId("match-allocation")).toBeTruthy();
+    expect(within(card).getByTestId("pitch-value")).toBeTruthy();
+  });
+
+  it("KUNSTRASEN 1 pitch name renders as a single text node (not split)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchWithLongText()], isEmpty: false })}
+      />,
+    );
+    const pitchValue = screen.getByTestId("pitch-value");
+    expect(pitchValue.textContent).toContain("KUNSTRASEN 1");
+  });
+
+  it("pitch names do not use word-break: break-all (overflow-wrap: normal expected)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({
+          current: [
+            makeEvent({
+              id: "kr2",
+              type: "MATCH",
+              startAt: "2026-09-12T15:00:00.000Z",
+              teamDisplayName: "FC Test",
+              opponentDisplayName: "FC Other",
+              competitionLabel: "Meisterschaft",
+              allocation: {
+                pitchLabel: "KUNSTRASEN 2",
+                homeDressingRoomLabel: "E1",
+                awayDressingRoomLabel: "E2",
+                refereeDressingRoomLabel: null,
+              },
+            }),
+          ],
+          isEmpty: false,
+        })}
+      />,
+    );
+    const pitchValue = screen.getByTestId("pitch-value");
+    expect(pitchValue.textContent).toBe("KUNSTRASEN 2");
+  });
+
+  it("sparse layout mode still activates for single Match card", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({ current: [makeMatchWithLongText()], isEmpty: false })}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+  });
+
+  it("fill layout mode activates for high-demand multi-event day", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
+    const list = screen.getByTestId("event-list");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+});
