@@ -1004,9 +1004,7 @@ export function InfoboardScreen1({
   const showDate = headerConfig?.showDate !== false;
   const showWeather = headerConfig?.showWeather === true;
   const subtitleEnabled = headerConfig?.subtitleEnabled !== false;
-  const subtitleText =
-    headerConfig?.subtitleText?.trim() ||
-    "HEUTE AUF DER SPORTANLAGE";
+  const subtitleText = headerConfig?.subtitleText?.trim() ?? null;
 
   // Club name for prefix stripping (presentation-only)
   const clubNameUpper = tenant.name.toUpperCase();
@@ -1112,7 +1110,7 @@ export function InfoboardScreen1({
         showTime={showTime}
         showDate={showDate}
         staticDateFallback={staticDateLine}
-        subtitle={subtitleText.toUpperCase()}
+        subtitle={subtitleText != null ? subtitleText.toUpperCase() : null}
         subtitleEnabled={subtitleEnabled}
       />
 

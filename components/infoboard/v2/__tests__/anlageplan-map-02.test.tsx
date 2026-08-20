@@ -498,11 +498,22 @@ describe("InfoboardAnlageplan — shared shell", () => {
     expect(screen.getByTestId("kiosk-shell-footer")).toBeTruthy();
   });
 
-  it("shows ANLAGENÜBERSICHT subtitle", () => {
+  it("renders no implicit subtitle when shellConfig is absent (no fallback text)", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
         branding={DEFAULT_BRANDING}
+      />,
+    );
+    expect(screen.queryByTestId("board-title")).toBeNull();
+  });
+
+  it("renders configured subtitleText when shellConfig.subtitleEnabled and subtitleText are set", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={DEFAULT_BRANDING}
+        shellConfig={{ subtitleEnabled: true, subtitleText: "ANLAGENÜBERSICHT" }}
       />,
     );
     const header = screen.getByTestId("kiosk-shell-header");

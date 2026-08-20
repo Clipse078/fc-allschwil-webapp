@@ -297,7 +297,7 @@ describe("Screen 1 — subtitle toggle", () => {
     expect(screen.queryByTestId("board-title")).toBeNull();
   });
 
-  it("subtitleEnabled=true with null text uses default", () => {
+  it("subtitleEnabled=true with null text renders no subtitle (no implicit fallback)", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed()}
@@ -305,7 +305,29 @@ describe("Screen 1 — subtitle toggle", () => {
         headerConfig={{ subtitleEnabled: true, subtitleText: null }}
       />,
     );
-    expect(screen.getByTestId("board-title-text").textContent).toContain("HEUTE AUF DER SPORTANLAGE");
+    expect(screen.queryByTestId("board-title")).toBeNull();
+  });
+
+  it("subtitleEnabled=true with empty string renders no subtitle (no implicit fallback)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed()}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        headerConfig={{ subtitleEnabled: true, subtitleText: "" }}
+      />,
+    );
+    expect(screen.queryByTestId("board-title")).toBeNull();
+  });
+
+  it("subtitleEnabled=true with whitespace-only text renders no subtitle", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed()}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        headerConfig={{ subtitleEnabled: true, subtitleText: "   " }}
+      />,
+    );
+    expect(screen.queryByTestId("board-title")).toBeNull();
   });
 });
 

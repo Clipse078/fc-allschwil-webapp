@@ -85,7 +85,7 @@ export function InfoboardAnlageplan({
   const showDate = shellConfig?.showDate !== false;
   const showWeather = shellConfig?.showWeather === true;
   const subtitleEnabled = shellConfig?.subtitleEnabled !== false;
-  const subtitleText = shellConfig?.subtitleText?.trim() || "ANLAGENÜBERSICHT";
+  const subtitleText = shellConfig?.subtitleText?.trim() ?? null;
   const announcement = shellConfig?.announcement ?? null;
 
   // ── Apply canonical facility hierarchy (groupFacilityPitches) ────────────
@@ -203,7 +203,6 @@ export function InfoboardAnlageplan({
       {/* ── SHARED FOOTER ─────────────────────────────────────────────── */}
       <KioskShellFooter
         productLogoSrc={branding.productLogoSrc}
-        leftLabel={branding.facilityName ?? "SPORTANLAGE"}
         announcement={announcement ?? undefined}
       />
     </div>
