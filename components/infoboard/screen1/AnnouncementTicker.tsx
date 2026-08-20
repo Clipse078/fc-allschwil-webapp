@@ -30,10 +30,8 @@ import styles from "./InfoboardScreen1.module.css";
 const GAP_PX = 96;
 
 /** Scroll speed in pixels per second — tuned for TV-distance readability. */
-const SPEED_PX_PER_S = 70;
+const SPEED_PX_PER_S = 50;
 
-/** Minimum animation duration in seconds (guards against very short overflows). */
-const MIN_DURATION_S = 10;
 
 type AnnouncementTickerProps = {
   text: string;
@@ -78,7 +76,7 @@ export function AnnouncementTicker({ text }: AnnouncementTickerProps) {
 
     if (textW > viewportW) {
       const dist = textW + GAP_PX;
-      const duration = Math.max(MIN_DURATION_S, dist / SPEED_PX_PER_S);
+      const duration = dist / SPEED_PX_PER_S;
       setCssVars({
         "--ticker-dist": `-${dist}px`,
         "--ticker-duration": `${duration}s`,
