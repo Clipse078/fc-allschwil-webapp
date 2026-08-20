@@ -33,6 +33,7 @@ const BOARD_NO_LAYOUT = {
   headerSubtitleText: "Heute auf der Sportanlage",
   headerShowTime: true,
   headerShowDate: true,
+  headerShowWeather: false,
   announcementEnabled: false,
   announcementText: null,
   announcementBgColor: null,
@@ -71,6 +72,7 @@ describe("persistence — save/reload round-trip", () => {
         subtitleText: "Willkommen",
         showTime: false,
         showDate: true,
+        showWeather: false,
       } satisfies HeaderWidgetSettings,
     });
 
@@ -327,6 +329,7 @@ describe("persistence — duplicate preserves layoutJson", () => {
         subtitleText: "Kopiert",
         showTime: true,
         showDate: false,
+        showWeather: false,
       } satisfies HeaderWidgetSettings,
     });
 
@@ -378,6 +381,7 @@ describe("persistence — flat-field sync from widget settings", () => {
           subtitleText: "Test",
           showTime: false,
           showDate: true,
+          showWeather: false,
         } satisfies HeaderWidgetSettings,
       }),
       "ANNOUNCEMENT",

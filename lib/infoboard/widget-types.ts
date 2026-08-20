@@ -57,6 +57,7 @@ export type HeaderWidgetSettings = {
   subtitleText: string | null;
   showTime: boolean;
   showDate: boolean;
+  showWeather: boolean;
 };
 
 /** Settings for the ACTIVITIES widget (no user-configurable settings in Designer-01) */
@@ -128,6 +129,7 @@ export function getDefaultLayout(board: {
   headerSubtitleText: string | null;
   headerShowTime: boolean;
   headerShowDate: boolean;
+  headerShowWeather: boolean;
   announcementEnabled: boolean;
   announcementText: string | null;
   announcementBgColor: string | null;
@@ -149,6 +151,7 @@ export function getDefaultLayout(board: {
           subtitleText: board.headerSubtitleText,
           showTime: board.headerShowTime,
           showDate: board.headerShowDate,
+          showWeather: board.headerShowWeather,
         } satisfies HeaderWidgetSettings,
       },
       {
@@ -190,6 +193,7 @@ export function parseLayoutJson(
     headerSubtitleText: string | null;
     headerShowTime: boolean;
     headerShowDate: boolean;
+    headerShowWeather: boolean;
     announcementEnabled: boolean;
     announcementText: string | null;
     announcementBgColor: string | null;

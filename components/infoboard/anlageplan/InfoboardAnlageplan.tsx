@@ -40,6 +40,20 @@ import { AnlageplanMapScene } from "./AnlageplanMapScene";
 
 // ── Component props ───────────────────────────────────────────────────────────
 
+export type InfoboardAnlageplanShellConfig = {
+  readonly subtitleEnabled?: boolean;
+  readonly subtitleText?: string | null;
+  readonly showTime?: boolean;
+  readonly showDate?: boolean;
+  readonly showWeather?: boolean;
+  readonly announcement?: {
+    readonly enabled: boolean;
+    readonly text: string | null;
+    readonly backgroundColor?: string | null;
+    readonly textColor?: string | null;
+  } | null;
+};
+
 export type InfoboardAnlageplanProps = {
   payload: AnlageplanLivePayload;
   weather?: WeatherResult | null;
@@ -50,6 +64,7 @@ export type InfoboardAnlageplanProps = {
     clubName?: string | null;
     facilityName?: string | null;
   };
+  shellConfig?: InfoboardAnlageplanShellConfig | null;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -59,10 +74,19 @@ export function InfoboardAnlageplan({
   weather,
   richEventCards = false,
   branding,
+  shellConfig,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
   const bgTransform = payload.backgroundTransform ?? resolveBackgroundTransform(anlageplanConfig);
+
+  // Per-board shell config (all default ON for backward compat)
+  const showTime = shellConfig?.showTime !== false;
+  const showDate = shellConfig?.showDate !== false;
+  const showWeather = shellConfig?.showWeather === true;
+  const subtitleEnabled = shellConfig?.subtitleEnabled !== false;
+  const subtitleText = shellConfig?.subtitleText?.trim() || "ANLAGENÜBERSICHT";
+  const announcement = shellConfig?.announcement ?? null;
 
   // ── Apply canonical facility hierarchy (groupFacilityPitches) ────────────
   // This is the SINGLE canonical call — do not apply hierarchy again in the
@@ -111,13 +135,13 @@ export function InfoboardAnlageplan({
         clubLogoSrc={branding.clubLogoSrc}
         clubName={branding.clubName ?? "FC ALLSCHWIL"}
         facilityLine={branding.facilityName ?? undefined}
-        subtitle="ANLAGENÜBERSICHT"
-        subtitleEnabled
+        subtitle={subtitleText}
+        subtitleEnabled={subtitleEnabled}
         initialTimeIso={currentTimeIso}
         timezone={tz}
-        weather={weather}
-        showTime
-        showDate
+        weather={showWeather ? weather : null}
+        showTime={showTime}
+        showDate={showDate}
       />
 
       {/* ── BODY: full-width map canvas ────────────────────────────────── */}
@@ -161,6 +185,7 @@ export function InfoboardAnlageplan({
       <KioskShellFooter
         productLogoSrc={branding.productLogoSrc}
         leftLabel={branding.facilityName ?? "SPORTANLAGE"}
+        announcement={announcement ?? undefined}
       />
     </div>
   );

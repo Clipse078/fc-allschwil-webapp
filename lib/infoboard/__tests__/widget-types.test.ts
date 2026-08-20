@@ -35,6 +35,7 @@ const BOARD_DEFAULTS = {
   headerSubtitleText: "Heute auf der Sportanlage",
   headerShowTime: true,
   headerShowDate: true,
+  headerShowWeather: false,
   announcementEnabled: false,
   announcementText: null,
   announcementBgColor: null,

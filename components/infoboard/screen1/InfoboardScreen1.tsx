@@ -96,6 +96,7 @@ export type InfoboardScreen1Props = {
     readonly subtitleText?: string | null;
     readonly showTime?: boolean;
     readonly showDate?: boolean;
+    readonly showWeather?: boolean;
   };
 };
 
@@ -971,6 +972,7 @@ export function InfoboardScreen1({
   // Header visibility settings (per-board config or defaults)
   const showTime = headerConfig?.showTime !== false;
   const showDate = headerConfig?.showDate !== false;
+  const showWeather = headerConfig?.showWeather === true;
   const subtitleEnabled = headerConfig?.subtitleEnabled !== false;
   const subtitleText =
     headerConfig?.subtitleText?.trim() ||
@@ -1074,7 +1076,7 @@ export function InfoboardScreen1({
         clubName={tenant.name}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
-        weather={weather}
+        weather={showWeather ? weather : null}
         showTime={showTime}
         showDate={showDate}
         staticDateFallback={staticDateLine}

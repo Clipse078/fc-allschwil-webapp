@@ -170,8 +170,8 @@ describe("InfoboardScreen2Page — /infoboard/screen-2", () => {
       const { default: Page } = await import("../page");
       const { container } = render(await Page());
 
-      // InfoboardAnlageplan shows ANLAGENÜBERSICHT as its subtitle (INFOBOARD-MAP-02)
-      expect(container.textContent).toMatch(/ANLAGENÜBER|ANLAGENUBERSICHT/i);
+      // InfoboardAnlageplan renders the anlageplan-map-canvas (INFOBOARD-MAP-02)
+      expect(container.querySelector('[data-testid="infoboard-anlageplan-root"]')).toBeTruthy();
     });
 
     it("calls buildAnlageplanLivePayload (not buildScreen2LivePayload) for ANLAGENUEBERSICHT", async () => {

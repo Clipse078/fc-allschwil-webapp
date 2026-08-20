@@ -115,7 +115,7 @@ export function HeaderWidgetPanel({
         </div>
       </section>
 
-      {/* ── Wetter (deferred) ────────────────────────────────────────────── */}
+      {/* ── Wetter ───────────────────────────────────────────────────────── */}
       <section aria-labelledby="header-section-weather">
         <p
           id="header-section-weather"
@@ -123,10 +123,13 @@ export function HeaderWidgetPanel({
         >
           Wetter
         </p>
-        <div className="rounded-[var(--radius-md)] border border-dashed border-[var(--border)] bg-[var(--surface-3)] px-3 py-2">
-          <p className="text-[0.74rem] text-[var(--muted)]">
-            Wetter-Widget folgt in einer späteren Version.
-          </p>
+        <div className="space-y-2.5">
+          <Toggle
+            id="header-show-weather"
+            label="Wetter anzeigen"
+            checked={settings.showWeather}
+            onChange={(v) => update({ showWeather: v })}
+          />
         </div>
       </section>
 
