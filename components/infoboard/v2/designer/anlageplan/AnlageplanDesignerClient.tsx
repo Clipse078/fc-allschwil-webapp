@@ -31,8 +31,6 @@ import {
   Trash2,
   Move,
   Save,
-  Plus,
-  MapPin,
   Square,
   Loader2,
   AlertCircle,
@@ -41,6 +39,9 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Settings,
+  Megaphone,
+  Map as MapIcon,
 } from "lucide-react";
 import type { InboardRow } from "@/lib/infoboard/types";
 import type {
@@ -70,6 +71,12 @@ import {
   anlageplanResourceLabel,
   type BackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
+import { HeaderWidgetPanel } from "@/components/infoboard/v2/designer/HeaderWidgetPanel";
+import { AnnouncementWidgetPanel } from "@/components/infoboard/v2/designer/AnnouncementWidgetPanel";
+import type {
+  HeaderWidgetSettings,
+  AnnouncementWidgetSettings,
+} from "@/lib/infoboard/widget-types";
 
 // ── Marker palette — driven by canonical MARKER_ICONS (single source of truth) ─
 
@@ -109,6 +116,12 @@ function clamp(v: number, lo: number, hi: number): number {
 
 // ── Props ──────────────────────────────────────────────────────────────────────
 
+// ── Right-panel tabs ───────────────────────────────────────────────────────────
+
+type RightPanelTab = "ANLAGEPLAN" | "KOPFZEILE" | "HINWEISLEISTE";
+
+// ── Props ──────────────────────────────────────────────────────────────────────
+
 type Props = {
   board: InboardRow;
   onBoardChange?: (updated: InboardRow) => void;
@@ -118,11 +131,18 @@ type Props = {
    * FULL_PITCH/HALF_PITCH types only).
    */
   facilityOptions?: AnlageplanResourceOption[];
+  /** Tenant display name shown in the Header panel (read-only identity section). */
+  tenantName?: string;
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions = [] }: Props) {
+export function AnlageplanDesignerClient({
+  board,
+  onBoardChange,
+  facilityOptions = [],
+  tenantName = "",
+}: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 450 });
 
@@ -138,6 +158,28 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
     const parsed = parseAnlageplanJson(board.anlageplanJson);
     return resolveBackgroundTransform(parsed ?? emptyAnlageplanConfig());
   });
+
+  // ── Shell config state (Header + Announcement) ─────────────────────────────
+  const [headerSettings, setHeaderSettings] = useState<HeaderWidgetSettings>(() => ({
+    subtitleEnabled: board.headerSubtitleEnabled,
+    subtitleText: board.headerSubtitleText,
+    showTime: board.headerShowTime,
+    showDate: board.headerShowDate,
+    showWeather: board.headerShowWeather,
+  }));
+  const [announcementEnabled, setAnnouncementEnabled] = useState<boolean>(
+    board.announcementEnabled,
+  );
+  const [announcementSettings, setAnnouncementSettings] = useState<AnnouncementWidgetSettings>(
+    () => ({
+      text: board.announcementText,
+      bgColor: board.announcementBgColor,
+      textColor: board.announcementTextColor,
+    }),
+  );
+
+  // ── Right-panel tab ────────────────────────────────────────────────────────
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>("ANLAGEPLAN");
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -352,7 +394,24 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
       const res = await fetch(`/api/infoboards/${board.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anlageplanJson: JSON.stringify(configToSave) }),
+        body: JSON.stringify({
+          anlageplanJson: JSON.stringify(configToSave),
+          // Shell config — header
+          headerSubtitleEnabled: headerSettings.subtitleEnabled,
+          headerSubtitleText: headerSettings.subtitleText,
+          headerShowTime: headerSettings.showTime,
+          headerShowDate: headerSettings.showDate,
+          headerShowWeather: headerSettings.showWeather,
+          // Shell config — announcement
+          announcementEnabled,
+          announcementText: announcementEnabled ? (announcementSettings.text ?? null) : null,
+          announcementBgColor: announcementEnabled
+            ? (announcementSettings.bgColor ?? null)
+            : null,
+          announcementTextColor: announcementEnabled
+            ? (announcementSettings.textColor ?? null)
+            : null,
+        }),
       });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
@@ -771,9 +830,92 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
         </p>
       </div>
 
-      {/* ── Right panel: properties ─────────────────────────────────────────── */}
-      <aside className="w-60 shrink-0 overflow-y-auto space-y-4 pl-1">
-        {selectedElement ? (
+      {/* ── Right panel: properties + shell config ─────────────────────────── */}
+      <aside className="w-60 shrink-0 overflow-y-auto space-y-3 pl-1">
+
+        {/* ── Panel tab bar ─────────────────────────────────────────────── */}
+        <div
+          className="flex gap-1 p-1 rounded-[var(--radius-lg)] bg-[var(--surface-3)] border border-[var(--border)]"
+          role="tablist"
+          aria-label="Anzeigebereiche"
+        >
+          <TabButton
+            id="tab-anlageplan"
+            active={rightPanelTab === "ANLAGEPLAN"}
+            onClick={() => setRightPanelTab("ANLAGEPLAN")}
+            icon={<MapIcon className="h-3.5 w-3.5" />}
+            label="Anlage"
+          />
+          <TabButton
+            id="tab-kopfzeile"
+            active={rightPanelTab === "KOPFZEILE"}
+            onClick={() => setRightPanelTab("KOPFZEILE")}
+            icon={<Settings className="h-3.5 w-3.5" />}
+            label="Kopfzeile"
+          />
+          <TabButton
+            id="tab-hinweisleiste"
+            active={rightPanelTab === "HINWEISLEISTE"}
+            onClick={() => setRightPanelTab("HINWEISLEISTE")}
+            icon={<Megaphone className="h-3.5 w-3.5" />}
+            label="Hinweis"
+          />
+        </div>
+
+        {/* ── KOPFZEILE panel ───────────────────────────────────────────── */}
+        {rightPanelTab === "KOPFZEILE" && (
+          <div
+            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+            data-testid="anlageplan-header-panel"
+          >
+            <div className="border-b border-[var(--border)] px-3 py-2 bg-[var(--surface-3)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                Kopfzeile
+              </p>
+            </div>
+            <div className="p-3">
+              <HeaderWidgetPanel
+                settings={headerSettings}
+                tenantName={tenantName}
+                onChange={(updated) => {
+                  setHeaderSettings(updated);
+                  setSaved(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── HINWEISLEISTE panel ───────────────────────────────────────── */}
+        {rightPanelTab === "HINWEISLEISTE" && (
+          <div
+            className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden"
+            data-testid="anlageplan-announcement-panel"
+          >
+            <div className="border-b border-[var(--border)] px-3 py-2 bg-[var(--surface-3)]">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
+                Hinweisleiste
+              </p>
+            </div>
+            <div className="p-3">
+              <AnnouncementWidgetPanel
+                enabled={announcementEnabled}
+                settings={announcementSettings}
+                onEnabledChange={(v) => {
+                  setAnnouncementEnabled(v);
+                  setSaved(false);
+                }}
+                onSettingsChange={(updated) => {
+                  setAnnouncementSettings(updated);
+                  setSaved(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ── ANLAGEPLAN element properties ─────────────────────────────── */}
+        {rightPanelTab === "ANLAGEPLAN" && (selectedElement ? (
           <>
             <PanelSection label="Element">
               <p className="text-[0.72rem] text-[var(--muted)] font-medium">
@@ -1012,9 +1154,42 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
               Klicke auf ein Element im Canvas
             </p>
           </div>
-        )}
+        ))}
       </aside>
     </div>
+  );
+}
+
+// ── TabButton ──────────────────────────────────────────────────────────────────
+
+function TabButton({
+  id,
+  active,
+  onClick,
+  icon,
+  label,
+}: {
+  id: string;
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      id={id}
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-1 rounded-[var(--radius-md)] px-2 py-1.5 text-[0.68rem] font-semibold transition-colors ${
+        active
+          ? "bg-[var(--surface)] text-[var(--foreground)] shadow-sm"
+          : "text-[var(--muted)] hover:text-[var(--foreground)]"
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
