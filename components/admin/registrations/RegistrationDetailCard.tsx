@@ -54,7 +54,7 @@ import {
   STATUS_HERO_CLASS as SHARED_STATUS_HERO_CLASS,
   STATUS_BADGE_CLASS as SHARED_STATUS_BADGE_CLASS,
 } from "@/lib/registrations/status";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
@@ -86,8 +86,10 @@ type RegistrationDetailCardProps = {
   timezone?: string;
   /** Active users available for assignment. */
   assignableUsers?: AssignableUser[];
-  /** Active target groups for routing. */
+  eligibleCoordinators?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -241,7 +243,10 @@ export default function RegistrationDetailCard({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
+  eligibleCoordinators = [],
   targetGroups = [],
+  orgUnits = [],
+  teamSeasons = [],
 }: RegistrationDetailCardProps) {
   const [registration, setRegistration] = useState(initialRegistration);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -423,7 +428,10 @@ export default function RegistrationDetailCard({
             locale={locale}
             timezone={timezone}
             assignableUsers={assignableUsers}
+            eligibleCoordinators={eligibleCoordinators}
             targetGroups={targetGroups}
+            orgUnits={orgUnits}
+            teamSeasons={teamSeasons}
             onUpdate={setRegistration}
           />
 

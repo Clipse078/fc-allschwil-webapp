@@ -60,7 +60,7 @@ import {
   STATUS_BADGE_CLASS,
   STATUS_DOT_CLASS,
 } from "@/lib/registrations/status";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
@@ -70,7 +70,7 @@ const NOT_PROVIDED = "Nicht angegeben";
 
 // Re-exported for backward compatibility — RegistrationInbox.tsx and other
 // call sites import these from here. Source of truth is workflow-types.ts.
-export type { AssignableUser, TargetGroupOption };
+export type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption };
 
 type Props = {
   registration: RegistrationListItem | null;
@@ -84,7 +84,10 @@ type Props = {
   locale?: string;
   timezone?: string;
   assignableUsers?: AssignableUser[];
+  eligibleCoordinators?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
   onClose: () => void;
   onUpdate: (updated: RegistrationListItem) => void;
   /**
@@ -382,7 +385,10 @@ export default function RegistrationDetailDrawer({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
+  eligibleCoordinators = [],
   targetGroups = [],
+  orgUnits = [],
+  teamSeasons = [],
   onClose,
   onUpdate,
   onDeleted,
@@ -676,7 +682,10 @@ export default function RegistrationDetailDrawer({
               locale={locale}
               timezone={timezone}
               assignableUsers={assignableUsers}
+              eligibleCoordinators={eligibleCoordinators}
               targetGroups={targetGroups}
+              orgUnits={orgUnits}
+              teamSeasons={teamSeasons}
               onUpdate={(updated) => {
                 setRegistration(updated);
                 onUpdate(updated);

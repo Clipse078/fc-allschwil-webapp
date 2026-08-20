@@ -10,9 +10,9 @@ import { WaitingListWorkspace } from "@/components/admin/registrations/WaitingLi
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { listEligibleRegistrationCoordinatorsForTenant } from "@/lib/registrations/coordinator-queries";
 import { listWaitingListEntriesForTenant } from "@/lib/registrations/waiting-list-queries";
 import { requireTenantContextForSlug } from "@/lib/tenants/active-tenant";
-import { prisma } from "@/lib/db/prisma";
 import { PageShell } from "@/components/ui/page";
 
 type Props = {
@@ -30,13 +30,9 @@ export default async function WartelistePage({ params }: Props) {
     tenantId,
   );
 
-  const [entries, assignableUsers] = await Promise.all([
+  const [entries, eligibleCoordinators] = await Promise.all([
     listWaitingListEntriesForTenant(tenantSlug),
-    prisma.user.findMany({
-      where: { isActive: true, tenantId },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      select: { id: true, firstName: true, lastName: true, email: true },
-    }),
+    listEligibleRegistrationCoordinatorsForTenant(tenantSlug),
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
@@ -50,7 +46,7 @@ export default async function WartelistePage({ params }: Props) {
         initialEntries={entries}
         canEdit={canEdit}
         canDelete={canDelete}
-        assignableUsers={assignableUsers}
+        eligibleCoordinators={eligibleCoordinators}
         currentUserId={currentUserId}
       />
     </PageShell>

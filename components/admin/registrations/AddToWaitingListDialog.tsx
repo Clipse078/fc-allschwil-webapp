@@ -3,39 +3,28 @@
 /**
  * components/admin/registrations/AddToWaitingListDialog.tsx
  *
- * REG-WAIT-01: Focused dialog for placing a Registration on the Waiting List.
- *
- * Collects:
- *   - scope (TARGET_GROUP | ORG_UNIT | TEAM_SEASON)
- *   - target group / OrgUnit / TeamSeason depending on scope
- *   - responsible coordinator
- *   - priority
- *   - reason
- *   - optional internal note
- *
- * On confirm:
- *   1. POST /api/tenants/{slug}/waiting-list
- *   2. Registration moves to WAITING
- *   3. WaitingListEntry is created
- *   4. Parent gets callback with updated registration
+ * REG-WAIT-01D: Dialog for placing a Registration on the Waiting List.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ClipboardList, Loader2 } from "lucide-react";
 import { Dialog } from "@/components/ui/Dialog";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
-import type { WaitingListScopeType, WaitingListPriority } from "@prisma/client";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
+import { WAITING_LIST_PRIORITY_COLORS } from "@/lib/registrations/waiting-list-ui";
+import { WaitingListCoordinatorPicker } from "./WaitingListCoordinatorPicker";
+import { OrgUnitScopePicker, TeamSeasonScopePicker } from "./WaitingListScopePickers";
+import type { WaitingListPriority, WaitingListScopeType } from "@prisma/client";
 
 type Props = {
   open: boolean;
   onClose: () => void;
   registration: RegistrationListItem;
   tenantSlug: string;
-  assignableUsers: AssignableUser[];
+  eligibleCoordinators: AssignableUser[];
   targetGroups: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
   onSuccess: (updatedRegistration: RegistrationListItem) => void;
 };
 
@@ -53,21 +42,15 @@ const PRIORITY_OPTIONS: { value: WaitingListPriority; label: string; desc: strin
   { value: "URGENT", label: "Dringend", desc: "Sofortiger Handlungsbedarf" },
 ];
 
-const PRIORITY_COLORS: Record<WaitingListPriority, string> = {
-  NORMAL: "border-slate-200 bg-slate-50 text-slate-700",
-  HIGH: "border-amber-200 bg-amber-50 text-amber-700",
-  URGENT: "border-rose-200 bg-rose-50 text-rose-700",
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function AddToWaitingListDialog({
   open,
   onClose,
   registration,
   tenantSlug,
-  assignableUsers,
+  eligibleCoordinators,
   targetGroups,
+  orgUnits: initialOrgUnits = [],
+  teamSeasons: initialTeamSeasons = [],
   onSuccess,
 }: Props) {
   const [scopeType, setScopeType] = useState<WaitingListScopeType>("TARGET_GROUP");
@@ -75,28 +58,63 @@ export function AddToWaitingListDialog({
   const [orgUnitId, setOrgUnitId] = useState<string>("");
   const [teamSeasonId, setTeamSeasonId] = useState<string>("");
   const [priority, setPriority] = useState<WaitingListPriority>("NORMAL");
-  const [responsibleUserId, setResponsibleUserId] = useState<string>(
-    registration.assignedToUserId ?? "",
-  );
+  const [responsibleUserId, setResponsibleUserId] = useState<string>(registration.assignedToUserId ?? "");
   const [reason, setReason] = useState<string>("");
   const [internalNote, setInternalNote] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [orgUnits, setOrgUnits] = useState<OrgUnitOption[]>(initialOrgUnits);
+  const [teamSeasons, setTeamSeasons] = useState<TeamSeasonOption[]>(initialTeamSeasons);
+  const [scopeOptionsLoading, setScopeOptionsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialOrgUnits.length > 0 && initialTeamSeasons.length > 0) {
+      setOrgUnits(initialOrgUnits);
+      setTeamSeasons(initialTeamSeasons);
+      return;
+    }
+
+    let cancelled = false;
+    setScopeOptionsLoading(true);
+
+    fetch(`/api/tenants/${encodeURIComponent(tenantSlug)}/waiting-list/scope-options`, {
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "Auswahloptionen konnten nicht geladen werden.");
+        if (cancelled) return;
+        setOrgUnits(Array.isArray(payload.orgUnits) ? payload.orgUnits : []);
+        setTeamSeasons(Array.isArray(payload.teamSeasons) ? payload.teamSeasons : []);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "Auswahloptionen konnten nicht geladen werden.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setScopeOptionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, tenantSlug, initialOrgUnits, initialTeamSeasons]);
 
   const handleSubmit = async () => {
     setError(null);
 
-    // Client-side scope validation
     if (scopeType === "TARGET_GROUP" && !targetGroupId) {
       setError("Bitte eine Zielgruppe auswählen.");
       return;
     }
     if (scopeType === "ORG_UNIT" && !orgUnitId) {
-      setError("Bitte eine Organisationseinheit angeben.");
+      setError("Bitte eine Abteilung auswählen.");
       return;
     }
     if (scopeType === "TEAM_SEASON" && !teamSeasonId) {
-      setError("Bitte ein Team / eine Saison angeben.");
+      setError("Bitte ein Team / eine Saison auswählen.");
       return;
     }
 
@@ -121,9 +139,7 @@ export function AddToWaitingListDialog({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error ?? "Unbekannter Fehler.");
 
-      // Update the registration to reflect WAITING status
-      const updatedReg: RegistrationListItem = { ...registration, status: "WAITING" };
-      onSuccess(updatedReg);
+      onSuccess({ ...registration, status: "WAITING" });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Fehler beim Erstellen des Wartelisten-Eintrags.");
@@ -147,15 +163,15 @@ export function AddToWaitingListDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="inline-flex items-center h-9 px-4 rounded-lg border border-[var(--border)] bg-white text-sm font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
+            className="inline-flex h-9 items-center rounded-lg border border-[var(--border)] bg-white px-4 text-sm font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
           >
             Abbrechen
           </button>
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={busy}
-            className="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            disabled={busy || scopeOptionsLoading}
+            className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--tenant-primary)] bg-[var(--tenant-primary)] px-4 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <ClipboardList className="h-4 w-4" aria-hidden />}
             Auf Warteliste setzen
@@ -164,15 +180,14 @@ export function AddToWaitingListDialog({
       }
     >
       <div className="space-y-5">
-        {error && (
+        {error ? (
           <div className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
             {error}
           </div>
-        )}
+        ) : null}
 
-        {/* Scope */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Wartelisten-Ebene
           </label>
           <div className="grid grid-cols-3 gap-2">
@@ -181,7 +196,7 @@ export function AddToWaitingListDialog({
                 key={opt.value}
                 type="button"
                 onClick={() => setScopeType(opt.value)}
-                className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-xs font-semibold text-left transition-colors ${
+                className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
                   scopeType === opt.value
                     ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
                     : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]"
@@ -193,10 +208,9 @@ export function AddToWaitingListDialog({
           </div>
         </div>
 
-        {/* Scope-specific picker */}
-        {scopeType === "TARGET_GROUP" && (
+        {scopeType === "TARGET_GROUP" ? (
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
               Zielgruppe <span className="text-rose-500">*</span>
             </label>
             <select
@@ -205,59 +219,58 @@ export function AddToWaitingListDialog({
               className="fca-select text-sm"
             >
               <option value="">— Zielgruppe wählen —</option>
-              {targetGroups.map((tg) => (
-                <option key={tg.id} value={tg.id}>
-                  {tg.name}
+              {targetGroups.map((targetGroup) => (
+                <option key={targetGroup.id} value={targetGroup.id}>
+                  {targetGroup.name}
                 </option>
               ))}
             </select>
-            {targetGroups.length === 0 && (
-              <p className="mt-1 text-xs text-[var(--muted)] italic">
+            {targetGroups.length === 0 ? (
+              <p className="mt-1 text-xs italic text-[var(--muted)]">
                 Keine aktiven Zielgruppen für diesen Mandanten hinterlegt.
               </p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {scopeType === "ORG_UNIT" ? (
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Abteilung <span className="text-rose-500">*</span>
+            </label>
+            {scopeOptionsLoading ? (
+              <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Abteilungen werden geladen…
+              </div>
+            ) : (
+              <OrgUnitScopePicker orgUnits={orgUnits} value={orgUnitId} onChange={setOrgUnitId} />
             )}
           </div>
-        )}
+        ) : null}
 
-        {scopeType === "ORG_UNIT" && (
+        {scopeType === "TEAM_SEASON" ? (
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
-              Abteilung / OrgUnit-ID <span className="text-rose-500">*</span>
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+              Team / Saison <span className="text-rose-500">*</span>
             </label>
-            <input
-              type="text"
-              value={orgUnitId}
-              onChange={(e) => setOrgUnitId(e.target.value)}
-              placeholder="OrgUnit-ID eingeben"
-              className="fca-input text-sm w-full"
-            />
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Die ID der Organisationseinheit aus der Abteilungsverwaltung.
-            </p>
+            {scopeOptionsLoading ? (
+              <div className="flex items-center gap-2 text-xs text-[var(--muted)]">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                Team-Saisons werden geladen…
+              </div>
+            ) : (
+              <TeamSeasonScopePicker
+                teamSeasons={teamSeasons}
+                value={teamSeasonId}
+                onChange={setTeamSeasonId}
+              />
+            )}
           </div>
-        )}
+        ) : null}
 
-        {scopeType === "TEAM_SEASON" && (
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
-              TeamSeason-ID <span className="text-rose-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={teamSeasonId}
-              onChange={(e) => setTeamSeasonId(e.target.value)}
-              placeholder="TeamSeason-ID eingeben"
-              className="fca-input text-sm w-full"
-            />
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Die ID der Saison-Teamzuweisung aus der Teamverwaltung.
-            </p>
-          </div>
-        )}
-
-        {/* Priority */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">
+          <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Priorität
           </label>
           <div className="flex gap-2">
@@ -266,9 +279,9 @@ export function AddToWaitingListDialog({
                 key={opt.value}
                 type="button"
                 onClick={() => setPriority(opt.value)}
-                className={`flex-1 rounded-[var(--radius-md)] border px-3 py-2 text-xs font-semibold text-center transition-colors ${
+                className={`flex-1 rounded-[var(--radius-md)] border px-3 py-2 text-center text-xs font-semibold transition-colors ${
                   priority === opt.value
-                    ? PRIORITY_COLORS[opt.value]
+                    ? WAITING_LIST_PRIORITY_COLORS[opt.value]
                     : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                 }`}
                 title={opt.desc}
@@ -279,28 +292,19 @@ export function AddToWaitingListDialog({
           </div>
         </div>
 
-        {/* Responsible coordinator */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Verantwortliche Koordination
           </label>
-          <select
-            value={responsibleUserId}
-            onChange={(e) => setResponsibleUserId(e.target.value)}
-            className="fca-select text-sm"
-          >
-            <option value="">— Nicht zugewiesen —</option>
-            {assignableUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName}
-              </option>
-            ))}
-          </select>
+          <WaitingListCoordinatorPicker
+            eligibleCoordinators={eligibleCoordinators}
+            selectedUserId={responsibleUserId || null}
+            onSelect={(userId) => setResponsibleUserId(userId ?? "")}
+          />
         </div>
 
-        {/* Reason */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Grund / Bemerkung
           </label>
           <textarea
@@ -308,13 +312,12 @@ export function AddToWaitingListDialog({
             onChange={(e) => setReason(e.target.value)}
             rows={2}
             placeholder="Warum wartet diese Person? (optional)"
-            className="fca-input text-sm w-full resize-none"
+            className="fca-input w-full resize-none text-sm"
           />
         </div>
 
-        {/* Internal note */}
         <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
             Interne Notiz
           </label>
           <textarea
@@ -322,7 +325,7 @@ export function AddToWaitingListDialog({
             onChange={(e) => setInternalNote(e.target.value)}
             rows={2}
             placeholder="Interne Anmerkungen (nur für Koordination sichtbar, optional)"
-            className="fca-input text-sm w-full resize-none"
+            className="fca-input w-full resize-none text-sm"
           />
         </div>
       </div>

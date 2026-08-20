@@ -48,7 +48,7 @@ import {
 import { AddToWaitingListDialog } from "./AddToWaitingListDialog";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import type { PersonMatchCandidate } from "@/lib/registrations/person-match";
 import { classifyRegistration, extractGenderFromPayload, TARGET_GROUP_COLORS } from "@/lib/registrations/classification";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
@@ -63,7 +63,10 @@ type Props = {
   locale?: string;
   timezone?: string;
   assignableUsers: AssignableUser[];
+  eligibleCoordinators?: AssignableUser[];
   targetGroups: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
   onUpdate: (updated: RegistrationListItem) => void;
 };
 
@@ -246,7 +249,10 @@ export default function RegistrationWorkflowPanel({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers,
+  eligibleCoordinators = [],
   targetGroups,
+  orgUnits = [],
+  teamSeasons = [],
   onUpdate,
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -442,8 +448,10 @@ export default function RegistrationWorkflowPanel({
           onClose={() => setShowWaitingListDialog(false)}
           registration={registration}
           tenantSlug={tenantSlug}
-          assignableUsers={assignableUsers}
+          eligibleCoordinators={eligibleCoordinators.length > 0 ? eligibleCoordinators : assignableUsers}
           targetGroups={targetGroups}
+          orgUnits={orgUnits}
+          teamSeasons={teamSeasons}
           onSuccess={(updated) => {
             onUpdate(updated);
             void loadTimeline();

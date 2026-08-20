@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import type { InboxTypeOption } from "@/lib/inbox/types";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import { STATUS_GROUPS, type StatusGroupKey } from "@/lib/registrations/status";
 import { classifyRegistration, extractGenderFromPayload } from "@/lib/registrations/classification";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
@@ -265,7 +265,10 @@ type Props = {
   locale?: string;
   timezone?: string;
   assignableUsers?: AssignableUser[];
+  eligibleCoordinators?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
   /** REGISTRATION-01F — Goal 9: drives the "Assigned to me" filter. */
   currentUserId?: string | null;
 };
@@ -280,7 +283,10 @@ export default function RegistrationInbox({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
+  eligibleCoordinators = [],
   targetGroups = [],
+  orgUnits = [],
+  teamSeasons = [],
   currentUserId = null,
 }: Props) {
   const [registrations, setRegistrations] = useState(initialRegistrations);
@@ -659,7 +665,10 @@ export default function RegistrationInbox({
           locale={locale}
           timezone={timezone}
           assignableUsers={assignableUsers}
+          eligibleCoordinators={eligibleCoordinators}
           targetGroups={targetGroups}
+          orgUnits={orgUnits}
+          teamSeasons={teamSeasons}
           onClose={handleClose}
           onUpdate={handleUpdate}
           onDeleted={handleDeleted}

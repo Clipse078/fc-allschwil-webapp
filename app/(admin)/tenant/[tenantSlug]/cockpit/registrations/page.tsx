@@ -2,6 +2,8 @@ import RegistrationInbox from "@/components/admin/registrations/RegistrationInbo
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { listEligibleRegistrationCoordinatorsForTenant } from "@/lib/registrations/coordinator-queries";
+import { getWaitingListScopeOptionsForTenant } from "@/lib/registrations/waiting-list-scope-options";
 import { listRegistrationsForTenant } from "@/lib/registrations/queries";
 import { requireTenantContextForSlug } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
@@ -33,13 +35,14 @@ export default async function TenantRegistrationsPage({ params }: Props) {
     tenantId,
   );
 
-  const [registrations, assignableUsers, targetGroups] = await Promise.all([
+  const [registrations, assignableUsers, eligibleCoordinators, targetGroups, scopeOptions] = await Promise.all([
     listRegistrationsForTenant(tenantSlug),
     prisma.user.findMany({
       where: { isActive: true, tenantId },
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       select: { id: true, firstName: true, lastName: true, email: true },
     }),
+    listEligibleRegistrationCoordinatorsForTenant(tenantSlug),
     prisma.targetGroup.findMany({
       where: {
         status: "ACTIVE",
@@ -48,6 +51,7 @@ export default async function TenantRegistrationsPage({ params }: Props) {
       orderBy: { name: "asc" },
       select: { id: true, name: true, key: true },
     }),
+    getWaitingListScopeOptionsForTenant(tenantSlug),
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
@@ -69,7 +73,10 @@ export default async function TenantRegistrationsPage({ params }: Props) {
         locale={tenantContext.locale ?? undefined}
         timezone={tenantContext.timezone ?? undefined}
         assignableUsers={assignableUsers}
+        eligibleCoordinators={eligibleCoordinators}
         targetGroups={targetGroups}
+        orgUnits={scopeOptions.orgUnits}
+        teamSeasons={scopeOptions.teamSeasons}
         currentUserId={currentUserId}
       />
     </PageShell>
