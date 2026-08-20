@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/Badge";
 import { PageShell, PageHeader, PageBreadcrumbs, SectionCard } from "@/components/ui/page";
 import { DashboardKpiCard } from "@/components/ui/dashboard/DashboardKpiCard";
+import { FinanzenTabNav } from "@/components/finanzen/FinanzenTabNav";
 
 // ── Demo-only data — never persisted, never DB-backed ─────────────────────────
 
@@ -125,6 +126,8 @@ export default function FinanzenPage() {
           </button>
         </div>
       </div>
+
+      <FinanzenTabNav />
 
       {/* Demo notice */}
       <div className="mb-6 flex items-start gap-3 rounded-xl border border-[var(--sce-warning-light)] bg-[var(--sce-warning-light)] px-4 py-3">
