@@ -160,6 +160,38 @@ function getHeaderContent(pathname: string): HeaderContent {
     return { eyebrow: "Kommunikation", title: "Vorlage", description: "Vorschau und Bearbeitung." };
   }
 
+  if (pathname === "/vereinsleitung/club-entwicklung") {
+    return {
+      eyebrow: "Club Entwicklung",
+      title: "Club Entwicklung",
+      description: "Strategische Steuerung, operative Prozesse und Entwicklungsinitiativen — alles an einem Ort.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/prozesse") {
+    return {
+      eyebrow: "Club Entwicklung",
+      title: "Prozesse & Aufgaben",
+      description: "Wiederkehrende Vereinsprozesse als strukturierte Checklisten — mit Verantwortlichen, Fristen und Fortschrittsverfolgung.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/material") {
+    return {
+      eyebrow: "Material & Inventar",
+      title: "Material & Inventar",
+      description: "Vereinsmaterial, Inventar, Zuweisungen, Standorte und Wartungsstatus im Überblick.",
+    };
+  }
+
+  if (pathname === "/vereinsleitung/finanzen") {
+    return {
+      eyebrow: "Club Entwicklung",
+      title: "Finanzen",
+      description: "Jahresbudget, Ist-Werte, Forecast und offene Posten für die Vereinsfinanzen im Überblick.",
+    };
+  }
+
   if (pathname === "/vereinsleitung" || pathname.startsWith("/vereinsleitung/")) {
     return {
       eyebrow: "Vereinsleitung",

@@ -328,9 +328,42 @@ export const NAV_SECTIONS: NavSection[] = [
         href: "/vereinsleitung/meetings",
       },
       {
-        key: "initiativen",
-        label: "Initiativen",
-        href: "/vereinsleitung/initiativen",
+        // DEMO-LAYER-03: Club Entwicklung umbrella — Pläne & Ziele, Prozesse,
+        // Initiativen. The three sub-capabilities each have their own route;
+        // this entry is the discoverable entry point for the whole area.
+        key: "club-entwicklung",
+        label: "Club Entwicklung",
+        href: "/vereinsleitung/club-entwicklung",
+        children: [
+          {
+            key: "club-entwicklung-ziele",
+            label: "Ziele",
+            href: "/vereinsleitung/targets",
+          },
+          {
+            key: "club-entwicklung-initiativen",
+            label: "Initiativen",
+            href: "/vereinsleitung/initiativen",
+          },
+          {
+            key: "club-entwicklung-prozesse",
+            label: "Prozesse & Aufgaben",
+            href: "/vereinsleitung/prozesse",
+          },
+        ],
+      },
+      {
+        // DEMO-LAYER-03: Material & Inventar — demo-only module.
+        key: "material",
+        label: "Material & Inventar",
+        href: "/vereinsleitung/material",
+      },
+      {
+        // DEMO-LAYER-03: Club-level Finanzen — demo-only module.
+        // Does NOT touch Person-level finance permissions.
+        key: "finanzen",
+        label: "Finanzen",
+        href: "/vereinsleitung/finanzen",
       },
     ],
   },
