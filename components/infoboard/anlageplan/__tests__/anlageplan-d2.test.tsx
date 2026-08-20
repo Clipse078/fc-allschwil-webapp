@@ -331,43 +331,44 @@ describe("C. Designer reachability — AnlageplanDesignerClient", () => {
     vi.stubGlobal("fetch", mockFetch);
   });
 
-  it("renders the right-panel tab bar with Anlage, Kopfzeile, Hinweis tabs", () => {
+  it("renders the left-panel section navigator with Kopfzeile, Anlagenplan, Hinweisleiste sections", () => {
     render(
       <AnlageplanDesignerClient
         board={makeBoard()}
         tenantName="FC Allschwil"
       />,
     );
-    // Tab bar is present
-    const tabBar = document.querySelector("[role='tablist']");
-    expect(tabBar).toBeTruthy();
-    // Kopfzeile tab
-    expect(screen.getByRole("tab", { name: /kopfzeile/i })).toBeTruthy();
-    // Hinweis tab
-    expect(screen.getByRole("tab", { name: /hinweis/i })).toBeTruthy();
+    // Section navigator replaces old right-panel tab bar (D3B UX parity)
+    expect(screen.getByTestId("section-navigator")).toBeTruthy();
+    // Kopfzeile section
+    expect(screen.getByTestId("section-nav-item-kopfzeile")).toBeTruthy();
+    // Hinweisleiste section
+    expect(screen.getByTestId("section-nav-item-hinweisleiste")).toBeTruthy();
+    // Anlagenplan section
+    expect(screen.getByTestId("section-nav-item-anlageplan")).toBeTruthy();
+    // No old tab bar
+    expect(document.querySelector("[role='tablist']")).toBeNull();
   });
 
-  it("clicking Kopfzeile tab reveals header panel", () => {
+  it("clicking Kopfzeile section nav item reveals header panel", () => {
     render(
       <AnlageplanDesignerClient
         board={makeBoard()}
         tenantName="FC Allschwil"
       />,
     );
-    const kopfzeileTab = screen.getByRole("tab", { name: /kopfzeile/i });
-    fireEvent.click(kopfzeileTab);
+    fireEvent.click(screen.getByTestId("section-nav-item-kopfzeile"));
     expect(screen.getByTestId("anlageplan-header-panel")).toBeTruthy();
   });
 
-  it("clicking Hinweis tab reveals announcement panel", () => {
+  it("clicking Hinweisleiste section nav item reveals announcement panel", () => {
     render(
       <AnlageplanDesignerClient
         board={makeBoard()}
         tenantName="FC Allschwil"
       />,
     );
-    const hinweisTab = screen.getByRole("tab", { name: /hinweis/i });
-    fireEvent.click(hinweisTab);
+    fireEvent.click(screen.getByTestId("section-nav-item-hinweisleiste"));
     expect(screen.getByTestId("anlageplan-announcement-panel")).toBeTruthy();
   });
 
@@ -379,12 +380,12 @@ describe("C. Designer reachability — AnlageplanDesignerClient", () => {
       />,
     );
     // Click Kopfzeile
-    fireEvent.click(screen.getByRole("tab", { name: /kopfzeile/i }));
+    fireEvent.click(screen.getByTestId("section-nav-item-kopfzeile"));
     expect(screen.getByTestId("anlageplan-header-panel")).toBeTruthy();
     expect(screen.queryByTestId("anlageplan-announcement-panel")).toBeNull();
 
-    // Click Hinweis
-    fireEvent.click(screen.getByRole("tab", { name: /hinweis/i }));
+    // Click Hinweisleiste
+    fireEvent.click(screen.getByTestId("section-nav-item-hinweisleiste"));
     expect(screen.getByTestId("anlageplan-announcement-panel")).toBeTruthy();
     expect(screen.queryByTestId("anlageplan-header-panel")).toBeNull();
   });

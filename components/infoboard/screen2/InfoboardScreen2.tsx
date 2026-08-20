@@ -522,7 +522,6 @@ export function InfoboardScreen2({
       <KioskShellHeader
         clubLogoSrc={clubLogoSrc}
         clubName={tenant.name}
-        facilityLine={feed.facilityName ?? undefined}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
         showTime={showTime}

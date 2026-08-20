@@ -66,30 +66,22 @@ export function KioskShellFooter({
   }
   const hasInlineStyle = Object.keys(footerInlineStyle).length > 0;
 
+  const layoutStyle: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "0 clamp(12px, 2vw, 32px)",
+    minHeight: "clamp(36px, 4.5vh, 54px)",
+    flexShrink: 0,
+    overflow: "hidden",
+    gap: "1vw",
+  };
+
   return (
     <footer
       data-testid={announcementEnabled ? "announcement-bar" : "kiosk-shell-footer"}
       className="bg-[#0A1828]"
-      style={hasInlineStyle ? {
-        ...footerInlineStyle,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 clamp(12px, 2vw, 32px)",
-        minHeight: "clamp(36px, 4.5vh, 54px)",
-        flexShrink: 0,
-        overflow: "hidden",
-        gap: "1vw",
-      } : {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 clamp(12px, 2vw, 32px)",
-        minHeight: "clamp(36px, 4.5vh, 54px)",
-        flexShrink: 0,
-        overflow: "hidden",
-        gap: "1vw",
-      }}
+      style={hasInlineStyle ? { ...footerInlineStyle, ...layoutStyle } : layoutStyle}
     >
       {/* LEFT: announcement or board label */}
       <div

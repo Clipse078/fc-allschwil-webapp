@@ -134,7 +134,6 @@ export function InfoboardAnlageplan({
       <KioskShellHeader
         clubLogoSrc={branding.clubLogoSrc}
         clubName={branding.clubName ?? "FC ALLSCHWIL"}
-        facilityLine={branding.facilityName ?? undefined}
         subtitle={subtitleText}
         subtitleEnabled={subtitleEnabled}
         initialTimeIso={currentTimeIso}

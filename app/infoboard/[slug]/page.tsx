@@ -29,7 +29,7 @@ import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
-import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { InfoboardAnlageplan, type InfoboardAnlageplanShellConfig } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
@@ -134,9 +134,27 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
         ? FC_ALLSCHWIL_LOGO_SRC
         : null;
 
+    const boardConfig = buildBoardConfig(board);
+    const shellConfig: InfoboardAnlageplanShellConfig = {
+      subtitleEnabled: boardConfig.headerSubtitleEnabled,
+      subtitleText: boardConfig.headerSubtitleText,
+      showTime: boardConfig.headerShowTime,
+      showDate: boardConfig.headerShowDate,
+      showWeather: boardConfig.headerShowWeather,
+      announcement: boardConfig.announcement
+        ? {
+            enabled: boardConfig.announcement.enabled,
+            text: boardConfig.announcement.text,
+            backgroundColor: boardConfig.announcement.backgroundColor,
+            textColor: boardConfig.announcement.textColor,
+          }
+        : null,
+    };
+
     return (
       <InfoboardAnlageplan
         payload={payload}
+        shellConfig={shellConfig}
         branding={{
           clubLogoSrc,
           productLogoSrc: PRODUCT_LOGO_SRC,
