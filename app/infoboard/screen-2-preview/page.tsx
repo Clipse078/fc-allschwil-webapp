@@ -1,83 +1,51 @@
+/**
+ * app/infoboard/screen-2-preview/page.tsx
+ *
+ * PREVIEW-ONLY — Screen 2 / Anlageplan acceptance harness.
+ *
+ * Route: /infoboard/screen-2-preview?scenario=<id>
+ *
+ * Available scenarios:
+ *   alles-frei      — STADION, KR2, KR3 all free
+ *   feld-a-training — KR2 Feld A TRAINING, Feld B free
+ *   feld-b-match    — KR2 Feld A free, Feld B MATCH
+ *   beide-frei      — KR2 Feld A + B both free (one full free pitch)
+ *   beide-belegt    — KR2 Feld A TRAINING, Feld B MATCH
+ *   turnier         — KR3 TURNIER
+ *   mixed-anlage    — STADION MATCH, KR2-A TRAINING, KR2-B FREI, KR3 TURNIER (default)
+ *
+ * Architecture:
+ *   - Server component that reads searchParams.scenario
+ *   - Uses entirely self-contained fixture data — no DB queries
+ *   - Renders the real production InfoboardAnlageplan component
+ *   - Shows a scenario selector panel outside the TV frame
+ *
+ * NOT available in production (notFound() unless NODE_ENV=development or STAGE).
+ */
+
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import Link from "next/link";
 
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { TvScaleWrapper } from "@/components/infoboard/preview/TvScaleWrapper";
 import {
-  PREVIEW_CURRENT_TIME_ISO_S2,
-  PREVIEW_WEATHER,
-} from "@/components/infoboard/screen2/screen2-preview-fixture";
-import { prisma } from "@/lib/db/prisma";
-import { getInfoboardBySlug } from "@/lib/infoboard/queries";
-import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
-import {
-  buildAnlageplanLivePayload,
-  type AnlageplanSourceDatabase,
-} from "@/lib/publishing/infoboard/anlageplan-live-service";
-import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
-import type {
-  InfoboardScreen2Feed,
-  PitchEventSummary,
-  PitchOccupancy,
-} from "@/lib/publishing/event-types";
-import type {
-  Screen2DressingRoomRow,
-  Screen2PitchRow,
-} from "@/lib/publishing/infoboard/screen2-live-service";
+  ACCEPTANCE_SCENARIOS_S2,
+  DEFAULT_SCENARIO_S2,
+  getAcceptancePayloadS2,
+  ACCEPTANCE_CURRENT_TIME_ISO_S2,
+} from "@/components/infoboard/screen2/screen2-acceptance-fixtures";
+import { PREVIEW_WEATHER } from "@/components/infoboard/screen2/screen2-preview-fixture";
 
-const SCREEN_2_SLUG = "screen-2";
+export const metadata: Metadata = {
+  title: "Screen 2 — Acceptance Preview",
+  robots: { index: false, follow: false },
+};
 
-function enrichApprovedPreviewDetails(
-  feed: InfoboardScreen2Feed,
-): InfoboardScreen2Feed {
-  return {
-    ...feed,
-    pitches: feed.pitches.map((pitch) => ({
-      ...pitch,
-      currentEvent: pitch.currentEvent
-        ? {
-            ...pitch.currentEvent,
-            ...(pitch.currentEvent.type === "MATCH"
-              ? {
-                  displayTitle:
-                    "FC Allschwil Junioren C2 vs. FC Therwil C Gelb",
-                  teamDisplayName: "FC Allschwil Junioren C2",
-                  opponentDisplayName: "FC Therwil C Gelb",
-                }
-              : pitch.currentEvent.type === "TOURNAMENT"
-                ? {
-                    displayTitle: "PlayMore Turnier",
-                    teamDisplayName: "PlayMore Turnier",
-                    participantTeamNames: [
-                      "FC Allschwil E2",
-                      "FC Binningen E3",
-                      "FC Oberwil E2",
-                      "FC Therwil E3",
-                      "FC Aesch E2",
-                      "SC Dornach E3",
-                    ],
-                  }
-                : {
-                    teamDisplayName: "Junioren F2",
-                  }),
-          }
-        : null,
-      nextEvent: pitch.nextEvent
-        ? {
-            ...pitch.nextEvent,
-            ...(pitch.nextEvent.type === "MATCH"
-              ? {
-                  teamDisplayName:
-                    pitch.nextEvent.teamDisplayName ??
-                    "FC Allschwil Junioren C2",
-                  opponentDisplayName:
-                    pitch.nextEvent.opponentDisplayName ??
-                    "FC Therwil C Gelb",
-                }
-              : {}),
-          }
-        : null,
-    })),
-  };
-}
+type PageProps = {
+  searchParams: Promise<{ scenario?: string }>;
+};
+
 function previewAllowed(): boolean {
   return (
     process.env.NODE_ENV === "development" ||
@@ -85,467 +53,165 @@ function previewAllowed(): boolean {
   );
 }
 
-function createPreviewDatabase(): AnlageplanSourceDatabase {
-  return {
-    event: {
-      findMany: (args) =>
-        prisma.event.findMany(
-          args as Parameters<typeof prisma.event.findMany>[0],
-        ) as unknown as ReturnType<
-          CanonicalInfoboardPolicyDatabase["event"]["findMany"]
-        >,
-    },
-
-    trainingSession: {
-      findMany: (args) =>
-        prisma.trainingSession.findMany(
-          args as Parameters<typeof prisma.trainingSession.findMany>[0],
-        ) as unknown as ReturnType<
-          CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]
-        >,
-    },
-
-    facilityResource: {
-      findMany: (args) =>
-        prisma.facilityResource.findMany(
-          args as Parameters<typeof prisma.facilityResource.findMany>[0],
-        ) as unknown as Promise<
-          ReadonlyArray<Screen2PitchRow | Screen2DressingRoomRow>
-        >,
-    },
-  };
-}
-
-function normalise(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function pitchIdentity(pitch: PitchOccupancy): string {
-  return normalise(
-    [
-      pitch.code,
-      pitch.displayLabel,
-      pitch.facilityName,
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
-
-function belongsTo(
-  pitch: PitchOccupancy,
-  facility: "STADION" | "KR2" | "KR3",
-): boolean {
-  const identity = pitchIdentity(pitch);
-
-  if (facility === "STADION") {
-    return identity.includes("STADION");
-  }
-
-  if (facility === "KR2") {
-    return (
-      /\bKR\s*2\b/.test(identity) ||
-      identity.includes("KUNSTRASEN 2")
-    );
-  }
-
-  return (
-    /\bKR\s*3\b/.test(identity) ||
-    identity.includes("KUNSTRASEN 3")
-  );
-}
-
-function halfSide(
-  pitch: PitchOccupancy,
-): "A" | "B" | null {
-  if (pitch.resourceType !== "HALF_PITCH") {
-    return null;
-  }
-
-  const identity = pitchIdentity(pitch);
-
-  if (
-    /\bFELD A\b/.test(identity) ||
-    /\bA\b/.test(identity)
-  ) {
-    return "A";
-  }
-
-  if (
-    /\bFELD B\b/.test(identity) ||
-    /\bB\b/.test(identity)
-  ) {
-    return "B";
-  }
-
-  return null;
-}
-
-function findExactlyOne(
-  pitches: readonly PitchOccupancy[],
-  predicate: (pitch: PitchOccupancy) => boolean,
-  description: string,
-): PitchOccupancy {
-  const matches = pitches.filter(predicate);
-
-  if (matches.length !== 1) {
-    throw new Error(
-      `Screen-2 preview expected exactly one ${description}; found ${matches.length}. ` +
-        `Available: ${pitches
-          .map(
-            (pitch) =>
-              `${pitch.code} | ${pitch.displayLabel ?? ""} | ${pitch.resourceType}`,
-          )
-          .join("; ")}`,
-    );
-  }
-
-  return matches[0];
-}
-
-function event(
-  values: Omit<PitchEventSummary, "dressingRooms">,
-): PitchEventSummary {
-  return {
-    ...values,
-    dressingRooms: [],
-  };
-}
-
-function buildPhysicalTvPreviewFeed(
-  base: InfoboardScreen2Feed,
-): InfoboardScreen2Feed {
-  /*
-   * CRITICAL:
-   *
-   * Start from the REAL configured FCA pitch inventory.
-   *
-   * This preserves the exact resource codes used by the persisted
-   * Anlageplan map zones. We overlay occupancy only.
-   *
-   * The production hierarchy remains exclusively owned by
-   * groupFacilityPitches() inside InfoboardAnlageplan.
-   */
-
-  const pitches = base.pitches;
-
-  const stadionFull = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "STADION") &&
-      pitch.resourceType === "FULL_PITCH",
-    "Stadion FULL_PITCH",
-  );
-
-  const kr2Full = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      pitch.resourceType === "FULL_PITCH",
-    "KR2 FULL_PITCH",
-  );
-
-  const kr2A = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      halfSide(pitch) === "A",
-    "KR2 Feld A",
-  );
-
-  const kr2B = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      halfSide(pitch) === "B",
-    "KR2 Feld B",
-  );
-
-  const kr3Full = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      pitch.resourceType === "FULL_PITCH",
-    "KR3 FULL_PITCH",
-  );
-
-  const kr3A = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      halfSide(pitch) === "A",
-    "KR3 Feld A",
-  );
-
-  const kr3B = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      halfSide(pitch) === "B",
-    "KR3 Feld B",
-  );
-
-  const stadionMatch = event({
-    eventId: "preview-tv-match-stadion",
-    displayTitle: "FC Allschwil C2 – FC Therwil C Gelb",
-    teamDisplayName: "FC Allschwil C2",
-    opponentDisplayName: "FC Therwil C Gelb",
-    startAt: "2026-09-12T15:00:00.000Z",
-    endAt: "2026-09-12T16:45:00.000Z",
-    status: "LIVE",
-    type: "MATCH",
-    temporalRelation: "current",
-  });
-
-  const kr2Training = event({
-    eventId: "preview-tv-training-kr2-a",
-    displayTitle: "Junioren F2",
-    teamDisplayName: "Junioren F2",
-    opponentDisplayName: null,
-    startAt: "2026-09-12T15:00:00.000Z",
-    endAt: "2026-09-12T16:30:00.000Z",
-    status: "LIVE",
-    type: "TRAINING",
-    temporalRelation: "current",
-  });
-
-  const kr3Tournament = event({
-    eventId: "preview-tv-tournament-kr3-b",
-    displayTitle: "Kinderfussball E-Junioren Turnier",
-    teamDisplayName: "FC Allschwil Junioren E",
-    opponentDisplayName: null,
-    startAt: "2026-09-12T15:00:00.000Z",
-    endAt: "2026-09-12T17:00:00.000Z",
-    status: "LIVE",
-    type: "TOURNAMENT",
-    temporalRelation: "current",
-  });
-
-  const nextStadionMatch = event({
-    eventId: "preview-tv-next-stadion",
-    displayTitle: "FC Allschwil B1 – FC Oberwil B1",
-    teamDisplayName: "FC Allschwil B1",
-    opponentDisplayName: "FC Oberwil B1",
-    startAt: "2026-09-12T18:00:00.000Z",
-    endAt: "2026-09-12T19:45:00.000Z",
-    status: "SCHEDULED",
-    type: "MATCH",
-    temporalRelation: "next",
-  });
-
-  const nextKr2Training = event({
-    eventId: "preview-tv-next-kr2-b",
-    displayTitle: "Junioren E3",
-    teamDisplayName: "Junioren E3",
-    opponentDisplayName: null,
-    startAt: "2026-09-12T17:00:00.000Z",
-    endAt: "2026-09-12T18:30:00.000Z",
-    status: "SCHEDULED",
-    type: "TRAINING",
-    temporalRelation: "next",
-  });
-
-  const nextKr3Training = event({
-    eventId: "preview-tv-next-kr3-a",
-    displayTitle: "Juniorinnen FF-17",
-    teamDisplayName: "Juniorinnen FF-17",
-    opponentDisplayName: null,
-    startAt: "2026-09-12T17:30:00.000Z",
-    endAt: "2026-09-12T19:00:00.000Z",
-    status: "SCHEDULED",
-    type: "TRAINING",
-    temporalRelation: "next",
-  });
-
-  const previewPitches = pitches.map(
-    (pitch): PitchOccupancy => {
-      /*
-       * Default every real resource to FREE.
-       * Then overlay the exact deterministic physical-TV scenario.
-       */
-      let result: PitchOccupancy = {
-        ...pitch,
-        state: "FREE_NOW",
-        hasAllocationConflict: false,
-        currentEvent: null,
-        nextEvent: null,
-      };
-
-      if (pitch.code === stadionFull.code) {
-        result = {
-          ...result,
-          state: "OCCUPIED_NOW",
-          currentEvent: stadionMatch,
-          nextEvent: nextStadionMatch,
-        };
-      }
-
-      if (pitch.code === kr2A.code) {
-        result = {
-          ...result,
-          state: "OCCUPIED_NOW",
-          currentEvent: kr2Training,
-        };
-      }
-
-      if (pitch.code === kr2B.code) {
-        result = {
-          ...result,
-          state: "UPCOMING",
-          nextEvent: nextKr2Training,
-        };
-      }
-
-      if (pitch.code === kr3A.code) {
-        result = {
-          ...result,
-          state: "UPCOMING",
-          nextEvent: nextKr3Training,
-        };
-      }
-
-      if (pitch.code === kr3B.code) {
-        result = {
-          ...result,
-          state: "OCCUPIED_NOW",
-          currentEvent: kr3Tournament,
-        };
-      }
-
-      /*
-       * Explicitly retain the real FULL resources in the raw feed.
-       * They are intentionally FREE.
-       *
-       * groupFacilityPitches() must suppress KR2/KR3 FULL because
-       * their halves have current events.
-       */
-      if (
-        pitch.code === kr2Full.code ||
-        pitch.code === kr3Full.code
-      ) {
-        result = {
-          ...result,
-          state: "FREE_NOW",
-          currentEvent: null,
-          nextEvent: null,
-        };
-      }
-
-      return result;
-    },
-  );
-
-  return {
-    ...base,
-    generatedAt: PREVIEW_CURRENT_TIME_ISO_S2,
-    displayDate: "2026-09-12",
-    isStale: false,
-    pitches: previewPitches,
-
-    /*
-     * Avoid leaking unrelated live dressing-room/unallocated state
-     * into the deterministic physical-TV preview.
-     */
-    dressingRooms: base.dressingRooms.map((room) => ({
-      ...room,
-      state: "FREE_NOW",
-      current: null,
-      next: null,
-    })),
-    unallocated: [],
-  };
-}
-
-export default async function InfoboardScreen2PreviewPage() {
+export default async function InfoboardScreen2PreviewPage({
+  searchParams,
+}: PageProps) {
   if (!previewAllowed()) {
     notFound();
   }
 
-  const tenant = await resolveKioskTenant();
+  const params = await searchParams;
+  const scenarioId = params.scenario ?? DEFAULT_SCENARIO_S2;
 
-  if (!tenant?.timezone) {
-    notFound();
-  }
+  const payload = getAcceptancePayloadS2(scenarioId);
 
-  const board = await getInfoboardBySlug(
-    SCREEN_2_SLUG,
-    tenant.id,
-  );
-
-  if (
-    !board ||
-    board.status !== "ACTIVE" ||
-    board.templateType !== "ANLAGENUEBERSICHT"
-  ) {
-    notFound();
-  }
-
-  /*
-   * Load the REAL configured Anlageplan and REAL FCA facility
-   * inventory using the production builder.
-   *
-   * Production itself is not modified.
-   */
-  const configuredPayload =
-    await buildAnlageplanLivePayload({
-      board,
-      tenant: {
-        id: tenant.id,
-        key: tenant.key,
-        name: tenant.name,
-        timezone: tenant.timezone,
-        logoUrl: tenant.logoUrl,
-        infoboardDisplayTheme:
-          tenant.infoboardDisplayTheme,
-      },
-      now: new Date(PREVIEW_CURRENT_TIME_ISO_S2),
-      database: createPreviewDatabase(),
-    });
-
-  /*
-   * Preview-only occupancy overlay.
-   *
-   * Crucially, this starts from configuredPayload.screen2.feed,
-   * therefore all pitch identities remain the REAL ones used by
-   * the persisted Anlageplan zones.
-   */
-  const previewFeed =
-    buildPhysicalTvPreviewFeed(
-      configuredPayload.screen2.feed,
-    );
-
-  const payload = {
-    ...configuredPayload,
-    screen2: {
-      ...configuredPayload.screen2,
-      feed: enrichApprovedPreviewDetails(previewFeed),
-      currentTimeIso: PREVIEW_CURRENT_TIME_ISO_S2,
-    },
-    currentTimeIso: PREVIEW_CURRENT_TIME_ISO_S2,
-  };
+  const currentScenario =
+    ACCEPTANCE_SCENARIOS_S2.find((s) => s.id === scenarioId) ??
+    ACCEPTANCE_SCENARIOS_S2[0];
 
   return (
-    <InfoboardAnlageplan
-        payload={payload}
-        weather={PREVIEW_WEATHER}
-        richEventCards
-      branding={{
-        clubLogoSrc:
-          tenant.logoUrl ??
-          "/images/logos/fc-allschwil.png",
-        productLogoSrc:
-          "/images/branding/sportclubevo_logo.png",
-        clubName:
-          tenant.name ?? "FC ALLSCHWIL",
-        facilityName:
-          "SPORTANLAGE IM BRÜEL",
+    <div
+      data-testid="screen2-preview-root"
+      style={{
+        minHeight: "100dvh",
+        background: "#0a0e1a",
+        color: "#e8eef4",
+        fontFamily: "Inter, system-ui, -apple-system, sans-serif",
+        display: "flex",
+        flexDirection: "column",
+        gap: "0.75rem",
+        padding: "0.75rem",
       }}
-      />
+    >
+      {/* ── PREVIEW CONTROLS (outside TV frame) ─────────────────────────── */}
+      <div
+        data-testid="preview-controls"
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "0.5rem 1rem",
+          padding: "0.5rem 0.75rem",
+          background: "rgba(255,255,255,0.04)",
+          borderRadius: "8px",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        {/* Scenario selector */}
+        <div
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "0.35rem",
+            alignItems: "center",
+          }}
+        >
+          <span
+            style={{
+              fontSize: "0.7rem",
+              fontWeight: 600,
+              letterSpacing: "0.12em",
+              color: "rgba(255,255,255,0.45)",
+              textTransform: "uppercase",
+              marginRight: "0.25rem",
+              whiteSpace: "nowrap",
+            }}
+          >
+            SZENARIO:
+          </span>
+          {ACCEPTANCE_SCENARIOS_S2.map((scenario) => {
+            const isActive = scenario.id === scenarioId;
+            return (
+              <Link
+                key={scenario.id}
+                href={`/infoboard/screen-2-preview?scenario=${scenario.id}`}
+                data-testid={`scenario-link-${scenario.id}`}
+                data-active={isActive ? "true" : "false"}
+                style={{
+                  display: "inline-block",
+                  padding: "0.2rem 0.5rem",
+                  borderRadius: "4px",
+                  fontSize: "0.72rem",
+                  fontWeight: isActive ? 700 : 500,
+                  letterSpacing: "0.05em",
+                  textDecoration: "none",
+                  background: isActive
+                    ? "rgba(96, 165, 250, 0.25)"
+                    : "rgba(255,255,255,0.06)",
+                  color: isActive
+                    ? "#93c5fd"
+                    : "rgba(255,255,255,0.6)",
+                  border: isActive
+                    ? "1px solid rgba(96,165,250,0.45)"
+                    : "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                {scenario.label}
+              </Link>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── SCENARIO DESCRIPTION ─────────────────────────────────────────── */}
+      <div
+        data-testid="scenario-description"
+        style={{
+          fontSize: "0.7rem",
+          fontFamily: "ui-monospace, 'SF Mono', Menlo, monospace",
+          color: "rgba(255,255,255,0.45)",
+          padding: "0.3rem 0.75rem",
+          background: "rgba(0,0,0,0.3)",
+          borderRadius: "6px",
+          border: "1px solid rgba(255,255,255,0.06)",
+        }}
+      >
+        <span>
+          Scenario: <strong style={{ color: "#93c5fd" }}>{currentScenario?.label ?? scenarioId}</strong>
+          {" · "}
+          <span>{currentScenario?.description}</span>
+          {" · "}
+          <span style={{ color: "rgba(255,255,255,0.3)" }}>Simplified status contract: FREI · TRAINING · MATCH · TURNIER</span>
+        </span>
+      </div>
+
+      {/* ── TV VIEWPORT LABEL ─────────────────────────────────────────────── */}
+      <div
+        data-testid="tv-viewport-label"
+        style={{
+          fontSize: "0.65rem",
+          color: "rgba(255,255,255,0.3)",
+          letterSpacing: "0.12em",
+          textTransform: "uppercase",
+          paddingLeft: "0.25rem",
+        }}
+      >
+        TV viewport: 1920 × 1080 &nbsp;·&nbsp; Aspect: 16:9
+      </div>
+
+      {/* ── 1920×1080 TV FRAME ────────────────────────────────────────────── */}
+      <div
+        style={{
+          borderRadius: "8px",
+          overflow: "hidden",
+          border: "2px solid rgba(255,255,255,0.10)",
+          flexShrink: 0,
+        }}
+      >
+        <TvScaleWrapper>
+          <InfoboardAnlageplan
+            payload={payload}
+            weather={PREVIEW_WEATHER}
+            richEventCards={false}
+            branding={{
+              clubLogoSrc: "/images/logos/fc-allschwil.png",
+              productLogoSrc: "/images/branding/sportclubevo_logo.png",
+              clubName: "FC ALLSCHWIL",
+              facilityName: "SPORTANLAGE IM BRÜEL",
+            }}
+          />
+        </TvScaleWrapper>
+      </div>
+    </div>
   );
 }

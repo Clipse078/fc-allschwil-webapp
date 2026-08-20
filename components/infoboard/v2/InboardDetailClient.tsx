@@ -371,6 +371,7 @@ export function InboardDetailClient({
             {board.templateType === "ANLAGENUEBERSICHT" ? (
               <AnlageplanDesignerClient
                 board={board}
+                tenantName={tenantName}
                 facilityOptions={facilityOptions}
                 onBoardChange={(updated) => {
                   setBoard(updated);

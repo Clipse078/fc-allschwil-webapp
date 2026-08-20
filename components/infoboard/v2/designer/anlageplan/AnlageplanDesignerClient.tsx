@@ -31,8 +31,6 @@ import {
   Trash2,
   Move,
   Save,
-  Plus,
-  MapPin,
   Square,
   Loader2,
   AlertCircle,
@@ -41,6 +39,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw,
+  Monitor,
 } from "lucide-react";
 import type { InboardRow } from "@/lib/infoboard/types";
 import type {
@@ -70,6 +69,10 @@ import {
   anlageplanResourceLabel,
   type BackgroundTransform,
 } from "@/lib/infoboard/anlageplan-types";
+import {
+  SharedShellSettingsPanel,
+  type SharedShellSettingsValues,
+} from "@/components/infoboard/v2/designer/SharedShellSettingsPanel";
 
 // ── Marker palette — driven by canonical MARKER_ICONS (single source of truth) ─
 
@@ -118,11 +121,16 @@ type Props = {
    * FULL_PITCH/HALF_PITCH types only).
    */
   facilityOptions?: AnlageplanResourceOption[];
+  /**
+   * Tenant display name shown in the Kopfzeile section of the shell settings
+   * panel. Matches the tenantName prop pattern used in InboardDesignerClient.
+   */
+  tenantName?: string;
 };
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions = [] }: Props) {
+export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions = [], tenantName = "" }: Props) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 450 });
 
@@ -137,6 +145,19 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
   const [bgTransform, setBgTransform] = useState<BackgroundTransform>(() => {
     const parsed = parseAnlageplanJson(board.anlageplanJson);
     return resolveBackgroundTransform(parsed ?? emptyAnlageplanConfig());
+  });
+
+  // ── Shared shell settings ─────────────────────────────────────────────────
+  const [shellSettings, setShellSettings] = useState<SharedShellSettingsValues>({
+    headerSubtitleEnabled: board.headerSubtitleEnabled,
+    headerSubtitleText: board.headerSubtitleText,
+    headerShowTime: board.headerShowTime,
+    headerShowDate: board.headerShowDate,
+    headerShowWeather: board.headerShowWeather,
+    announcementEnabled: board.announcementEnabled,
+    announcementText: board.announcementText,
+    announcementBgColor: board.announcementBgColor,
+    announcementTextColor: board.announcementTextColor,
   });
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -349,10 +370,23 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
     setSaving(true);
     setSaveError(null);
     try {
+      const announcementEnabled = shellSettings.announcementEnabled;
       const res = await fetch(`/api/infoboards/${board.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ anlageplanJson: JSON.stringify(configToSave) }),
+        body: JSON.stringify({
+          anlageplanJson: JSON.stringify(configToSave),
+          // Shared shell settings — saved alongside anlageplan config
+          headerSubtitleEnabled: shellSettings.headerSubtitleEnabled,
+          headerSubtitleText: shellSettings.headerSubtitleText,
+          headerShowTime: shellSettings.headerShowTime,
+          headerShowDate: shellSettings.headerShowDate,
+          headerShowWeather: shellSettings.headerShowWeather,
+          announcementEnabled,
+          announcementText: announcementEnabled ? shellSettings.announcementText : null,
+          announcementBgColor: announcementEnabled ? shellSettings.announcementBgColor : null,
+          announcementTextColor: announcementEnabled ? shellSettings.announcementTextColor : null,
+        }),
       });
       if (!res.ok) {
         const d = (await res.json().catch(() => ({}))) as { error?: string };
@@ -576,6 +610,21 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
               </button>
             ))}
           </div>
+        </PanelSection>
+
+        {/* ── Kopfzeile & Hinweisleiste ──────────────────────────────────────
+          * Shared shell settings: subtitle, time, date, weather, announcement.
+          * Saved alongside anlageplanJson in handleSave().
+          */}
+        <PanelSection label="Kopfzeile & Hinweisleiste" icon={<Monitor className="h-3 w-3" />}>
+          <SharedShellSettingsPanel
+            values={shellSettings}
+            tenantName={tenantName}
+            onChange={(updated) => {
+              setShellSettings(updated);
+              setSaved(false);
+            }}
+          />
         </PanelSection>
       </aside>
 
@@ -1022,14 +1071,17 @@ export function AnlageplanDesignerClient({ board, onBoardChange, facilityOptions
 
 function PanelSection({
   label,
+  icon,
   children,
 }: {
   label: string;
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface)] overflow-hidden">
-      <div className="border-b border-[var(--border)] px-3 py-2 bg-[var(--surface-3)]">
+      <div className="border-b border-[var(--border)] px-3 py-2 bg-[var(--surface-3)] flex items-center gap-1.5">
+        {icon && <span className="text-[var(--muted)]">{icon}</span>}
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.10em] text-[var(--muted)]">
           {label}
         </p>

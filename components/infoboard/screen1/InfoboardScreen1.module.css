@@ -373,6 +373,10 @@
   gap: 4px;
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   border-right: 1px solid var(--ib-border);
+  /* Definite height ensures justify-content:center properly distributes space. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .statusLabel {
@@ -421,6 +425,10 @@
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   border-right: 1px solid var(--ib-border);
   min-width: 0;
+  /* Definite height ensures justify-content:center properly distributes space. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .eventTypeLabel {
@@ -537,6 +545,13 @@
   gap: var(--ib-sp-3);
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   min-width: 0;
+  /* Ensure the zone has a definite height so justify-content:center works.
+   * Grid items with align-self:stretch receive the grid area height, but
+   * height:100% explicitly establishes a definite height for the flex
+   * algorithm's justify-content calculation. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .cardDressingRoomZone {
@@ -551,23 +566,35 @@
   font-size: clamp(1.8rem, 3vw, var(--ib-fs-dest-pitch));
   line-height: 0.95;
   white-space: normal;
-  overflow-wrap: break-word;
+  /* Break only at word boundaries (spaces) — never split mid-word.
+   * KUNSTRASEN 1 wraps as "KUNSTRASEN" / "1" at the space, never as
+   * "KUNSTRASE" / "N 1". overflow-wrap: break-word is intentionally
+   * avoided here to prevent character-level fragmentation. */
+  overflow-wrap: normal;
+  word-break: normal;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocation,
 .cardDressingRoomZone .participantAllocationBlock {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocRow,
 .cardDressingRoomZone .participantAllocationRow {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocTeam,
 .cardDressingRoomZone .participantTeamName {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .destinationZone {
   display: flex;
@@ -615,6 +642,11 @@
   text-transform: uppercase;
   color: var(--ib-text);
   line-height: 1;
+  /* Wrap at word boundaries; never split mid-word (e.g., KUNSTRASEN stays intact). */
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: 100%;
 }
 
 .destRoomRow {
@@ -1000,6 +1032,37 @@
   min-width: 0;
 }
 
+/* ─── Sparse layout mode ─────────────────────────────────────────────────────
+ *
+ * When total page demand is LOW (data-layout-mode="sparse"), cards must NOT
+ * absorb all remaining viewport height. A single low-demand MATCH or 1-row
+ * TRAINING card should appear substantial and readable — but not stretched
+ * to fill the entire screen with empty interior.
+ *
+ * Fix:
+ *   max-height: calc(var(--ib-card-demand, 1) * 25vh)
+ *
+ * This cap is demand-proportional so:
+ *   - 1 MATCH (demand 1.5): max ≈ 405px at 1080p (≈43% of content area) ✓
+ *   - 2 MATCH (demand 1.5 each): each ≈ 405px, background visible below ✓
+ *   - 1 TRAINING 1-row (demand 1.55): max ≈ 419px — comfortable ✓
+ *
+ * As demand approaches the fill threshold (4.0), max-height approaches
+ * 100vh — becoming equivalent to no constraint. Continuity is preserved.
+ *
+ * The event list itself (flex: 1) still fills main; only the cards are
+ * bounded. Unused space within the list shows the dark board background
+ * anchored below the activity stack, never centring the cards.
+ *
+ * FILL mode (data-layout-mode="fill") restores unconstrained flex-grow
+ * for dense / ultra pages where every pixel of viewport must be used.
+ * No rule is needed — the default .eventCard behaviour applies.
+ */
+
+.eventList[data-layout-mode="sparse"] .eventCard {
+  max-height: calc(var(--ib-card-demand, 1) * 25vh);
+}
+
 /* ─── Adaptive density tiers ────────────────────────────────────────────────
  *
  * When total content demand on a page is high, the density tier is set via
@@ -1096,15 +1159,24 @@
 
 .trainingGroupPitchValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-dest-pitch);
+  /*
+   * Pitch label wrapping: wrap at word boundaries (spaces) only.
+   * Never split mid-word (e.g., KUNSTRASEN must not become KUNSTRASE/N).
+   * overflow-wrap: normal ensures breaks happen at spaces first; the label
+   * only fragments within a word when there is absolutely no other option.
+   * For standard pitch designations (STADION, KR 1, KUNSTRASEN 2) this
+   * produces legible two-line wrapping when the column is narrow.
+   */
+  font-size: clamp(1.1rem, 1.6vw, var(--ib-fs-dest-pitch));
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   color: var(--ib-text);
-  line-height: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.05;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: 100%;
 }
 
 .trainingGroupRoomValue {
@@ -1172,15 +1244,16 @@
   margin: 0;
   padding: 0;
 }
-/* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT structural TV alignment
+/* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT vertical centering
  *
- * Match and Tournament use one identical two-row zone architecture:
+ * Match and Tournament zones vertically center their [label + content]
+ * block within the available card height. The base flex layout
+ * (justify-content: center) already achieves this; these rules add
+ * precise gap control and prevent overflow.
  *
- *   LABEL
- *   CONTENT
- *
- * This guarantees that MEISTERSCHAFT/TURNIER, KABINE and PLATZ start
- * on the exact same physical baseline regardless of content height.
+ * Cross-zone alignment: all three zones (MEISTERSCHAFT/TURNIER, KABINE,
+ * PLATZ) use the same flex centering, so their content blocks share
+ * approximate vertical positions. No fixed top offsets are used.
  */
 .eventCard[data-type="MATCH"] .cardEventZone,
 .eventCard[data-type="MATCH"] .cardDressingRoomZone,
@@ -1188,51 +1261,59 @@
 .eventCard[data-type="TOURNAMENT"] .cardEventZone,
 .eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
-  justify-content: stretch;
-  row-gap: clamp(6px, 0.65vh, 10px);
+  /* Explicitly restore flex centering that INFOBOARD-TV-UX-04 previously
+   * suppressed by switching to display:grid/align-content:stretch. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(5px, 0.55vh, 8px);
 }
 
+/* Labels: single-line, no overflow into adjacent zones. */
 .eventCard[data-type="MATCH"] .cardEventZone > .eventTypeLabel,
 .eventCard[data-type="MATCH"] .cardDressingRoomZone > .destLabel,
 .eventCard[data-type="MATCH"] .cardPitchZone > .destLabel,
 .eventCard[data-type="TOURNAMENT"] .cardEventZone > .eventTypeLabel,
 .eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone > .destLabel,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destLabel {
-  align-self: start;
-  justify-self: start;
   margin: 0;
   padding: 0;
   line-height: 1;
-  /* Force single-line labels — ensures MEISTERSCHAFT/TURNIER, KABINE, PLATZ
-   * all start at the same vertical position across adjacent cards. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  flex-shrink: 0;
 }
 
-/* Values begin from one common second-row origin. */
+/* Content blocks: contained within their zone, no min-height forcing. */
 .eventCard[data-type="MATCH"] .matchIdentity,
 .eventCard[data-type="MATCH"] .matchAllocation,
 .eventCard[data-type="MATCH"] .cardPitchZone > .destPitchValue,
 .eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
 .eventCard[data-type="TOURNAMENT"] .participantAllocationBlock,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destPitchValue {
-  align-self: start;
   min-width: 0;
+  max-width: 100%;
 }
 
-/* Use Kabine width for the team identity instead of truncating early. */
-.eventCard[data-type="MATCH"] .matchAllocTeam,
+/* Kabine team label: ellipsize rather than overflow across column boundary. */
+.eventCard[data-type="MATCH"] .matchAllocTeam {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  line-height: 1.15;
+}
+
+/* Tournament participant names: controlled wrapping within the zone. */
 .eventCard[data-type="TOURNAMENT"] .participantTeamName,
 .eventCard[data-type="TOURNAMENT"] .tournamentParticipantName {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
   word-break: normal;
   line-height: 1.15;
 }

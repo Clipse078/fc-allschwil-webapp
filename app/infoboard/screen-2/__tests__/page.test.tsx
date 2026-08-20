@@ -127,8 +127,9 @@ const ANLAGEPLAN_BOARD = {
   anlageplanJson: JSON.stringify({ version: 1, elements: [] }),
   anlageplanBackgroundUrl: "https://cdn.example.com/anlageplan.jpg",
   displayTheme: null,
-  headerSubtitleEnabled: false,
-  headerSubtitleText: null,
+  // Subtitle enabled with canonical default text (matches physical-TV accepted visual)
+  headerSubtitleEnabled: true,
+  headerSubtitleText: "ANLAGENÜBERSICHT",
   headerShowTime: true,
   headerShowDate: true,
   headerShowWeather: false,

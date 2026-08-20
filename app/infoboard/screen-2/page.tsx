@@ -56,6 +56,7 @@ import {
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { fetchCurrentWeather } from "@/lib/weather/weather-service";
+import { buildSharedShellConfig } from "@/lib/infoboard/board-config";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
@@ -147,6 +148,7 @@ export default async function InfoboardScreen2Page() {
     return (
       <InfoboardAnlageplan weather={weather}
         payload={payload}
+        shellConfig={buildSharedShellConfig(board)}
         branding={{
           clubLogoSrc,
           productLogoSrc: PRODUCT_LOGO_SRC,
@@ -166,6 +168,10 @@ export default async function InfoboardScreen2Page() {
   //   - The board's templateType is not ANLAGENUEBERSICHT.
   const payload = await buildScreen2LivePayload({ tenant, now, database });
 
+  // Pass shell config when an ACTIVE board with matching slug exists.
+  // When no board exists (legacy path), InfoboardScreen2 uses its own defaults.
+  const shellConfig =
+    board?.status === "ACTIVE" ? buildSharedShellConfig(board) : null;
 
   return (
     <InfoboardScreen2
@@ -174,6 +180,7 @@ export default async function InfoboardScreen2Page() {
       currentTimeIso={payload.currentTimeIso}
       weather={weather}
       theme={payload.theme}
+      shellConfig={shellConfig}
     />
   );
 }
