@@ -38,6 +38,7 @@ vi.mock("@/components/infoboard/screen1/AnnouncementTicker", () => ({
 const BASE_FEED: InfoboardScreen2Feed = {
   generatedAt: "2024-01-01T12:00:00Z",
   displayDate: "2024-01-01",
+  isStale: false,
   tenant: {
     id: "t1",
     key: "fc-allschwil",

@@ -388,7 +388,7 @@ describe("Pitch card — event-type statuses", () => {
     expect(card.getAttribute("data-event-type")).toBe("tournament");
   });
 
-  it("pitch card status shows TRAINING for a training event (simplified status)", () => {
+  it("pitch card status badge renders for occupied pitch", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -414,78 +414,16 @@ describe("Pitch card — event-type statuses", () => {
       />,
     );
     const statusBadge = screen.getByTestId("pitch-card-status");
-    expect(statusBadge.textContent).toContain("TRAINING");
-  });
-
-  it("pitch card status shows MATCH for a match event", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          pitches: [
-            makePitch({
-              state: "OCCUPIED_NOW",
-              currentEvent: {
-                eventId: "e-match",
-                displayTitle: "FC Test – FC Other",
-                teamDisplayName: "FC Test",
-                opponentDisplayName: "FC Other",
-                startAt: "2026-09-12T15:00:00.000Z",
-                endAt: null,
-                status: "LIVE",
-                type: "MATCH",
-                temporalRelation: "current",
-                dressingRooms: [],
-              },
-              nextEvent: null,
-            }),
-          ],
-        })}
-      />,
-    );
-    const statusBadge = screen.getByTestId("pitch-card-status");
-    expect(statusBadge.textContent).toContain("MATCH");
-  });
-
-  it("pitch card status shows TURNIER for a tournament event", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          pitches: [
-            makePitch({
-              state: "OCCUPIED_NOW",
-              currentEvent: {
-                eventId: "e-tour",
-                displayTitle: "Cup",
-                teamDisplayName: "FC Cup",
-                opponentDisplayName: null,
-                startAt: "2026-09-12T14:00:00.000Z",
-                endAt: null,
-                status: "LIVE",
-                type: "TOURNAMENT",
-                temporalRelation: "current",
-                dressingRooms: [],
-              },
-              nextEvent: null,
-            }),
-          ],
-        })}
-      />,
-    );
-    const statusBadge = screen.getByTestId("pitch-card-status");
-    expect(statusBadge.textContent).toContain("TURNIER");
+    expect(statusBadge.textContent).toContain("BELEGT");
   });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Simplified status — orientation-first (INFOBOARD-FINAL-C) ────────────────
+// ── Current + next together (JETZT / DANACH, INFOBOARD-INTEGRATION-01C) ─────
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// Screen 2 shows only FREI / TRAINING / MATCH / TURNIER.
-// No temporal labels (JETZT/DANACH), no team names, no times.
-// The current event determines the status; if absent the pitch is FREI.
 
-describe("Pitch card — simplified orientation-first status", () => {
-  it("pitch with currentEvent TRAINING shows TRAINING status (not JETZT)", () => {
+describe("Pitch card — current and next together", () => {
+  it("renders both JETZT and DANACH blocks when a pitch has current and next events", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -523,17 +461,13 @@ describe("Pitch card — simplified orientation-first status", () => {
         })}
       />,
     );
-    const statusBadge = screen.getByTestId("pitch-card-status");
-    expect(statusBadge.textContent).toContain("TRAINING");
-    // Orientation-first: temporal labels (JETZT/DANACH) are not shown
-    expect(screen.queryByTestId("pitch-card-temporal-current")).toBeNull();
-    expect(screen.queryByTestId("pitch-card-temporal-next")).toBeNull();
-    // Team names are not displayed in pitch cards
-    expect(screen.queryByText("Juniorinnen FF-14")).toBeNull();
-    expect(screen.queryByText("FC Allschwil D1")).toBeNull();
+    expect(screen.getByTestId("pitch-card-temporal-current").textContent).toBe("JETZT");
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
+    expect(screen.getByText("Juniorinnen FF-14")).toBeTruthy();
+    expect(screen.getByText("FC Allschwil D1")).toBeTruthy();
   });
 
-  it("pitch with only a nextEvent shows FREI (pitch is currently free)", () => {
+  it("renders only DANACH when a pitch has only a next event", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -559,54 +493,21 @@ describe("Pitch card — simplified orientation-first status", () => {
         })}
       />,
     );
-    const statusBadge = screen.getByTestId("pitch-card-status");
-    // No current event: pitch is free regardless of upcoming events
-    expect(statusBadge.textContent).toContain("FREI");
     expect(screen.queryByTestId("pitch-card-temporal-current")).toBeNull();
-    expect(screen.queryByTestId("pitch-card-temporal-next")).toBeNull();
+    expect(screen.getByTestId("pitch-card-temporal-next").textContent).toBe("DANACH");
   });
 
-  it("preview fixture: occupied pitches show correct simplified status types", () => {
+  it("preview fixture KR1 pitch shows both JETZT and DANACH", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
-    const statusBadges = screen.getAllByTestId("pitch-card-status");
-    const statusTexts = statusBadges.map((b) => b.textContent ?? "");
-    // Only FREI/TRAINING/MATCH/TURNIER are allowed — no BELEGT, DEMNÄCHST, etc.
-    for (const text of statusTexts) {
-      const allowed = ["FREI", "TRAINING", "MATCH", "TURNIER"];
-      expect(allowed.some((s) => text.includes(s))).toBe(true);
-    }
-    // The preview fixture has a MATCH (Stadion) and a TRAINING (KR1)
-    expect(statusTexts.some((t) => t.includes("MATCH"))).toBe(true);
-    expect(statusTexts.some((t) => t.includes("TRAINING"))).toBe(true);
-  });
-
-  it("temporal labels (JETZT/DANACH) are never rendered in pitch cards", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
-      />,
-    );
-    expect(screen.queryAllByTestId("pitch-card-temporal-current")).toHaveLength(0);
-    expect(screen.queryAllByTestId("pitch-card-temporal-next")).toHaveLength(0);
-  });
-
-  it("no team names are displayed within pitch cards", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
-      />,
-    );
-    const facilityOverview = screen.getByTestId("facility-overview");
-    // Team names from the fixture should not appear in pitch cards
-    expect(within(facilityOverview).queryByText("FC Allschwil E1")).toBeNull();
-    expect(within(facilityOverview).queryByText("FC Binningen E1")).toBeNull();
+    const jetztLabels = screen.getAllByTestId("pitch-card-temporal-current");
+    const danachLabels = screen.getAllByTestId("pitch-card-temporal-next");
+    expect(jetztLabels.length).toBeGreaterThan(0);
+    expect(danachLabels.length).toBeGreaterThan(0);
   });
 });
 
@@ -943,15 +844,16 @@ describe("Dressing-room section", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ── Unallocated section (removed — INFOBOARD-FINAL-C orientation-first) ──────
+// ── Unallocated section (restrained, INFOBOARD-INTEGRATION-01C) ─────────────
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// Screen 2 is orientation-first. The "unallocated" section was detailed event
-// metadata that violated the simplified status contract (FREI/TRAINING/MATCH/
-// TURNIER only). It is no longer rendered. Feed data still accepted for compat.
 
-describe("Unallocated section (removed — orientation-first)", () => {
-  it("does not render unallocated-section even when unallocated data is present", () => {
+describe("Unallocated section", () => {
+  it("does not render unallocated-section when unallocated is empty", () => {
+    render(<InfoboardScreen2 feed={makeFeed({ unallocated: [] })} />);
+    expect(screen.queryByTestId("unallocated-section")).toBeNull();
+  });
+
+  it("renders unallocated-section when an activity has no facility mapping", () => {
     render(
       <InfoboardScreen2
         feed={makeFeed({
@@ -972,22 +874,55 @@ describe("Unallocated section (removed — orientation-first)", () => {
         })}
       />,
     );
-    expect(screen.queryByTestId("unallocated-section")).toBeNull();
+    expect(screen.getByTestId("unallocated-section")).toBeTruthy();
+    expect(screen.getByText("NICHT ZUGETEILT")).toBeTruthy();
+    expect(screen.getByText("Aktive Herren")).toBeTruthy();
   });
 
-  it("does not render unallocated-section when unallocated is empty", () => {
-    render(<InfoboardScreen2 feed={makeFeed({ unallocated: [] })} />);
-    expect(screen.queryByTestId("unallocated-section")).toBeNull();
+  it("renders one unallocated-item per unmapped activity", () => {
+    render(
+      <InfoboardScreen2
+        feed={makeFeed({
+          unallocated: [
+            {
+              eventId: "evt-u1",
+              displayTitle: "Team A",
+              teamDisplayName: "Team A",
+              opponentDisplayName: null,
+              startAt: "2026-09-12T18:00:00.000Z",
+              endAt: null,
+              status: "SCHEDULED",
+              type: "TRAINING",
+              temporalRelation: "next",
+              dressingRooms: [],
+            },
+            {
+              eventId: "evt-u2",
+              displayTitle: "Team B",
+              teamDisplayName: "Team B",
+              opponentDisplayName: null,
+              startAt: "2026-09-12T19:00:00.000Z",
+              endAt: null,
+              status: "SCHEDULED",
+              type: "TRAINING",
+              temporalRelation: "next",
+              dressingRooms: [],
+            },
+          ],
+        })}
+      />,
+    );
+    expect(screen.getAllByTestId("unallocated-item")).toHaveLength(2);
   });
 
-  it("full preview fixture no longer renders unallocated-section", () => {
+  it("full preview fixture renders the unallocated section", () => {
     render(
       <InfoboardScreen2
         feed={PREVIEW_FIXTURE_SCREEN2}
         currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
       />,
     );
-    expect(screen.queryByTestId("unallocated-section")).toBeNull();
+    expect(screen.getByTestId("unallocated-section")).toBeTruthy();
   });
 });
 
@@ -1203,216 +1138,5 @@ describe("13. No visual regression to Screen 1", () => {
     expect(screen.queryByTestId("infoboard-screen1-root")).toBeNull();
     expect(screen.queryByTestId("event-card")).toBeNull();
     expect(screen.queryByTestId("event-list")).toBeNull();
-  });
-});
-
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-FINAL-C — Orientation-first acceptance tests ───────────────────
-// ─────────────────────────────────────────────────────────────────────────────
-
-import {
-  PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV,
-} from "@/components/infoboard/screen2/screen2-preview-fixture";
-
-describe("Orientation-first: whole-pitch when all-free", () => {
-  it("all-free fixture shows all pitch cards as free", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_FREE} />);
-    const cards = screen.getAllByTestId("pitch-card");
-    expect(cards.length).toBeGreaterThan(0);
-    const freeCards = cards.filter((c) => c.getAttribute("data-state") === "free");
-    expect(freeCards.length).toBe(cards.length);
-  });
-
-  it("all-free pitch cards show FREI status", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_FREE} />);
-    const statusBadges = screen.getAllByTestId("pitch-card-status");
-    for (const badge of statusBadges) {
-      expect(badge.textContent).toContain("FREI");
-    }
-  });
-
-  it("pitch names are displayed when all pitches are free", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_FREE} />);
-    // All pitches from the preview fixture should still show their names
-    const names = screen.getAllByTestId("pitch-card-name");
-    expect(names.length).toBeGreaterThan(0);
-    for (const name of names) {
-      expect(name.textContent?.trim().length).toBeGreaterThan(0);
-    }
-  });
-});
-
-describe("Orientation-first: Feld A/B split for HALF_PITCH facilities", () => {
-  it("physical-TV fixture with occupied HALF_PITCH produces pitch-half-pair containers", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const halfPairs = screen.queryAllByTestId("pitch-half-pair");
-    // KR2 and KR3 each have one half occupied → both appear as half-pairs
-    expect(halfPairs.length).toBeGreaterThan(0);
-  });
-
-  it("half-pair contains two pitch-card elements representing the two halves", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const halfPairs = screen.queryAllByTestId("pitch-half-pair");
-    for (const pair of halfPairs) {
-      const halves = within(pair).getAllByTestId("pitch-card");
-      expect(halves.length).toBe(2);
-    }
-  });
-
-  it("Feld A and B have different statuses when one is occupied and one is free", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const halfPairs = screen.queryAllByTestId("pitch-half-pair");
-    expect(halfPairs.length).toBeGreaterThan(0);
-    // At least one pair should have one occupied and one free half
-    const hasMixedPair = halfPairs.some((pair) => {
-      const halves = within(pair).getAllByTestId("pitch-card");
-      const states = halves.map((h) => h.getAttribute("data-state"));
-      return states.includes("occupied") && states.includes("free");
-    });
-    expect(hasMixedPair).toBe(true);
-  });
-
-  it("STADION is shown as a single FULL_PITCH card (not split)", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const allCards = screen.getAllByTestId("pitch-card");
-    // STADION card shows its name
-    const stadionCard = allCards.find((c) =>
-      within(c).queryByTestId("pitch-card-name")?.textContent?.toUpperCase().includes("STADION"),
-    );
-    expect(stadionCard).toBeTruthy();
-    // STADION is not inside a half-pair
-    const halfPairs = screen.queryAllByTestId("pitch-half-pair");
-    for (const pair of halfPairs) {
-      const names = within(pair).queryAllByTestId("pitch-card-name");
-      const pairHasStadion = names.some((n) => n.textContent?.toUpperCase().includes("STADION"));
-      expect(pairHasStadion).toBe(false);
-    }
-  });
-});
-
-describe("Orientation-first: allowed statuses only", () => {
-  const ALLOWED_STATUSES = ["FREI", "TRAINING", "MATCH", "TURNIER"];
-
-  it("status badges only contain allowed values across all-occupied fixture", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_ALL_OCCUPIED} />);
-    const badges = screen.getAllByTestId("pitch-card-status");
-    for (const badge of badges) {
-      const text = badge.textContent ?? "";
-      expect(ALLOWED_STATUSES.some((s) => text.includes(s))).toBe(true);
-    }
-  });
-
-  it("UPCOMING pitch state maps to FREI simplified status", () => {
-    render(
-      <InfoboardScreen2
-        feed={makeFeed({
-          pitches: [
-            makePitch({
-              state: "UPCOMING",
-              currentEvent: null,
-              nextEvent: {
-                eventId: "e-next",
-                displayTitle: "Upcoming Event",
-                teamDisplayName: "Team X",
-                opponentDisplayName: null,
-                startAt: "2026-09-12T20:00:00.000Z",
-                endAt: null,
-                status: "SCHEDULED",
-                type: "TRAINING",
-                temporalRelation: "next",
-                dressingRooms: [],
-              },
-            }),
-          ],
-        })}
-      />,
-    );
-    const badge = screen.getByTestId("pitch-card-status");
-    expect(badge.textContent).toContain("FREI");
-  });
-
-  it("no BELEGT status badge appears anywhere", () => {
-    render(
-      <InfoboardScreen2
-        feed={PREVIEW_FIXTURE_SCREEN2}
-        currentTimeIso={PREVIEW_CURRENT_TIME_ISO_S2}
-      />,
-    );
-    const root = screen.getByTestId("infoboard-screen2-root");
-    const badgesWithBelegt = Array.from(
-      root.querySelectorAll("[data-testid='pitch-card-status']"),
-    ).filter((el) => el.textContent?.includes("BELEGT"));
-    expect(badgesWithBelegt).toHaveLength(0);
-  });
-
-  it("no DEMNÄCHST status badge appears anywhere", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    const root = screen.getByTestId("infoboard-screen2-root");
-    const badgesWithDemnaechst = Array.from(
-      root.querySelectorAll("[data-testid='pitch-card-status']"),
-    ).filter((el) => el.textContent?.includes("DEMNÄCHST"));
-    expect(badgesWithDemnaechst).toHaveLength(0);
-  });
-});
-
-describe("Orientation-first: facility names are present and dominant", () => {
-  it("facility names are present in all pitch regions", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    const nameEls = screen.getAllByTestId("pitch-card-name");
-    expect(nameEls.length).toBeGreaterThan(0);
-    // All pitch cards must have a non-empty name
-    for (const el of nameEls) {
-      expect(el.textContent?.trim().length).toBeGreaterThan(0);
-    }
-  });
-
-  it("Stadion, Kunstrasen 1, Kunstrasen 2, Kunstrasen 3 appear in the preview fixture", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    const root = screen.getByTestId("infoboard-screen2-root");
-    expect(root.textContent).toContain("Stadion");
-    expect(root.textContent).toContain("Kunstrasen 1");
-    expect(root.textContent).toContain("Kunstrasen 2");
-    expect(root.textContent).toContain("Kunstrasen 3");
-  });
-
-  it("facility names in physical-TV fixture are present", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const nameEls = screen.getAllByTestId("pitch-card-name");
-    const allNames = nameEls.map((n) => n.textContent ?? "").join(" ");
-    // Stadion should appear
-    expect(allNames.toUpperCase()).toContain("STADION");
-  });
-});
-
-describe("Orientation-first: no detailed event metadata in pitch cards", () => {
-  it("does not render pitch-card-event testid", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    expect(screen.queryAllByTestId("pitch-card-event")).toHaveLength(0);
-  });
-
-  it("does not render pitch-card-next-event testid", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    expect(screen.queryAllByTestId("pitch-card-next-event")).toHaveLength(0);
-  });
-
-  it("does not render pitch-card-temporal-current or pitch-card-temporal-next", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} />);
-    expect(screen.queryAllByTestId("pitch-card-temporal-current")).toHaveLength(0);
-    expect(screen.queryAllByTestId("pitch-card-temporal-next")).toHaveLength(0);
-  });
-
-  it("InfoboardScreen2 is the orientation renderer (data-testid=infoboard-screen2-root)", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.getByTestId("infoboard-screen2-root")).toBeTruthy();
-  });
-
-  it("groupFacilityPitches is applied: HALF_PITCH hierarchy produces correct visible set", () => {
-    // Physical-TV fixture: KR2 and KR3 have HALF_PITCH entries with current events.
-    // groupFacilityPitches should suppress the FULL_PITCH entries and show halves.
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2_PHYSICAL_TV} />);
-    const cards = screen.getAllByTestId("pitch-card");
-    // Expected: 1 Stadion (FULL) + 2 KR2 halves + 2 KR3 halves = 5
-    // FULL KR2 and FULL KR3 are suppressed by groupFacilityPitches
-    expect(cards.length).toBe(5);
   });
 });

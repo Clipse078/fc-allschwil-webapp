@@ -1,27 +1,23 @@
 /**
  * components/infoboard/screen2/InfoboardScreen2.module.css
  *
- * INFOBOARD-04B: Orientation-first facility diagram design (Screen 2).
- *
- * INFOBOARD-FINAL-C (VISUAL ACCEPTANCE CORRECTIONS V2):
- *   Redesigned from a dashboard of small pitch cards to a spatial
- *   facility diagram where:
- *     - Pitch/facility names are the dominant visual element.
- *     - Status is simplified: FREI / TRAINING / MATCH / TURNIER only.
- *     - No team names, no times, no opponent info.
- *     - HALF_PITCH pairs are shown as halves within one shared pitch region.
- *     - The full content canvas is used; no giant empty voids.
+ * INFOBOARD-04B: Premium dark facility orientation design (Screen 2).
  *
  * Design principles:
- *   - Full dark stadium palette.
- *   - Barlow Condensed for pitch names and status labels.
- *   - Each pitch region is a large visual block with a color fill.
- *   - Status: FREI = green, TRAINING = blue, MATCH = red, TURNIER = orange.
- *   - Physical readability from TV distance (5–8m).
+ *   - Full dark stadium palette — deep navy background, dark card surfaces.
+ *   - Barlow Condensed for dominant headings and status labels.
+ *   - Single-column layout — the facility overview uses the full content
+ *     width (INFOBOARD-INTEGRATION-01C-C1 removed the sponsor/weather
+ *     sidebar; weather now lives compactly in the header).
+ *   - Pitch cards are substantially larger than 04A, filling the facility area.
+ *   - Dressing-room section below pitch grid.
+ *   - Status colors: SPIEL red, TRAINING blue, TURNIER orange, FREI green.
+ *   - No Next Events panel. No sponsor section.
  *   - No scrolling — content must fit within 100dvh.
+ *   - Values must be readable from TV distance (5–8 m).
  */
 
-/* ─── Semantic dark palette ──────────────────────────────────────────────── */
+/* ─── Semantic dark palette (mirrors Screen 1) ───────────────────────────── */
 
 .root {
   /* Page and card backgrounds */
@@ -38,6 +34,7 @@
   --ib2-text:           #E8EEF4;
   --ib2-text-muted:     #6E87A0;
   --ib2-text-dim:       #4A6078;
+  /* Secondary text — opponent name, slightly softer than primary text (theme-aware). */
   --ib2-text-secondary: rgba(232, 238, 244, 0.7);
 
   /* Status colors */
@@ -47,6 +44,8 @@
   --ib2-free:           #1A7A4A;
   --ib2-upcoming:       #1E5BC6;
   --ib2-warning:        #CC8B14;
+
+  /* Sizing (kept for reference; header/footer now use KioskShellHeader/Footer inline styles) */
 
   /* Spacing */
   --ib2-sp-1: 4px;
@@ -59,9 +58,12 @@
 
   /* Typography */
   --ib2-fs-section-label:  clamp(0.65rem, 0.8vw, 0.95rem);
-  --ib2-fs-pitch-name:     clamp(2.2rem, 3.2vw, 4.4rem);
-  --ib2-fs-pitch-status:   clamp(1.4rem, 2vw, 2.8rem);
-  --ib2-fs-half-label:     clamp(0.85rem, 1.1vw, 1.4rem);
+  --ib2-fs-pitch-name:     clamp(1.3rem, 1.8vw, 2.4rem);
+  --ib2-fs-pitch-status:   clamp(0.7rem, 0.9vw, 1.1rem);
+  --ib2-fs-pitch-type:     clamp(0.65rem, 0.82vw, 1rem);
+  --ib2-fs-pitch-title:    clamp(1rem, 1.4vw, 1.9rem);
+  --ib2-fs-pitch-opponent: clamp(0.8rem, 1.1vw, 1.5rem);
+  --ib2-fs-pitch-time:     clamp(0.85rem, 1.1vw, 1.4rem);
 
   --ib2-fs-dr-title:       clamp(0.65rem, 0.8vw, 0.95rem);
   --ib2-fs-dr-code:        clamp(0.95rem, 1.3vw, 1.7rem);
@@ -73,7 +75,11 @@
   --ib2-radius-xs:         3px;
 }
 
-/* ─── Light theme palette ────────────────────────────────────────────────── */
+/* ─── Light theme palette (INFOBOARD-INTEGRATION-01C) ───────────────────────
+ * Same warm/neutral bright daytime palette introduced for Screen 1
+ * (INFOBOARD-INTEGRATION-01B) — identical layout, identical information
+ * hierarchy, only color tokens are redefined. No second theme system.
+ * ────────────────────────────────────────────────────────────────────────── */
 
 .root[data-theme="light"] {
   --ib2-page-bg:        #F4EFE6;
@@ -111,7 +117,11 @@
   overflow: hidden;
 }
 
-/* ─── Header weather (compact) ───────────────────────────────────────────── */
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+/* Header is now the canonical KioskShellHeader (inline styles). No
+   Screen-2-specific header CSS remains. */
+
+/* ─── Header weather (compact — placed in KioskShellHeader rightContent slot) */
 
 .headerWeather {
   display: flex;
@@ -186,6 +196,8 @@
   min-height: 0;
 }
 
+/* ─── Facility column (full width — INFOBOARD-INTEGRATION-01C-C1) ────────── */
+
 .facilityColumn {
   display: flex;
   flex-direction: column;
@@ -195,14 +207,30 @@
   overflow: hidden;
 }
 
+/* ─── Facility section ───────────────────────────────────────────────────── */
+
 .facilitySection {
   display: flex;
   flex-direction: column;
+  gap: var(--ib2-sp-2);
   flex: 1;
   min-height: 0;
 }
 
-/* ─── Pitch grid — spatial facility diagram ──────────────────────────────── */
+.facilitySectionTitle {
+  padding: 0 var(--ib2-sp-1);
+  flex-shrink: 0;
+}
+
+.sectionLabel {
+  font-size: var(--ib2-fs-section-label);
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+/* ─── Pitch grid ─────────────────────────────────────────────────────────── */
 
 .pitchGrid {
   display: grid;
@@ -212,19 +240,19 @@
   min-height: 0;
 }
 
-/* 1 facility: full width */
+/* 1 pitch: full width */
 .pitchGrid[data-count="1"] {
   grid-template-columns: 1fr;
 }
 
-/* 3 facilities: first two side-by-side, third spans full width at bottom */
-.pitchGrid[data-count="3"] > *:last-child {
-  grid-column: 1 / -1;
+/* 3 pitches: 2-1 layout */
+.pitchGrid[data-count="3"] {
+  grid-template-columns: 1fr 1fr;
 }
 
-/* 4+ facilities: 2-column equal grid */
-.pitchGrid[data-count="4"] {
-  grid-template-columns: repeat(2, 1fr);
+.pitchGrid[data-count="3"] .pitchCard:last-child {
+  grid-column: 1 / -1;
+  max-height: 40%;
 }
 
 .pitchGridEmpty {
@@ -244,143 +272,212 @@
   color: var(--ib2-text-dim);
 }
 
-/* ─── Pitch card — spatial facility region ───────────────────────────────── */
+/* ─── Pitch card ─────────────────────────────────────────────────────────── */
 
 .pitchCard {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-end;
-  gap: clamp(8px, 1.2vh, 16px);
+  gap: var(--ib2-sp-2);
   background: var(--ib2-card-bg);
   border: 1px solid var(--ib2-border);
   border-radius: var(--ib2-radius);
-  padding: clamp(16px, 2.4vh, 32px) clamp(18px, 2.2vw, 32px);
+  padding: clamp(14px, 2vh, 28px) clamp(16px, 2vw, 28px);
   position: relative;
   overflow: hidden;
   min-height: 0;
-  /* Color-fill accent via a large subtle gradient behind content */
 }
 
-/* Status-driven left stripe */
+/* Left color stripe based on state */
 .pitchCard::before {
   content: "";
   position: absolute;
   left: 0;
   top: 0;
   bottom: 0;
-  width: clamp(6px, 0.7vw, 10px);
+  width: 5px;
   background: var(--ib2-border);
   border-radius: var(--ib2-radius) 0 0 var(--ib2-radius);
 }
 
-/* Status-driven background tint — subtle area fill */
-.pitchCard[data-simplified-status="frei"]::after,
-.pitchCard[data-simplified-status="training"]::after,
-.pitchCard[data-simplified-status="match"]::after,
-.pitchCard[data-simplified-status="turnier"]::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  border-radius: inherit;
+.pitchCard[data-state="occupied"]::before,
+.pitchCard[data-event-type="match"]::before {
+  background: var(--ib2-match);
 }
 
-.pitchCard[data-simplified-status="frei"]::before    { background: var(--ib2-free); }
-.pitchCard[data-simplified-status="training"]::before { background: var(--ib2-training); }
-.pitchCard[data-simplified-status="match"]::before   { background: var(--ib2-match); }
-.pitchCard[data-simplified-status="turnier"]::before { background: var(--ib2-tournament); }
-
-.pitchCard[data-simplified-status="frei"]::after    { background: rgba(26, 122, 74, 0.07); }
-.pitchCard[data-simplified-status="training"]::after { background: rgba(30, 91, 198, 0.07); }
-.pitchCard[data-simplified-status="match"]::after   { background: rgba(216, 48, 51, 0.07); }
-.pitchCard[data-simplified-status="turnier"]::after { background: rgba(232, 124, 36, 0.07); }
-
-/* Half label (FELD A / FELD B) inside a half-pair region */
-.pitchHalfLabel {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib2-fs-half-label);
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ib2-text-muted);
-  line-height: 1;
+.pitchCard[data-event-type="training"]::before {
+  background: var(--ib2-training);
 }
 
-/* Pitch / facility name — dominant element */
+.pitchCard[data-event-type="tournament"]::before {
+  background: var(--ib2-tournament);
+}
+
+.pitchCard[data-state="upcoming"]::before {
+  background: var(--ib2-upcoming);
+  opacity: 0.6;
+}
+
+.pitchCard[data-state="free"]::before {
+  background: var(--ib2-free);
+}
+
 .pitchCardName {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib2-fs-pitch-name);
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ib2-text);
-  line-height: 0.95;
-  word-break: normal;
-  overflow-wrap: normal;
+  line-height: 1;
+  padding-left: 10px;
 }
 
-/* Simplified status label */
 .pitchCardStatus {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: var(--ib2-radius-xs);
   font-size: var(--ib2-fs-pitch-status);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1;
+  width: fit-content;
+  margin-left: 10px;
+}
+
+.pitchCardStatus[data-state="occupied"] {
+  background: rgba(216, 48, 51, 0.18);
+  color: #f07072;
+  border: 1px solid rgba(216, 48, 51, 0.3);
+}
+
+.pitchCardStatus[data-state="free"] {
+  background: rgba(26, 122, 74, 0.18);
+  color: #4caf83;
+  border: 1px solid rgba(26, 122, 74, 0.3);
+}
+
+.pitchCardStatus[data-state="upcoming"] {
+  background: rgba(30, 91, 198, 0.18);
+  color: #6a9cec;
+  border: 1px solid rgba(30, 91, 198, 0.3);
+}
+
+.pitchCardStatus[data-state="unknown"] {
+  background: rgba(204, 139, 20, 0.18);
+  color: #e0ab45;
+  border: 1px solid rgba(204, 139, 20, 0.3);
+}
+
+.pitchCardEvent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  margin-top: auto;
+}
+
+/* Second (DANACH) block — same structure, visually subdued relative to JETZT. */
+.pitchCardNextEvent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 10px;
+  padding-top: var(--ib2-sp-2);
+  margin-top: var(--ib2-sp-1);
+  border-top: 1px solid var(--ib2-border);
+  opacity: 0.82;
+}
+
+.pitchCardEventHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib2-sp-2);
+}
+
+.pitchCardTemporalLabel {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib2-fs-pitch-type);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pitchCardTemporalLabel[data-status="current"] {
+  color: var(--ib2-match);
+}
+
+.pitchCardTemporalLabel[data-status="next"] {
+  color: var(--ib2-training);
+}
+
+.pitchCardEventType {
+  font-size: var(--ib2-fs-pitch-type);
+  font-weight: 700;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   line-height: 1;
 }
 
-.pitchCardStatus[data-simplified-status="frei"]    { color: #4caf83; }
-.pitchCardStatus[data-simplified-status="training"] { color: #6a9cec; }
-.pitchCardStatus[data-simplified-status="match"]   { color: #f07072; }
-.pitchCardStatus[data-simplified-status="turnier"] { color: #e0ab45; }
+.pitchCardEventType[data-event-type="match"]      { color: rgba(216, 48, 51, 0.85); }
+.pitchCardEventType[data-event-type="training"]   { color: rgba(30, 91, 198, 0.85); }
+.pitchCardEventType[data-event-type="tournament"] { color: rgba(232, 124, 36, 0.85); }
 
-/* Free state — FREI fills the region, visually dominant */
+.pitchCardEventTitle {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib2-fs-pitch-title);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--ib2-text);
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pitchCardEventOpponent {
+  font-size: var(--ib2-fs-pitch-opponent);
+  font-weight: 500;
+  color: var(--ib2-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pitchCardEventTime {
+  font-size: var(--ib2-fs-pitch-time);
+  font-weight: 500;
+  color: var(--ib2-text-muted);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pitchCardEventEndTime {
+  color: var(--ib2-text-dim);
+}
+
 .pitchCardFree {
-  position: absolute;
-  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  pointer-events: none;
+  flex: 1;
+  padding-left: 10px;
 }
 
 .pitchCardFreeLine {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(3rem, 5vw, 7rem);
+  font-size: clamp(1.1rem, 1.6vw, 2.2rem);
   font-weight: 700;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(26, 122, 74, 0.18);
-}
-
-/* ─── Half-pitch pair container ──────────────────────────────────────────── */
-
-.pitchHalfPair {
-  display: flex;
-  flex-direction: column;
-  gap: var(--ib2-sp-2);
-  min-height: 0;
-  overflow: hidden;
-}
-
-.pitchHalfPairName {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.85rem, 1.1vw, 1.4rem);
-  font-weight: 700;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ib2-text-dim);
-  line-height: 1;
-  padding: 0 clamp(4px, 0.5vw, 8px);
-}
-
-.pitchHalfPairGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--ib2-sp-2);
-  flex: 1;
-  min-height: 0;
+  color: rgba(26, 122, 74, 0.6);
 }
 
 /* ─── Dressing-room section ──────────────────────────────────────────────── */
@@ -470,6 +567,87 @@
   line-height: 1.1;
 }
 
+.dressingRoomEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--ib2-sp-3);
+}
+
+.dressingRoomEmptyText {
+  font-size: clamp(0.7rem, 0.9vw, 1.1rem);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+/* ─── Unallocated section (restrained — never a warning banner) ─────────── */
+
+.unallocatedSection {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--ib2-sp-2) var(--ib2-sp-4);
+  flex-shrink: 0;
+  padding: clamp(6px, 1vh, 10px) clamp(14px, 1.8vw, 22px);
+  border: 1px dashed var(--ib2-warning);
+  border-radius: var(--ib2-radius-sm);
+  background: rgba(204, 139, 20, 0.08);
+}
+
+.unallocatedTitle {
+  font-size: var(--ib2-fs-dr-title);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ib2-warning);
+  flex-shrink: 0;
+}
+
+.unallocatedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ib2-sp-1) var(--ib2-sp-4);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.unallocatedItem {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ib2-sp-2);
+  font-size: clamp(0.75rem, 0.95vw, 1.15rem);
+  color: var(--ib2-text-muted);
+  white-space: nowrap;
+}
+
+.unallocatedTime {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-weight: 700;
+  color: var(--ib2-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.unallocatedType {
+  font-size: 0.85em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ib2-text-dim);
+}
+
+.unallocatedName {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* ─── Footer ─────────────────────────────────────────────────────────────── */
+/* Footer is now the canonical KioskShellFooter (inline styles). No
+   Screen-2-specific footer CSS remains. */
+
 /* ─── Responsive: 1280×720 ───────────────────────────────────────────────── */
 
 @media (max-width: 1366px) {
@@ -478,9 +656,11 @@
   }
 
   .pitchCard {
-    padding: clamp(12px, 1.8vh, 24px) clamp(14px, 1.6vw, 22px);
+    padding: clamp(10px, 1.5vh, 18px) clamp(12px, 1.5vw, 18px);
   }
 
+  /* At reduced widths, drop the MeteoSwiss attribution line and narrow the
+     condition text in the compact weather block in the header right slot. */
   .headerWeatherAttribution {
     display: none;
   }

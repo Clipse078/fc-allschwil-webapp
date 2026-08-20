@@ -95,9 +95,25 @@ export function AnlageplanMapScene({
 
   return (
     <>
-      {/* No empty-state overlay when background is absent: the dark canvas
-          itself provides the spatial context for zone overlays. A floating
-          text label adds no navigation value and is intentionally removed. */}
+      {/* Empty state overlay (no background) */}
+      {!backgroundUrl && (
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "rgba(255,255,255,0.12)",
+            fontSize: "clamp(10px, 1.4vh, 18px)",
+            letterSpacing: "0.18em",
+            zIndex: 0,
+            pointerEvents: "none",
+          }}
+        >
+          ANLAGEPLAN
+        </div>
+      )}
 
       {/*
        * Shared map scene container — background image + all overlays live

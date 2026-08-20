@@ -47,6 +47,7 @@ const BASE_PAYLOAD: AnlageplanLivePayload = {
     feed: {
       generatedAt: "2024-01-01T12:00:00Z",
       displayDate: "2024-01-01",
+      isStale: false,
       tenant: {
         id: "t1",
         key: "fc-allschwil",
@@ -58,6 +59,9 @@ const BASE_PAYLOAD: AnlageplanLivePayload = {
       unallocated: [],
       facilityName: "Sportanlage im Brüel",
     },
+    branding: { clubLogoSrc: null, productLogoSrc: null },
+    currentTimeIso: "2024-01-01T12:00:00Z",
+    theme: "DARK",
   },
   anlageplanConfig: { version: 1, elements: [] },
   backgroundUrl: null,
