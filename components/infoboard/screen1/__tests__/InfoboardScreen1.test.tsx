@@ -363,15 +363,30 @@ describe("Header — Alexa-safe right zone", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("Board title", () => {
-  it("renders HEUTE AUF DER SPORTANLAGE", () => {
+  it("no implicit subtitle when no headerConfig provided (no fallback text)", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
+    expect(screen.queryByTestId("board-title")).toBeNull();
+  });
+
+  it("renders configured subtitle when headerConfig.subtitleEnabled=true and subtitleText provided", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed()}
+        headerConfig={{ subtitleEnabled: true, subtitleText: "HEUTE AUF DER SPORTANLAGE" }}
+      />,
+    );
     const boardTitle = screen.getByTestId("board-title");
     expect(boardTitle.textContent).toContain("HEUTE AUF DER SPORTANLAGE");
   });
 
-  it("board-title element is present in DOM", () => {
-    render(<InfoboardScreen1 feed={makeFeed()} />);
-    expect(screen.getByTestId("board-title")).toBeTruthy();
+  it("board-title absent when subtitleText is null (no implicit fallback)", () => {
+    render(
+      <InfoboardScreen1
+        feed={makeFeed()}
+        headerConfig={{ subtitleEnabled: true, subtitleText: null }}
+      />,
+    );
+    expect(screen.queryByTestId("board-title")).toBeNull();
   });
 });
 
@@ -1712,11 +1727,12 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
     expect(root.getAttribute("data-theme")).toBe("light");
   });
 
-  it("light theme still renders the same layout structure (header, board title, footer)", () => {
+  it("light theme still renders the same layout structure (header, footer, event rows)", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
         theme="LIGHT"
+        headerConfig={{ subtitleEnabled: true, subtitleText: "HEUTE AUF DER SPORTANLAGE" }}
       />,
     );
     expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();

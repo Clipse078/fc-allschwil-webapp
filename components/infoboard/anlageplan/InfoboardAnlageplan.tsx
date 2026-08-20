@@ -85,7 +85,7 @@ export function InfoboardAnlageplan({
   const showDate = shellConfig?.showDate !== false;
   const showWeather = shellConfig?.showWeather === true;
   const subtitleEnabled = shellConfig?.subtitleEnabled !== false;
-  const subtitleText = shellConfig?.subtitleText?.trim() || "ANLAGENÜBERSICHT";
+  const subtitleText = shellConfig?.subtitleText?.trim() ?? null;
   const announcement = shellConfig?.announcement ?? null;
 
   // ── Apply canonical facility hierarchy (groupFacilityPitches) ────────────
@@ -134,7 +134,6 @@ export function InfoboardAnlageplan({
       <KioskShellHeader
         clubLogoSrc={branding.clubLogoSrc}
         clubName={branding.clubName ?? "FC ALLSCHWIL"}
-        facilityLine={branding.facilityName ?? undefined}
         subtitle={subtitleText}
         subtitleEnabled={subtitleEnabled}
         initialTimeIso={currentTimeIso}
@@ -144,20 +143,39 @@ export function InfoboardAnlageplan({
         showDate={showDate}
       />
 
-      {/* ── BODY: full-width map canvas ────────────────────────────────── */}
+      {/* ── BODY: map canvas ───────────────────────────────────────────── */}
+      {/*
+       * FRAMING INVARIANT: the map canvas is constrained to 16:9 to match
+       * the designer canvas aspect ratio (AnlageplanDesignerClient also uses
+       * aspectRatio: 16/9). This ensures that the persisted BackgroundTransform
+       * and normalized zone coordinates produce identical visual framing in
+       * both the designer and the live kiosk — including the tree line at the
+       * top of the source image. Without this constraint the live canvas is
+       * wider than 16:9 (header + footer reduce the available height while
+       * the full viewport width remains), causing object-fit: cover to crop
+       * more from the top/bottom than the designer preview shows.
+       *
+       * Side effect: narrow dark gutters (≈ 110 px at 1920 × 1080) appear on
+       * each side of the canvas. These are filled by the page background
+       * (#060B12) and are intentional — they are not accidental gaps within
+       * the map content.
+       */}
       <div
         style={{
           flex: 1,
           display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
           minHeight: 0,
           padding: "0.6vh 0.9vw",
         }}
       >
-        {/* ── MAP CANVAS (full width — Nächste Aktivitäten removed) ─── */}
+        {/* ── MAP CANVAS — 16:9 to match designer coordinate system ─── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
-            flex: 1,
+            height: "100%",
+            aspectRatio: "16/9",
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",
             overflow: "hidden",
@@ -184,7 +202,6 @@ export function InfoboardAnlageplan({
       {/* ── SHARED FOOTER ─────────────────────────────────────────────── */}
       <KioskShellFooter
         productLogoSrc={branding.productLogoSrc}
-        leftLabel={branding.facilityName ?? "SPORTANLAGE"}
         announcement={announcement ?? undefined}
       />
     </div>

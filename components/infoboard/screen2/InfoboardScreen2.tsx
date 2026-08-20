@@ -87,6 +87,8 @@ export type InfoboardScreen2Props = {
    * Current weather for the facility location. Rendered compactly in the
    * header next to the time/date block (INFOBOARD-INTEGRATION-01C-C1).
    * When absent or unavailable, renders a compact "WETTER N/A" fallback.
+   * Only visible when headerConfig.showWeather is true (defaults to true to
+   * preserve existing behavior).
    */
   weather?: WeatherResult | null;
   /**
@@ -103,6 +105,33 @@ export type InfoboardScreen2Props = {
    * Tenant.infoboardDisplayTheme → resolver pipeline as Screen 1.
    */
   theme?: InfoboardDisplayTheme;
+  /**
+   * Per-board header configuration — canonical shell model identical to
+   * Screen 1 and InfoboardAnlageplan.
+   * Controls subtitle, time, date, weather visibility and subtitle text.
+   *
+   * Empty/null subtitleText renders nothing (no implicit fallback).
+   * showWeather defaults to true to preserve existing Screen 2 weather
+   * behavior when no headerConfig is provided.
+   */
+  headerConfig?: {
+    readonly subtitleEnabled?: boolean;
+    readonly subtitleText?: string | null;
+    readonly showTime?: boolean;
+    readonly showDate?: boolean;
+    readonly showWeather?: boolean;
+  };
+  /**
+   * Announcement bar configuration — canonical shell model identical to
+   * Screen 1.
+   * enabled=false or empty text => footer left side renders nothing.
+   */
+  announcement?: {
+    readonly enabled: boolean;
+    readonly text: string | null;
+    readonly backgroundColor?: string | null;
+    readonly textColor?: string | null;
+  } | null;
 };
 
 // ── Time / date formatting ────────────────────────────────────────────────────
@@ -461,6 +490,8 @@ export function InfoboardScreen2({
   weather,
   currentTimeIso,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
+  headerConfig,
+  announcement,
 }: InfoboardScreen2Props): ReactElement {
   const { tenant, pitches, dressingRooms, unallocated } = feed;
   const timeZone = tenant.timezone;
@@ -468,6 +499,14 @@ export function InfoboardScreen2({
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
+
+  // Per-board shell config — identical semantics to Screen 1.
+  // showWeather defaults to true to preserve existing Screen 2 behavior.
+  const showTime = headerConfig?.showTime !== false;
+  const showDate = headerConfig?.showDate !== false;
+  const showWeather = headerConfig?.showWeather !== false;
+  const subtitleEnabled = headerConfig?.subtitleEnabled !== false;
+  const subtitleText = headerConfig?.subtitleText?.trim() ?? null;
 
   const staticDateFallback = formatDisplayDate(feed.displayDate);
 
@@ -483,15 +522,14 @@ export function InfoboardScreen2({
       <KioskShellHeader
         clubLogoSrc={clubLogoSrc}
         clubName={tenant.name}
-        facilityLine={feed.facilityName ?? undefined}
         initialTimeIso={currentTimeIso}
         timezone={timeZone}
-        showTime={true}
-        showDate={true}
+        showTime={showTime}
+        showDate={showDate}
         staticDateFallback={staticDateFallback}
-        subtitle="ANLAGENÜBERSICHT"
-        subtitleEnabled={true}
-        rightContent={<HeaderWeather weather={weather} />}
+        subtitle={subtitleText ?? null}
+        subtitleEnabled={subtitleEnabled}
+        rightContent={showWeather ? <HeaderWeather weather={weather} /> : undefined}
       />
 
       {/* ── Main content: facility overview (full width) ───────────────────
@@ -541,7 +579,7 @@ export function InfoboardScreen2({
       {/* ── Shared kiosk footer (canonical — identical to Screen 1) ─────── */}
       <KioskShellFooter
         productLogoSrc={productLogoSrc}
-        leftLabel={feed.facilityName ?? undefined}
+        announcement={announcement ?? undefined}
       />
     </div>
   );

@@ -372,6 +372,7 @@ export function InboardDetailClient({
               <AnlageplanDesignerClient
                 board={board}
                 facilityOptions={facilityOptions}
+                tenantName={tenantName}
                 onBoardChange={(updated) => {
                   setBoard(updated);
                   router.refresh();

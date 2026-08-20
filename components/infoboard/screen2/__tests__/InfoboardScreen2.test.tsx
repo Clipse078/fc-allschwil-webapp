@@ -177,10 +177,12 @@ describe("Header", () => {
     expect(header.textContent).toContain("FC Testclub");
   });
 
-  it("renders facility name in header", () => {
+  it("does NOT render feed.facilityName as implicit header line (D3B: no implicit branding)", () => {
     render(<InfoboardScreen2 feed={makeFeed({ facilityName: "Mein Stadion" })} />);
     const header = screen.getByTestId("kiosk-shell-header");
-    expect(header.textContent).toContain("Mein Stadion");
+    // facilityName must not appear implicitly in the header — only configured
+    // subtitle text may appear there (per INFOBOARD-FINAL-D3B product rule).
+    expect(header.textContent).not.toContain("Mein Stadion");
   });
 
   it("renders current time when currentTimeIso is provided", () => {
