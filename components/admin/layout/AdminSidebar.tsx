@@ -31,16 +31,19 @@ import {
   Menu,
   Monitor,
   Newspaper,
+  Package,
   Palette,
   PenLine,
   ScrollText,
   Settings2,
   ShieldCheck,
   Target,
+  TrendingUp,
   UserCircle2,
   UserRound,
   Users,
   Volleyball,
+  Wallet,
 } from "lucide-react";
 import SignOutButton from "@/components/admin/layout/SignOutButton";
 import SidebarBrandHeader from "@/components/admin/branding/SidebarBrandHeader";
@@ -126,6 +129,12 @@ function getNavIcon(label: string) {
     case "Spieler":                     return UserRound;
     case "Trainer":                     return BadgeIcon;
     case "Registrierungen":             return Inbox;
+    // DEMO-LAYER-03: new module nav entries
+    case "Club Entwicklung":            return TrendingUp;
+    case "Prozesse & Aufgaben":         return ClipboardList;
+    case "Initiativen":                 return Flag;
+    case "Material & Inventar":         return Package;
+    case "Finanzen":                    return Wallet;
     default:                            return LayoutDashboard;
   }
 }
