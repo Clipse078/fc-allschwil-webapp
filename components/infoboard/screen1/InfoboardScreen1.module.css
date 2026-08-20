@@ -551,23 +551,35 @@
   font-size: clamp(1.8rem, 3vw, var(--ib-fs-dest-pitch));
   line-height: 0.95;
   white-space: normal;
-  overflow-wrap: break-word;
+  /* Break only at word boundaries (spaces) — never split mid-word.
+   * KUNSTRASEN 1 wraps as "KUNSTRASEN" / "1" at the space, never as
+   * "KUNSTRASE" / "N 1". overflow-wrap: break-word is intentionally
+   * avoided here to prevent character-level fragmentation. */
+  overflow-wrap: normal;
+  word-break: normal;
   max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocation,
 .cardDressingRoomZone .participantAllocationBlock {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocRow,
 .cardDressingRoomZone .participantAllocationRow {
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .cardDressingRoomZone .matchAllocTeam,
 .cardDressingRoomZone .participantTeamName {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .destinationZone {
   display: flex;
@@ -615,6 +627,11 @@
   text-transform: uppercase;
   color: var(--ib-text);
   line-height: 1;
+  /* Wrap at word boundaries; never split mid-word (e.g., KUNSTRASEN stays intact). */
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  max-width: 100%;
 }
 
 .destRoomRow {
@@ -1128,15 +1145,12 @@
 .trainingGroupPitchValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   /*
-   * PLATZ TRUNCATION FIX — physical STAGE TV acceptance defect:
-   * Long canonical pitch designations such as "KR 3 – FELD A" were silently
-   * truncated to "KR 3 – F…" when the pitch zone (18% card width) was too
-   * narrow at the kiosk font size. The physical label is a product invariant
-   * and must never be ellipsized.
-   *
-   * Fix: allow the value to wrap (word-break if needed) instead of clipping.
-   * The font size scales with the zone via the existing --ib-fs-dest-pitch
-   * token so shorter values (STADION, KR 1) remain visually unchanged.
+   * Pitch label wrapping: wrap at word boundaries (spaces) only.
+   * Never split mid-word (e.g., KUNSTRASEN must not become KUNSTRASE/N).
+   * overflow-wrap: normal ensures breaks happen at spaces first; the label
+   * only fragments within a word when there is absolutely no other option.
+   * For standard pitch designations (STADION, KR 1, KUNSTRASEN 2) this
+   * produces legible two-line wrapping when the column is narrow.
    */
   font-size: clamp(1.1rem, 1.6vw, var(--ib-fs-dest-pitch));
   font-weight: 700;
@@ -1145,7 +1159,8 @@
   color: var(--ib-text);
   line-height: 1.05;
   white-space: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
+  word-break: normal;
   max-width: 100%;
 }
 
@@ -1214,15 +1229,16 @@
   margin: 0;
   padding: 0;
 }
-/* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT structural TV alignment
+/* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT vertical centering
  *
- * Match and Tournament use one identical two-row zone architecture:
+ * Match and Tournament zones vertically center their [label + content]
+ * block within the available card height. The base flex layout
+ * (justify-content: center) already achieves this; these rules add
+ * precise gap control and prevent overflow.
  *
- *   LABEL
- *   CONTENT
- *
- * This guarantees that MEISTERSCHAFT/TURNIER, KABINE and PLATZ start
- * on the exact same physical baseline regardless of content height.
+ * Cross-zone alignment: all three zones (MEISTERSCHAFT/TURNIER, KABINE,
+ * PLATZ) use the same flex centering, so their content blocks share
+ * approximate vertical positions. No fixed top offsets are used.
  */
 .eventCard[data-type="MATCH"] .cardEventZone,
 .eventCard[data-type="MATCH"] .cardDressingRoomZone,
@@ -1230,51 +1246,53 @@
 .eventCard[data-type="TOURNAMENT"] .cardEventZone,
 .eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
-  justify-content: stretch;
-  row-gap: clamp(6px, 0.65vh, 10px);
+  gap: clamp(5px, 0.55vh, 8px);
 }
 
+/* Labels: single-line, no overflow into adjacent zones. */
 .eventCard[data-type="MATCH"] .cardEventZone > .eventTypeLabel,
 .eventCard[data-type="MATCH"] .cardDressingRoomZone > .destLabel,
 .eventCard[data-type="MATCH"] .cardPitchZone > .destLabel,
 .eventCard[data-type="TOURNAMENT"] .cardEventZone > .eventTypeLabel,
 .eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone > .destLabel,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destLabel {
-  align-self: start;
-  justify-self: start;
   margin: 0;
   padding: 0;
   line-height: 1;
-  /* Force single-line labels — ensures MEISTERSCHAFT/TURNIER, KABINE, PLATZ
-   * all start at the same vertical position across adjacent cards. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+  flex-shrink: 0;
 }
 
-/* Values begin from one common second-row origin. */
+/* Content blocks: contained within their zone, no min-height forcing. */
 .eventCard[data-type="MATCH"] .matchIdentity,
 .eventCard[data-type="MATCH"] .matchAllocation,
 .eventCard[data-type="MATCH"] .cardPitchZone > .destPitchValue,
 .eventCard[data-type="TOURNAMENT"] .tournamentIdentity,
 .eventCard[data-type="TOURNAMENT"] .participantAllocationBlock,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone > .destPitchValue {
-  align-self: start;
   min-width: 0;
+  max-width: 100%;
 }
 
-/* Use Kabine width for the team identity instead of truncating early. */
-.eventCard[data-type="MATCH"] .matchAllocTeam,
+/* Kabine team label: ellipsize rather than overflow across column boundary. */
+.eventCard[data-type="MATCH"] .matchAllocTeam {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: normal;
+  line-height: 1.15;
+}
+
+/* Tournament participant names: controlled wrapping within the zone. */
 .eventCard[data-type="TOURNAMENT"] .participantTeamName,
 .eventCard[data-type="TOURNAMENT"] .tournamentParticipantName {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: normal;
   word-break: normal;
   line-height: 1.15;
 }
