@@ -373,6 +373,10 @@
   gap: 4px;
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   border-right: 1px solid var(--ib-border);
+  /* Definite height ensures justify-content:center properly distributes space. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .statusLabel {
@@ -421,6 +425,10 @@
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   border-right: 1px solid var(--ib-border);
   min-width: 0;
+  /* Definite height ensures justify-content:center properly distributes space. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .eventTypeLabel {
@@ -537,6 +545,13 @@
   gap: var(--ib-sp-3);
   padding: var(--ib-card-pad-v) var(--ib-card-pad-h);
   min-width: 0;
+  /* Ensure the zone has a definite height so justify-content:center works.
+   * Grid items with align-self:stretch receive the grid area height, but
+   * height:100% explicitly establishes a definite height for the flex
+   * algorithm's justify-content calculation. */
+  min-height: 0;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .cardDressingRoomZone {
@@ -1246,6 +1261,12 @@
 .eventCard[data-type="TOURNAMENT"] .cardEventZone,
 .eventCard[data-type="TOURNAMENT"] .cardDressingRoomZone,
 .eventCard[data-type="TOURNAMENT"] .cardPitchZone {
+  /* Explicitly restore flex centering that INFOBOARD-TV-UX-04 previously
+   * suppressed by switching to display:grid/align-content:stretch. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
   gap: clamp(5px, 0.55vh, 8px);
 }
 
