@@ -27,7 +27,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
-import { buildBoardConfig } from "@/lib/infoboard/board-config";
+import { buildBoardConfig, buildSharedShellConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
@@ -137,6 +137,7 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
     return (
       <InfoboardAnlageplan
         payload={payload}
+        shellConfig={buildSharedShellConfig(board)}
         branding={{
           clubLogoSrc,
           productLogoSrc: PRODUCT_LOGO_SRC,
