@@ -259,13 +259,14 @@ export async function updateRegistrationStatusForTenant(
   }
 
   if (input.personId) {
-    // Person is a global entity (no tenantId column today) — existence only.
-    const person = await prisma.person.findUnique({
-      where: { id: input.personId },
+    // REG-WAIT-01: Person IS tenant-scoped (tenantId added in PERSONS-01).
+    // Validate that the Person belongs to the same tenant as the Registration.
+    const person = await prisma.person.findFirst({
+      where: { id: input.personId, tenantId: tenant.id },
       select: { id: true },
     });
     if (!person) {
-      throw new Error("Person not found.");
+      throw new Error("Person nicht gefunden oder gehört zu einem anderen Mandanten.");
     }
   }
 

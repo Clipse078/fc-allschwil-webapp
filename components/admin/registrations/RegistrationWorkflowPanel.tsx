@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ClipboardList,
   Clock,
   ExternalLink,
   Lightbulb,
@@ -44,6 +45,7 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { AddToWaitingListDialog } from "./AddToWaitingListDialog";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
@@ -199,6 +201,7 @@ const TIMELINE_ICON: Record<TimelineEntryKind, ComponentType<{ className?: strin
   PERSON_LINKED: Link2,
   PERSON_UNLINKED: Link2,
   DUPLICATE_IGNORED: ShieldAlert,
+  WAITING_LIST_ADDED: ClipboardList,
   OTHER: Clock,
 };
 
@@ -252,6 +255,7 @@ export default function RegistrationWorkflowPanel({
   const [createPersonConfirming, setCreatePersonConfirming] = useState(false);
   const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
+  const [showWaitingListDialog, setShowWaitingListDialog] = useState(false);
 
   const genderCode = extractGenderFromPayload(registration.payloadJson);
   const classification = classifyRegistration(registration.birthYear, genderCode, registration.type);
@@ -395,13 +399,31 @@ export default function RegistrationWorkflowPanel({
             variant="primary"
           />
         )}
-        {registration.status !== "CONTACTED" && !isTerminal && (
+        {registration.status !== "CONTACTED" && !isTerminal && registration.status !== "WAITING" && (
           <QuickActionButton
             icon={CheckCircle2}
             label="Als kontaktiert markieren"
             onClick={() => patch({ status: "CONTACTED" }, "mark-contacted")}
             disabled={!canEdit || !!busy}
           />
+        )}
+        {/* REG-WAIT-01: Auf Warteliste setzen — focused action, not a status shortcut */}
+        {canAdvance && registration.status !== "WAITING" && (
+          <QuickActionButton
+            icon={ClipboardList}
+            label="Auf Warteliste setzen"
+            onClick={() => setShowWaitingListDialog(true)}
+            disabled={!!busy}
+          />
+        )}
+        {registration.status === "WAITING" && (
+          <a
+            href={`/tenant/${tenantSlug}/cockpit/registrations/warteliste`}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+          >
+            <ClipboardList className="h-3.5 w-3.5" aria-hidden />
+            Auf Warteliste — öffnen
+          </a>
         )}
         {!isTerminal && (
           <QuickActionButton
@@ -412,6 +434,22 @@ export default function RegistrationWorkflowPanel({
           />
         )}
       </div>
+
+      {/* REG-WAIT-01: Auf Warteliste setzen dialog */}
+      {showWaitingListDialog && (
+        <AddToWaitingListDialog
+          open={showWaitingListDialog}
+          onClose={() => setShowWaitingListDialog(false)}
+          registration={registration}
+          tenantSlug={tenantSlug}
+          assignableUsers={assignableUsers}
+          targetGroups={targetGroups}
+          onSuccess={(updated) => {
+            onUpdate(updated);
+            void loadTimeline();
+          }}
+        />
+      )}
 
       {/* Goal 3/11: Create-person confirmation */}
       {createPersonConfirming && (

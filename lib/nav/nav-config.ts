@@ -308,6 +308,14 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Anmeldungen",
         href: "/dashboard/registrations",
         permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+        children: [
+          {
+            key: "warteliste",
+            label: "Warteliste",
+            href: "/dashboard/registrations/warteliste",
+            permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+          },
+        ],
       },
       {
         key: "infoboard",

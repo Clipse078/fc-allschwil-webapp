@@ -31,6 +31,7 @@ export type TimelineEntryKind =
   | "PERSON_LINKED"
   | "PERSON_UNLINKED"
   | "DUPLICATE_IGNORED"
+  | "WAITING_LIST_ADDED"
   | "OTHER";
 
 export type TimelineEntry = {
@@ -166,6 +167,16 @@ function mapAuditEntry(entry: {
         id: entry.id,
         kind: "DUPLICATE_IGNORED",
         label: "Duplikatwarnung ignoriert",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "WAITING_LIST_CREATED":
+      return {
+        id: entry.id,
+        kind: "WAITING_LIST_ADDED",
+        label: "Auf Warteliste gesetzt",
         detail: null,
         actorName: actor,
         occurredAt,
