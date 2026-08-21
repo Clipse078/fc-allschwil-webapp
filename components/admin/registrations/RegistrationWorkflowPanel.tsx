@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  ClipboardList,
   Clock,
   ExternalLink,
   Lightbulb,
@@ -44,13 +45,15 @@ import {
   Users,
   X,
 } from "lucide-react";
+import { AddToWaitingListDialog } from "./AddToWaitingListDialog";
+import { WaitingListCoordinatorPicker } from "./WaitingListCoordinatorPicker";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import type { PersonMatchCandidate } from "@/lib/registrations/person-match";
 import { classifyRegistration, extractGenderFromPayload, TARGET_GROUP_COLORS } from "@/lib/registrations/classification";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
-import type { TimelineEntry, TimelineEntryKind } from "@/lib/registrations/timeline";
+import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
@@ -61,8 +64,13 @@ type Props = {
   locale?: string;
   timezone?: string;
   assignableUsers: AssignableUser[];
+  eligibleCoordinators?: AssignableUser[];
   targetGroups: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
   onUpdate: (updated: RegistrationListItem) => void;
+  /** REG-WAIT-01K: drawer uses dedicated Verlauf tab; detail page keeps inline timeline. */
+  showInlineTimeline?: boolean;
 };
 
 // ── Small building blocks ───────────────────────────────────────────────────
@@ -178,57 +186,8 @@ function PersonCandidateRow({
           className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-emerald-300 bg-emerald-50 text-[0.7rem] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
         >
           {linking ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <Link2 className="h-3 w-3" aria-hidden />}
-          Verknüpfen
+          Mit bestehender Person verknüpfen
         </button>
-      </div>
-    </div>
-  );
-}
-
-// ── Timeline icon mapping ───────────────────────────────────────────────────
-
-const TIMELINE_ICON: Record<TimelineEntryKind, ComponentType<{ className?: string }>> = {
-  RECEIVED: Mail,
-  STATUS_CHANGE: Clock,
-  CONTACTED: CheckCircle2,
-  ARCHIVED: Archive,
-  ASSIGNED_USER: UserCheck,
-  ASSIGNED_TEAM: Users,
-  NO_RECOMMENDATION: Lightbulb,
-  PERSON_CREATED: UserPlus,
-  PERSON_LINKED: Link2,
-  PERSON_UNLINKED: Link2,
-  DUPLICATE_IGNORED: ShieldAlert,
-  OTHER: Clock,
-};
-
-function TimelineRow({
-  entry,
-  locale,
-  timezone,
-  isLast,
-}: {
-  entry: TimelineEntry;
-  locale: string;
-  timezone: string;
-  isLast: boolean;
-}) {
-  const Icon = TIMELINE_ICON[entry.kind] ?? Clock;
-  return (
-    <div className="flex gap-3">
-      <div className="flex flex-shrink-0 flex-col items-center">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)]">
-          <Icon className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
-        </span>
-        {!isLast && <span className="mt-1 flex-1 w-px bg-[var(--border)]" aria-hidden />}
-      </div>
-      <div className="min-w-0 flex-1 pb-4">
-        <p className="text-sm font-medium text-[var(--foreground)]">{entry.label}</p>
-        {entry.detail && <p className="mt-0.5 text-xs text-[var(--muted)]">{entry.detail}</p>}
-        <p className="mt-0.5 text-[0.7rem] text-[var(--muted)]">
-          {formatDateTimeCompact(entry.occurredAt, { locale, timezone })}
-          {entry.actorName ? ` · ${entry.actorName}` : ""}
-        </p>
       </div>
     </div>
   );
@@ -242,16 +201,18 @@ export default function RegistrationWorkflowPanel({
   canEdit,
   locale = "de-CH",
   timezone = "Europe/Zurich",
-  assignableUsers,
+  eligibleCoordinators = [],
   targetGroups,
+  orgUnits = [],
+  teamSeasons = [],
   onUpdate,
+  showInlineTimeline = true,
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showElsewherePicker, setShowElsewherePicker] = useState(false);
   const [createPersonConfirming, setCreatePersonConfirming] = useState(false);
-  const [timeline, setTimeline] = useState<TimelineEntry[] | null>(null);
-  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [showWaitingListDialog, setShowWaitingListDialog] = useState(false);
 
   const genderCode = extractGenderFromPayload(registration.payloadJson);
   const classification = classifyRegistration(registration.birthYear, genderCode, registration.type);
@@ -269,21 +230,6 @@ export default function RegistrationWorkflowPanel({
     !Array.isArray(registration.payloadJson) &&
     (registration.payloadJson as Record<string, unknown>).possibleDuplicate === true;
 
-  const loadTimeline = useCallback(async () => {
-    setTimelineLoading(true);
-    try {
-      const res = await fetch(
-        `/api/tenants/${encodeURIComponent(tenantSlug)}/registrations/${encodeURIComponent(registration.id)}/timeline`,
-      );
-      const payload = await res.json();
-      if (res.ok) setTimeline(payload.timeline as TimelineEntry[]);
-    } catch {
-      // Best-effort — timeline is supplementary, never blocks the workflow.
-    } finally {
-      setTimelineLoading(false);
-    }
-  }, [registration.id, tenantSlug]);
-
   const patch = useCallback(
     async (body: Record<string, unknown>, busyKey: string) => {
       setBusy(busyKey);
@@ -300,9 +246,6 @@ export default function RegistrationWorkflowPanel({
         const payload = await res.json();
         if (!res.ok) throw new Error(payload.error ?? "Änderung konnte nicht gespeichert werden.");
         onUpdate(payload.registration as RegistrationListItem);
-        // Goal 5: every mutation writes an AuditLog entry — refresh the
-        // timeline immediately so it never looks stale after an action.
-        void loadTimeline();
         return payload.registration as RegistrationListItem;
       } catch (err) {
         setError(err instanceof Error ? err.message : "Änderung konnte nicht gespeichert werden.");
@@ -311,7 +254,7 @@ export default function RegistrationWorkflowPanel({
         setBusy(null);
       }
     },
-    [registration.id, tenantSlug, onUpdate, loadTimeline],
+    [registration.id, tenantSlug, onUpdate],
   );
 
   const createPerson = useCallback(
@@ -337,14 +280,13 @@ export default function RegistrationWorkflowPanel({
         }
         setCreatePersonConfirming(false);
         if (payload.registration) onUpdate(payload.registration as RegistrationListItem);
-        void loadTimeline();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Person konnte nicht erstellt werden.");
       } finally {
         setBusy(null);
       }
     },
-    [registration.id, tenantSlug, onUpdate, loadTimeline],
+    [registration.id, tenantSlug, onUpdate],
   );
 
   const handleCreatePersonClick = useCallback(() => {
@@ -356,11 +298,8 @@ export default function RegistrationWorkflowPanel({
   }, [personMatch, createPerson]);
 
   useEffect(() => {
-    setTimeline(null);
     setShowElsewherePicker(false);
     setCreatePersonConfirming(false);
-    void loadTimeline();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [registration.id]);
 
   const isTerminal = registration.status === "ARCHIVED";
@@ -385,23 +324,41 @@ export default function RegistrationWorkflowPanel({
       <div className="flex flex-wrap items-center gap-2">
         <QuickActionButton icon={Mail} label="Kontaktieren" href={`mailto:${registration.email}`} />
         {registration.personId ? (
-          <QuickActionButton icon={UserRound} label="Person öffnen" href={`/dashboard/persons/${registration.personId}`} />
+          <QuickActionButton icon={UserRound} label="In Vereinsverwaltung öffnen" href={`/dashboard/persons/${registration.personId}`} />
         ) : (
           <QuickActionButton
             icon={UserPlus}
-            label="Person erstellen"
+            label="In Vereinsverwaltung aufnehmen"
             onClick={handleCreatePersonClick}
             disabled={!canEdit || busy === "create-person"}
             variant="primary"
           />
         )}
-        {registration.status !== "CONTACTED" && !isTerminal && (
+        {registration.status !== "CONTACTED" && !isTerminal && registration.status !== "WAITING" && (
           <QuickActionButton
             icon={CheckCircle2}
             label="Als kontaktiert markieren"
             onClick={() => patch({ status: "CONTACTED" }, "mark-contacted")}
             disabled={!canEdit || !!busy}
           />
+        )}
+        {/* REG-WAIT-01: Auf Warteliste setzen — focused action, not a status shortcut */}
+        {canAdvance && registration.status !== "WAITING" && (
+          <QuickActionButton
+            icon={ClipboardList}
+            label="Auf Warteliste setzen"
+            onClick={() => setShowWaitingListDialog(true)}
+            disabled={!!busy}
+          />
+        )}
+        {registration.status === "WAITING" && (
+          <a
+            href={`/tenant/${tenantSlug}/cockpit/registrations/warteliste`}
+            className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-amber-300 bg-amber-50 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+          >
+            <ClipboardList className="h-3.5 w-3.5" aria-hidden />
+            Auf Warteliste — öffnen
+          </a>
         )}
         {!isTerminal && (
           <QuickActionButton
@@ -412,6 +369,21 @@ export default function RegistrationWorkflowPanel({
           />
         )}
       </div>
+
+      {/* REG-WAIT-01: Auf Warteliste setzen dialog */}
+      {showWaitingListDialog && (
+        <AddToWaitingListDialog
+          open={showWaitingListDialog}
+          onClose={() => setShowWaitingListDialog(false)}
+          registration={registration}
+          tenantSlug={tenantSlug}
+          eligibleCoordinators={eligibleCoordinators}
+          targetGroups={targetGroups}
+          orgUnits={orgUnits}
+          teamSeasons={teamSeasons}
+          onSuccess={onUpdate}
+        />
+      )}
 
       {/* Goal 3/11: Create-person confirmation */}
       {createPersonConfirming && (
@@ -447,35 +419,28 @@ export default function RegistrationWorkflowPanel({
         </div>
       )}
 
-      {/* Goal 1: Team recommendation actions */}
-      <PanelSection title="Empfehlung" icon={Lightbulb}>
-        <div className={cn("rounded-[var(--radius-lg)] border p-3.5", groupColors.border, groupColors.bg)}>
-          <div className="flex items-center gap-2">
-            <span className={cn("h-2.5 w-2.5 rounded-full flex-shrink-0", groupColors.dot)} aria-hidden />
-            <span className={cn("text-sm font-bold", groupColors.text)}>{classification.targetGroupLabel}</span>
-            {registration.targetGroup && (
-              <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-800">
-                <CheckCircle2 className="h-3 w-3" aria-hidden />
-                Team zugewiesen: {registration.targetGroup.name}
-              </span>
+      {/* Goal 1: Team recommendation actions — compact operational surface */}
+      <PanelSection title="Ziel / Team" icon={Lightbulb}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+              groupColors.border,
+              groupColors.bg,
+              groupColors.text,
             )}
-          </div>
-          <div className="mt-2 grid gap-1.5 text-xs">
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Altersgruppe</span>
-              <span className={cn("font-medium", groupColors.text)}>
-                {registration.birthYear ? `Jahrgang ${registration.birthYear}` : "Kein Jahrgang angegeben"}
-              </span>
-            </div>
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Grund</span>
-              <span className={cn("font-medium", groupColors.text)}>{classification.reasoning}</span>
-            </div>
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Zuständig</span>
-              <span className={cn("font-medium", groupColors.text)}>{classification.coordinatorRole}</span>
-            </div>
-          </div>
+          >
+            <span className={cn("h-2 w-2 rounded-full", groupColors.dot)} aria-hidden />
+            {classification.targetGroupLabel}
+          </span>
+          {registration.targetGroup ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-800">
+              <CheckCircle2 className="h-3 w-3" aria-hidden />
+              {registration.targetGroup.name}
+            </span>
+          ) : (
+            <span className="text-xs text-[var(--muted)]">{classification.reasoning}</span>
+          )}
         </div>
 
         {canAdvance && (
@@ -560,7 +525,7 @@ export default function RegistrationWorkflowPanel({
 
       {/* Goal 2/3/11: Person lookup + creation */}
       <PanelSection
-        title="Person"
+        title="Vereinsverwaltung"
         icon={User}
         badge={
           personMatch && (
@@ -594,7 +559,7 @@ export default function RegistrationWorkflowPanel({
               className="fca-button-secondary text-xs gap-1.5"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-              Person öffnen
+              In Vereinsverwaltung öffnen
             </a>
           </div>
         ) : personMatch && personMatch.candidates.length > 0 ? (
@@ -618,7 +583,7 @@ export default function RegistrationWorkflowPanel({
             <p className="text-sm text-[var(--muted)]">Keine passende Person gefunden.</p>
             <QuickActionButton
               icon={UserPlus}
-              label="Person erstellen"
+              label="In Vereinsverwaltung aufnehmen"
               variant="primary"
               disabled={!canEdit || busy === "create-person"}
               onClick={handleCreatePersonClick}
@@ -627,25 +592,16 @@ export default function RegistrationWorkflowPanel({
         )}
       </PanelSection>
 
-      {/* Goal 4: Assignment workflow — existing users only */}
-      <PanelSection title="Zuweisung" icon={UserCheck}>
-        <p className="mb-2 text-[0.7rem] text-[var(--muted)]">
-          Zuweisung an Koordinator, Trainer oder Vereinsadmin — bestehende Benutzer dieses Mandanten.
-        </p>
-        {canEdit && assignableUsers.length > 0 ? (
-          <select
-            value={registration.assignedToUserId ?? ""}
+      {/* Goal 4: Assignment workflow — canonical searchable coordinator picker */}
+      <PanelSection title="Verantwortlich" icon={UserCheck}>
+        {canEdit ? (
+          <WaitingListCoordinatorPicker
+            eligibleCoordinators={eligibleCoordinators}
+            selectedUserId={registration.assignedToUserId}
+            onSelect={(userId) => patch({ assignedToUserId: userId }, "assign-user")}
             disabled={busy === "assign-user"}
-            onChange={(e) => patch({ assignedToUserId: e.target.value || null }, "assign-user")}
-            className="fca-select text-xs"
-          >
-            <option value="">— Nicht zugewiesen —</option>
-            {assignableUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName}
-              </option>
-            ))}
-          </select>
+            placeholder="Koordinator zuweisen…"
+          />
         ) : registration.assignedToUser ? (
           <span className="sce-data-value flex items-center gap-1.5 text-sm">
             <UserCheck className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
@@ -696,26 +652,18 @@ export default function RegistrationWorkflowPanel({
         </PanelSection>
       )}
 
-      {/* Goal 5: Timeline */}
-      <PanelSection title="Verlauf" icon={Clock}>
-        {timelineLoading && !timeline ? (
-          <p className="text-xs text-[var(--muted)]">Wird geladen…</p>
-        ) : timeline && timeline.length > 0 ? (
-          <div>
-            {timeline.map((entry, idx) => (
-              <TimelineRow
-                key={entry.id}
-                entry={entry}
-                locale={locale}
-                timezone={timezone}
-                isLast={idx === timeline.length - 1}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-[var(--muted)]">Kein Verlauf vorhanden.</p>
-        )}
-      </PanelSection>
+      {showInlineTimeline ? (
+        <PanelSection title="Verlauf" icon={Clock}>
+          <RegistrationTimelinePanel
+            registrationId={registration.id}
+            tenantSlug={tenantSlug}
+            locale={locale}
+            timezone={timezone}
+            refreshKey={registration.updatedAt}
+            className=""
+          />
+        </PanelSection>
+      ) : null}
     </div>
   );
 }

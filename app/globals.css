@@ -429,6 +429,14 @@ button {
   cursor: not-allowed;
 }
 
+.fca-search-input {
+  padding-top: 0;
+  padding-bottom: 0;
+  padding-right: 0.75rem;
+  /* icon offset (12px) + icon width (14px) + comfortable gap (12px) */
+  padding-left: 2.375rem;
+}
+
 .fca-label {
   color: var(--text-2);
   font-size: 0.8125rem;

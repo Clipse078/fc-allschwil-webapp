@@ -19,3 +19,18 @@ export type TargetGroupOption = {
   name: string;
   key: string;
 };
+
+export type OrgUnitOption = {
+  id: string;
+  name: string;
+  key: string;
+  type: string;
+  level: number;
+};
+
+export type TeamSeasonOption = {
+  id: string;
+  teamId: string;
+  teamName: string;
+  seasonName: string;
+};

@@ -629,6 +629,8 @@ model Tenant {
   // PERSON-UX-10: canonical guardian relationships and emergency contacts
   guardianRelationships   GuardianRelationship[]    @relation("TenantGuardianRelationships")
   personEmergencyContacts PersonEmergencyContact[]  @relation("TenantPersonEmergencyContacts")
+  // REG-WAIT-01: canonical waiting list entries for this tenant
+  waitingListEntries      WaitingListEntry[]        @relation("TenantWaitingListEntries")
 
   @@index([status])
   @@index([name])
@@ -690,6 +692,11 @@ model User {
 
   // PERSON-UX-05: assessments authored by this user as assessor
   assessorAssessments DevelopmentAssessment[] @relation("AssessorDevelopmentAssessments")
+
+  // REG-WAIT-01: waiting list back-relations (three distinct roles)
+  responsibleWaitingListEntries WaitingListEntry[] @relation("WaitingListEntryResponsibleUser")
+  addedWaitingListEntries       WaitingListEntry[] @relation("WaitingListEntryAddedByUser")
+  resolvedWaitingListEntries    WaitingListEntry[] @relation("WaitingListEntryResolvedByUser")
 
   @@index([isActive])
   @@index([tenantId])
@@ -796,6 +803,108 @@ model Registration {
   @@index([tenantId, source])
   @@index([personId])
   @@index([duplicateIgnoredById])
+
+  // REG-WAIT-01: back-relation — waiting list entries created from this registration.
+  waitingListEntries WaitingListEntry[]
+}
+
+// ---------------------------------------------------------------------------
+// REG-WAIT-01: Canonical Waiting List domain
+//
+// WaitingListEntry is an operational waiting-list record — separate from the
+// Registration intake record. A Registration with status=WAITING may (and
+// should) have a corresponding active WaitingListEntry that carries the
+// operational context (scope, priority, responsible coordinator, etc.).
+//
+// Lifecycle: WAITING → CONTACTED → OFFERED → PLACED | WITHDRAWN | REJECTED
+//            Any terminal state can also transition to ARCHIVED.
+//
+// Scope: every entry is scoped to exactly one level:
+//   TARGET_GROUP → targetGroupId is required
+//   ORG_UNIT     → orgUnitId is required
+//   TEAM_SEASON  → teamSeasonId is required
+// ---------------------------------------------------------------------------
+
+enum WaitingListScopeType {
+  TARGET_GROUP
+  ORG_UNIT
+  TEAM_SEASON
+}
+
+enum WaitingListStatus {
+  WAITING
+  CONTACTED
+  OFFERED
+  PLACED
+  WITHDRAWN
+  REJECTED
+  ARCHIVED
+}
+
+enum WaitingListPriority {
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model WaitingListEntry {
+  id       String @id @default(cuid())
+  tenantId String
+
+  // Source registration — the intake record that triggered waiting-list placement.
+  registrationId String
+  registration   Registration @relation(fields: [registrationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  // Linked Person — populated when person is already known or created from registration.
+  personId String?
+  person   Person? @relation("WaitingListEntryPerson", fields: [personId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Scope — exactly one of the three FKs must be set, matching scopeType.
+  scopeType     WaitingListScopeType
+  targetGroupId String?
+  targetGroup   TargetGroup? @relation("WaitingListEntryTargetGroup", fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orgUnitId     String?
+  orgUnit       OrgUnit?     @relation("WaitingListEntryOrgUnit", fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teamSeasonId  String?
+  teamSeason    TeamSeason?  @relation("WaitingListEntryTeamSeason", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Lifecycle
+  status   WaitingListStatus   @default(WAITING)
+  priority WaitingListPriority @default(NORMAL)
+
+  // Responsible coordinator
+  responsibleUserId String?
+  responsibleUser   User?   @relation("WaitingListEntryResponsibleUser", fields: [responsibleUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  // Context fields
+  reason       String?
+  internalNote String?
+
+  // Lifecycle timestamps
+  addedAt         DateTime  @default(now())
+  addedByUserId   String?
+  addedByUser     User?     @relation("WaitingListEntryAddedByUser", fields: [addedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  lastContactedAt DateTime?
+  offeredAt       DateTime?
+  resolvedAt      DateTime?
+  resolvedByUserId String?
+  resolvedByUser   User?    @relation("WaitingListEntryResolvedByUser", fields: [resolvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  tenant Tenant @relation("TenantWaitingListEntries", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Operational indexes
+  @@index([tenantId, status])
+  @@index([tenantId, addedAt])
+  @@index([tenantId, priority])
+  @@index([registrationId])
+  @@index([personId])
+  @@index([responsibleUserId])
+  @@index([targetGroupId])
+  @@index([orgUnitId])
+  @@index([teamSeasonId])
 }
 
 model Role {
@@ -1211,6 +1320,8 @@ model Person {
   guardianRelationshipsAsGuardian GuardianRelationship[] @relation("PersonAsGuardian")
   // PERSON-UX-10: standalone emergency contacts (NOT Person records)
   emergencyContacts PersonEmergencyContact[] @relation("PersonEmergencyContacts")
+  // REG-WAIT-01: waiting list entries linked to this Person
+  waitingListEntries WaitingListEntry[] @relation("WaitingListEntryPerson")
 }
 
 // ---------------------------------------------------------------------------
@@ -1462,6 +1573,8 @@ model TeamSeason {
   trainingSessions   TrainingSession[]
   // PERSON-UX-05: optional team context for development assessments
   developmentAssessments DevelopmentAssessment[] @relation("TeamSeasonDevelopmentAssessments")
+  // REG-WAIT-01: waiting list entries scoped to this TeamSeason
+  waitingListEntries     WaitingListEntry[]      @relation("WaitingListEntryTeamSeason")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -1857,6 +1970,8 @@ model OrgUnit {
   userRoles          UserRole[]
   // PERSONS-02: person assignment back-relation (dedicated model, not OrgUnitMembership)
   personAssignments  PersonAssignment[]  @relation("OrgUnitPersonAssignments")
+  // REG-WAIT-01: waiting list entries scoped to this OrgUnit
+  waitingListEntries WaitingListEntry[]  @relation("WaitingListEntryOrgUnit")
 
   @@unique([tenantId, key])
   @@index([tenantId])
@@ -2002,7 +2117,8 @@ model TargetGroup {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  registrations Registration[]
+  registrations      Registration[]
+  waitingListEntries WaitingListEntry[] @relation("WaitingListEntryTargetGroup")
 
   @@unique([tenantId, key])
   @@index([status])

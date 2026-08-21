@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
   targetGroupFindFirst: vi.fn(),
   personFindMany: vi.fn(),
   personFindUnique: vi.fn(),
+  // REG-WAIT-01: person.findFirst used for tenant-scoped person validation.
+  personFindFirst: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -34,7 +36,12 @@ vi.mock("@/lib/db/prisma", () => ({
     // REGISTRATION-01F: person lookup used by attachPersonMatchSummaries —
     // returns no candidates by default so pre-existing duplicate-reference
     // assertions (which only count registrationFindMany calls) stay valid.
-    person: { findMany: mocks.personFindMany, findUnique: mocks.personFindUnique },
+    // REG-WAIT-01: person.findFirst now used for tenant-scoped validation.
+    person: {
+      findMany: mocks.personFindMany,
+      findUnique: mocks.personFindUnique,
+      findFirst: mocks.personFindFirst,
+    },
   },
 }));
 
@@ -267,18 +274,19 @@ describe("updateRegistrationStatusForTenant — quick-action timestamps (Goal 6/
 });
 
 describe("updateRegistrationStatusForTenant — person link (Goal 2)", () => {
-  it("validates the person exists before linking", async () => {
+  it("validates the person exists and belongs to the same tenant before linking", async () => {
+    // REG-WAIT-01: validation now uses findFirst with tenantId for tenant isolation.
     mocks.registrationFindFirst.mockResolvedValueOnce(makeRegistration());
-    mocks.personFindUnique.mockResolvedValueOnce(null);
+    mocks.personFindFirst.mockResolvedValueOnce(null); // not found in this tenant
 
     await expect(
       updateRegistrationStatusForTenant("fc-allschwil", "reg-1", { personId: "missing-person" }, "user-1"),
-    ).rejects.toThrow("Person not found.");
+    ).rejects.toThrow("Person nicht gefunden oder gehört zu einem anderen Mandanten.");
   });
 
   it("links an existing person by id", async () => {
     mocks.registrationFindFirst.mockResolvedValueOnce(makeRegistration());
-    mocks.personFindUnique.mockResolvedValueOnce({ id: "person-1" });
+    mocks.personFindFirst.mockResolvedValueOnce({ id: "person-1" });
     mocks.registrationUpdate.mockResolvedValueOnce(makeRegistration({ personId: "person-1" }));
 
     const result = await updateRegistrationStatusForTenant(
@@ -302,7 +310,7 @@ describe("updateRegistrationStatusForTenant — person link (Goal 2)", () => {
     const updateArgs = mocks.registrationUpdate.mock.calls[0][0];
     expect(updateArgs.data.personId).toBeNull();
     // null does not trigger the existence check (only truthy ids do).
-    expect(mocks.personFindUnique).not.toHaveBeenCalled();
+    expect(mocks.personFindFirst).not.toHaveBeenCalled();
   });
 });
 

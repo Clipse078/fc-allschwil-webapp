@@ -77,18 +77,55 @@ export const STATUS_DOT_CLASS: Record<RegistrationStatus, string> = {
 
 export const STATUS_OPTIONS: RegistrationStatus[] = STATUS_ORDER;
 
-// ── Inbox filter/status groups (Goal 9) ───────────────────────────────────
+// ── Lifecycle workspace projections (REG-WAIT-01H) ────────────────────────
 
-export type StatusGroupKey = "ALL" | "NEW" | "REVIEWING" | "CONTACTED" | "WAITING" | "DONE";
+/** Active operational inbox — registrations requiring club action. */
+export const ACTIVE_INBOX_STATUSES: RegistrationStatus[] = [
+  RegistrationStatus.NEW,
+  RegistrationStatus.REVIEWING,
+  RegistrationStatus.ASSIGNED,
+  RegistrationStatus.CONTACTED,
+];
 
-export const STATUS_GROUPS: {
+/** Terminal / historical registrations shown in the Archiv workspace. */
+export const ARCHIVE_STATUSES: RegistrationStatus[] = [
+  RegistrationStatus.ACCEPTED,
+  RegistrationStatus.REJECTED,
+  RegistrationStatus.ARCHIVED,
+];
+
+/** Statuses managed exclusively in the Warteliste workspace. */
+export const WAITING_LIST_REGISTRATION_STATUSES: RegistrationStatus[] = [
+  RegistrationStatus.WAITING,
+];
+
+/** Statuses that count as "final" for KPI / archive purposes. */
+export const TERMINAL_STATUSES: RegistrationStatus[] = ARCHIVE_STATUSES;
+
+export function isActiveInboxRegistrationStatus(status: RegistrationStatus): boolean {
+  return ACTIVE_INBOX_STATUSES.includes(status);
+}
+
+export function isArchiveRegistrationStatus(status: RegistrationStatus): boolean {
+  return ARCHIVE_STATUSES.includes(status);
+}
+
+// ── Inbox filter/status groups (Goal 9 / REG-WAIT-01H) ────────────────────
+
+export type InboxStatusGroupKey = "NEW" | "REVIEWING" | "CONTACTED";
+export type ArchiveStatusGroupKey = "ACCEPTED" | "REJECTED" | "ARCHIVED";
+export type StatusGroupKey = InboxStatusGroupKey | ArchiveStatusGroupKey;
+
+type StatusGroupDefinition = {
   key: StatusGroupKey;
   label: string;
   statuses: RegistrationStatus[];
   pillClass: string;
   pillActiveClass: string;
   dotClass: string;
-}[] = [
+};
+
+export const INBOX_STATUS_GROUPS: StatusGroupDefinition[] = [
   {
     key: "NEW",
     label: "Neu",
@@ -113,27 +150,34 @@ export const STATUS_GROUPS: {
     pillActiveClass: "border-violet-500 bg-violet-600 text-white shadow-sm",
     dotClass: "bg-violet-500",
   },
+];
+
+export const ARCHIVE_STATUS_GROUPS: StatusGroupDefinition[] = [
   {
-    key: "WAITING",
-    label: "Wartend",
-    statuses: [RegistrationStatus.WAITING],
-    pillClass: "border-orange-200 bg-white text-orange-700 hover:bg-orange-50",
-    pillActiveClass: "border-orange-500 bg-orange-600 text-white shadow-sm",
-    dotClass: "bg-orange-500",
-  },
-  {
-    key: "DONE",
-    label: "Abgeschlossen",
-    statuses: [RegistrationStatus.ACCEPTED, RegistrationStatus.REJECTED, RegistrationStatus.ARCHIVED],
+    key: "ACCEPTED",
+    label: "Angenommen",
+    statuses: [RegistrationStatus.ACCEPTED],
     pillClass: "border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50",
     pillActiveClass: "border-emerald-600 bg-emerald-600 text-white shadow-sm",
     dotClass: "bg-emerald-500",
   },
+  {
+    key: "REJECTED",
+    label: "Abgelehnt",
+    statuses: [RegistrationStatus.REJECTED],
+    pillClass: "border-red-200 bg-white text-red-700 hover:bg-red-50",
+    pillActiveClass: "border-red-600 bg-red-600 text-white shadow-sm",
+    dotClass: "bg-red-500",
+  },
+  {
+    key: "ARCHIVED",
+    label: "Archiviert",
+    statuses: [RegistrationStatus.ARCHIVED],
+    pillClass: "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+    pillActiveClass: "border-slate-500 bg-slate-600 text-white shadow-sm",
+    dotClass: "bg-slate-400",
+  },
 ];
 
-/** Statuses that count as "final" for KPI purposes (Goal 10: "Completed today"). */
-export const TERMINAL_STATUSES: RegistrationStatus[] = [
-  RegistrationStatus.ACCEPTED,
-  RegistrationStatus.REJECTED,
-  RegistrationStatus.ARCHIVED,
-];
+/** Active inbox filter pills — alias kept for existing imports. */
+export const STATUS_GROUPS = INBOX_STATUS_GROUPS;

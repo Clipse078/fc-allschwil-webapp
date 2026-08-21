@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { RegistrationStatus } from "@prisma/client";
 import {
   ArrowLeft,
   Baby,
@@ -49,13 +48,12 @@ import {
   type RegistrationSourceKey,
 } from "@/lib/registrations/source";
 import {
-  STATUS_ORDER,
   STATUS_LABELS as SHARED_STATUS_LABELS,
-  STATUS_HERO_CLASS as SHARED_STATUS_HERO_CLASS,
   STATUS_BADGE_CLASS as SHARED_STATUS_BADGE_CLASS,
 } from "@/lib/registrations/status";
-import type { AssignableUser, TargetGroupOption } from "@/lib/registrations/workflow-types";
+import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
+import { RegistrationWorkflowSteps } from "./RegistrationWorkflowSteps";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
@@ -86,8 +84,10 @@ type RegistrationDetailCardProps = {
   timezone?: string;
   /** Active users available for assignment. */
   assignableUsers?: AssignableUser[];
-  /** Active target groups for routing. */
+  eligibleCoordinators?: AssignableUser[];
   targetGroups?: TargetGroupOption[];
+  orgUnits?: OrgUnitOption[];
+  teamSeasons?: TeamSeasonOption[];
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -108,9 +108,7 @@ const TYPE_LABELS: Record<string, string> = {
 // REGISTRATION-01F — Goal 8: status metadata now lives in one shared module
 // (lib/registrations/status.ts).
 const STATUS_LABELS = SHARED_STATUS_LABELS;
-const STATUS_HERO_CLASS = SHARED_STATUS_HERO_CLASS;
 const STATUS_BADGE_CLASS = SHARED_STATUS_BADGE_CLASS;
-const STATUS_OPTIONS = STATUS_ORDER;
 
 
 function getInitials(firstName: string, lastName: string) {
@@ -241,11 +239,12 @@ export default function RegistrationDetailCard({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   assignableUsers = [],
+  eligibleCoordinators = [],
   targetGroups = [],
+  orgUnits = [],
+  teamSeasons = [],
 }: RegistrationDetailCardProps) {
   const [registration, setRegistration] = useState(initialRegistration);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const cfg = { locale, timezone };
 
@@ -255,8 +254,6 @@ export default function RegistrationDetailCard({
   const typeLabel = TYPE_LABELS[registration.type] ?? registration.type;
   const backHref = `/tenant/${tenantSlug}/cockpit/registrations`;
 
-  // Goal 3/4 (REGISTRATION-01D): normalized read-model covering every field
-  // collected across the pipeline (website → API → DB → payloadJson).
   const fields = getRegistrationDetailFields(registration);
   const genderCode = extractGenderFromPayload(registration.payloadJson);
   const isAdultForGender = registration.birthYear
@@ -264,149 +261,79 @@ export default function RegistrationDetailCard({
     : false;
   const genderDisplayLabel = getGenderLabel(genderCode, isAdultForGender) ?? fields.player.gender;
 
-  // Goal 6 (REGISTRATION-01E): presentation-only source label — ingestion
-  // still always writes "WEBSITE" today (see lib/registrations/source.ts).
   const sourceInfo = getRegistrationSourceInfo(registration.source);
   const SourceIcon = sourceInfo ? SOURCE_ICON[sourceInfo.key] : null;
   const addressLines = formatCompactAddressLines(fields.address);
 
-  async function patchRegistration(patch: Record<string, unknown>) {
-    setIsUpdating(true);
-    setUpdateError(null);
-    try {
-      const response = await fetch(
-        `/api/tenants/${encodeURIComponent(tenantSlug)}/registrations/${encodeURIComponent(registration.id)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(patch),
-        },
-      );
-
-      const payload = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          payload.error ?? "Änderung konnte nicht gespeichert werden.",
-        );
-      }
-
-      setRegistration(payload.registration);
-    } catch (error) {
-      setUpdateError(
-        error instanceof Error
-          ? error.message
-          : "Änderung konnte nicht gespeichert werden.",
-      );
-    } finally {
-      setIsUpdating(false);
-    }
-  }
-
-  function updateStatus(status: RegistrationStatus) {
-    return patchRegistration({ status });
-  }
-
   return (
-    <div className="space-y-6">
-      {/* ── Hero ──────────────────────────────────────────────────────────── */}
-      <div className="sce-entity-hero">
-        <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
-          {/* Identity */}
-          <div className="flex items-center gap-5">
-            <div className="sce-avatar-xl">{initials}</div>
+    <div className="space-y-5">
+      {/* ── Page header ────────────────────────────────────────────────────── */}
+      <div className="rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+        <div className="flex items-start gap-4 px-6 py-5">
+          {/* Avatar */}
+          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border-2 bg-gradient-to-br from-[color-mix(in_srgb,var(--tenant-primary)_10%,white)] to-[color-mix(in_srgb,var(--tenant-primary)_20%,white)] font-bold uppercase tracking-wide text-[var(--tenant-primary)] border-[color-mix(in_srgb,var(--tenant-primary)_20%,white)]">
+            {initials}
+          </div>
 
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/60">
-                {typeLabel}
-              </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
               <h1
-                className="mt-1 text-2xl font-bold text-white"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  letterSpacing: "-0.01em",
-                }}
+                className="text-xl font-bold text-[var(--foreground)]"
+                style={{ fontFamily: "var(--font-display)" }}
               >
                 {registration.firstName} {registration.lastName}
               </h1>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                {/* Status badge — reactive to state updates */}
-                <span
-                  className={`inline-flex h-5 items-center rounded-full border px-2.5 text-[0.65rem] font-semibold ${STATUS_HERO_CLASS[registration.status]}`}
-                >
-                  {STATUS_LABELS[registration.status]}
+              <span
+                className={`inline-flex h-6 items-center rounded-full border px-2.5 text-[0.7rem] font-semibold ${STATUS_BADGE_CLASS[registration.status]}`}
+              >
+                {STATUS_LABELS[registration.status]}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-0.5 text-[0.68rem] font-semibold text-slate-600">
+                {typeLabel}
+              </span>
+              {sourceInfo && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-[0.68rem] font-semibold text-indigo-700">
+                  {SourceIcon ? <SourceIcon className="h-3 w-3" aria-hidden /> : null}
+                  {sourceInfo.label}
                 </span>
-                {/* Target group badge (if assigned) */}
-                {registration.targetGroup ? (
-                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-500/20 px-2.5 text-[0.65rem] font-semibold text-emerald-200">
-                    <Users className="h-2.5 w-2.5" />
-                    {registration.targetGroup.name}
-                  </span>
-                ) : routingSuggestion ? (
-                  <span className="inline-flex h-5 items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 text-[0.65rem] font-semibold text-white/80">
-                    <MapPin className="h-2.5 w-2.5" />
-                    {routingSuggestion}
-                  </span>
-                ) : null}
-              </div>
+              )}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--muted)]">
+              <span className="flex items-center gap-1">
+                <Mail className="h-3 w-3" aria-hidden />
+                {registration.email}
+              </span>
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" aria-hidden />
+                {formatDateShort(registration.submittedAt, cfg)} · {formatTime(registration.submittedAt, cfg)}
+              </span>
+              {registration.birthYear ? (
+                <span className="flex items-center gap-1">
+                  <User className="h-3 w-3" aria-hidden />
+                  Jahrgang {registration.birthYear}
+                </span>
+              ) : null}
+              {registration.targetGroup ? (
+                <span className="flex items-center gap-1 text-emerald-700">
+                  <Users className="h-3 w-3" aria-hidden />
+                  {registration.targetGroup.name}
+                </span>
+              ) : routingSuggestion ? (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" aria-hidden />
+                  {routingSuggestion}
+                </span>
+              ) : null}
             </div>
           </div>
 
-          {/* Back action */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href={backHref}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white/80 backdrop-blur-sm transition hover:bg-white/20 hover:text-white"
-            >
-              <ArrowLeft className="h-3.5 w-3.5" />
-              Zurück zur Inbox
-            </Link>
-          </div>
-        </div>
-
-        {/* Quick-info strip */}
-        <div className="relative z-10 mt-6 flex flex-wrap gap-6 border-t border-white/15 pt-4">
-          <div className="flex min-w-0 items-center gap-2 text-sm text-white/80">
-            <Mail className="h-4 w-4 flex-shrink-0 text-white/60" />
-            <span className="break-all">{registration.email}</span>
-          </div>
-          {/* Goal 2 (REGISTRATION-01D): "Registriert" — date + time immediately
-              visible in the hero, never requires scrolling to Systemdaten. */}
-          <div className="flex items-center gap-2 text-sm text-white/80">
-            <Clock className="h-4 w-4 text-white/60" />
-            <span>
-              Registriert:{" "}
-              <span className="font-semibold text-white tabular-nums">
-                {formatDateShort(registration.submittedAt, cfg)}
-              </span>{" "}
-              <span className="text-white/50" aria-hidden>
-                ·
-              </span>{" "}
-              <span className="font-semibold text-white tabular-nums">
-                {formatTime(registration.submittedAt, cfg)}
-              </span>
-            </span>
-          </div>
-          {registration.birthYear ? (
-            <div className="flex items-center gap-2 text-sm text-white/80">
-              <User className="h-4 w-4 text-white/60" />
-              <span>
-                Jahrgang{" "}
-                <span className="font-semibold text-white">
-                  {registration.birthYear}
-                </span>
-              </span>
-            </div>
-          ) : null}
-          {/* Goal 6 (REGISTRATION-01E): presentation-only source label. */}
-          {sourceInfo && (
-            <div className="flex items-center gap-2 text-sm text-white/80">
-              {SourceIcon ? <SourceIcon className="h-4 w-4 text-white/60" /> : null}
-              <span>
-                Quelle: <span className="font-semibold text-white">{sourceInfo.label}</span>
-              </span>
-            </div>
-          )}
+          <Link
+            href={backHref}
+            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+            Zurück zur Inbox
+          </Link>
         </div>
       </div>
 
@@ -414,6 +341,8 @@ export default function RegistrationDetailCard({
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
         {/* Main column */}
         <div className="space-y-5">
+          <RegistrationWorkflowSteps registration={registration} locale={locale} timezone={timezone} />
+
           {/* REGISTRATION-01F: team recommendation actions, person lookup/
               creation, assignment workflow, duplicate workflow, timeline. */}
           <RegistrationWorkflowPanel
@@ -423,7 +352,10 @@ export default function RegistrationDetailCard({
             locale={locale}
             timezone={timezone}
             assignableUsers={assignableUsers}
+            eligibleCoordinators={eligibleCoordinators}
             targetGroups={targetGroups}
+            orgUnits={orgUnits}
+            teamSeasons={teamSeasons}
             onUpdate={setRegistration}
           />
 
@@ -644,11 +576,11 @@ export default function RegistrationDetailCard({
 
         {/* Sidebar */}
         <div className="space-y-5">
-          {/* Bearbeitung */}
+          {/* Status overview */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                Bearbeitung
+                Status
               </p>
               <span
                 className={`inline-flex h-5 items-center rounded-full border px-2 text-[0.65rem] font-semibold ${STATUS_BADGE_CLASS[registration.status]}`}
@@ -656,47 +588,10 @@ export default function RegistrationDetailCard({
                 {STATUS_LABELS[registration.status]}
               </span>
             </div>
-            <div className="sce-detail-section-body space-y-4">
-
-              {/* Error */}
-              {updateError ? (
-                <div className="rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-2 text-[0.75rem] text-rose-700">
-                  {updateError}
-                </div>
-              ) : null}
-
-              {/* Status */}
-              <div className="sce-data-field">
-                <span className="sce-data-label">Status</span>
-                {canEdit ? (
-                  <select
-                    value={registration.status}
-                    disabled={isUpdating}
-                    onChange={(e) =>
-                      updateStatus(e.target.value as RegistrationStatus)
-                    }
-                    className="fca-select mt-1"
-                  >
-                    {STATUS_OPTIONS.map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABELS[s]}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
-                  <span
-                    className={`mt-1 inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${STATUS_BADGE_CLASS[registration.status]}`}
-                  >
-                    {STATUS_LABELS[registration.status]}
-                  </span>
-                )}
-              </div>
-
-              {isUpdating ? (
-                <p className="text-xs text-[var(--muted)]">
-                  Wird gespeichert…
-                </p>
-              ) : null}
+            <div className="sce-detail-section-body">
+              <p className="text-xs text-[var(--muted)]">
+                Statusübergänge erfolgen über die Schnellaktionen im Workflow-Bereich links.
+              </p>
             </div>
           </div>
 

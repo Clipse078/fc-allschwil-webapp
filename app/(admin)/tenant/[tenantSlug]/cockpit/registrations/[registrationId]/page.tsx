@@ -4,6 +4,8 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getRegistrationForTenant } from "@/lib/registrations/queries";
+import { listEligibleRegistrationCoordinatorsForTenant } from "@/lib/registrations/coordinator-queries";
+import { getWaitingListScopeOptionsForTenant } from "@/lib/registrations/waiting-list-scope-options";
 import { requireTenantContextForSlug } from "@/lib/tenants/active-tenant";
 import { prisma } from "@/lib/db/prisma";
 
@@ -34,7 +36,7 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
     tenantId,
   );
 
-  const [registration, users, targetGroups] = await Promise.all([
+  const [registration, users, eligibleCoordinators, targetGroups, scopeOptions] = await Promise.all([
     getRegistrationForTenant(tenantSlug, registrationId),
     // Tenant-scoped: only users belonging to this tenant are assignable.
     prisma.user.findMany({
@@ -42,6 +44,7 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       select: { id: true, firstName: true, lastName: true, email: true },
     }),
+    listEligibleRegistrationCoordinatorsForTenant(tenantSlug),
     // Tenant-scoped: target groups for this tenant + global groups (tenantId IS NULL).
     prisma.targetGroup.findMany({
       where: {
@@ -51,6 +54,7 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       orderBy: { name: "asc" },
       select: { id: true, name: true, key: true },
     }),
+    getWaitingListScopeOptionsForTenant(tenantSlug),
   ]);
 
   const canEdit = hasPermission(session, PERMISSIONS.REGISTRATIONS_EDIT);
@@ -70,7 +74,10 @@ export default async function TenantRegistrationDetailPage({ params }: Props) {
       locale={tenantContext.locale ?? undefined}
       timezone={tenantContext.timezone ?? undefined}
       assignableUsers={users}
+      eligibleCoordinators={eligibleCoordinators}
       targetGroups={targetGroups}
+      orgUnits={scopeOptions.orgUnits}
+      teamSeasons={scopeOptions.teamSeasons}
     />
   );
 }

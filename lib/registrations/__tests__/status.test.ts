@@ -15,7 +15,10 @@ import {
   STATUS_BADGE_CLASS,
   STATUS_HERO_CLASS,
   STATUS_DOT_CLASS,
-  STATUS_GROUPS,
+  INBOX_STATUS_GROUPS,
+  ARCHIVE_STATUS_GROUPS,
+  ACTIVE_INBOX_STATUSES,
+  ARCHIVE_STATUSES,
   TERMINAL_STATUSES,
 } from "@/lib/registrations/status";
 
@@ -52,23 +55,47 @@ describe("display metadata completeness", () => {
   });
 });
 
-describe("STATUS_GROUPS (inbox filter pills)", () => {
-  it("every status belongs to exactly one group", () => {
-    for (const status of ALL_STATUSES) {
-      const owners = STATUS_GROUPS.filter((g) => g.statuses.includes(status));
+describe("INBOX_STATUS_GROUPS (active inbox filter pills)", () => {
+  it("every active inbox status belongs to exactly one group", () => {
+    for (const status of ACTIVE_INBOX_STATUSES) {
+      const owners = INBOX_STATUS_GROUPS.filter((g) => g.statuses.includes(status));
       expect(owners).toHaveLength(1);
     }
   });
 
   it("ASSIGNED groups with REVIEWING under 'In Bearbeitung'", () => {
-    const group = STATUS_GROUPS.find((g) => g.key === "REVIEWING");
+    const group = INBOX_STATUS_GROUPS.find((g) => g.key === "REVIEWING");
     expect(group?.statuses).toContain(RegistrationStatus.ASSIGNED);
     expect(group?.statuses).toContain(RegistrationStatus.REVIEWING);
   });
+});
 
-  it("WAITING has its own dedicated group", () => {
-    const group = STATUS_GROUPS.find((g) => g.key === "WAITING");
-    expect(group?.statuses).toEqual([RegistrationStatus.WAITING]);
+describe("ARCHIVE_STATUS_GROUPS", () => {
+  it("every archive status belongs to exactly one group", () => {
+    for (const status of ARCHIVE_STATUSES) {
+      const owners = ARCHIVE_STATUS_GROUPS.filter((g) => g.statuses.includes(status));
+      expect(owners).toHaveLength(1);
+    }
+  });
+
+  it("preserves distinct terminal outcomes instead of flattening them", () => {
+    expect(ARCHIVE_STATUS_GROUPS.map((group) => group.label)).toEqual([
+      "Angenommen",
+      "Abgelehnt",
+      "Archiviert",
+    ]);
+  });
+});
+
+describe("lifecycle workspace projections", () => {
+  it("keeps waiting-list registrations out of the active inbox and archive", () => {
+    expect(ACTIVE_INBOX_STATUSES).not.toContain(RegistrationStatus.WAITING);
+    expect(ARCHIVE_STATUSES).not.toContain(RegistrationStatus.WAITING);
+  });
+
+  it("covers every non-waiting registration status across inbox and archive", () => {
+    const covered = new Set([...ACTIVE_INBOX_STATUSES, ...ARCHIVE_STATUSES, RegistrationStatus.WAITING]);
+    expect(covered).toEqual(new Set(ALL_STATUSES));
   });
 });
 
