@@ -47,6 +47,7 @@ import {
   WaitingListResponsibleDisplay,
 } from "./WaitingListCoordinatorPicker";
 import RegistrationDetailDrawer from "./RegistrationDetailDrawer";
+import { RegistrationApplicantMetadataPills } from "./RegistrationApplicantMetadataPills";
 
 const TYPE_FILTER_OPTIONS: InboxTypeOption[] = [
   { value: "ALL", label: "Alle Typen" },
@@ -695,6 +696,10 @@ export default function RegistrationInbox({
                               {registration.firstName} {registration.lastName}
                             </p>
                             <p className="truncate text-xs text-[var(--muted)]">{registration.email}</p>
+                            <RegistrationApplicantMetadataPills
+                              registration={registration}
+                              className="mt-0.5"
+                            />
                             {duplicate || missingPerson ? (
                               <div className="mt-0.5 flex flex-wrap gap-2">
                                 {duplicate ? (

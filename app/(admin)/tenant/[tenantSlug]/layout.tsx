@@ -42,7 +42,6 @@
 import type { ReactNode } from "react";
 import { getCurrentTenantContext } from "@/lib/tenants/context";
 import { generateTenantCssVars } from "@/lib/tenant-runtime/theme";
-import TenantLogo from "@/components/admin/branding/TenantLogo";
 
 type Props = {
   children: ReactNode;
@@ -60,31 +59,5 @@ export default async function TenantCockpitLayout({ children, params }: Props) {
 
   // Scope --tenant-primary / --tenant-secondary to this tenant's cockpit content,
   // overriding the outer admin layout's default-tenant values for all descendants.
-  // The branded header renders the tenant logo + name — canonical Cockpit Header Area
-  // (Slice 10.9). TenantLogo handles the fallback when logoUrl is absent.
-  return (
-    <div style={tenantCssVars as React.CSSProperties}>
-      {/* Cockpit Header Area — tenant identity strip */}
-      <div className="mb-6 flex items-center gap-3 rounded-[var(--radius-xl)] border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
-        <TenantLogo
-          logoUrl={ctx?.logoUrl}
-          size={28}
-          alt={ctx?.name ? `${ctx.name} logo` : "Club logo"}
-        />
-        <div>
-          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
-            Cockpit
-          </p>
-          <p
-            className="text-[0.85rem] font-bold leading-tight tracking-tight"
-            style={{ color: "var(--tenant-primary)" }}
-          >
-            {ctx?.name ?? tenantSlug}
-          </p>
-        </div>
-      </div>
-
-      {children}
-    </div>
-  );
+  return <div style={tenantCssVars as React.CSSProperties}>{children}</div>;
 }
