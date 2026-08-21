@@ -37,6 +37,7 @@ import {
   CoordinatorFilterBar,
   WaitingListResponsibleDisplay,
 } from "./WaitingListCoordinatorPicker";
+import { RegistrationApplicantIdentity } from "./RegistrationApplicantIdentity";
 import { WaitingListDetailDrawer } from "./WaitingListDetailDrawer";
 import type { WaitingListPriority, WaitingListScopeType, WaitingListStatus } from "@prisma/client";
 
@@ -282,15 +283,25 @@ export function WaitingListWorkspace({
       ? `${entry.teamSeason.team.name} — ${entry.teamSeason.displayName}`
       : "—");
 
-  const personName = (entry: WaitingListEntryItem) =>
-    entry.person
-      ? entry.person.displayName || `${entry.person.firstName} ${entry.person.lastName}`
-      : `${entry.registration.firstName} ${entry.registration.lastName}`;
+  const applicantFirstName = (entry: WaitingListEntryItem) =>
+    entry.person?.firstName ?? entry.registration.firstName;
 
-  const birthYear = (entry: WaitingListEntryItem) =>
-    entry.person?.dateOfBirth
-      ? new Date(entry.person.dateOfBirth).getFullYear()
-      : entry.registration.birthYear;
+  const applicantLastName = (entry: WaitingListEntryItem) =>
+    entry.person?.lastName ?? entry.registration.lastName;
+
+  const registrationRawShape = (entry: WaitingListEntryItem) => ({
+    id: entry.registration.id,
+    firstName: entry.registration.firstName,
+    lastName: entry.registration.lastName,
+    email: entry.registration.email,
+    phone: entry.registration.phone ?? null,
+    birthDate: entry.registration.birthDate,
+    birthYear: entry.registration.birthYear,
+    message: entry.registration.message ?? null,
+    payloadJson: entry.registration.payloadJson ?? null,
+    source: entry.registration.source ?? null,
+    submittedAt: entry.registration.submittedAt,
+  });
 
   const handleUpdate = (updated: WaitingListEntryItem) => {
     setEntries((prev) => prev.map((entry) => (entry.id === updated.id ? updated : entry)));
@@ -607,19 +618,17 @@ export function WaitingListWorkspace({
                       )}
                     >
                       <td className="px-4 py-3">
-                        <p className="font-semibold text-[var(--foreground)]">{personName(entry)}</p>
-                        <p className="text-xs text-[var(--muted)]">{entry.registration.email}</p>
-                        {entry.person ? (
-                          <p className="mt-0.5 text-[0.68rem] text-emerald-700">Person verknüpft</p>
-                        ) : (
-                          <p className="mt-0.5 text-[0.68rem] italic text-[var(--muted)]">Noch keine Person</p>
-                        )}
+                        <RegistrationApplicantIdentity
+                          firstName={applicantFirstName(entry)}
+                          lastName={applicantLastName(entry)}
+                          registration={registrationRawShape(entry)}
+                          personId={entry.personId ?? entry.registration.personId}
+                          personDateOfBirth={entry.person?.dateOfBirth ?? null}
+                          showClubManagementState
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs text-[var(--foreground)]">{entry.registration.type}</p>
-                        {birthYear(entry) ? (
-                          <p className="text-xs text-[var(--muted)]">Jg. {birthYear(entry)}</p>
-                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs font-medium text-[var(--foreground)]">{scopeLabel(entry)}</p>

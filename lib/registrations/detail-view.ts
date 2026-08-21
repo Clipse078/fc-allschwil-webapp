@@ -38,6 +38,12 @@
  *     display lines without changing the underlying fields.
  */
 
+import {
+  deriveBirthYearFromDate,
+  payloadPersonBirthDate,
+  payloadPersonBirthYear,
+} from "./birth-year";
+
 export type RegistrationRawShape = {
   id: string;
   firstName: string;
@@ -340,13 +346,19 @@ export function getRegistrationDetailFields(
       ? payload.possibleDuplicateOf.trim()
       : null;
 
+  const playerBirthDate = registration.birthDate ?? payloadPersonBirthDate(registration.payloadJson);
+  const playerBirthYear =
+    registration.birthYear ??
+    deriveBirthYearFromDate(playerBirthDate) ??
+    payloadPersonBirthYear(registration.payloadJson);
+
   return {
     player: {
       firstName: registration.firstName,
       lastName: registration.lastName,
       gender: genderRaw,
-      birthDate: registration.birthDate,
-      birthYear: registration.birthYear,
+      birthDate: playerBirthDate,
+      birthYear: playerBirthYear,
       nationality,
     },
     address: { street, houseNumber, postalCode, city, country },

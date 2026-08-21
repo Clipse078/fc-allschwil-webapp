@@ -1,54 +1,54 @@
+import { formatDateShort, type TenantFormatConfig } from "@/lib/tenant-runtime/formatters";
+import { resolveRegistrationBirthYear } from "./birth-year";
 import { getRegistrationDetailFields, type RegistrationRawShape } from "./detail-view";
 
 export type RegistrationApplicantMetadata = {
   birthYear: number | null;
   postalCode: string | null;
   city: string | null;
+  receivedAtLabel: string | null;
 };
 
-export function deriveBirthYearFromDate(birthDate: string | null): number | null {
-  if (!birthDate) return null;
+export { deriveBirthYearFromDate, payloadPersonBirthDate, payloadPersonBirthYear, resolveRegistrationBirthYear } from "./birth-year";
 
-  const dateOnlyMatch = birthDate.match(/^(\d{4})-\d{2}-\d{2}/);
-  if (dateOnlyMatch) {
-    const year = Number.parseInt(dateOnlyMatch[1]!, 10);
-    return Number.isFinite(year) ? year : null;
-  }
-
-  const parsed = new Date(birthDate);
-  const year = parsed.getFullYear();
-  return Number.isFinite(year) ? year : null;
+export function formatApplicantReceivedDate(
+  submittedAt: string | null | undefined,
+  cfg: TenantFormatConfig,
+): string | null {
+  if (!submittedAt) return null;
+  return formatDateShort(submittedAt, cfg);
 }
 
-function payloadPersonBirthDate(payloadJson: unknown): string | null {
-  if (!payloadJson || typeof payloadJson !== "object" || Array.isArray(payloadJson)) {
-    return null;
-  }
-  const person = (payloadJson as Record<string, unknown>).person;
-  if (!person || typeof person !== "object" || Array.isArray(person)) {
-    return null;
-  }
-  const birthDate = (person as Record<string, unknown>).birthDate;
-  return typeof birthDate === "string" && birthDate.trim() ? birthDate.trim() : null;
-}
+type ApplicantMetadataOptions = {
+  personDateOfBirth?: string | null;
+  locale?: string;
+  timezone?: string;
+};
 
 /**
- * Operational applicant metadata for registration inbox rows.
- * Uses canonical registration fields / payloadJson address paths only.
+ * Operational applicant metadata for registration lifecycle rows.
+ * Uses canonical registration fields / payloadJson paths only.
  */
 export function getRegistrationApplicantMetadata(
   registration: RegistrationRawShape,
+  options: ApplicantMetadataOptions = {},
 ): RegistrationApplicantMetadata {
   const { address, player } = getRegistrationDetailFields(registration);
-  const birthYear =
-    registration.birthYear ??
-    deriveBirthYearFromDate(registration.birthDate) ??
-    deriveBirthYearFromDate(player.birthDate) ??
-    deriveBirthYearFromDate(payloadPersonBirthDate(registration.payloadJson));
+  const birthYear = resolveRegistrationBirthYear(
+    registration,
+    player,
+    options.personDateOfBirth,
+  );
+
+  const cfg: TenantFormatConfig = {
+    locale: options.locale ?? "de-CH",
+    timezone: options.timezone ?? "Europe/Zurich",
+  };
 
   return {
     birthYear,
     postalCode: address.postalCode,
     city: address.city,
+    receivedAtLabel: formatApplicantReceivedDate(registration.submittedAt, cfg),
   };
 }

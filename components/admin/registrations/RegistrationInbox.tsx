@@ -31,7 +31,6 @@ import { PopoverContent } from "@/components/ui/Popover";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import type { InboxTypeOption } from "@/lib/inbox/types";
-import { getInitials } from "@/lib/inbox/types";
 import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import {
   INBOX_STATUS_GROUPS,
@@ -52,7 +51,7 @@ import {
   WaitingListResponsibleDisplay,
 } from "./WaitingListCoordinatorPicker";
 import RegistrationDetailDrawer from "./RegistrationDetailDrawer";
-import { RegistrationApplicantMetadataPills } from "./RegistrationApplicantMetadataPills";
+import { RegistrationApplicantIdentity } from "./RegistrationApplicantIdentity";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 
 const TYPE_FILTER_OPTIONS: InboxTypeOption[] = [
@@ -725,10 +724,7 @@ export default function RegistrationInbox({
                   const { birthYear } = getRegistrationApplicantMetadata(registration);
                   const classification = classifyRegistration(birthYear, gender, registration.type);
                   const isSelected = selectedRegistration?.id === registration.id;
-                  const initials = getInitials(registration.firstName, registration.lastName);
                   const duplicate = isActiveDuplicate(registration);
-                  const missingPerson = needsPerson(registration);
-                  const linkedPerson = !!registration.personId;
                   const completionAt = registration.archivedAt ?? registration.updatedAt;
 
                   return (
@@ -742,37 +738,18 @@ export default function RegistrationInbox({
                       )}
                     >
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] text-[0.65rem] font-bold uppercase text-[var(--blue)]">
-                            {initials}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[var(--foreground)]">
-                              {registration.firstName} {registration.lastName}
-                            </p>
-                            <p className="truncate text-xs text-[var(--muted)]">{registration.email}</p>
-                            <RegistrationApplicantMetadataPills
-                              registration={registration}
-                              className="mt-0.5"
-                            />
-                            {(duplicate || missingPerson || linkedPerson) && !isArchive ? (
-                              <div className="mt-0.5 flex flex-wrap gap-2">
-                                {duplicate ? (
-                                  <span className="text-[0.65rem] font-medium text-amber-600">Duplikat</span>
-                                ) : null}
-                                {missingPerson ? (
-                                  <span className="text-[0.65rem] font-medium text-violet-600">
-                                    Noch nicht in der Vereinsverwaltung
-                                  </span>
-                                ) : linkedPerson ? (
-                                  <span className="text-[0.65rem] font-medium text-emerald-700">
-                                    In Vereinsverwaltung
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
+                        <RegistrationApplicantIdentity
+                          firstName={registration.firstName}
+                          lastName={registration.lastName}
+                          registration={registration}
+                          personId={registration.personId}
+                          locale={locale}
+                          timezone={timezone}
+                          showClubManagementState
+                        />
+                        {duplicate && !isArchive ? (
+                          <p className="mt-0.5 pl-[2.625rem] text-[0.65rem] font-medium text-amber-600">Duplikat</p>
+                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs text-[var(--foreground)]">{TYPE_LABELS[registration.type] ?? registration.type}</p>
