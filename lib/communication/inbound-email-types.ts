@@ -1,11 +1,6 @@
-export type InboundEmailAttachment = {
-  id: string;
-  filename: string | null;
-  contentType: string | null;
-  contentDisposition: string | null;
-  contentId: string | null;
-  size: number | null;
-};
+import type { CommunicationAttachmentMetadata } from "@/lib/communication/attachment-metadata";
+
+export type InboundEmailAttachment = CommunicationAttachmentMetadata;
 
 export type NormalizedInboundEmail = {
   provider: string;

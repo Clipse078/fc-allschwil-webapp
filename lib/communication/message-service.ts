@@ -19,6 +19,9 @@ import {
   requireCommunicationThreadForTenant,
 } from "@/lib/communication/thread-service";
 import type { CommunicationTargetType } from "@prisma/client";
+import type {
+  CommunicationAttachmentMetadataList,
+} from "@/lib/communication/attachment-metadata";
 
 const messageSelect = {
   id: true,
@@ -64,7 +67,7 @@ export type CreateCommunicationMessageInput = {
   providerEventId?: string | null;
   providerMessageId?: string | null;
   replyToAddress?: string | null;
-  attachments?: unknown[] | null;
+  attachments?: CommunicationAttachmentMetadataList | null;
   deliveryError?: string | null;
   messageIdHeader?: string | null;
   inReplyTo?: string | null;
