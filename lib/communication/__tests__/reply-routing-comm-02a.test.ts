@@ -60,6 +60,12 @@ describe("COMM-02A inbound reply token + routing address constraints", () => {
     expect(extracted).toBe(legacyToken);
   });
 
+  it("parses current 48-character tokens (COMM-02A compatibility)", () => {
+    const token48 = "b".repeat(48);
+    const extracted = extractInboundReplyTokenFromAddresses([`reply+${token48}@${DOMAIN}`]);
+    expect(extracted).toBe(token48);
+  });
+
   it("returns null when EMAIL_INBOUND_DOMAIN is missing", () => {
     delete process.env.EMAIL_INBOUND_DOMAIN;
     expect(buildInboundReplyToAddress(generateInboundReplyToken())).toBeNull();
