@@ -115,7 +115,7 @@ export function EmailCommunicationPanel({
       if (!response.ok) {
         throw new Error(payload.error ?? "E-Mail-Verlauf konnte nicht geladen werden.");
       }
-      if (!payload.recipient) {
+      if (!payload.recipient || (payload.recipient.available && !payload.recipient.email)) {
         throw new Error("E-Mail-Verlauf konnte nicht geladen werden.");
       }
       if (generation !== requestGenerationRef.current) return;
@@ -282,7 +282,7 @@ export function EmailCommunicationPanel({
           </section>
 
           {recipient ? (
-          <section aria-label="E-Mail verfassen" className="mt-5 border-t border-[var(--border)] pt-5">
+            <section aria-label="E-Mail verfassen" className="mt-5 border-t border-[var(--border)] pt-5">
             <div className="mb-4">
               <p className="text-sm font-semibold text-[var(--foreground)]">Neue E-Mail</p>
               <p className="mt-0.5 text-xs text-[var(--muted)]">Direkt aus SportClubEvo senden</p>
@@ -291,7 +291,7 @@ export function EmailCommunicationPanel({
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">An</span>
               <div className="min-h-10 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm text-[var(--text-2)]">
-                {recipient?.email ?? "Keine E-Mail-Adresse verfügbar"}
+                {recipient.available ? recipient.email : "Keine E-Mail-Adresse verfügbar"}
               </div>
             </label>
 
@@ -339,7 +339,7 @@ export function EmailCommunicationPanel({
                 {sending ? "Wird gesendet…" : "E-Mail senden"}
               </button>
             </div>
-          </section>
+            </section>
           ) : null}
         </>
       )}
