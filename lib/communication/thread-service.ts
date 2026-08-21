@@ -168,8 +168,24 @@ export async function getCommunicationThreadByInboundToken(
     throw new CommunicationServiceError("INVALID_INPUT", "inboundReplyToken ist erforderlich.");
   }
 
-  return prisma.communicationThread.findFirst({
+  const thread = await prisma.communicationThread.findFirst({
     where: { inboundReplyToken: token },
+    select: threadSelect,
+  });
+  if (thread) return thread;
+
+  // Backward compatibility: if a token was rotated after an outbound message was
+  // sent, the reply address in the delivered email still contains the old token.
+  // Resolve the owning thread via the stored outbound message metadata without
+  // trusting any webhook-supplied tenant context.
+  const message = await prisma.communicationMessage.findFirst({
+    where: { replyToAddress: { startsWith: `reply+${token}@` } },
+    select: { threadId: true, tenantId: true },
+  });
+  if (!message) return null;
+
+  return prisma.communicationThread.findFirst({
+    where: { id: message.threadId, tenantId: message.tenantId },
     select: threadSelect,
   });
 }

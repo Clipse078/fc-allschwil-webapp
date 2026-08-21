@@ -89,6 +89,45 @@ describe("COMM-02 inbound email persistence", () => {
     );
   });
 
+  it("resolves legacy reply tokens via stored outbound replyToAddress after token rotation", async () => {
+    // Simulate a token that no longer exists on the thread (rotated), but was used
+    // in a previously sent outbound reply-to address.
+    mocks.threadFindFirst.mockImplementation(async (args) => {
+      const where = (args as { where?: Record<string, unknown> }).where ?? {};
+      if ("inboundReplyToken" in where) return null;
+      if (where.id === THREAD_A && where.tenantId === TENANT_A) return thread();
+      return null;
+    });
+    mocks.messageFindFirst.mockImplementation(async (args) => {
+      const where = (args as { where?: Record<string, unknown> }).where ?? {};
+      // Thread resolution fallback lookup by replyToAddress prefix.
+      if (where.replyToAddress) return { threadId: THREAD_A, tenantId: TENANT_A };
+      // Idempotency lookup: no existing inbound message.
+      return null;
+    });
+
+    const result = await persistInboundEmailReply({
+      provider: "resend",
+      providerEventId: "evt-1",
+      providerMessageId: "email-legacy-1",
+      fromAddress: "customer@example.com",
+      toAddresses: [`reply+${TOKEN_A}@inbound.example.com`],
+      ccAddresses: [],
+      bccAddresses: [],
+      subject: "Re: Hallo",
+      bodyText: "Danke!",
+      bodyHtml: null,
+      messageIdHeader: "<m1@example.com>",
+      inReplyTo: "<m0@example.com>",
+      references: ["<m0@example.com>"],
+      receivedAt: new Date("2026-08-21T11:00:00.000Z"),
+      attachments: null,
+    });
+
+    expect(result).toMatchObject({ ok: true, kind: "PERSISTED", tenantId: TENANT_A, threadId: THREAD_A });
+    expect(mocks.messageCreate).toHaveBeenCalled();
+  });
+
   it("blocks cross-tenant idempotency conflicts safely", async () => {
     mocks.messageFindFirst.mockResolvedValue({ id: "msg-in-1", tenantId: "tenant-b", threadId: "thread-b" });
 
