@@ -1,36 +1,63 @@
 /**
- * COMM-01C: Safe public DTOs for the outbound email history.
+ * COMM-02: Safe public DTOs for email thread history (inbound + outbound).
  */
 import { prisma } from "@/lib/db/prisma";
 import { resolveAuditActorDisplayName } from "@/lib/registrations/actor-display";
 import type { CommunicationMessageRecord } from "@/lib/communication/message-service";
 
-export type PublicOutboundEmailMessage = {
+export type PublicEmailThreadMessage = {
   id: string;
+  direction: "OUTBOUND" | "INBOUND";
   subject: string;
   body: string;
-  recipient: string;
-  status: "QUEUED" | "SENT" | "FAILED";
+  from: string | null;
+  to: string | null;
+  status: "QUEUED" | "SENT" | "FAILED" | "RECEIVED";
   senderDisplayName: string | null;
   sentAt: string | null;
+  receivedAt: string | null;
   createdAt: string;
   deliveryError: string | null;
+  attachmentCount: number;
 };
 
-function firstRecipient(value: unknown): string {
-  return Array.isArray(value) && typeof value[0] === "string" ? value[0] : "";
+function firstAddress(value: unknown): string | null {
+  return Array.isArray(value) && typeof value[0] === "string" ? value[0] : null;
 }
 
-export async function toPublicOutboundEmailMessages(
+function htmlToPlainText(input: string): string {
+  // Minimal, safe HTML→text fallback for display only (no fragile quoting logic).
+  return input
+    .replaceAll(/<br\s*\/?>/gi, "\n")
+    .replaceAll(/<\/p>/gi, "\n")
+    .replaceAll(/<[^>]+>/g, "")
+    .replaceAll(/&nbsp;/g, " ")
+    .replaceAll(/&amp;/g, "&")
+    .replaceAll(/&lt;/g, "<")
+    .replaceAll(/&gt;/g, ">")
+    .replaceAll(/&quot;/g, '"')
+    .replaceAll(/&#039;/g, "'")
+    .trim();
+}
+
+function safeEmailBodyForDisplay(message: CommunicationMessageRecord): string {
+  if (typeof message.bodyText === "string" && message.bodyText.trim()) return message.bodyText;
+  if (typeof message.bodyHtml === "string" && message.bodyHtml.trim()) return htmlToPlainText(message.bodyHtml);
+  return "";
+}
+
+function attachmentCount(value: unknown): number {
+  return Array.isArray(value) ? value.length : 0;
+}
+
+export async function toPublicEmailThreadMessages(
   tenantId: string,
   messages: CommunicationMessageRecord[],
-): Promise<PublicOutboundEmailMessage[]> {
-  const outgoing = messages.filter(
-    (message) => message.direction === "OUTBOUND" && message.channel === "EMAIL",
-  );
+): Promise<PublicEmailThreadMessage[]> {
+  const emailMessages = messages.filter((message) => message.channel === "EMAIL");
   const userIds = [
     ...new Set(
-      outgoing
+      emailMessages
         .map((message) => message.createdByUserId)
         .filter((id): id is string => typeof id === "string"),
     ),
@@ -55,22 +82,36 @@ export async function toPublicOutboundEmailMessages(
     users.map((user) => [user.id, resolveAuditActorDisplayName(user)]),
   );
 
-  return outgoing.map((message) => ({
+  return emailMessages.map((message) => ({
     id: message.id,
+    direction: message.direction,
     subject: message.subject ?? "",
-    body: message.bodyText ?? "",
-    recipient: firstRecipient(message.toAddresses),
+    body: safeEmailBodyForDisplay(message),
+    from: message.fromAddress ?? null,
+    to: firstAddress(message.toAddresses),
     status:
-      message.status === "SENT" || message.status === "DELIVERED"
-        ? "SENT"
-        : message.status === "FAILED"
-          ? "FAILED"
-          : "QUEUED",
+      message.direction === "INBOUND"
+        ? "RECEIVED"
+        : message.status === "SENT" || message.status === "DELIVERED"
+          ? "SENT"
+          : message.status === "FAILED"
+            ? "FAILED"
+            : "QUEUED",
     senderDisplayName: message.createdByUserId
       ? (actorNames.get(message.createdByUserId) ?? null)
       : null,
     sentAt: message.sentAt?.toISOString() ?? null,
+    receivedAt: message.receivedAt?.toISOString() ?? null,
     createdAt: message.createdAt.toISOString(),
     deliveryError: message.status === "FAILED" ? message.deliveryError : null,
+    attachmentCount: attachmentCount((message as any).attachments),
   }));
+}
+
+export async function toPublicOutboundEmailMessages(
+  tenantId: string,
+  messages: CommunicationMessageRecord[],
+): Promise<PublicEmailThreadMessage[]> {
+  const mapped = await toPublicEmailThreadMessages(tenantId, messages);
+  return mapped.filter((m) => m.direction === "OUTBOUND");
 }

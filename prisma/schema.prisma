@@ -2255,7 +2255,14 @@ model CommunicationMessage {
 
   /// Provider identifier (e.g. "resend"). Kept as string for extensibility.
   provider          String?
+  /// Provider webhook/event identifier (e.g. Standard Webhooks / Svix message id).
+  /// Used for idempotency across webhook retries when available.
+  providerEventId   String?
   providerMessageId String?
+  /// Reply-To address used for outbound messages when reply routing is enabled.
+  replyToAddress    String?
+  /// Normalized attachment metadata (no binary payloads).
+  attachments       Json?
   /// Safe, user-displayable delivery failure summary. Never store provider
   /// credentials, raw request payloads, or unfiltered provider responses.
   deliveryError     String?
@@ -2276,10 +2283,14 @@ model CommunicationMessage {
   thread        CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   createdByUser User?               @relation("CommunicationMessageCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
+  @@unique([provider, providerMessageId])
+  @@unique([provider, providerEventId])
   @@index([tenantId])
   @@index([tenantId, threadId])
   @@index([tenantId, createdAt])
   @@index([tenantId, providerMessageId])
+  @@index([provider, providerMessageId])
+  @@index([provider, providerEventId])
 }
 
 model InternalComment {

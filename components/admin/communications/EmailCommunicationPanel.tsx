@@ -11,7 +11,7 @@ import {
   MAX_EMAIL_BODY_LENGTH,
   MAX_EMAIL_SUBJECT_LENGTH,
 } from "@/lib/communication/constants";
-import type { PublicOutboundEmailMessage } from "@/lib/communication/message-enrichment";
+import type { PublicEmailThreadMessage } from "@/lib/communication/message-enrichment";
 import type { CommunicationRecipient } from "@/lib/communication/recipient-resolver";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 import { REGISTRATION_DRAWER_TAB_CONTENT_CLASS } from "@/components/admin/registrations/RegistrationDrawerTabShell";
@@ -29,7 +29,7 @@ type Props = {
 
 type ThreadResponse = { thread?: { id: string }; error?: string };
 type HistoryResponse = {
-  messages?: PublicOutboundEmailMessage[];
+  messages?: PublicEmailThreadMessage[];
   recipient?: CommunicationRecipient;
   error?: string;
 };
@@ -38,6 +38,7 @@ const STATUS = {
   SENT: { label: "Gesendet", Icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700" },
   FAILED: { label: "Fehlgeschlagen", Icon: AlertCircle, className: "bg-rose-50 text-rose-700" },
   QUEUED: { label: "Wird gesendet", Icon: Clock3, className: "bg-amber-50 text-amber-700" },
+  RECEIVED: { label: "Empfangen", Icon: Mail, className: "bg-slate-50 text-slate-700" },
 } as const;
 
 function EmailHistoryCard({
@@ -45,12 +46,17 @@ function EmailHistoryCard({
   locale,
   timezone,
 }: {
-  message: PublicOutboundEmailMessage;
+  message: PublicEmailThreadMessage;
   locale: string;
   timezone: string;
 }) {
   const status = STATUS[message.status];
   const { Icon } = status;
+  const isInbound = message.direction === "INBOUND";
+  const metaLine = isInbound ? `Von ${message.from ?? "-"}` : `An ${message.to ?? "-"}`;
+  const timestamp =
+    (isInbound ? message.receivedAt : message.sentAt) ?? message.createdAt;
+
   return (
     <article className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -59,7 +65,7 @@ function EmailHistoryCard({
             {message.subject}
           </h3>
           <p className="mt-1 break-all text-[0.7rem] text-[var(--muted)]">
-            An {message.recipient}
+            {metaLine}
           </p>
         </div>
         <span className={cn("inline-flex flex-shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[0.65rem] font-semibold", status.className)}>
@@ -71,8 +77,9 @@ function EmailHistoryCard({
         {message.body}
       </p>
       <div className="mt-3 border-t border-[var(--border)] pt-2 text-[0.7rem] text-[var(--muted)]">
-        {formatDateTimeCompact(message.sentAt ?? message.createdAt, { locale, timezone })}
-        {message.senderDisplayName ? ` · ${message.senderDisplayName}` : ""}
+        {formatDateTimeCompact(timestamp, { locale, timezone })}
+        {!isInbound && message.senderDisplayName ? ` · ${message.senderDisplayName}` : ""}
+        {message.attachmentCount ? ` · ${message.attachmentCount} Anhänge` : ""}
       </div>
       {message.status === "FAILED" ? (
         <p className="mt-2 text-xs text-rose-600">
@@ -94,7 +101,7 @@ export function EmailCommunicationPanel({
   enabled = true,
 }: Props) {
   const [threadId, setThreadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<PublicOutboundEmailMessage[] | null>(null);
+  const [messages, setMessages] = useState<PublicEmailThreadMessage[] | null>(null);
   const [recipient, setRecipient] = useState<CommunicationRecipient | null>(null);
   const [subject, setSubject] = useState("");
   const [bodyText, setBodyText] = useState("");

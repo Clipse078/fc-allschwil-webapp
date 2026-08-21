@@ -40,6 +40,7 @@ export type MailMessage = {
   subject: string;
   html: string;
   text?: string;
+  replyTo?: string;
   idempotencyKey?: string;
 };
 
@@ -92,6 +93,7 @@ export async function sendMail(message: MailMessage): Promise<MailDeliveryResult
       subject: message.subject,
       html: message.html,
       text: message.text,
+      replyTo: message.replyTo,
     },
     message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined,
   );

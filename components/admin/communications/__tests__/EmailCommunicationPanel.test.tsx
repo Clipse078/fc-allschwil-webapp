@@ -253,14 +253,18 @@ describe("COMM-01C email communication UX", () => {
         messages: [
           {
             id: "message-a",
+            direction: "OUTBOUND",
             subject: longSubject,
             body: longBody,
-            recipient: "anna@example.com",
+            from: null,
+            to: "anna@example.com",
             status: "FAILED",
             senderDisplayName: "Michael Duijster",
             sentAt: null,
+            receivedAt: null,
             createdAt: "2026-08-21T10:00:00.000Z",
             deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
+            attachmentCount: 0,
           },
         ],
       });

@@ -14,7 +14,11 @@ import {
   type CommunicationMessageRecord,
 } from "@/lib/communication/message-service";
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
-import { requireCommunicationThreadForTenant } from "@/lib/communication/thread-service";
+import {
+  ensureStableInboundReplyTokenForThread,
+  requireCommunicationThreadForTenant,
+} from "@/lib/communication/thread-service";
+import { buildInboundReplyToAddress } from "@/lib/communication/reply-routing";
 
 export type SendOutboundEmailInput = {
   tenantId: string;
@@ -87,7 +91,8 @@ export async function sendOutboundEmailForThread(
   }
 
   const { subject, bodyText } = normalizeContent(input);
-  const thread = await requireCommunicationThreadForTenant(tenantId, input.threadId);
+  // Ensure reply-token survives common email address normalization.
+  const thread = await ensureStableInboundReplyTokenForThread(tenantId, input.threadId);
   const recipient = await resolveCommunicationRecipientForTarget({
     tenantId,
     targetType: thread.targetType,
@@ -107,6 +112,8 @@ export async function sendOutboundEmailForThread(
     );
   }
 
+  const replyToAddress = buildInboundReplyToAddress(thread.inboundReplyToken);
+
   const pending = await prisma.communicationMessage.create({
     data: {
       tenantId,
@@ -118,6 +125,7 @@ export async function sendOutboundEmailForThread(
       toAddresses: [recipient.email],
       provider: "resend",
       status: "QUEUED",
+      replyToAddress,
       createdByUserId: actorUserId,
     },
   });
@@ -129,6 +137,7 @@ export async function sendOutboundEmailForThread(
       subject,
       text: bodyText,
       html: plainTextToSafeHtml(bodyText),
+      replyTo: replyToAddress ?? undefined,
       idempotencyKey: pending.id,
     });
   } catch (error) {

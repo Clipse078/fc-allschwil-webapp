@@ -43,6 +43,8 @@ import { resolveCommunicationRecipientForTarget } from "@/lib/communication/reci
 const TENANT_A = "tenant-a";
 const THREAD_A = "thread-a";
 const ACTOR_A = "actor-a";
+const STABLE_TOKEN = "a".repeat(64);
+const INBOUND_DOMAIN = "inbound.example.com";
 
 function thread(targetType: "REGISTRATION" | "WAITING_LIST_ENTRY", targetId: string) {
   return {
@@ -50,7 +52,7 @@ function thread(targetType: "REGISTRATION" | "WAITING_LIST_ENTRY", targetId: str
     tenantId: TENANT_A,
     targetType,
     targetId,
-    inboundReplyToken: "secret",
+    inboundReplyToken: STABLE_TOKEN,
     createdByUserId: ACTOR_A,
     createdAt: new Date("2026-08-21T10:00:00.000Z"),
     updatedAt: new Date("2026-08-21T10:00:00.000Z"),
@@ -109,6 +111,7 @@ function storedMessage(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.EMAIL_INBOUND_DOMAIN = INBOUND_DOMAIN;
   mocks.state.message = null;
   mocks.recordAudit.mockResolvedValue(undefined);
   mocks.sendMail.mockResolvedValue({
@@ -194,13 +197,16 @@ describe("COMM-01C outbound delivery", () => {
   it("H/J/M — sends registration mail and persists provider id, SENT, actor and audit", async () => {
     const result = await sendRegistration();
 
-    expect(mocks.sendMail).toHaveBeenCalledWith({
-      to: "anna@example.com",
-      subject: "Willkommen",
-      text: "Hallo Anna",
-      html: "<p>Hallo Anna</p>",
-      idempotencyKey: "message-a",
-    });
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: "anna@example.com",
+        subject: "Willkommen",
+        text: "Hallo Anna",
+        html: "<p>Hallo Anna</p>",
+        replyTo: `reply+${STABLE_TOKEN}@${INBOUND_DOMAIN}`,
+        idempotencyKey: "message-a",
+      }),
+    );
     expect(mocks.messageCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: TENANT_A,
@@ -208,6 +214,7 @@ describe("COMM-01C outbound delivery", () => {
         direction: "OUTBOUND",
         channel: "EMAIL",
         status: "QUEUED",
+        replyToAddress: `reply+${STABLE_TOKEN}@${INBOUND_DOMAIN}`,
         createdByUserId: ACTOR_A,
       }),
     });

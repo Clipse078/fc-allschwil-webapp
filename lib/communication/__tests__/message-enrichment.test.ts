@@ -39,7 +39,10 @@ describe("COMM-01C public email history", () => {
         fromAddress: "private-sender@example.com",
         toAddresses: ["anna@example.com"],
         provider: "resend",
+        providerEventId: null,
         providerMessageId: "provider-secret-id",
+        replyToAddress: null,
+        attachments: null,
         deliveryError: null,
         messageIdHeader: null,
         inReplyTo: null,
@@ -54,14 +57,14 @@ describe("COMM-01C public email history", () => {
     ]);
 
     expect(result).toMatchObject({
+      direction: "OUTBOUND",
       senderDisplayName: "Michael Duijster",
-      recipient: "anna@example.com",
+      to: "anna@example.com",
       status: "SENT",
     });
     expect(result).not.toHaveProperty("tenantId");
     expect(result).not.toHaveProperty("threadId");
     expect(result).not.toHaveProperty("provider");
     expect(result).not.toHaveProperty("providerMessageId");
-    expect(result).not.toHaveProperty("fromAddress");
   });
 });
