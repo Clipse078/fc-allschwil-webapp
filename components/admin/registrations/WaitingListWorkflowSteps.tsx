@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * WaitingListWorkflowSteps — REG-WAIT-01D
+ * WaitingListWorkflowSteps — REG-WAIT-01D / REG-WAIT-01E
  *
  * Visual workflow progression for a waiting-list entry.
+ * Phase 01E: Fixed horizontal overflow — stepper now wraps within drawer width.
  */
 
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
@@ -46,8 +47,9 @@ export function WaitingListWorkflowSteps({ entry }: Props) {
         </span>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
-        <ol className="flex min-w-[520px] items-start gap-0">
+      {/* Stepper — no horizontal scroll; uses flex-wrap for narrow drawers */}
+      <div className="mt-4">
+        <ol className="flex flex-wrap items-start gap-y-3">
           {steps.map((step, index) => {
             const isCompleted = index < currentIndex || (entry.status === "PLACED" && index <= 4);
             const isCurrent =
@@ -60,7 +62,8 @@ export function WaitingListWorkflowSteps({ entry }: Props) {
             const isFuture = !isCompleted && !isCurrent;
 
             return (
-              <li key={step.key} className="relative flex flex-1 min-w-0 flex-col items-center text-center">
+              <li key={step.key} className="relative flex flex-1 min-w-[4.5rem] flex-col items-center text-center">
+                {/* Left connector */}
                 {index > 0 ? (
                   <span
                     aria-hidden
@@ -70,6 +73,7 @@ export function WaitingListWorkflowSteps({ entry }: Props) {
                     )}
                   />
                 ) : null}
+                {/* Right connector */}
                 {index < steps.length - 1 ? (
                   <span
                     aria-hidden

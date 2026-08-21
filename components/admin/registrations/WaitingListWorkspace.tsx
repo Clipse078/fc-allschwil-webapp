@@ -3,13 +3,15 @@
 /**
  * components/admin/registrations/WaitingListWorkspace.tsx
  *
- * REG-WAIT-01D: Premium operational Warteliste cockpit.
+ * REG-WAIT-01D / REG-WAIT-01E: Premium operational Warteliste cockpit.
+ * Phase 01E: Compact filter bar (no legacy selects), canonical coordinator filter.
  */
 
 import { useMemo, useState } from "react";
 import {
   Archive,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   Clock,
   Filter,
@@ -32,7 +34,7 @@ import {
   waitingListDuration,
 } from "@/lib/registrations/waiting-list-ui";
 import {
-  WaitingListCoordinatorFilter,
+  CoordinatorFilterBar,
   WaitingListResponsibleDisplay,
 } from "./WaitingListCoordinatorPicker";
 import { WaitingListDetailDrawer } from "./WaitingListDetailDrawer";
@@ -52,11 +54,15 @@ function MetricCard({
   label,
   value,
   tone,
+  onClick,
+  active,
 }: {
   icon: typeof Clock;
   label: string;
   value: number;
   tone: "amber" | "blue" | "purple" | "emerald" | "slate" | "rose";
+  onClick?: () => void;
+  active?: boolean;
 }) {
   const toneClass: Record<typeof tone, string> = {
     amber: "text-amber-600",
@@ -68,7 +74,15 @@ function MetricCard({
   };
 
   return (
-    <div className="sce-kpi-card">
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "sce-kpi-card text-left transition-all",
+        onClick && "cursor-pointer hover:shadow-md",
+        active && "ring-2 ring-[var(--tenant-primary)] ring-offset-1",
+      )}
+    >
       <p className="sce-data-label flex items-center gap-1.5">
         <Icon className="h-3 w-3" aria-hidden />
         {label}
@@ -79,7 +93,7 @@ function MetricCard({
       >
         {value}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -100,6 +114,102 @@ function FilterChip({
       <X className="h-3 w-3" aria-hidden />
     </button>
   );
+}
+
+// Compact dropdown for status / priority / scope filters
+function CompactFilterSelect<T extends string>({
+  label,
+  value,
+  onChange,
+  options,
+  active,
+}: {
+  label: string;
+  value: T | "";
+  onChange: (v: T | "") => void;
+  options: { value: T; label: string }[];
+  active?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const currentLabel = options.find((o) => o.value === value)?.label ?? null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className={cn(
+          "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+          active || value
+            ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
+            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+        )}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={label}
+      >
+        <span className="max-w-[120px] truncate">{currentLabel ?? label}</span>
+        <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-60" aria-hidden />
+        {value ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onChange("" as T | ""); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onChange("" as T | ""); } }}
+            className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full hover:bg-[var(--tenant-primary)]/20"
+            aria-label="Filter entfernen"
+          >
+            <X className="h-2.5 w-2.5" />
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <ul
+          role="listbox"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[160px] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
+        >
+          <li role="option" aria-selected={!value}>
+            <button
+              type="button"
+              onMouseDown={() => { onChange(""); setOpen(false); }}
+              className={cn(
+                "flex w-full items-start px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
+                !value && "bg-[var(--surface-2)] font-semibold",
+              )}
+            >
+              Alle
+            </button>
+          </li>
+          {options.map((opt) => (
+            <li key={opt.value} role="option" aria-selected={value === opt.value}>
+              <button
+                type="button"
+                onMouseDown={() => { onChange(opt.value); setOpen(false); }}
+                className={cn(
+                  "flex w-full items-start px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
+                  value === opt.value && "bg-[var(--surface-2)] font-semibold",
+                )}
+              >
+                {opt.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+const SCOPE_TYPE_LABELS: Record<WaitingListScopeType, string> = {
+  TARGET_GROUP: "Zielgruppe",
+  ORG_UNIT: "Abteilung",
+  TEAM_SEASON: "Team",
+};
+
+function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
+  return SCOPE_TYPE_LABELS[entry.scopeType];
 }
 
 export function WaitingListWorkspace({
@@ -171,16 +281,6 @@ export function WaitingListWorkspace({
     (entry.teamSeason
       ? `${entry.teamSeason.team.name} — ${entry.teamSeason.displayName}`
       : "—");
-
-const SCOPE_TYPE_LABELS: Record<WaitingListScopeType, string> = {
-  TARGET_GROUP: "Zielgruppe",
-  ORG_UNIT: "Abteilung",
-  TEAM_SEASON: "Team",
-};
-
-function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
-  return SCOPE_TYPE_LABELS[entry.scopeType];
-}
 
   const personName = (entry: WaitingListEntryItem) =>
     entry.person
@@ -266,6 +366,25 @@ function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
       : null,
   ].filter(Boolean) as { key: string; label: string; onRemove: () => void }[];
 
+  const statusFilterOptions = [
+    { value: "active" as const, label: "Aktive Einträge" },
+    { value: "all" as const, label: "Alle Status" },
+    ...(Object.entries(WAITING_LIST_STATUS_LABELS) as [WaitingListStatus, string][]).map(([key, label]) => ({
+      value: key,
+      label,
+    })),
+  ];
+
+  const priorityFilterOptions = (Object.entries(WAITING_LIST_PRIORITY_LABELS) as [WaitingListPriority, string][]).map(
+    ([key, label]) => ({ value: key, label }),
+  );
+
+  const scopeFilterOptions = [
+    { value: "TARGET_GROUP" as WaitingListScopeType, label: "Zielgruppe" },
+    { value: "ORG_UNIT" as WaitingListScopeType, label: "Abteilung" },
+    { value: "TEAM_SEASON" as WaitingListScopeType, label: "Team / Saison" },
+  ];
+
   return (
     <div className="flex h-full min-h-0">
       <div
@@ -274,31 +393,77 @@ function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
           selectedEntry ? "hidden lg:flex" : "flex",
         )}
       >
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className="border-b border-[var(--border)] bg-white px-6 py-4">
-          <div className="mb-4">
-            <h1
-              className="flex items-center gap-2 text-xl font-bold text-[var(--foreground)]"
-              style={{ fontFamily: "var(--font-display)" }}
-            >
-              <ClipboardList className="h-5 w-5 text-[var(--tenant-primary)]" aria-hidden />
-              Warteliste
-            </h1>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">
-              Übersicht und Verwaltung der Wartelisten-Einträge
-            </p>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h1
+                className="flex items-center gap-2 text-xl font-bold text-[var(--foreground)]"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                <ClipboardList className="h-5 w-5 text-[var(--tenant-primary)]" aria-hidden />
+                Warteliste
+              </h1>
+              <p className="mt-0.5 text-sm text-[var(--muted)]">
+                Übersicht und Verwaltung der Wartelisten-Einträge
+              </p>
+            </div>
           </div>
 
+          {/* ── KPI metrics — clickable to filter by status ─────────────── */}
           <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            <MetricCard icon={Clock} label="Wartend" value={metrics.waiting} tone="amber" />
-            <MetricCard icon={UserCheck} label="Kontaktiert" value={metrics.contacted} tone="blue" />
-            <MetricCard icon={Flag} label="Angebot gemacht" value={metrics.offered} tone="purple" />
-            <MetricCard icon={CheckCircle2} label="Platziert" value={metrics.placed} tone="emerald" />
-            <MetricCard icon={X} label="Abgesagt / beendet" value={metrics.ended} tone="rose" />
-            <MetricCard icon={Archive} label="Archiviert" value={metrics.archived} tone="slate" />
+            <MetricCard
+              icon={Clock}
+              label="Wartend"
+              value={metrics.waiting}
+              tone="amber"
+              active={statusFilter === "WAITING"}
+              onClick={() => setStatusFilter((v) => (v === "WAITING" ? "active" : "WAITING"))}
+            />
+            <MetricCard
+              icon={UserCheck}
+              label="Kontaktiert"
+              value={metrics.contacted}
+              tone="blue"
+              active={statusFilter === "CONTACTED"}
+              onClick={() => setStatusFilter((v) => (v === "CONTACTED" ? "active" : "CONTACTED"))}
+            />
+            <MetricCard
+              icon={Flag}
+              label="Angebot gemacht"
+              value={metrics.offered}
+              tone="purple"
+              active={statusFilter === "OFFERED"}
+              onClick={() => setStatusFilter((v) => (v === "OFFERED" ? "active" : "OFFERED"))}
+            />
+            <MetricCard
+              icon={CheckCircle2}
+              label="Platziert"
+              value={metrics.placed}
+              tone="emerald"
+              active={statusFilter === "PLACED"}
+              onClick={() => setStatusFilter((v) => (v === "PLACED" ? "active" : "PLACED"))}
+            />
+            <MetricCard
+              icon={X}
+              label="Abgesagt / beendet"
+              value={metrics.ended}
+              tone="rose"
+            />
+            <MetricCard
+              icon={Archive}
+              label="Archiviert"
+              value={metrics.archived}
+              tone="slate"
+              active={statusFilter === "ARCHIVED"}
+              onClick={() => setStatusFilter((v) => (v === "ARCHIVED" ? "active" : "ARCHIVED"))}
+            />
           </div>
 
+          {/* ── Filter bar ──────────────────────────────────────────────── */}
           <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
             <div className="flex flex-wrap items-center gap-2">
+              {/* Search */}
               <div className="relative min-w-[220px] flex-1">
                 <Search
                   className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--muted)]"
@@ -310,52 +475,34 @@ function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Name, E-Mail suchen…"
                   className="fca-input h-8 w-full pl-8 text-xs"
+                  aria-label="Suchen"
                 />
               </div>
 
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="fca-select h-8 min-w-[150px] text-xs"
-              >
-                <option value="active">Aktive Einträge</option>
-                <option value="all">Alle Status</option>
-                {(Object.entries(WAITING_LIST_STATUS_LABELS) as [WaitingListStatus, string][]).map(
-                  ([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ),
-                )}
-              </select>
+              {/* Compact filter dropdowns */}
+              <CompactFilterSelect<"active" | "all" | WaitingListStatus>
+                label="Status"
+                value={statusFilter === "active" ? "" : statusFilter}
+                onChange={(v) => setStatusFilter(v || "active")}
+                options={statusFilterOptions as { value: "active" | "all" | WaitingListStatus; label: string }[]}
+                active={statusFilter !== "active"}
+              />
 
-              <select
+              <CompactFilterSelect<WaitingListPriority>
+                label="Priorität"
                 value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value as WaitingListPriority | "")}
-                className="fca-select h-8 min-w-[130px] text-xs"
-              >
-                <option value="">Alle Prioritäten</option>
-                {(Object.entries(WAITING_LIST_PRIORITY_LABELS) as [WaitingListPriority, string][]).map(
-                  ([key, label]) => (
-                    <option key={key} value={key}>
-                      {label}
-                    </option>
-                  ),
-                )}
-              </select>
+                onChange={setPriorityFilter}
+                options={priorityFilterOptions}
+              />
 
-              <select
+              <CompactFilterSelect<WaitingListScopeType>
+                label="Ebene"
                 value={scopeFilter}
-                onChange={(e) => setScopeFilter(e.target.value as WaitingListScopeType | "")}
-                className="fca-select h-8 min-w-[130px] text-xs"
-              >
-                <option value="">Alle Ebenen</option>
-                <option value="TARGET_GROUP">Zielgruppe</option>
-                <option value="ORG_UNIT">Abteilung</option>
-                <option value="TEAM_SEASON">Team / Saison</option>
-              </select>
+                onChange={setScopeFilter}
+                options={scopeFilterOptions}
+              />
 
-              <WaitingListCoordinatorFilter
+              <CoordinatorFilterBar
                 eligibleCoordinators={eligibleCoordinators}
                 value={responsibleFilter}
                 onChange={setResponsibleFilter}
@@ -367,6 +514,7 @@ function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
                   type="button"
                   onClick={clearFilters}
                   className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 text-xs text-[var(--muted)] hover:bg-white hover:text-[var(--foreground)]"
+                  aria-label="Alle Filter zurücksetzen"
                 >
                   <X className="h-3 w-3" aria-hidden />
                   Zurücksetzen
@@ -387,6 +535,7 @@ function scopeTypeLabel(entry: Pick<WaitingListEntryItem, "scopeType">) {
           </div>
         </div>
 
+        {/* ── Table ──────────────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 px-6 py-20 text-center">

@@ -1,11 +1,17 @@
 "use client";
 
 /**
- * WaitingListCoordinatorPicker — REG-WAIT-01D
+ * WaitingListCoordinatorPicker — REG-WAIT-01D / REG-WAIT-01E
  *
  * Person-oriented coordinator selection constrained to eligible registration
  * coordinators (users with effective registrations.edit in the tenant).
  * Reuses the established inline user-search UX from ScopedResponsibilitiesCard.
+ *
+ * Exports:
+ *   WaitingListCoordinatorPicker  — searchable full picker (create/edit)
+ *   WaitingListResponsibleDisplay — read-only avatar + name
+ *   CoordinatorFilterBar          — compact pill-based coordinator filter
+ *   WaitingListCoordinatorFilter  — legacy <select> (preserved, not used in normal UX)
  */
 
 import { useId, useMemo, useState } from "react";
@@ -14,16 +20,9 @@ import { cn } from "@/lib/cn";
 import type { AssignableUser } from "@/lib/registrations/workflow-types";
 import { getPersonInitials } from "@/lib/registrations/waiting-list-ui";
 
-type Props = {
-  eligibleCoordinators: AssignableUser[];
-  selectedUserId?: string | null;
-  onSelect: (userId: string | null) => void;
-  disabled?: boolean;
-  placeholder?: string;
-  compact?: boolean;
-};
+// ── Avatar ────────────────────────────────────────────────────────────────────
 
-function CoordinatorAvatar({ name, compact }: { name: string; compact?: boolean }) {
+export function CoordinatorAvatar({ name, compact }: { name: string; compact?: boolean }) {
   return (
     <div
       aria-hidden
@@ -37,6 +36,17 @@ function CoordinatorAvatar({ name, compact }: { name: string; compact?: boolean 
   );
 }
 
+// ── Searchable full picker ────────────────────────────────────────────────────
+
+type PickerProps = {
+  eligibleCoordinators: AssignableUser[];
+  selectedUserId?: string | null;
+  onSelect: (userId: string | null) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  compact?: boolean;
+};
+
 export function WaitingListCoordinatorPicker({
   eligibleCoordinators,
   selectedUserId = null,
@@ -44,9 +54,9 @@ export function WaitingListCoordinatorPicker({
   disabled = false,
   placeholder = "Koordinator suchen…",
   compact = false,
-}: Props) {
+}: PickerProps) {
   const instanceId = useId();
-  const listboxId = `waiting-list-coordinator-listbox-${instanceId}`;
+  const listboxId = `wl-coordinator-listbox-${instanceId}`;
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
 
@@ -105,7 +115,7 @@ export function WaitingListCoordinatorPicker({
             disabled && "pointer-events-none opacity-50",
           )}
         >
-          <UserCheck className={cn("flex-shrink-0 text-[var(--muted)]", compact ? "h-3.5 w-3.5" : "h-4 w-4")} />
+          <UserCheck className={cn("flex-shrink-0 text-[var(--muted)]", compact ? "h-3.5 w-3.5" : "h-4 w-4")} aria-hidden />
           <input
             type="text"
             value={query}
@@ -122,9 +132,12 @@ export function WaitingListCoordinatorPicker({
               "flex-1 bg-transparent text-[var(--foreground)] placeholder:text-[var(--muted)] focus:outline-none",
               compact ? "text-xs" : "text-sm",
             )}
+            aria-label={placeholder}
+            role="combobox"
             aria-autocomplete="list"
             aria-expanded={open && filtered.length > 0}
             aria-controls={listboxId}
+            aria-haspopup="listbox"
           />
           {query ? (
             <button
@@ -160,7 +173,7 @@ export function WaitingListCoordinatorPicker({
           {filtered.map((user) => {
             const label = `${user.firstName} ${user.lastName}`;
             return (
-              <li key={user.id} role="option">
+              <li key={user.id} role="option" aria-selected={false}>
                 <button
                   type="button"
                   onMouseDown={(e) => {
@@ -185,6 +198,8 @@ export function WaitingListCoordinatorPicker({
     </div>
   );
 }
+
+// ── Read-only responsible display ─────────────────────────────────────────────
 
 export function WaitingListResponsibleDisplay({
   firstName,
@@ -214,6 +229,125 @@ export function WaitingListResponsibleDisplay({
   );
 }
 
+// ── Compact pill-based coordinator filter ─────────────────────────────────────
+// Replaces the legacy fca-select for filtering by responsible coordinator.
+
+type FilterBarProps = {
+  eligibleCoordinators: AssignableUser[];
+  value: string;
+  onChange: (value: string) => void;
+  currentUserId?: string | null;
+};
+
+export function CoordinatorFilterBar({ eligibleCoordinators, value, onChange, currentUserId }: FilterBarProps) {
+  const instanceId = useId();
+  const listboxId = `coord-filter-listbox-${instanceId}`;
+  const [open, setOpen] = useState(false);
+
+  const selectedUser = eligibleCoordinators.find((u) => u.id === value) ?? null;
+  const isMe = value === currentUserId && !!currentUserId;
+
+  const displayLabel = isMe
+    ? "Mir zugewiesen"
+    : selectedUser
+      ? `${selectedUser.firstName} ${selectedUser.lastName}`
+      : null;
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className={cn(
+          "inline-flex h-8 items-center gap-2 rounded-lg border px-2.5 text-xs font-medium transition-colors",
+          value
+            ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
+            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+        )}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="Koordinator filtern"
+      >
+        <UserCheck className="h-3.5 w-3.5 flex-shrink-0" aria-hidden />
+        <span className="max-w-[120px] truncate">
+          {displayLabel ?? "Koordinator"}
+        </span>
+        {value ? (
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onChange(""); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onChange(""); } }}
+            className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full hover:bg-[var(--tenant-primary)]/20"
+            aria-label="Filter entfernen"
+          >
+            <X className="h-2.5 w-2.5" />
+          </span>
+        ) : null}
+      </button>
+
+      {open ? (
+        <ul
+          id={listboxId}
+          role="listbox"
+          className="absolute left-0 top-full z-50 mt-1 min-w-[200px] overflow-y-auto rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
+        >
+          <li role="option" aria-selected={!value}>
+            <button
+              type="button"
+              onMouseDown={() => { onChange(""); setOpen(false); }}
+              className={cn(
+                "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
+                !value && "bg-[var(--surface-2)] font-semibold",
+              )}
+            >
+              Alle Koordinatoren
+            </button>
+          </li>
+          {currentUserId ? (
+            <li role="option" aria-selected={value === currentUserId}>
+              <button
+                type="button"
+                onMouseDown={() => { onChange(currentUserId); setOpen(false); }}
+                className={cn(
+                  "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
+                  value === currentUserId && "bg-[var(--surface-2)] font-semibold",
+                )}
+              >
+                <CoordinatorAvatar name="Ich" compact />
+                Mir zugewiesen
+              </button>
+            </li>
+          ) : null}
+          {eligibleCoordinators
+            .filter((u) => u.id !== currentUserId)
+            .map((user) => {
+              const label = `${user.firstName} ${user.lastName}`;
+              return (
+                <li key={user.id} role="option" aria-selected={value === user.id}>
+                  <button
+                    type="button"
+                    onMouseDown={() => { onChange(user.id); setOpen(false); }}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
+                      value === user.id && "bg-[var(--surface-2)] font-semibold",
+                    )}
+                  >
+                    <CoordinatorAvatar name={label} compact />
+                    <span className="truncate">{label}</span>
+                  </button>
+                </li>
+              );
+            })}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+// ── Legacy <select> filter — preserved but not used in main UX ────────────────
+
 export function WaitingListCoordinatorFilter({
   eligibleCoordinators,
   value,
@@ -230,6 +364,7 @@ export function WaitingListCoordinatorFilter({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className="fca-select h-8 min-w-[160px] text-xs"
+      aria-label="Koordinator filtern"
     >
       <option value="">Alle Koordinatoren</option>
       {currentUserId ? <option value={currentUserId}>Mir zugewiesen</option> : null}

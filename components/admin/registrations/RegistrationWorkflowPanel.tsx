@@ -46,6 +46,7 @@ import {
   X,
 } from "lucide-react";
 import { AddToWaitingListDialog } from "./AddToWaitingListDialog";
+import { WaitingListCoordinatorPicker } from "./WaitingListCoordinatorPicker";
 import { cn } from "@/lib/cn";
 import type { RegistrationListItem } from "@/lib/registrations/queries";
 import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
@@ -673,25 +674,16 @@ export default function RegistrationWorkflowPanel({
         )}
       </PanelSection>
 
-      {/* Goal 4: Assignment workflow — existing users only */}
+      {/* Goal 4: Assignment workflow — canonical searchable coordinator picker */}
       <PanelSection title="Zuweisung" icon={UserCheck}>
-        <p className="mb-2 text-[0.7rem] text-[var(--muted)]">
-          Zuweisung an Koordinator, Trainer oder Vereinsadmin — bestehende Benutzer dieses Mandanten.
-        </p>
-        {canEdit && assignableUsers.length > 0 ? (
-          <select
-            value={registration.assignedToUserId ?? ""}
+        {canEdit ? (
+          <WaitingListCoordinatorPicker
+            eligibleCoordinators={eligibleCoordinators.length > 0 ? eligibleCoordinators : assignableUsers}
+            selectedUserId={registration.assignedToUserId}
+            onSelect={(userId) => patch({ assignedToUserId: userId }, "assign-user")}
             disabled={busy === "assign-user"}
-            onChange={(e) => patch({ assignedToUserId: e.target.value || null }, "assign-user")}
-            className="fca-select text-xs"
-          >
-            <option value="">— Nicht zugewiesen —</option>
-            {assignableUsers.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.firstName} {u.lastName}
-              </option>
-            ))}
-          </select>
+            placeholder="Koordinator zuweisen…"
+          />
         ) : registration.assignedToUser ? (
           <span className="sce-data-value flex items-center gap-1.5 text-sm">
             <UserCheck className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />

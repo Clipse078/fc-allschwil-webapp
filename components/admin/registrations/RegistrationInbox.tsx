@@ -298,6 +298,8 @@ export default function RegistrationInbox({
   const [toggleFilters, setToggleFilters] = useState<Set<ToggleFilterKey>>(new Set());
   const [ageGroupFilter, setAgeGroupFilter] = useState("ALL");
   const [recommendedTeamFilter, setRecommendedTeamFilter] = useState("ALL");
+  const [ageDropdownOpen, setAgeDropdownOpen] = useState(false);
+  const [teamDropdownOpen, setTeamDropdownOpen] = useState(false);
 
   // ── Classification cache (Goal 9: Age group / Recommended team filters) ───
 
@@ -548,33 +550,101 @@ export default function RegistrationInbox({
         />
 
         {ageGroupOptions.length > 0 && (
-          <select
-            value={ageGroupFilter}
-            onChange={(e) => setAgeGroupFilter(e.target.value)}
-            className="fca-select h-7 text-[0.72rem]"
-          >
-            <option value="ALL">Altersgruppe: Alle</option>
-            {ageGroupOptions.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setAgeDropdownOpen((v) => !v)}
+              onBlur={() => setTimeout(() => setAgeDropdownOpen(false), 150)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[0.72rem] font-medium transition-all",
+                ageGroupFilter !== "ALL"
+                  ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white"
+                  : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+              )}
+              aria-haspopup="listbox"
+              aria-expanded={ageDropdownOpen}
+              aria-label="Altersgruppe filtern"
+            >
+              {ageGroupFilter !== "ALL" ? `Jg.: ${ageGroupFilter}` : "Altersgruppe"}
+              {ageGroupFilter !== "ALL" ? (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setAgeGroupFilter("ALL"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setAgeGroupFilter("ALL"); } }}
+                  className="ml-1 opacity-80 hover:opacity-100"
+                  aria-label="Filter entfernen"
+                >✕</span>
+              ) : null}
+            </button>
+            {ageDropdownOpen ? (
+              <ul
+                role="listbox"
+                className="absolute left-0 top-full z-50 mt-1 min-w-[140px] rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
+              >
+                {ageGroupOptions.map((g) => (
+                  <li key={g} role="option" aria-selected={ageGroupFilter === g}>
+                    <button
+                      type="button"
+                      onMouseDown={() => { setAgeGroupFilter(g); setAgeDropdownOpen(false); }}
+                      className="flex w-full px-3 py-2 text-left text-[0.72rem] hover:bg-[var(--surface-2)]"
+                    >
+                      {g}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         )}
 
         {recommendedTeamOptions.length > 0 && (
-          <select
-            value={recommendedTeamFilter}
-            onChange={(e) => setRecommendedTeamFilter(e.target.value)}
-            className="fca-select h-7 text-[0.72rem]"
-          >
-            <option value="ALL">Empfohlenes Team: Alle</option>
-            {recommendedTeamOptions.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setTeamDropdownOpen((v) => !v)}
+              onBlur={() => setTimeout(() => setTeamDropdownOpen(false), 150)}
+              className={cn(
+                "inline-flex h-7 items-center gap-1.5 rounded-full border px-3 text-[0.72rem] font-medium transition-all",
+                recommendedTeamFilter !== "ALL"
+                  ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white"
+                  : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+              )}
+              aria-haspopup="listbox"
+              aria-expanded={teamDropdownOpen}
+              aria-label="Empfohlenes Team filtern"
+            >
+              {recommendedTeamFilter !== "ALL" ? `Team: ${recommendedTeamFilter}` : "Empf. Team"}
+              {recommendedTeamFilter !== "ALL" ? (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); setRecommendedTeamFilter("ALL"); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); setRecommendedTeamFilter("ALL"); } }}
+                  className="ml-1 opacity-80 hover:opacity-100"
+                  aria-label="Filter entfernen"
+                >✕</span>
+              ) : null}
+            </button>
+            {teamDropdownOpen ? (
+              <ul
+                role="listbox"
+                className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-[var(--radius-xl)] border border-[var(--border-strong)] bg-[var(--surface)] py-1 shadow-[var(--shadow-lg)]"
+              >
+                {recommendedTeamOptions.map((t) => (
+                  <li key={t} role="option" aria-selected={recommendedTeamFilter === t}>
+                    <button
+                      type="button"
+                      onMouseDown={() => { setRecommendedTeamFilter(t); setTeamDropdownOpen(false); }}
+                      className="flex w-full px-3 py-2 text-left text-[0.72rem] hover:bg-[var(--surface-2)]"
+                    >
+                      {t}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
         )}
       </div>
 
