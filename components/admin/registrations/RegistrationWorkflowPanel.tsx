@@ -184,7 +184,7 @@ function PersonCandidateRow({
           className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-emerald-300 bg-emerald-50 text-[0.7rem] font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
         >
           {linking ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden /> : <Link2 className="h-3 w-3" aria-hidden />}
-          Verknüpfen
+          Mit bestehender Person verknüpfen
         </button>
       </div>
     </div>
@@ -395,11 +395,11 @@ export default function RegistrationWorkflowPanel({
       <div className="flex flex-wrap items-center gap-2">
         <QuickActionButton icon={Mail} label="Kontaktieren" href={`mailto:${registration.email}`} />
         {registration.personId ? (
-          <QuickActionButton icon={UserRound} label="Person öffnen" href={`/dashboard/persons/${registration.personId}`} />
+          <QuickActionButton icon={UserRound} label="In Vereinsverwaltung öffnen" href={`/dashboard/persons/${registration.personId}`} />
         ) : (
           <QuickActionButton
             icon={UserPlus}
-            label="Person erstellen"
+            label="In Vereinsverwaltung aufnehmen"
             onClick={handleCreatePersonClick}
             disabled={!canEdit || busy === "create-person"}
             variant="primary"
@@ -599,7 +599,7 @@ export default function RegistrationWorkflowPanel({
 
       {/* Goal 2/3/11: Person lookup + creation */}
       <PanelSection
-        title="Person"
+        title="Vereinsverwaltung"
         icon={User}
         badge={
           personMatch && (
@@ -633,7 +633,7 @@ export default function RegistrationWorkflowPanel({
               className="fca-button-secondary text-xs gap-1.5"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden />
-              Person öffnen
+              In Vereinsverwaltung öffnen
             </a>
           </div>
         ) : personMatch && personMatch.candidates.length > 0 ? (
@@ -657,7 +657,7 @@ export default function RegistrationWorkflowPanel({
             <p className="text-sm text-[var(--muted)]">Keine passende Person gefunden.</p>
             <QuickActionButton
               icon={UserPlus}
-              label="Person erstellen"
+              label="In Vereinsverwaltung aufnehmen"
               variant="primary"
               disabled={!canEdit || busy === "create-person"}
               onClick={handleCreatePersonClick}

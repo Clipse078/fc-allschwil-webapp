@@ -16,6 +16,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { requireTenant } from "@/lib/tenants/require-tenant";
+import { resolveAuditActorDisplayName } from "@/lib/registrations/actor-display";
 import { STATUS_LABELS } from "@/lib/registrations/status";
 import type { RegistrationStatus } from "@prisma/client";
 
@@ -43,9 +44,19 @@ export type TimelineEntry = {
   occurredAt: string;
 };
 
-function actorName(actor: { firstName: string; lastName: string } | null): string | null {
-  if (!actor) return null;
-  return `${actor.firstName} ${actor.lastName}`.trim() || null;
+function actorName(
+  actor: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    person: {
+      firstName: string;
+      lastName: string;
+      displayName: string | null;
+    } | null;
+  } | null,
+): string | null {
+  return resolveAuditActorDisplayName(actor);
 }
 
 function isStatus(value: unknown): value is RegistrationStatus {
@@ -58,7 +69,16 @@ function mapAuditEntry(entry: {
   beforeJson: unknown;
   afterJson: unknown;
   createdAt: Date;
-  actorUser: { firstName: string; lastName: string } | null;
+  actorUser: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    person: {
+      firstName: string;
+      lastName: string;
+      displayName: string | null;
+    } | null;
+  } | null;
 }): TimelineEntry {
   const before = (entry.beforeJson ?? {}) as Record<string, unknown>;
   const after = (entry.afterJson ?? {}) as Record<string, unknown>;
@@ -222,7 +242,21 @@ export async function getRegistrationTimeline(
       beforeJson: true,
       afterJson: true,
       createdAt: true,
-      actorUser: { select: { firstName: true, lastName: true } },
+      actorUser: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          person: {
+            where: { tenantId: tenant.id },
+            select: {
+              firstName: true,
+              lastName: true,
+              displayName: true,
+            },
+          },
+        },
+      },
     },
   });
 

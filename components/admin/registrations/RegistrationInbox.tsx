@@ -20,12 +20,12 @@ import {
   UserCheck2,
   AlertTriangle,
   UserRoundSearch,
-  Link2,
-  Clock3,
   Inbox,
   Filter,
   X,
   SlidersHorizontal,
+  CheckCircle2,
+  Archive,
 } from "lucide-react";
 import { PopoverContent } from "@/components/ui/Popover";
 import { cn } from "@/lib/cn";
@@ -34,12 +34,17 @@ import type { InboxTypeOption } from "@/lib/inbox/types";
 import { getInitials } from "@/lib/inbox/types";
 import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import {
-  STATUS_GROUPS,
+  INBOX_STATUS_GROUPS,
+  ARCHIVE_STATUS_GROUPS,
   STATUS_BADGE_CLASS,
   STATUS_LABELS,
-  type StatusGroupKey,
+  isActiveInboxRegistrationStatus,
+  isArchiveRegistrationStatus,
+  type InboxStatusGroupKey,
+  type ArchiveStatusGroupKey,
 } from "@/lib/registrations/status";
 import { classifyRegistration, extractGenderFromPayload } from "@/lib/registrations/classification";
+import { getRegistrationApplicantMetadata } from "@/lib/registrations/applicant-metadata";
 import { getRoutingSuggestion } from "@/lib/registrations/routing-suggestion";
 import { getRegistrationNextStep } from "@/lib/registrations/registration-workflow-ui";
 import {
@@ -48,6 +53,7 @@ import {
 } from "./WaitingListCoordinatorPicker";
 import RegistrationDetailDrawer from "./RegistrationDetailDrawer";
 import { RegistrationApplicantMetadataPills } from "./RegistrationApplicantMetadataPills";
+import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 
 const TYPE_FILTER_OPTIONS: InboxTypeOption[] = [
   { value: "ALL", label: "Alle Typen" },
@@ -76,19 +82,16 @@ function needsPerson(r: RegistrationListItem): boolean {
   return !r.personId;
 }
 
-function isCompletedToday(r: RegistrationListItem): boolean {
-  if (!(["ACCEPTED", "REJECTED", "ARCHIVED"] as string[]).includes(r.status)) return false;
-  const updated = new Date(r.updatedAt);
-  const now = new Date();
-  return (
-    updated.getFullYear() === now.getFullYear() &&
-    updated.getMonth() === now.getMonth() &&
-    updated.getDate() === now.getDate()
-  );
+function needsAssignment(r: RegistrationListItem): boolean {
+  return !r.assignedToUserId && isActiveInboxRegistrationStatus(r.status);
 }
 
-function needsAssignment(r: RegistrationListItem): boolean {
-  return !r.assignedToUserId && r.status !== "ARCHIVED";
+export type RegistrationWorkspaceMode = "inbox" | "archive";
+
+function belongsInWorkspace(registration: RegistrationListItem, mode: RegistrationWorkspaceMode): boolean {
+  return mode === "archive"
+    ? isArchiveRegistrationStatus(registration.status)
+    : isActiveInboxRegistrationStatus(registration.status);
 }
 
 function MetricCard({
@@ -235,6 +238,7 @@ function CompactFilterSelect<T extends string>({
 type Props = {
   tenantSlug: string;
   initialRegistrations: RegistrationListItem[];
+  workspaceMode?: RegistrationWorkspaceMode;
   canEdit: boolean;
   canDelete?: boolean;
   locale?: string;
@@ -250,6 +254,7 @@ type Props = {
 export default function RegistrationInbox({
   tenantSlug,
   initialRegistrations,
+  workspaceMode = "inbox",
   canEdit,
   canDelete = false,
   locale = "de-CH",
@@ -261,10 +266,12 @@ export default function RegistrationInbox({
   teamSeasons = [],
   currentUserId = null,
 }: Props) {
-  const [registrations, setRegistrations] = useState(initialRegistrations);
+  const [registrations, setRegistrations] = useState(() =>
+    initialRegistrations.filter((registration) => belongsInWorkspace(registration, workspaceMode)),
+  );
   const [selectedRegistration, setSelectedRegistration] = useState<RegistrationListItem | null>(null);
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<StatusGroupKey | "">("");
+  const [statusFilter, setStatusFilter] = useState<InboxStatusGroupKey | ArchiveStatusGroupKey | "">("");
   const [typeFilter, setTypeFilter] = useState("");
   const [coordinatorFilter, setCoordinatorFilter] = useState("");
   const [toggleFilters, setToggleFilters] = useState<Set<ToggleFilterKey>>(new Set());
@@ -273,14 +280,18 @@ export default function RegistrationInbox({
   const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
   const moreFiltersRef = useRef<HTMLDivElement>(null);
 
+  const statusGroups = workspaceMode === "archive" ? ARCHIVE_STATUS_GROUPS : INBOX_STATUS_GROUPS;
+
   const classified = useMemo(() => {
-    const map = new Map<string, { ageGroup: string | null; team: string }>();
+    const map = new Map<string, { ageGroup: string | null; team: string; birthYear: number | null }>();
     for (const r of registrations) {
       const gender = extractGenderFromPayload(r.payloadJson);
-      const classification = classifyRegistration(r.birthYear, gender, r.type);
+      const { birthYear } = getRegistrationApplicantMetadata(r);
+      const classification = classifyRegistration(birthYear, gender, r.type);
       map.set(r.id, {
-        ageGroup: getRoutingSuggestion(r.birthYear),
+        ageGroup: getRoutingSuggestion(birthYear),
         team: classification.targetGroupLabel,
+        birthYear,
       });
     }
     return map;
@@ -296,23 +307,28 @@ export default function RegistrationInbox({
     [classified],
   );
 
-  const metrics = useMemo(
-    () => ({
+  const metrics = useMemo(() => {
+    if (workspaceMode === "archive") {
+      return {
+        accepted: registrations.filter((r) => r.status === "ACCEPTED").length,
+        rejected: registrations.filter((r) => r.status === "REJECTED").length,
+        archived: registrations.filter((r) => r.status === "ARCHIVED").length,
+      };
+    }
+
+    return {
       new: registrations.filter((r) => r.status === "NEW").length,
       needsAssignment: registrations.filter(needsAssignment).length,
       needsPerson: registrations.filter(needsPerson).length,
       duplicates: registrations.filter(isActiveDuplicate).length,
-      waiting: registrations.filter((r) => r.status === "WAITING").length,
-      completedToday: registrations.filter(isCompletedToday).length,
-    }),
-    [registrations],
-  );
+    };
+  }, [registrations, workspaceMode]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return registrations.filter((r) => {
       if (statusFilter) {
-        const group = STATUS_GROUPS.find((g) => g.key === statusFilter);
+        const group = statusGroups.find((g) => g.key === statusFilter);
         if (group && !(group.statuses as string[]).includes(r.status)) return false;
       }
       if (typeFilter && r.type !== typeFilter) return false;
@@ -325,13 +341,16 @@ export default function RegistrationInbox({
       if (recommendedTeamFilter && classified.get(r.id)?.team !== recommendedTeamFilter) return false;
 
       if (q) {
+        const metadata = getRegistrationApplicantMetadata(r);
         const searchable = [
           `${r.firstName} ${r.lastName}`,
           r.email,
           r.type,
           STATUS_LABELS[r.status],
           r.phone ?? "",
-          r.birthYear ? String(r.birthYear) : "",
+          metadata.birthYear ? String(metadata.birthYear) : "",
+          metadata.postalCode ?? "",
+          metadata.city ?? "",
         ]
           .join(" ")
           .toLowerCase();
@@ -347,15 +366,31 @@ export default function RegistrationInbox({
     toggleFilters,
     ageGroupFilter,
     recommendedTeamFilter,
+    statusGroups,
     classified,
     currentUserId,
     query,
   ]);
 
-  const handleUpdate = useCallback((updated: RegistrationListItem) => {
-    setRegistrations((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-    setSelectedRegistration(updated);
-  }, []);
+  const handleUpdate = useCallback(
+    (updated: RegistrationListItem) => {
+      if (!belongsInWorkspace(updated, workspaceMode)) {
+        setRegistrations((prev) => prev.filter((r) => r.id !== updated.id));
+        setSelectedRegistration(null);
+        return;
+      }
+
+      setRegistrations((prev) => {
+        const exists = prev.some((r) => r.id === updated.id);
+        if (exists) {
+          return prev.map((r) => (r.id === updated.id ? updated : r));
+        }
+        return [updated, ...prev];
+      });
+      setSelectedRegistration(updated);
+    },
+    [workspaceMode],
+  );
 
   const handleClose = useCallback(() => setSelectedRegistration(null), []);
 
@@ -393,7 +428,7 @@ export default function RegistrationInbox({
       recommendedTeamFilter,
   );
 
-  const statusOptions = STATUS_GROUPS.map((group) => ({ value: group.key, label: group.label }));
+  const statusOptions = statusGroups.map((group) => ({ value: group.key, label: group.label }));
   const typeOptions = TYPE_FILTER_OPTIONS.filter((o) => o.value !== "ALL").map((o) => ({
     value: o.value,
     label: o.label,
@@ -402,15 +437,15 @@ export default function RegistrationInbox({
   const secondaryFilterLabels: Record<ToggleFilterKey, string> = {
     ASSIGNED_TO_ME: "Mir zugewiesen",
     HAS_DUPLICATE: "Hat Duplikat",
-    NEEDS_PERSON: "Braucht Person",
-    ALREADY_LINKED: "Bereits verknüpft",
+    NEEDS_PERSON: "Braucht Vereinsverwaltung",
+    ALREADY_LINKED: "In Vereinsverwaltung",
   };
 
   const activeFilterChips = [
     statusFilter
       ? {
           key: "status",
-          label: `Status: ${STATUS_GROUPS.find((g) => g.key === statusFilter)?.label ?? statusFilter}`,
+          label: `Status: ${statusGroups.find((g) => g.key === statusFilter)?.label ?? statusFilter}`,
           onRemove: () => setStatusFilter(""),
         }
       : null,
@@ -447,7 +482,8 @@ export default function RegistrationInbox({
     query.trim() ? { key: "search", label: `Suche: ${query.trim()}`, onRemove: () => setQuery("") } : null,
   ].filter(Boolean) as { key: string; label: string; onRemove: () => void }[];
 
-  const openCount = registrations.filter((r) => r.status === "NEW").length;
+  const openCount = workspaceMode === "inbox" ? registrations.filter((r) => r.status === "NEW").length : 0;
+  const isArchive = workspaceMode === "archive";
 
   return (
     <div className="flex flex-col gap-0">
@@ -457,28 +493,38 @@ export default function RegistrationInbox({
             className="text-xl font-bold text-[var(--foreground)] tracking-tight"
             style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.01em" }}
           >
-            Registrierungen
+            {isArchive ? "Archiv" : "Registrierungen"}
           </h1>
           <p className="mt-0.5 text-sm text-[var(--muted)]">
-            {openCount > 0 ? (
+            {isArchive ? (
+              `${registrations.length} abgeschlossene Anmeldung${registrations.length !== 1 ? "en" : ""}`
+            ) : openCount > 0 ? (
               <>
                 <span className="font-semibold text-[var(--blue)]">{openCount}</span> offene Anmeldung
                 {openCount !== 1 ? "en" : ""}
               </>
             ) : (
-              `${registrations.length} Anmeldung${registrations.length !== 1 ? "en" : ""} total`
+              `${registrations.length} aktive Anmeldung${registrations.length !== 1 ? "en" : ""}`
             )}
           </p>
         </div>
       </div>
 
-      <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <MetricCard icon={Inbox} label="Neu" value={metrics.new} tone="blue" />
-        <MetricCard icon={UserCheck2} label="Braucht Zuweisung" value={metrics.needsAssignment} tone="amber" />
-        <MetricCard icon={UserRoundSearch} label="Braucht Person" value={metrics.needsPerson} tone="violet" />
-        <MetricCard icon={AlertTriangle} label="Duplikate" value={metrics.duplicates} tone="red" />
-        <MetricCard icon={Clock3} label="Wartend" value={metrics.waiting} tone="orange" />
-        <MetricCard icon={Link2} label="Heute abgeschlossen" value={metrics.completedToday} tone="emerald" />
+      <div className={cn("mb-5 grid grid-cols-2 gap-3", isArchive ? "sm:grid-cols-3" : "sm:grid-cols-2 lg:grid-cols-4")}>
+        {isArchive ? (
+          <>
+            <MetricCard icon={CheckCircle2} label="Angenommen" value={metrics.accepted ?? 0} tone="emerald" />
+            <MetricCard icon={AlertTriangle} label="Abgelehnt" value={metrics.rejected ?? 0} tone="red" />
+            <MetricCard icon={Archive} label="Archiviert" value={metrics.archived ?? 0} tone="blue" />
+          </>
+        ) : (
+          <>
+            <MetricCard icon={Inbox} label="Neu" value={metrics.new ?? 0} tone="blue" />
+            <MetricCard icon={UserCheck2} label="Braucht Zuweisung" value={metrics.needsAssignment ?? 0} tone="amber" />
+            <MetricCard icon={UserRoundSearch} label="Braucht Vereinsverwaltung" value={metrics.needsPerson ?? 0} tone="violet" />
+            <MetricCard icon={AlertTriangle} label="Duplikate" value={metrics.duplicates ?? 0} tone="red" />
+          </>
+        )}
       </div>
 
       <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
@@ -495,7 +541,7 @@ export default function RegistrationInbox({
             />
           </div>
 
-          <CompactFilterSelect<StatusGroupKey>
+          <CompactFilterSelect<InboxStatusGroupKey | ArchiveStatusGroupKey>
             label="Status"
             value={statusFilter}
             onChange={setStatusFilter}
@@ -519,6 +565,8 @@ export default function RegistrationInbox({
           />
 
           <div ref={moreFiltersRef} className="relative">
+            {!isArchive ? (
+              <>
             <button
               type="button"
               onClick={() => setMoreFiltersOpen((v) => !v)}
@@ -601,6 +649,8 @@ export default function RegistrationInbox({
                 </div>
               ) : null}
             </PopoverContent>
+              </>
+            ) : null}
           </div>
 
           {hasActiveFilters ? (
@@ -633,12 +683,14 @@ export default function RegistrationInbox({
             <Filter className="h-8 w-8 text-[var(--muted)]" aria-hidden />
             <div>
               <p className="text-sm font-semibold text-[var(--foreground)]">
-                {hasActiveFilters ? "Keine Treffer" : "Keine Anmeldungen"}
+                {hasActiveFilters ? "Keine Treffer" : isArchive ? "Keine archivierten Anmeldungen" : "Keine aktiven Anmeldungen"}
               </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
                 {hasActiveFilters
                   ? "Suchbegriff anpassen oder Filter zurücksetzen."
-                  : "Noch keine Anmeldungen für diesen Tenant eingegangen."}
+                  : isArchive
+                    ? "Abgeschlossene oder abgelehnte Anmeldungen erscheinen hier."
+                    : "Neue Anmeldungen erscheinen hier, sobald sie eingehen."}
               </p>
             </div>
           </div>
@@ -651,7 +703,7 @@ export default function RegistrationInbox({
                     Bewerber/in
                   </th>
                   <th className="px-4 py-2.5 text-left text-[0.68rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    Typ / Jg.
+                    Typ
                   </th>
                   <th className="px-4 py-2.5 text-left text-[0.68rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
                     Ziel / Empfehlung
@@ -663,18 +715,21 @@ export default function RegistrationInbox({
                     Status
                   </th>
                   <th className="px-4 py-2.5 text-left text-[0.68rem] font-semibold uppercase tracking-wider text-[var(--muted)]">
-                    Nächster Schritt
+                    {isArchive ? "Abschluss" : "Nächster Schritt"}
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--border)]">
                 {filtered.map((registration) => {
                   const gender = extractGenderFromPayload(registration.payloadJson);
-                  const classification = classifyRegistration(registration.birthYear, gender, registration.type);
+                  const { birthYear } = getRegistrationApplicantMetadata(registration);
+                  const classification = classifyRegistration(birthYear, gender, registration.type);
                   const isSelected = selectedRegistration?.id === registration.id;
                   const initials = getInitials(registration.firstName, registration.lastName);
                   const duplicate = isActiveDuplicate(registration);
                   const missingPerson = needsPerson(registration);
+                  const linkedPerson = !!registration.personId;
+                  const completionAt = registration.archivedAt ?? registration.updatedAt;
 
                   return (
                     <tr
@@ -700,13 +755,19 @@ export default function RegistrationInbox({
                               registration={registration}
                               className="mt-0.5"
                             />
-                            {duplicate || missingPerson ? (
+                            {(duplicate || missingPerson || linkedPerson) && !isArchive ? (
                               <div className="mt-0.5 flex flex-wrap gap-2">
                                 {duplicate ? (
                                   <span className="text-[0.65rem] font-medium text-amber-600">Duplikat</span>
                                 ) : null}
                                 {missingPerson ? (
-                                  <span className="text-[0.65rem] font-medium text-violet-600">Person fehlt</span>
+                                  <span className="text-[0.65rem] font-medium text-violet-600">
+                                    Noch nicht in der Vereinsverwaltung
+                                  </span>
+                                ) : linkedPerson ? (
+                                  <span className="text-[0.65rem] font-medium text-emerald-700">
+                                    In Vereinsverwaltung
+                                  </span>
                                 ) : null}
                               </div>
                             ) : null}
@@ -715,9 +776,6 @@ export default function RegistrationInbox({
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs text-[var(--foreground)]">{TYPE_LABELS[registration.type] ?? registration.type}</p>
-                        {registration.birthYear ? (
-                          <p className="text-xs text-[var(--muted)]">Jg. {registration.birthYear}</p>
-                        ) : null}
                       </td>
                       <td className="px-4 py-3">
                         <p className="text-xs font-medium text-[var(--foreground)]">
@@ -747,7 +805,9 @@ export default function RegistrationInbox({
                         </span>
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--foreground)]">
-                        {getRegistrationNextStep(registration)}
+                        {isArchive
+                          ? formatDateTimeCompact(completionAt, { locale, timezone })
+                          : getRegistrationNextStep(registration)}
                       </td>
                     </tr>
                   );

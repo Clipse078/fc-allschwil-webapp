@@ -48,7 +48,9 @@ export function getRegistrationNextStep(
 
   switch (status) {
     case RegistrationStatus.NEW:
-      return hasTarget ? "Person prüfen oder Kontakt aufnehmen" : "Team zuweisen oder Person prüfen";
+      return hasTarget
+        ? "Vereinsverwaltung prüfen oder Kontakt aufnehmen"
+        : "Team zuweisen oder Vereinsverwaltung prüfen";
     case RegistrationStatus.REVIEWING:
       return hasTarget && hasAssignment
         ? "Kontakt aufnehmen"
@@ -60,7 +62,7 @@ export function getRegistrationNextStep(
     case RegistrationStatus.CONTACTED:
       return hasPerson
         ? "Entscheidung treffen oder auf Warteliste setzen"
-        : "Person verknüpfen oder erstellen";
+        : "In Vereinsverwaltung aufnehmen oder verknüpfen";
     case RegistrationStatus.WAITING:
       return "Warteliste bearbeiten";
     case RegistrationStatus.ACCEPTED:

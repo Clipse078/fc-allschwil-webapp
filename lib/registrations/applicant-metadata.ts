@@ -6,10 +6,30 @@ export type RegistrationApplicantMetadata = {
   city: string | null;
 };
 
-function deriveBirthYearFromDate(birthDate: string | null): number | null {
+export function deriveBirthYearFromDate(birthDate: string | null): number | null {
   if (!birthDate) return null;
-  const year = new Date(birthDate).getFullYear();
+
+  const dateOnlyMatch = birthDate.match(/^(\d{4})-\d{2}-\d{2}/);
+  if (dateOnlyMatch) {
+    const year = Number.parseInt(dateOnlyMatch[1]!, 10);
+    return Number.isFinite(year) ? year : null;
+  }
+
+  const parsed = new Date(birthDate);
+  const year = parsed.getFullYear();
   return Number.isFinite(year) ? year : null;
+}
+
+function payloadPersonBirthDate(payloadJson: unknown): string | null {
+  if (!payloadJson || typeof payloadJson !== "object" || Array.isArray(payloadJson)) {
+    return null;
+  }
+  const person = (payloadJson as Record<string, unknown>).person;
+  if (!person || typeof person !== "object" || Array.isArray(person)) {
+    return null;
+  }
+  const birthDate = (person as Record<string, unknown>).birthDate;
+  return typeof birthDate === "string" && birthDate.trim() ? birthDate.trim() : null;
 }
 
 /**
@@ -19,8 +39,12 @@ function deriveBirthYearFromDate(birthDate: string | null): number | null {
 export function getRegistrationApplicantMetadata(
   registration: RegistrationRawShape,
 ): RegistrationApplicantMetadata {
-  const birthYear = registration.birthYear ?? deriveBirthYearFromDate(registration.birthDate);
-  const { address } = getRegistrationDetailFields(registration);
+  const { address, player } = getRegistrationDetailFields(registration);
+  const birthYear =
+    registration.birthYear ??
+    deriveBirthYearFromDate(registration.birthDate) ??
+    deriveBirthYearFromDate(player.birthDate) ??
+    deriveBirthYearFromDate(payloadPersonBirthDate(registration.payloadJson));
 
   return {
     birthYear,

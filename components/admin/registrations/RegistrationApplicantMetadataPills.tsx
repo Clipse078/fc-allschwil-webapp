@@ -24,9 +24,9 @@ export function RegistrationApplicantMetadataPills({ registration, className }: 
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      {birthYear ? <MetadataPill>Jg. {birthYear}</MetadataPill> : null}
-      {postalCode ? <MetadataPill>{postalCode}</MetadataPill> : null}
-      {city ? <MetadataPill>{city}</MetadataPill> : null}
+      {birthYear ? <MetadataPill>Jahrgang: {birthYear}</MetadataPill> : null}
+      {postalCode ? <MetadataPill>Postleitzahl: {postalCode}</MetadataPill> : null}
+      {city ? <MetadataPill>Ort: {city}</MetadataPill> : null}
     </div>
   );
 }

@@ -15,7 +15,7 @@ describe("registration-workflow-ui", () => {
         assignedToUserId: null,
         targetGroupId: null,
       }),
-    ).toBe("Team zuweisen oder Person prüfen");
+    ).toBe("Team zuweisen oder Vereinsverwaltung prüfen");
 
     expect(
       getRegistrationNextStep({

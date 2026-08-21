@@ -310,9 +310,21 @@ export const NAV_SECTIONS: NavSection[] = [
         permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
         children: [
           {
+            key: "registrierungen",
+            label: "Registrierungen",
+            href: "/dashboard/registrations",
+            permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+          },
+          {
             key: "warteliste",
             label: "Warteliste",
             href: "/dashboard/registrations/warteliste",
+            permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
+          },
+          {
+            key: "archiv",
+            label: "Archiv",
+            href: "/dashboard/registrations/archiv",
             permissionKeys: [PERMISSIONS.REGISTRATIONS_VIEW, PERMISSIONS.REGISTRATIONS_EDIT],
           },
         ],

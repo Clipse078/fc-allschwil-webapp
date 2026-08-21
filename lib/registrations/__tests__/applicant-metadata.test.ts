@@ -52,6 +52,30 @@ describe("getRegistrationApplicantMetadata", () => {
     expect(metadata.city).toBeNull();
   });
 
+  it("derives birth year from date-only birthDate without timezone drift", () => {
+    const metadata = getRegistrationApplicantMetadata(
+      baseRegistration({
+        birthDate: "2019-08-15",
+      }),
+    );
+
+    expect(metadata.birthYear).toBe(2019);
+  });
+
+  it("falls back to payloadJson.person.birthDate when top-level fields are empty", () => {
+    const metadata = getRegistrationApplicantMetadata(
+      baseRegistration({
+        payloadJson: {
+          person: {
+            birthDate: "2017-06-10",
+          },
+        },
+      }),
+    );
+
+    expect(metadata.birthYear).toBe(2017);
+  });
+
   it("omits unavailable values instead of fabricating placeholders", () => {
     const metadata = getRegistrationApplicantMetadata(baseRegistration());
 

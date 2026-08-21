@@ -124,11 +124,35 @@ describe("getRegistrationTimeline", () => {
       submittedAt: new Date("2026-08-01T09:00:00.000Z"),
     });
     mocks.auditLogFindMany.mockResolvedValueOnce([
-      logEntry({ actorUser: { firstName: "Anna", lastName: "Admin" } }),
+      logEntry({ actorUser: { firstName: "Anna", lastName: "Admin", email: "anna@example.ch", person: null } }),
     ]);
 
     const result = await getRegistrationTimeline("fc-allschwil", "reg-1");
     expect(result[0].actorName).toBe("Anna Admin");
+  });
+
+  it("prefers linked Person identity over technical account labels", async () => {
+    mocks.registrationFindFirst.mockResolvedValueOnce({
+      id: "reg-1",
+      submittedAt: new Date("2026-08-01T09:00:00.000Z"),
+    });
+    mocks.auditLogFindMany.mockResolvedValueOnce([
+      logEntry({
+        actorUser: {
+          firstName: "FC Allschwil",
+          lastName: "Club Admin",
+          email: "admin@fcallschwil.ch",
+          person: {
+            firstName: "Michael",
+            lastName: "Duijster",
+            displayName: null,
+          },
+        },
+      }),
+    ]);
+
+    const result = await getRegistrationTimeline("fc-allschwil", "reg-1");
+    expect(result[0].actorName).toBe("Michael Duijster");
   });
 
   it("maps PERSON_CREATED, PERSON_LINKED and DUPLICATE_IGNORED to their dedicated kinds", async () => {
