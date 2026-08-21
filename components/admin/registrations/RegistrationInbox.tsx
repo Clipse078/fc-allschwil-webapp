@@ -9,7 +9,6 @@
 
 import { useMemo, useState, useCallback, useRef } from "react";
 import {
-  Search,
   ChevronDown,
   Volleyball,
   User,
@@ -52,6 +51,7 @@ import {
 } from "./WaitingListCoordinatorPicker";
 import RegistrationDetailDrawer from "./RegistrationDetailDrawer";
 import { RegistrationApplicantIdentity } from "./RegistrationApplicantIdentity";
+import { RegistrationWorkspaceSearchInput } from "./RegistrationWorkspaceSearchInput";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 
 const TYPE_FILTER_OPTIONS: InboxTypeOption[] = [
@@ -528,17 +528,12 @@ export default function RegistrationInbox({
 
       <div className="mb-4 rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[220px] flex-1">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--muted)]" aria-hidden />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Suche Anmeldungen…"
-              className="fca-input h-8 w-full pl-8 text-xs"
-              aria-label="Suche Anmeldungen"
-            />
-          </div>
+          <RegistrationWorkspaceSearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Suche Anmeldungen…"
+            ariaLabel="Suche Anmeldungen"
+          />
 
           <CompactFilterSelect<InboxStatusGroupKey | ArchiveStatusGroupKey>
             label="Status"

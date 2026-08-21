@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { WaitingListEntryItem } from "@/lib/registrations/waiting-list-queries";
+import type { WaitingListTimelineEntry } from "@/lib/registrations/waiting-list-timeline";
 import type { AssignableUser, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import {
   WAITING_LIST_PRIORITY_COLORS,
@@ -128,6 +129,8 @@ export function WaitingListDetailDrawer({
   const [teamSeasonOptionsLoading, setTeamSeasonOptionsLoading] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [timeline, setTimeline] = useState<WaitingListTimelineEntry[] | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
 
   const terminal = isTerminalWaitingListStatus(entry.status);
 
@@ -164,6 +167,33 @@ export function WaitingListDetailDrawer({
       setPlaceTeamSeasonId(entry.teamSeasonId);
     }
   }, [entry.scopeType, entry.teamSeasonId]);
+
+  useEffect(() => {
+    if (activeTab !== "history") return;
+
+    let cancelled = false;
+    setTimelineLoading(true);
+
+    fetch(
+      `/api/tenants/${encodeURIComponent(tenantSlug)}/waiting-list/${encodeURIComponent(entry.id)}/timeline`,
+      { cache: "no-store" },
+    )
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) throw new Error(payload.error ?? "Verlauf konnte nicht geladen werden.");
+        if (!cancelled) setTimeline(Array.isArray(payload.timeline) ? payload.timeline : []);
+      })
+      .catch(() => {
+        if (!cancelled) setTimeline([]);
+      })
+      .finally(() => {
+        if (!cancelled) setTimelineLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, entry.id, entry.updatedAt, tenantSlug]);
 
   const patch = async (body: Record<string, unknown>, busyKey: string) => {
     setBusy(busyKey);
@@ -241,24 +271,6 @@ export function WaitingListDetailDrawer({
     entry.targetGroup?.name ??
     entry.orgUnit?.name ??
     (entry.teamSeason ? `${entry.teamSeason.team.name} — ${entry.teamSeason.displayName}` : "—");
-
-  // ── History timeline items ────────────────────────────────────────────────
-
-  const historyEvents = [
-    { key: "added", label: "Auf Warteliste gesetzt", date: entry.addedAt as string },
-    entry.lastContactedAt ? { key: "contacted", label: "Kontaktiert", date: entry.lastContactedAt as string } : null,
-    entry.offeredAt ? { key: "offered", label: "Angebot gemacht", date: entry.offeredAt as string } : null,
-    entry.resolvedAt
-      ? {
-          key: "resolved",
-          label: `Abgeschlossen: ${WAITING_LIST_STATUS_LABELS[entry.status]}`,
-          date: entry.resolvedAt as string,
-          actor: entry.resolvedByUser
-            ? `${entry.resolvedByUser.firstName} ${entry.resolvedByUser.lastName}`
-            : undefined,
-        }
-      : null,
-  ].filter(Boolean) as { key: string; label: string; date: string; actor?: string }[];
 
   return (
     <div className="flex h-full flex-col">
@@ -736,23 +748,25 @@ export function WaitingListDetailDrawer({
         {/* ── VERLAUF tab ──────────────────────────────────────────────────── */}
         {activeTab === "history" ? (
           <div className="px-5 py-4">
-            {historyEvents.length > 0 ? (
+            {timelineLoading && !timeline ? (
+              <p className="text-sm text-[var(--muted)]">Wird geladen…</p>
+            ) : timeline && timeline.length > 0 ? (
               <ol className="space-y-0">
-                {historyEvents.map((event, idx) => (
-                  <li key={event.key} className="flex gap-3">
+                {timeline.map((event, idx) => (
+                  <li key={event.id} className="flex gap-3">
                     <div className="flex flex-col items-center">
                       <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface-2)]">
                         <CheckCircle2 className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
                       </span>
-                      {idx < historyEvents.length - 1 ? (
+                      {idx < timeline.length - 1 ? (
                         <span className="my-1 flex-1 w-px bg-[var(--border)]" aria-hidden />
                       ) : null}
                     </div>
                     <div className="min-w-0 flex-1 pb-4">
                       <p className="text-sm font-medium text-[var(--foreground)]">{event.label}</p>
                       <p className="mt-0.5 text-[0.7rem] text-[var(--muted)]">
-                        {formatWaitingListDateTime(event.date)}
-                        {event.actor ? ` · ${event.actor}` : ""}
+                        {formatWaitingListDateTime(event.occurredAt)}
+                        {event.actorName ? ` · ${event.actorName}` : ""}
                       </p>
                     </div>
                   </li>

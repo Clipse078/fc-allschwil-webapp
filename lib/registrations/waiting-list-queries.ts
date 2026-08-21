@@ -88,10 +88,34 @@ const waitingListEntrySelect = {
     select: { id: true, firstName: true, lastName: true, email: true },
   },
   addedByUser: {
-    select: { id: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      person: {
+        select: {
+          firstName: true,
+          lastName: true,
+          displayName: true,
+        },
+      },
+    },
   },
   resolvedByUser: {
-    select: { id: true, firstName: true, lastName: true },
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      email: true,
+      person: {
+        select: {
+          firstName: true,
+          lastName: true,
+          displayName: true,
+        },
+      },
+    },
   },
 } satisfies Prisma.WaitingListEntrySelect;
 

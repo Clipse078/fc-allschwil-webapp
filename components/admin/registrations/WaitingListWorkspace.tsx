@@ -16,7 +16,6 @@ import {
   Clock,
   Filter,
   Flag,
-  Search,
   UserCheck,
   X,
 } from "lucide-react";
@@ -39,6 +38,7 @@ import {
 } from "./WaitingListCoordinatorPicker";
 import { RegistrationApplicantIdentity } from "./RegistrationApplicantIdentity";
 import { WaitingListDetailDrawer } from "./WaitingListDetailDrawer";
+import { RegistrationWorkspaceSearchInput } from "./RegistrationWorkspaceSearchInput";
 import type { WaitingListPriority, WaitingListScopeType, WaitingListStatus } from "@prisma/client";
 
 type Props = {
@@ -474,21 +474,12 @@ export function WaitingListWorkspace({
           {/* ── Filter bar ──────────────────────────────────────────────── */}
           <div className="rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface-2)] p-3">
             <div className="flex flex-wrap items-center gap-2">
-              {/* Search */}
-              <div className="relative min-w-[220px] flex-1">
-                <Search
-                  className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--muted)]"
-                  aria-hidden
-                />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Name, E-Mail suchen…"
-                  className="fca-input h-8 w-full pl-8 text-xs"
-                  aria-label="Suchen"
-                />
-              </div>
+              <RegistrationWorkspaceSearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Name, E-Mail suchen…"
+                ariaLabel="Suchen"
+              />
 
               {/* Compact filter dropdowns */}
               <CompactFilterSelect<"active" | "all" | WaitingListStatus>
