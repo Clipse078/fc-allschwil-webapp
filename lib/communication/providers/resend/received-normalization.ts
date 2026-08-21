@@ -153,4 +153,3 @@ export async function normalizeResendEmailReceivedEvent(args: {
     attachments: attachments && attachments.length ? attachments : null,
   };
 }
-

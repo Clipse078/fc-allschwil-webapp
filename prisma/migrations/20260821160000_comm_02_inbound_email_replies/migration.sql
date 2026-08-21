@@ -16,4 +16,3 @@ ON "CommunicationMessage"("provider", "providerMessageId");
 
 CREATE INDEX "CommunicationMessage_provider_providerEventId_idx"
 ON "CommunicationMessage"("provider", "providerEventId");
-

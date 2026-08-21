@@ -168,4 +168,3 @@ describe("COMM-02 inbound email persistence", () => {
     );
   });
 });
-

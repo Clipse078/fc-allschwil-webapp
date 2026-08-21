@@ -55,4 +55,3 @@ export function getResendWebhookEventId(headers: Headers): string | null {
     null;
   return id?.trim() ? id.trim() : null;
 }
-

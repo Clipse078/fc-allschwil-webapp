@@ -28,4 +28,3 @@ export type NormalizedInboundEmail = {
   receivedAt: Date;
   attachments: InboundEmailAttachment[] | null;
 };
-

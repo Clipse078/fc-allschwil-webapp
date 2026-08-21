@@ -93,4 +93,3 @@ describe("COMM-02 Resend inbound webhook", () => {
     expect(mocks.persist).toHaveBeenCalled();
   });
 });
-

@@ -68,4 +68,3 @@ describe("COMM-02 communication history GET", () => {
     expect(mocks.enrich).toHaveBeenCalledWith("tenant-a", [{ id: "m1" }, { id: "m2" }]);
   });
 });
-
