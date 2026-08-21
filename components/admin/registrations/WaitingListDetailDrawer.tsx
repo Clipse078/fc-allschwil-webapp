@@ -39,6 +39,13 @@ import {
 import { WaitingListCoordinatorPicker } from "./WaitingListCoordinatorPicker";
 import { TeamSeasonScopePicker } from "./WaitingListScopePickers";
 import { WaitingListWorkflowSteps } from "./WaitingListWorkflowSteps";
+import {
+  REGISTRATION_DRAWER_TAB_CONTENT_CLASS,
+  RegistrationCommunicationTabPlaceholder,
+  RegistrationDrawerTabBody,
+  RegistrationDrawerTabStrip,
+  type RegistrationDrawerTab,
+} from "./RegistrationDrawerTabShell";
 import type { WaitingListPriority } from "@prisma/client";
 
 // ── Section helper ────────────────────────────────────────────────────────────
@@ -96,8 +103,6 @@ function ApplicantAvatar({ name, size = "md" }: { name: string; size?: "sm" | "m
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type Tab = "overview" | "history";
-
 type Props = {
   entry: WaitingListEntryItem;
   tenantSlug: string;
@@ -128,7 +133,7 @@ export function WaitingListDetailDrawer({
   const [teamSeasonOptions, setTeamSeasonOptions] = useState<TeamSeasonOption[]>([]);
   const [teamSeasonOptionsLoading, setTeamSeasonOptionsLoading] = useState(false);
   const [deleteConfirming, setDeleteConfirming] = useState(false);
-  const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeTab, setActiveTab] = useState<RegistrationDrawerTab>("overview");
   const [timeline, setTimeline] = useState<WaitingListTimelineEntry[] | null>(null);
   const [timelineLoading, setTimelineLoading] = useState(false);
 
@@ -313,35 +318,10 @@ export function WaitingListDetailDrawer({
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────────── */}
-      <div className="flex border-b border-[var(--border)]">
-        <button
-          type="button"
-          onClick={() => setActiveTab("overview")}
-          className={cn(
-            "flex-1 px-4 py-2.5 text-xs font-semibold transition-colors",
-            activeTab === "overview"
-              ? "border-b-2 border-[var(--tenant-primary)] text-[var(--tenant-primary)]"
-              : "text-[var(--muted)] hover:text-[var(--foreground)]",
-          )}
-        >
-          Überblick
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("history")}
-          className={cn(
-            "flex-1 px-4 py-2.5 text-xs font-semibold transition-colors",
-            activeTab === "history"
-              ? "border-b-2 border-[var(--tenant-primary)] text-[var(--tenant-primary)]"
-              : "text-[var(--muted)] hover:text-[var(--foreground)]",
-          )}
-        >
-          Verlauf
-        </button>
-      </div>
+      <RegistrationDrawerTabStrip activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* ── Tab content ────────────────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto">
+      <RegistrationDrawerTabBody>
 
         {error ? (
           <div className="mx-5 mt-4 rounded-[var(--radius-md)] border border-rose-200 bg-rose-50 px-3 py-2.5 text-sm text-rose-700">
@@ -351,7 +331,7 @@ export function WaitingListDetailDrawer({
 
         {/* ── ÜBERBLICK tab ─────────────────────────────────────────────── */}
         {activeTab === "overview" ? (
-          <div className="space-y-4 px-5 py-4">
+          <div className={cn("space-y-4", REGISTRATION_DRAWER_TAB_CONTENT_CLASS)}>
 
             {/* Workflow & Status */}
             <WaitingListWorkflowSteps entry={entry} />
@@ -747,7 +727,7 @@ export function WaitingListDetailDrawer({
 
         {/* ── VERLAUF tab ──────────────────────────────────────────────────── */}
         {activeTab === "history" ? (
-          <div className="px-5 py-4">
+          <div className={REGISTRATION_DRAWER_TAB_CONTENT_CLASS}>
             {timelineLoading && !timeline ? (
               <p className="text-sm text-[var(--muted)]">Wird geladen…</p>
             ) : timeline && timeline.length > 0 ? (
@@ -777,7 +757,9 @@ export function WaitingListDetailDrawer({
             )}
           </div>
         ) : null}
-      </div>
+
+        {activeTab === "communication" ? <RegistrationCommunicationTabPlaceholder /> : null}
+      </RegistrationDrawerTabBody>
     </div>
   );
 }

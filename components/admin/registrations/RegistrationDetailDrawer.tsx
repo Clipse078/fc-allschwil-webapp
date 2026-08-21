@@ -61,6 +61,13 @@ import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 import { RegistrationWorkflowSteps } from "./RegistrationWorkflowSteps";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
+import {
+  RegistrationCommunicationTabPlaceholder,
+  RegistrationDrawerTabBody,
+  RegistrationDrawerTabStrip,
+  type RegistrationDrawerTab,
+} from "./RegistrationDrawerTabShell";
+import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
 
 const NOT_PROVIDED = "Nicht angegeben";
 
@@ -306,6 +313,18 @@ function getContactName(payloadJson: unknown): string | null {
     : null;
 }
 
+function RegistrationDetailDrawerTabs({
+  children,
+}: {
+  children: (tabs: {
+    activeTab: RegistrationDrawerTab;
+    setActiveTab: (tab: RegistrationDrawerTab) => void;
+  }) => React.ReactNode;
+}) {
+  const [activeTab, setActiveTab] = useState<RegistrationDrawerTab>("overview");
+  return <>{children({ activeTab, setActiveTab })}</>;
+}
+
 // ── Main drawer ───────────────────────────────────────────────────────────────
 
 export default function RegistrationDetailDrawer({
@@ -482,37 +501,44 @@ export default function RegistrationDetailDrawer({
           </div>
         </div>
 
-        {/* ── Scrollable body ──────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="border-b border-[var(--border)] px-6 py-5">
-            <RegistrationWorkflowSteps
-              registration={registration}
-              locale={locale}
-              timezone={timezone}
-            />
-          </div>
+        <RegistrationDetailDrawerTabs key={registration.id}>
+          {({ activeTab, setActiveTab }) => (
+            <>
+        <RegistrationDrawerTabStrip activeTab={activeTab} onTabChange={setActiveTab} />
 
-          <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
-            <RegistrationWorkflowPanel
-              registration={registration}
-              tenantSlug={tenantSlug}
-              canEdit={canEdit}
-              locale={locale}
-              timezone={timezone}
-              assignableUsers={assignableUsers}
-              eligibleCoordinators={eligibleCoordinators}
-              targetGroups={targetGroups}
-              orgUnits={orgUnits}
-              teamSeasons={teamSeasons}
-              onUpdate={(updated) => {
-                setRegistration(updated);
-                onUpdate(updated);
-              }}
-            />
-          </div>
+        <RegistrationDrawerTabBody>
+          {activeTab === "overview" ? (
+            <>
+              <div className="border-b border-[var(--border)] px-6 py-5">
+                <RegistrationWorkflowSteps
+                  registration={registration}
+                  locale={locale}
+                  timezone={timezone}
+                />
+              </div>
 
-          {/* Vollständige Angaben — expandable secondary data section */}
-          <div className="border-b border-[var(--border)]">
+              <div className="border-b border-[var(--border)] px-6 py-5">
+                <RegistrationWorkflowPanel
+                  registration={registration}
+                  tenantSlug={tenantSlug}
+                  canEdit={canEdit}
+                  locale={locale}
+                  timezone={timezone}
+                  assignableUsers={assignableUsers}
+                  eligibleCoordinators={eligibleCoordinators}
+                  targetGroups={targetGroups}
+                  orgUnits={orgUnits}
+                  teamSeasons={teamSeasons}
+                  showInlineTimeline={false}
+                  onUpdate={(updated) => {
+                    setRegistration(updated);
+                    onUpdate(updated);
+                  }}
+                />
+              </div>
+
+              {/* Vollständige Angaben — expandable secondary data section */}
+              <div className="border-b border-[var(--border)]">
             <button
               type="button"
               onClick={() => setShowFullData((v) => !v)}
@@ -732,7 +758,24 @@ export default function RegistrationDetailDrawer({
               </div>
             </div>
           )}
-        </div>
+            </>
+          ) : null}
+
+          {activeTab === "history" ? (
+            <RegistrationTimelinePanel
+              registrationId={registration.id}
+              tenantSlug={tenantSlug}
+              locale={locale}
+              timezone={timezone}
+              refreshKey={registration.updatedAt}
+            />
+          ) : null}
+
+          {activeTab === "communication" ? <RegistrationCommunicationTabPlaceholder /> : null}
+        </RegistrationDrawerTabBody>
+            </>
+          )}
+        </RegistrationDetailDrawerTabs>
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-[var(--border)] bg-[var(--surface-2)]">
