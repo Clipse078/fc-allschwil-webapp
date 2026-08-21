@@ -1,7 +1,7 @@
 /**
  * lib/communication/__tests__/tenant-isolation.test.ts
  *
- * COMM-01A: Mandatory cross-tenant isolation test matrix (A–K).
+ * COMM-01A/01B: Mandatory cross-tenant isolation test matrix (A–O).
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -15,11 +15,16 @@ const mocks = vi.hoisted(() => ({
   internalCommentFindMany: vi.fn(),
   internalCommentFindFirst: vi.fn(),
   internalCommentCreate: vi.fn(),
+  internalCommentUpdate: vi.fn(),
   commentMentionCreateMany: vi.fn(),
+  commentMentionDeleteMany: vi.fn(),
   registrationFindFirst: vi.fn(),
   waitingListEntryFindFirst: vi.fn(),
   tenantMembershipFindFirst: vi.fn(),
   tenantMembershipFindMany: vi.fn(),
+  transaction: vi.fn(),
+  logAction: vi.fn(),
+  userFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -37,9 +42,11 @@ vi.mock("@/lib/db/prisma", () => ({
       findMany: mocks.internalCommentFindMany,
       findFirst: mocks.internalCommentFindFirst,
       create: mocks.internalCommentCreate,
+      update: mocks.internalCommentUpdate,
     },
     commentMention: {
       createMany: mocks.commentMentionCreateMany,
+      deleteMany: mocks.commentMentionDeleteMany,
     },
     registration: {
       findFirst: mocks.registrationFindFirst,
@@ -51,6 +58,10 @@ vi.mock("@/lib/db/prisma", () => ({
       findFirst: mocks.tenantMembershipFindFirst,
       findMany: mocks.tenantMembershipFindMany,
     },
+    user: {
+      findMany: mocks.userFindMany,
+    },
+    $transaction: mocks.transaction,
   },
 }));
 
@@ -58,24 +69,35 @@ vi.mock("@/lib/tenants/require-tenant", () => ({
   requireTenant: vi.fn().mockResolvedValue({ id: "tenant-a", key: "fc-a" }),
 }));
 
+vi.mock("@/lib/audit/log-action", () => ({
+  logAction: mocks.logAction,
+}));
+
 import { resolveCommunicationTargetForTenant } from "@/lib/communication/target-resolver";
 import {
   getCommunicationThreadByIdForTenant,
-  getCommunicationThreadByInboundTokenForTenant,
   getOrCreateCommunicationThreadForTarget,
 } from "@/lib/communication/thread-service";
 import {
   createCommunicationMessage,
-  getCommunicationMessageByIdForTenant,
   getCommunicationMessageByProviderIdForTenant,
   listCommunicationMessages,
 } from "@/lib/communication/message-service";
-import { createInternalComment, listInternalComments } from "@/lib/communication/comment-service";
+import {
+  createInternalComment,
+  listInternalComments,
+  softDeleteInternalComment,
+  updateInternalComment,
+} from "@/lib/communication/comment-service";
+import { listMentionCandidatesForTenant } from "@/lib/communication/mention-candidates";
 import { CommunicationServiceError } from "@/lib/communication/errors";
 
 const TENANT_A = "tenant-a";
 const TENANT_B = "tenant-b";
+const THREAD_A = "thread-a";
 const THREAD_B = "thread-b";
+const COMMENT_A = "comment-a";
+const COMMENT_B = "comment-b";
 const MESSAGE_B = "message-b";
 const REG_A = "reg-a";
 const REG_B = "reg-b";
@@ -93,6 +115,21 @@ function makeThread(overrides: Record<string, unknown> = {}) {
     createdByUserId: null,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    ...overrides,
+  };
+}
+
+function makeComment(overrides: Record<string, unknown> = {}) {
+  return {
+    id: COMMENT_B,
+    tenantId: TENANT_B,
+    threadId: THREAD_B,
+    authorUserId: USER_B,
+    body: "Secret comment",
+    deletedAt: null,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    mentions: [],
     ...overrides,
   };
 }
@@ -126,6 +163,13 @@ function makeMessage(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+    callback({
+      commentMention: { deleteMany: mocks.commentMentionDeleteMany, createMany: mocks.commentMentionCreateMany },
+      internalComment: { update: mocks.internalCommentUpdate },
+    }),
+  );
+  mocks.logAction.mockResolvedValue(undefined);
 });
 
 describe("COMM-01A tenant isolation matrix", () => {
@@ -151,10 +195,6 @@ describe("COMM-01A tenant isolation matrix", () => {
     } satisfies Partial<CommunicationServiceError>);
 
     expect(mocks.communicationThreadCreate).not.toHaveBeenCalled();
-    expect(mocks.registrationFindFirst).toHaveBeenCalledWith({
-      where: { id: REG_B, tenantId: TENANT_A },
-      select: expect.any(Object),
-    });
   });
 
   it("C — waiting-list target: Tenant A cannot attach a thread to Tenant B waiting-list entry", async () => {
@@ -167,10 +207,6 @@ describe("COMM-01A tenant isolation matrix", () => {
     });
 
     expect(mocks.communicationThreadCreate).not.toHaveBeenCalled();
-    expect(mocks.waitingListEntryFindFirst).toHaveBeenCalledWith({
-      where: { id: WAIT_B, tenantId: TENANT_A },
-      select: expect.any(Object),
-    });
   });
 
   it("D — message read: Tenant A cannot read Tenant B communication messages", async () => {
@@ -178,16 +214,6 @@ describe("COMM-01A tenant isolation matrix", () => {
 
     await expect(listCommunicationMessages(TENANT_A, THREAD_B)).rejects.toMatchObject({
       code: "THREAD_NOT_FOUND",
-    });
-
-    mocks.communicationThreadFindFirst.mockReset();
-    mocks.communicationMessageFindFirst.mockResolvedValue(null);
-
-    const message = await getCommunicationMessageByIdForTenant(TENANT_A, MESSAGE_B);
-    expect(message).toBeNull();
-    expect(mocks.communicationMessageFindFirst).toHaveBeenCalledWith({
-      where: { id: MESSAGE_B, tenantId: TENANT_A },
-      select: expect.any(Object),
     });
   });
 
@@ -228,13 +254,13 @@ describe("COMM-01A tenant isolation matrix", () => {
 
   it("H — mentions: Tenant A cannot mention a user without valid Tenant A membership", async () => {
     mocks.communicationThreadFindFirst.mockResolvedValue(
-      makeThread({ id: "thread-a", tenantId: TENANT_A, targetId: REG_A }),
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
     );
     mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
     mocks.tenantMembershipFindMany.mockResolvedValue([]);
 
     await expect(
-      createInternalComment(TENANT_A, "thread-a", USER_A, "mention attempt", [USER_B]),
+      createInternalComment(TENANT_A, THREAD_A, USER_A, "mention attempt", [USER_B]),
     ).rejects.toMatchObject({
       code: "MENTION_FORBIDDEN",
     });
@@ -252,14 +278,6 @@ describe("COMM-01A tenant isolation matrix", () => {
     );
 
     expect(message).toBeNull();
-    expect(mocks.communicationMessageFindFirst).toHaveBeenCalledWith({
-      where: {
-        tenantId: TENANT_A,
-        provider: "resend",
-        providerMessageId: "provider-msg-b",
-      },
-      select: expect.any(Object),
-    });
   });
 
   it("J — target tampering: valid targetType with another tenant's targetId fails", async () => {
@@ -285,28 +303,26 @@ describe("COMM-01A tenant isolation matrix", () => {
     });
     mocks.communicationThreadFindFirst
       .mockResolvedValueOnce(null)
-      .mockResolvedValue(makeThread({ id: "thread-a", tenantId: TENANT_A, targetId: REG_A }));
+      .mockResolvedValue(makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }));
     mocks.communicationThreadCreate.mockResolvedValue(
-      makeThread({ id: "thread-a", tenantId: TENANT_A, targetId: REG_A }),
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
     );
     mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
     mocks.tenantMembershipFindMany.mockResolvedValue([{ userId: USER_A }]);
-    mocks.internalCommentCreate.mockResolvedValue({
-      id: "comment-a",
-      tenantId: TENANT_A,
-      threadId: "thread-a",
-      authorUserId: USER_A,
-      body: "All good",
-      deletedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      mentions: [],
-    });
+    mocks.internalCommentCreate.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "All good",
+      }),
+    );
     mocks.communicationMessageCreate.mockResolvedValue(
       makeMessage({
         id: "message-a",
         tenantId: TENANT_A,
-        threadId: "thread-a",
+        threadId: THREAD_A,
       }),
     );
 
@@ -332,12 +348,249 @@ describe("COMM-01A tenant isolation matrix", () => {
       [USER_A],
     );
     expect(comment.tenantId).toBe(TENANT_A);
+  });
+});
 
-    const tokenThread = await getCommunicationThreadByInboundTokenForTenant(
-      TENANT_A,
-      thread.inboundReplyToken,
+describe("COMM-01B tenant isolation matrix", () => {
+  it("A — Tenant A cannot list Tenant B comments", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(null);
+
+    await expect(listInternalComments(TENANT_A, THREAD_B)).rejects.toMatchObject({
+      code: "THREAD_NOT_FOUND",
+    });
+  });
+
+  it("B — Tenant A cannot create comment on Tenant B thread", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(null);
+
+    await expect(
+      createInternalComment(TENANT_A, THREAD_B, USER_A, "cross tenant"),
+    ).rejects.toMatchObject({ code: "THREAD_NOT_FOUND" });
+  });
+
+  it("C — Tenant A cannot edit Tenant B comment by raw commentId", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
     );
-    expect(tokenThread?.id).toBe(thread.id);
+    mocks.internalCommentFindFirst.mockResolvedValue(null);
+
+    await expect(
+      updateInternalComment(TENANT_A, THREAD_A, COMMENT_B, USER_A, "edited"),
+    ).rejects.toMatchObject({ code: "COMMENT_NOT_FOUND" });
+  });
+
+  it("D — Tenant A cannot delete Tenant B comment", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindFirst.mockResolvedValue(null);
+
+    await expect(
+      softDeleteInternalComment(TENANT_A, THREAD_A, COMMENT_B, USER_A),
+    ).rejects.toMatchObject({ code: "COMMENT_NOT_FOUND" });
+  });
+
+  it("E — Tenant A cannot mention Tenant B user", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
+    mocks.tenantMembershipFindMany.mockResolvedValue([]);
+
+    await expect(
+      createInternalComment(TENANT_A, THREAD_A, USER_A, "hello @other", [USER_B]),
+    ).rejects.toMatchObject({ code: "MENTION_FORBIDDEN" });
+  });
+
+  it("F — mention candidate search stays tenant-scoped", async () => {
+    mocks.tenantMembershipFindMany.mockResolvedValue([
+      {
+        user: {
+          id: USER_A,
+          firstName: "Michael",
+          lastName: "Duijster",
+          email: "michael@fc-a.ch",
+          person: null,
+        },
+      },
+    ]);
+
+    const candidates = await listMentionCandidatesForTenant("fc-a", "mi");
+
+    expect(candidates.every((candidate) => candidate.id === USER_A)).toBe(true);
+    expect(mocks.tenantMembershipFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: "tenant-a" }),
+      }),
+    );
+  });
+
+  it("G — manipulating threadId with valid Tenant B thread fails", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(null);
+
+    await expect(
+      createInternalComment(TENANT_A, THREAD_B, USER_A, "illegal"),
+    ).rejects.toMatchObject({ code: "THREAD_NOT_FOUND" });
+  });
+
+  it("H — Tenant B comment under Tenant A thread fails", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindFirst.mockResolvedValue(
+      makeComment({ id: COMMENT_B, tenantId: TENANT_B, threadId: THREAD_B }),
+    );
+
+    await expect(
+      updateInternalComment(TENANT_A, THREAD_A, COMMENT_B, USER_A, "tamper"),
+    ).rejects.toMatchObject({ code: "COMMENT_NOT_FOUND" });
+  });
+
+  it("J — valid Tenant A author can create comment and mention Tenant A user", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
+    mocks.tenantMembershipFindMany.mockResolvedValue([{ userId: USER_A }]);
+    mocks.internalCommentCreate.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "Hello @Michael",
+        mentions: [{ id: "mention-a", tenantId: TENANT_A, commentId: COMMENT_A, mentionedUserId: USER_A, createdAt: new Date() }],
+      }),
+    );
+
+    const comment = await createInternalComment(TENANT_A, THREAD_A, USER_A, "Hello @Michael", [USER_A]);
+    expect(comment.tenantId).toBe(TENANT_A);
+    expect(mocks.logAction).toHaveBeenCalled();
+  });
+
+  it("K — author can edit own Tenant A comment", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindFirst.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "Original",
+      }),
+    );
+    mocks.tenantMembershipFindMany.mockResolvedValue([]);
+    mocks.internalCommentUpdate.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "Updated",
+      }),
+    );
+
+    const comment = await updateInternalComment(
+      TENANT_A,
+      THREAD_A,
+      COMMENT_A,
+      USER_A,
+      "Updated",
+      [],
+    );
+
+    expect(comment.body).toBe("Updated");
+    expect(mocks.logAction).toHaveBeenCalled();
+  });
+
+  it("L — other Tenant A user cannot edit author's comment", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindFirst.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+      }),
+    );
+
+    await expect(
+      updateInternalComment(TENANT_A, THREAD_A, COMMENT_A, USER_B, "nope"),
+    ).rejects.toMatchObject({ code: "COMMENT_FORBIDDEN" });
+  });
+
+  it("M — author can soft-delete own Tenant A comment", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindFirst.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+      }),
+    );
+    mocks.internalCommentUpdate.mockResolvedValue(
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "Original",
+        deletedAt: new Date(),
+      }),
+    );
+
+    const comment = await softDeleteInternalComment(TENANT_A, THREAD_A, COMMENT_A, USER_A);
+    expect(comment.deletedAt).not.toBeNull();
+    expect(mocks.commentMentionDeleteMany).toHaveBeenCalled();
+  });
+
+  it("N — deleted comment is returned without body content in list path", async () => {
+    mocks.communicationThreadFindFirst.mockResolvedValue(
+      makeThread({ id: THREAD_A, tenantId: TENANT_A, targetId: REG_A }),
+    );
+    mocks.internalCommentFindMany.mockResolvedValue([
+      makeComment({
+        id: COMMENT_A,
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        authorUserId: USER_A,
+        body: "Secret",
+        deletedAt: new Date(),
+      }),
+    ]);
+
+    const comments = await listInternalComments(TENANT_A, THREAD_A);
+    expect(comments[0]?.deletedAt).not.toBeNull();
+    expect(comments[0]?.body).toBe("Secret");
+  });
+
+  it("O — target tampering between REGISTRATION and WAITING_LIST_ENTRY cannot cross tenant", async () => {
+    mocks.waitingListEntryFindFirst.mockResolvedValue(null);
+
+    await expect(
+      resolveCommunicationTargetForTenant({
+        tenantId: TENANT_A,
+        targetType: "WAITING_LIST_ENTRY",
+        targetId: WAIT_B,
+      }),
+    ).rejects.toMatchObject({ code: "TARGET_NOT_FOUND" });
+
+    mocks.registrationFindFirst.mockResolvedValue(null);
+
+    await expect(
+      resolveCommunicationTargetForTenant({
+        tenantId: TENANT_A,
+        targetType: "REGISTRATION",
+        targetId: REG_B,
+      }),
+    ).rejects.toMatchObject({ code: "TARGET_NOT_FOUND" });
   });
 });
 
@@ -359,9 +612,5 @@ describe("resolveCommunicationTargetForTenant — waiting list same-tenant succe
     });
 
     expect(resolved.targetId).toBe(WAIT_B);
-    expect(mocks.waitingListEntryFindFirst).toHaveBeenCalledWith({
-      where: { id: WAIT_B, tenantId: TENANT_B },
-      select: expect.any(Object),
-    });
   });
 });

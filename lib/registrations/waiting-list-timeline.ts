@@ -93,6 +93,30 @@ function mapAuditLog(entry: {
         occurredAt,
       };
 
+    case "INTERNAL_COMMENT_CREATED":
+      return {
+        id: entry.id,
+        label: "Interner Kommentar erstellt",
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "INTERNAL_COMMENT_UPDATED":
+      return {
+        id: entry.id,
+        label: "Interner Kommentar bearbeitet",
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "INTERNAL_COMMENT_DELETED":
+      return {
+        id: entry.id,
+        label: "Interner Kommentar gelöscht",
+        actorName: actor,
+        occurredAt,
+      };
+
     default:
       return null;
   }

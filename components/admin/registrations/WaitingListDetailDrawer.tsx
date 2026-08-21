@@ -44,9 +44,9 @@ import {
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
   RegistrationEmailTabPlaceholder,
-  RegistrationInternalCommentsTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
+import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
 import type { WaitingListPriority } from "@prisma/client";
 
 // ── Section helper ────────────────────────────────────────────────────────────
@@ -113,6 +113,9 @@ type Props = {
   onClose: () => void;
   onUpdate: (updated: WaitingListEntryItem) => void;
   onDelete: () => void;
+  currentUserId?: string | null;
+  locale?: string;
+  timezone?: string;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -126,6 +129,9 @@ export function WaitingListDetailDrawer({
   onClose,
   onUpdate,
   onDelete,
+  currentUserId = null,
+  locale = "de-CH",
+  timezone = "Europe/Zurich",
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -761,7 +767,18 @@ export function WaitingListDetailDrawer({
 
         {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
 
-        {activeTab === "internalComments" ? <RegistrationInternalCommentsTabPlaceholder /> : null}
+        {activeTab === "internalComments" ? (
+          <InternalCommentsPanel
+            tenantSlug={tenantSlug}
+            targetType="WAITING_LIST_ENTRY"
+            targetId={entry.id}
+            canEdit={canEdit}
+            currentUserId={currentUserId}
+            locale={locale}
+            timezone={timezone}
+            enabled={activeTab === "internalComments"}
+          />
+        ) : null}
       </RegistrationDrawerTabBody>
     </div>
   );

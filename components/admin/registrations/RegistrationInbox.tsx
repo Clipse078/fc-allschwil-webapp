@@ -806,6 +806,7 @@ export default function RegistrationInbox({
           onClose={handleClose}
           onUpdate={handleUpdate}
           onDeleted={handleDeleted}
+          currentUserId={currentUserId}
         />
       ) : null}
     </div>

@@ -65,9 +65,9 @@ import {
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
   RegistrationEmailTabPlaceholder,
-  RegistrationInternalCommentsTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
+import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
 import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
 
 const NOT_PROVIDED = "Nicht angegeben";
@@ -101,6 +101,7 @@ type Props = {
    * the deleted item from the parent list without a full-page navigation.
    */
   onDeleted?: (deletedId: string) => void;
+  currentUserId?: string | null;
 };
 
 // ── Display constants (Lucide icons replace emojis) ───────────────────────────
@@ -343,6 +344,7 @@ export default function RegistrationDetailDrawer({
   onClose,
   onUpdate,
   onDeleted,
+  currentUserId = null,
 }: Props) {
   const [registration, setRegistration] = useState(initialRegistration);
   const [isVisible, setIsVisible] = useState(false);
@@ -774,7 +776,18 @@ export default function RegistrationDetailDrawer({
 
           {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
 
-          {activeTab === "internalComments" ? <RegistrationInternalCommentsTabPlaceholder /> : null}
+          {activeTab === "internalComments" ? (
+            <InternalCommentsPanel
+              tenantSlug={tenantSlug}
+              targetType="REGISTRATION"
+              targetId={registration.id}
+              canEdit={canEdit}
+              currentUserId={currentUserId}
+              locale={locale}
+              timezone={timezone}
+              enabled={activeTab === "internalComments"}
+            />
+          ) : null}
         </RegistrationDrawerTabBody>
             </>
           )}
