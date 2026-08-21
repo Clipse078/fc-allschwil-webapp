@@ -74,7 +74,11 @@ export async function resolveCommunicationRecipientForTarget(input: {
 
   if (target.targetType === "WAITING_LIST_ENTRY") {
     const entry = await prisma.waitingListEntry.findFirst({
-      where: { id: target.targetId, tenantId },
+      where: {
+        id: target.targetId,
+        tenantId,
+        registration: { tenantId },
+      },
       select: {
         status: true,
         registration: {

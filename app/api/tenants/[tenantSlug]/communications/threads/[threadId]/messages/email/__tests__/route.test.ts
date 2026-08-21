@@ -23,7 +23,7 @@ vi.mock("@/lib/communication/message-enrichment", () => ({
   toPublicOutboundEmailMessages: mocks.enrich,
 }));
 
-import { POST } from "./route";
+import { POST } from "../route";
 
 const context = {
   params: Promise.resolve({ tenantSlug: "fc-a", threadId: "thread-a" }),

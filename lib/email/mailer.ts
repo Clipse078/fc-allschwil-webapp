@@ -40,6 +40,7 @@ export type MailMessage = {
   subject: string;
   html: string;
   text?: string;
+  idempotencyKey?: string;
 };
 
 export type MailDeliveryResult = {
@@ -84,13 +85,16 @@ export async function sendMail(message: MailMessage): Promise<MailDeliveryResult
 
   const resend = new Resend(apiKey);
 
-  const { data, error } = await resend.emails.send({
-    from,
-    to: message.to,
-    subject: message.subject,
-    html: message.html,
-    text: message.text,
-  });
+  const { data, error } = await resend.emails.send(
+    {
+      from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    },
+    message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined,
+  );
 
   if (error) {
     throw new Error(`Resend delivery error: ${error.name} — ${error.message}`);

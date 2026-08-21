@@ -102,9 +102,10 @@ export function EmailCommunicationPanel({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const requestGenerationRef = useRef(0);
 
   const loadHistory = useCallback(
-    async (resolvedThreadId: string) => {
+    async (resolvedThreadId: string, generation: number) => {
       const response = await fetch(
         `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(resolvedThreadId)}/messages`,
         { cache: "no-store" },
@@ -113,6 +114,7 @@ export function EmailCommunicationPanel({
       if (!response.ok) {
         throw new Error(payload.error ?? "E-Mail-Verlauf konnte nicht geladen werden.");
       }
+      if (generation !== requestGenerationRef.current) return;
       setMessages(Array.isArray(payload.messages) ? payload.messages : []);
       setRecipient(payload.recipient ?? null);
     },
@@ -120,6 +122,7 @@ export function EmailCommunicationPanel({
   );
 
   const initialize = useCallback(async () => {
+    const generation = ++requestGenerationRef.current;
     setLoading(true);
     setError(null);
     try {
@@ -132,8 +135,12 @@ export function EmailCommunicationPanel({
       if (existingResponse.ok) {
         const payload = (await existingResponse.json()) as ThreadResponse;
         resolvedThreadId = payload.thread?.id ?? null;
+      } else if (existingResponse.status !== 404) {
+        const payload = (await existingResponse.json()) as ThreadResponse;
+        throw new Error(payload.error ?? "E-Mail-Kommunikation konnte nicht geladen werden.");
       }
 
+      if (generation !== requestGenerationRef.current) return;
       if (!resolvedThreadId && canEdit && lifecycleAllowsSend) {
         const createResponse = await fetch(
           `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads`,
@@ -150,18 +157,20 @@ export function EmailCommunicationPanel({
         resolvedThreadId = payload.thread?.id ?? null;
       }
 
+      if (generation !== requestGenerationRef.current) return;
       setThreadId(resolvedThreadId);
       if (resolvedThreadId) {
-        await loadHistory(resolvedThreadId);
+        await loadHistory(resolvedThreadId, generation);
       } else {
         setMessages([]);
         setRecipient(null);
       }
     } catch (loadError) {
+      if (generation !== requestGenerationRef.current) return;
       setMessages([]);
       setError(loadError instanceof Error ? loadError.message : "E-Mail-Verlauf konnte nicht geladen werden.");
     } finally {
-      setLoading(false);
+      if (generation === requestGenerationRef.current) setLoading(false);
     }
   }, [canEdit, lifecycleAllowsSend, loadHistory, targetId, targetType, tenantSlug]);
 
@@ -173,6 +182,9 @@ export function EmailCommunicationPanel({
     setSubject("");
     setBodyText("");
     void initialize();
+    return () => {
+      requestGenerationRef.current += 1;
+    };
   }, [enabled, initialize, targetId, targetType]);
 
   useEffect(() => {
@@ -181,11 +193,13 @@ export function EmailCommunicationPanel({
 
   const submit = async () => {
     if (!threadId || !recipient?.sendAllowed || sending) return;
+    const generation = requestGenerationRef.current;
+    const sendingThreadId = threadId;
     setSending(true);
     setError(null);
     try {
       const response = await fetch(
-        `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(threadId)}/messages/email`,
+        `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(sendingThreadId)}/messages/email`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -196,14 +210,16 @@ export function EmailCommunicationPanel({
       if (!response.ok) {
         throw new Error(payload.error ?? "Die E-Mail konnte nicht gesendet werden.");
       }
+      if (generation !== requestGenerationRef.current) return;
       setSubject("");
       setBodyText("");
-      await loadHistory(threadId);
+      await loadHistory(sendingThreadId, generation);
     } catch (sendError) {
+      if (generation !== requestGenerationRef.current) return;
       setError(sendError instanceof Error ? sendError.message : "Die E-Mail konnte nicht gesendet werden.");
-      await loadHistory(threadId).catch(() => undefined);
+      await loadHistory(sendingThreadId, generation).catch(() => undefined);
     } finally {
-      setSending(false);
+      if (generation === requestGenerationRef.current) setSending(false);
     }
   };
 
@@ -222,6 +238,18 @@ export function EmailCommunicationPanel({
         <div className="flex flex-1 items-center gap-2 text-sm text-[var(--muted)]">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           E-Mails werden geladen…
+        </div>
+      ) : error && !threadId ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+          <AlertCircle className="h-5 w-5 text-rose-500" aria-hidden />
+          <p className="text-sm text-rose-600">{error}</p>
+          <button
+            type="button"
+            onClick={() => void initialize()}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+          >
+            Erneut versuchen
+          </button>
         </div>
       ) : (
         <>

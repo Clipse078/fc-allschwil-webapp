@@ -129,6 +129,7 @@ export async function sendOutboundEmailForThread(
       subject,
       text: bodyText,
       html: plainTextToSafeHtml(bodyText),
+      idempotencyKey: pending.id,
     });
   } catch (error) {
     const deliveryError = safeFailureSummary(error);
@@ -154,7 +155,7 @@ export async function sendOutboundEmailForThread(
     );
   }
 
-  await prisma.communicationMessage.updateMany({
+  const updated = await prisma.communicationMessage.updateMany({
     where: { id: pending.id, tenantId, threadId: thread.id },
     data: {
       fromAddress: deliveryResult.from,
@@ -164,6 +165,12 @@ export async function sendOutboundEmailForThread(
       sentAt: new Date(),
     },
   });
+  if (updated.count !== 1) {
+    throw new CommunicationServiceError(
+      "MESSAGE_NOT_FOUND",
+      "Der Versand wurde angenommen, der Nachrichtenstatus konnte aber nicht aktualisiert werden.",
+    );
+  }
 
   await recordCommunicationAuditEvent({
     tenantId,

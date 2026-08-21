@@ -289,7 +289,20 @@ export async function getRegistrationTimeline(
   if (!registration) return [];
 
   const logs = await prisma.auditLog.findMany({
-    where: { entityType: "Registration", entityId: registration.id },
+    where: {
+      entityType: "Registration",
+      entityId: registration.id,
+      // Legacy business events predate AuditLog.tenantId and are admitted only
+      // after the tenant-owned registration above is resolved. Communication
+      // events are never read without an explicit matching tenantId.
+      OR: [
+        { tenantId: tenant.id },
+        {
+          tenantId: null,
+          action: { notIn: ["EMAIL_SENT", "EMAIL_FAILED", "EMAIL_DELIVERED", "EMAIL_RECEIVED"] },
+        },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

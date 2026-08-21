@@ -199,6 +199,7 @@ describe("COMM-01C outbound delivery", () => {
       subject: "Willkommen",
       text: "Hallo Anna",
       html: "<p>Hallo Anna</p>",
+      idempotencyKey: "message-a",
     });
     expect(mocks.messageCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -240,6 +241,14 @@ describe("COMM-01C outbound delivery", () => {
 
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({ to: "wait@example.com" }),
+    );
+    expect(mocks.waitingListEntryFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: TENANT_A,
+          registration: { tenantId: TENANT_A },
+        }),
+      }),
     );
   });
 
