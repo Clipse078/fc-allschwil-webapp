@@ -72,7 +72,9 @@ describe("COMM-02 Resend inbound webhook", () => {
     const { ResendInboundEmailFetchError } = await import(
       "@/lib/communication/providers/resend/received-normalization"
     );
-    mocks.normalize.mockRejectedValue(new ResendInboundEmailFetchError("Resend down"));
+    mocks.normalize.mockRejectedValue(
+      new ResendInboundEmailFetchError({ message: "Resend down", emailId: "email-1" }),
+    );
 
     const res = await POST(signedRequest(payload) as never);
     expect(res.status).toBe(502);
