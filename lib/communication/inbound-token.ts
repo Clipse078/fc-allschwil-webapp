@@ -6,6 +6,8 @@ import { randomBytes } from "crypto";
  */
 export function generateInboundReplyToken(): string {
   // Use a lower-case charset that survives common email address normalization.
-  // A 32-byte random source produces a 64-char hex token (256-bit entropy).
-  return randomBytes(32).toString("hex");
+  // Keep the reply-to local-part safely below 64 chars:
+  // `reply+` prefix (6) + token (48) = 54 <= 64.
+  // A 24-byte random source produces a 48-char hex token (192-bit entropy).
+  return randomBytes(24).toString("hex");
 }

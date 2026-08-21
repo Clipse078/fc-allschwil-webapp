@@ -43,7 +43,7 @@ import { resolveCommunicationRecipientForTarget } from "@/lib/communication/reci
 const TENANT_A = "tenant-a";
 const THREAD_A = "thread-a";
 const ACTOR_A = "actor-a";
-const STABLE_TOKEN = "a".repeat(64);
+const STABLE_TOKEN = "a".repeat(48);
 const INBOUND_DOMAIN = "inbound.example.com";
 
 function thread(targetType: "REGISTRATION" | "WAITING_LIST_ENTRY", targetId: string) {
@@ -207,6 +207,10 @@ describe("COMM-01C outbound delivery", () => {
         idempotencyKey: "message-a",
       }),
     );
+    const sentPayload = vi.mocked(mocks.sendMail).mock.calls[0]?.[0];
+    const replyTo = (sentPayload as { replyTo?: string }).replyTo ?? "";
+    const localPart = replyTo.split("@")[0] ?? "";
+    expect(localPart.length).toBeLessThanOrEqual(64);
     expect(mocks.messageCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         tenantId: TENANT_A,

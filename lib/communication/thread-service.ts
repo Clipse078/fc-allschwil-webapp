@@ -13,7 +13,9 @@ import { resolveCommunicationTargetForTenant } from "@/lib/communication/target-
 
 function isStableInboundReplyToken(token: string): boolean {
   // Lower-case hex survives common email address normalization.
-  return /^[a-f0-9]{64}$/.test(token);
+  // Token length is constrained to fit the Reply-To local-part budget:
+  // `reply+` prefix (6) + token (48) = 54 <= 64.
+  return /^[a-f0-9]{48}$/.test(token);
 }
 
 const threadSelect = {
