@@ -155,6 +155,46 @@ describe("getRegistrationTimeline", () => {
     expect(result[0].actorName).toBe("Michael Duijster");
   });
 
+  it("M — maps successful email audit with its human actor", async () => {
+    mocks.registrationFindFirst.mockResolvedValueOnce({
+      id: "reg-1",
+      submittedAt: new Date("2026-08-01T09:00:00.000Z"),
+    });
+    mocks.auditLogFindMany.mockResolvedValueOnce([
+      logEntry({
+        action: "EMAIL_SENT",
+        actorUser: {
+          firstName: "FC Allschwil",
+          lastName: "Club Admin",
+          email: "admin@fcallschwil.ch",
+          person: { firstName: "Michael", lastName: "Duijster", displayName: null },
+        },
+      }),
+    ]);
+
+    const result = await getRegistrationTimeline("fc-allschwil", "reg-1");
+    expect(result[0]).toMatchObject({
+      kind: "EMAIL_SENT",
+      label: "E-Mail gesendet",
+      actorName: "Michael Duijster",
+      detail: null,
+    });
+  });
+
+  it("L — maps failed delivery without falsely labelling it sent", async () => {
+    mocks.registrationFindFirst.mockResolvedValueOnce({
+      id: "reg-1",
+      submittedAt: new Date("2026-08-01T09:00:00.000Z"),
+    });
+    mocks.auditLogFindMany.mockResolvedValueOnce([
+      logEntry({ action: "EMAIL_FAILED" }),
+    ]);
+
+    const result = await getRegistrationTimeline("fc-allschwil", "reg-1");
+    expect(result[0].label).toBe("E-Mail-Versand fehlgeschlagen");
+    expect(result.some((entry) => entry.label === "E-Mail gesendet")).toBe(false);
+  });
+
   it("maps PERSON_CREATED, PERSON_LINKED and DUPLICATE_IGNORED to their dedicated kinds", async () => {
     mocks.registrationFindFirst.mockResolvedValueOnce({
       id: "reg-1",

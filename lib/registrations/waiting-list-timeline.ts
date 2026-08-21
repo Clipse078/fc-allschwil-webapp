@@ -93,6 +93,22 @@ function mapAuditLog(entry: {
         occurredAt,
       };
 
+    case "EMAIL_SENT":
+      return {
+        id: entry.id,
+        label: "E-Mail gesendet",
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "EMAIL_FAILED":
+      return {
+        id: entry.id,
+        label: "E-Mail-Versand fehlgeschlagen",
+        actorName: actor,
+        occurredAt,
+      };
+
     case "INTERNAL_COMMENT_CREATED":
       return {
         id: entry.id,

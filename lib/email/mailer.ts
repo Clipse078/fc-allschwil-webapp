@@ -42,6 +42,11 @@ export type MailMessage = {
   text?: string;
 };
 
+export type MailDeliveryResult = {
+  providerMessageId: string;
+  from: string;
+};
+
 /**
  * Thrown when required email configuration (RESEND_API_KEY or EMAIL_FROM)
  * is absent or empty. Callers should log this as an operational/configuration
@@ -62,7 +67,7 @@ export class MailConfigurationError extends Error {
  *
  * Never logs the message body, reset tokens, or reset URLs.
  */
-export async function sendMail(message: MailMessage): Promise<void> {
+export async function sendMail(message: MailMessage): Promise<MailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     throw new MailConfigurationError(
@@ -79,7 +84,7 @@ export async function sendMail(message: MailMessage): Promise<void> {
 
   const resend = new Resend(apiKey);
 
-  const { error } = await resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from,
     to: message.to,
     subject: message.subject,
@@ -90,4 +95,10 @@ export async function sendMail(message: MailMessage): Promise<void> {
   if (error) {
     throw new Error(`Resend delivery error: ${error.name} — ${error.message}`);
   }
+
+  if (!data?.id) {
+    throw new Error("Resend delivery error: response did not include a message id.");
+  }
+
+  return { providerMessageId: data.id, from };
 }

@@ -2256,6 +2256,9 @@ model CommunicationMessage {
   /// Provider identifier (e.g. "resend"). Kept as string for extensibility.
   provider          String?
   providerMessageId String?
+  /// Safe, user-displayable delivery failure summary. Never store provider
+  /// credentials, raw request payloads, or unfiltered provider responses.
+  deliveryError     String?
   messageIdHeader   String?
   inReplyTo         String?
   /// JSON array of Message-ID references for threading.

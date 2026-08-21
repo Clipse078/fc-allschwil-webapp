@@ -33,6 +33,8 @@ export type TimelineEntryKind =
   | "PERSON_UNLINKED"
   | "DUPLICATE_IGNORED"
   | "WAITING_LIST_ADDED"
+  | "EMAIL_SENT"
+  | "EMAIL_FAILED"
   | "INTERNAL_COMMENT_CREATED"
   | "INTERNAL_COMMENT_UPDATED"
   | "INTERNAL_COMMENT_DELETED"
@@ -200,6 +202,26 @@ function mapAuditEntry(entry: {
         id: entry.id,
         kind: "WAITING_LIST_ADDED",
         label: "Auf Warteliste gesetzt",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "EMAIL_SENT":
+      return {
+        id: entry.id,
+        kind: "EMAIL_SENT",
+        label: "E-Mail gesendet",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "EMAIL_FAILED":
+      return {
+        id: entry.id,
+        kind: "EMAIL_FAILED",
+        label: "E-Mail-Versand fehlgeschlagen",
         detail: null,
         actorName: actor,
         occurredAt,

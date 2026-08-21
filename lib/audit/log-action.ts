@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/prisma";
 
 type LogActionInput = {
+  tenantId?: string | null;
   actorUserId?: string | null;
   moduleKey: string;
   entityType: string;
@@ -15,6 +16,7 @@ export async function logAction(input: LogActionInput) {
   try {
     await prisma.auditLog.create({
       data: {
+        tenantId: input.tenantId ?? null,
         actorUserId: input.actorUserId ?? null,
         moduleKey: input.moduleKey,
         entityType: input.entityType,
