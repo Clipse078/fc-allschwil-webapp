@@ -62,9 +62,10 @@ import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
 import { RegistrationWorkflowSteps } from "./RegistrationWorkflowSteps";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 import {
-  RegistrationCommunicationTabPlaceholder,
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
+  RegistrationEmailTabPlaceholder,
+  RegistrationInternalCommentsTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
 import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
@@ -771,7 +772,9 @@ export default function RegistrationDetailDrawer({
             />
           ) : null}
 
-          {activeTab === "communication" ? <RegistrationCommunicationTabPlaceholder /> : null}
+          {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
+
+          {activeTab === "internalComments" ? <RegistrationInternalCommentsTabPlaceholder /> : null}
         </RegistrationDrawerTabBody>
             </>
           )}

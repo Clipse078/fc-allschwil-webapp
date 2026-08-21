@@ -41,9 +41,10 @@ import { TeamSeasonScopePicker } from "./WaitingListScopePickers";
 import { WaitingListWorkflowSteps } from "./WaitingListWorkflowSteps";
 import {
   REGISTRATION_DRAWER_TAB_CONTENT_CLASS,
-  RegistrationCommunicationTabPlaceholder,
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
+  RegistrationEmailTabPlaceholder,
+  RegistrationInternalCommentsTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
 import type { WaitingListPriority } from "@prisma/client";
@@ -758,7 +759,9 @@ export function WaitingListDetailDrawer({
           </div>
         ) : null}
 
-        {activeTab === "communication" ? <RegistrationCommunicationTabPlaceholder /> : null}
+        {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
+
+        {activeTab === "internalComments" ? <RegistrationInternalCommentsTabPlaceholder /> : null}
       </RegistrationDrawerTabBody>
     </div>
   );
