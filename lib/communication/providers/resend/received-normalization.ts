@@ -50,9 +50,21 @@ function parseReferences(value: string | null): string[] | null {
 }
 
 export class ResendInboundEmailFetchError extends Error {
-  constructor(message: string) {
-    super(message);
+  public readonly emailId: string;
+  public readonly statusCode: number | null;
+  public readonly providerErrorName: string | null;
+
+  constructor(args: {
+    message: string;
+    emailId: string;
+    statusCode?: number | null;
+    providerErrorName?: string | null;
+  }) {
+    super(args.message);
     this.name = "ResendInboundEmailFetchError";
+    this.emailId = args.emailId;
+    this.statusCode = args.statusCode ?? null;
+    this.providerErrorName = args.providerErrorName ?? null;
   }
 }
 
@@ -92,9 +104,15 @@ export async function normalizeResendEmailReceivedEvent(args: {
     return null;
   }
 
-  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const apiKey =
+    process.env.RESEND_RECEIVING_API_KEY?.trim() ||
+    process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
-    throw new ResendInboundEmailFetchError("RESEND_API_KEY is not configured.");
+    throw new ResendInboundEmailFetchError({
+      message:
+        "Resend receiving.get failed: RESEND_API_KEY (or RESEND_RECEIVING_API_KEY) is not configured.",
+      emailId: parsed.data.data.email_id,
+    });
   }
 
   const resend = new Resend(apiKey);
@@ -102,8 +120,23 @@ export async function normalizeResendEmailReceivedEvent(args: {
 
   const { data, error } = await resend.emails.receiving.get(emailId);
   if (error || !data) {
-    const message = error?.message ? `Resend receiving.get failed: ${error.message}` : "Resend receiving.get failed.";
-    throw new ResendInboundEmailFetchError(message);
+    const providerErrorName =
+      typeof (error as { name?: unknown } | null | undefined)?.name === "string"
+        ? (error as { name: string }).name
+        : null;
+    const statusCode =
+      typeof (error as { statusCode?: unknown } | null | undefined)?.statusCode === "number"
+        ? (error as { statusCode: number }).statusCode
+        : null;
+    const message = error?.message
+      ? `Resend receiving.get failed: ${error.message}`
+      : "Resend receiving.get failed.";
+    throw new ResendInboundEmailFetchError({
+      message,
+      emailId,
+      statusCode,
+      providerErrorName,
+    });
   }
 
   const email = data as unknown as ResendReceivedEmail;

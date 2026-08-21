@@ -62,6 +62,23 @@ describe("COMM-02 Resend inbound webhook", () => {
     expect(res.status).toBe(401);
   });
 
+  it("returns 502 when provider retrieval fails (retryable)", async () => {
+    const payload = JSON.stringify({
+      type: "email.received",
+      created_at: "2026-08-21T11:00:00.000Z",
+      data: { email_id: "email-1" },
+    });
+
+    const { ResendInboundEmailFetchError } = await import(
+      "@/lib/communication/providers/resend/received-normalization"
+    );
+    mocks.normalize.mockRejectedValue(new ResendInboundEmailFetchError("Resend down"));
+
+    const res = await POST(signedRequest(payload) as never);
+    expect(res.status).toBe(502);
+    expect(mocks.persist).not.toHaveBeenCalled();
+  });
+
   it("accepts verified payloads and returns 200 on ignored/unknown tokens", async () => {
     const payload = JSON.stringify({
       type: "email.received",

@@ -73,7 +73,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (err) {
     if (err instanceof ResendInboundEmailFetchError) {
-      console.error("Resend inbound webhook: receiving.get failed:", err.message);
+      console.error("Resend inbound webhook: receiving.get failed:", {
+        message: err.message,
+        emailId: err.emailId,
+        statusCode: err.statusCode,
+        providerErrorName: err.providerErrorName,
+        providerEventId,
+      });
       return NextResponse.json({ error: "Upstream provider unavailable." }, { status: 502 });
     }
     console.error("Resend inbound webhook: processing failed:", err);
