@@ -104,7 +104,7 @@ export async function toPublicEmailThreadMessages(
     receivedAt: message.receivedAt?.toISOString() ?? null,
     createdAt: message.createdAt.toISOString(),
     deliveryError: message.status === "FAILED" ? message.deliveryError : null,
-    attachmentCount: attachmentCount((message as any).attachments),
+    attachmentCount: attachmentCount(message.attachments),
   }));
 }
 

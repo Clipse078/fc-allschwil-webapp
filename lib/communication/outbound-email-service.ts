@@ -16,7 +16,6 @@ import {
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
 import {
   ensureStableInboundReplyTokenForThread,
-  requireCommunicationThreadForTenant,
 } from "@/lib/communication/thread-service";
 import { buildInboundReplyToAddress } from "@/lib/communication/reply-routing";
 

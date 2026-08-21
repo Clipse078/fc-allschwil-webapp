@@ -90,6 +90,29 @@ function EmailHistoryCard({
   );
 }
 
+export function EmailThreadTimeline({
+  messages,
+  locale,
+  timezone,
+}: {
+  messages: PublicEmailThreadMessage[];
+  locale: string;
+  timezone: string;
+}) {
+  return (
+    <div className="space-y-3">
+      {messages.map((message) => (
+        <EmailHistoryCard
+          key={message.id}
+          message={message}
+          locale={locale}
+          timezone={timezone}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function EmailCommunicationPanel({
   tenantSlug,
   targetType,
@@ -271,10 +294,8 @@ export function EmailCommunicationPanel({
         <>
           <section aria-label="E-Mail-Verlauf" className="flex-1">
             {messages && messages.length > 0 ? (
-              <div className="space-y-3">
-                {messages.map((message) => (
-                  <EmailHistoryCard key={message.id} message={message} locale={locale} timezone={timezone} />
-                ))}
+              <div>
+                <EmailThreadTimeline messages={messages} locale={locale} timezone={timezone} />
                 <div ref={endRef} />
               </div>
             ) : (

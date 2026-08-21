@@ -56,6 +56,33 @@ export class ResendInboundEmailFetchError extends Error {
   }
 }
 
+type ResendReceivedEmail = {
+  id?: string;
+  to?: string[];
+  cc?: string[];
+  bcc?: string[];
+  from?: string;
+  created_at?: string;
+  subject?: string | null;
+  html?: string | null;
+  text?: string | null;
+  message_id?: string | null;
+  headers?: Record<string, unknown>;
+  attachments?: Array<{
+    id?: string;
+    filename?: string | null;
+    content_type?: string | null;
+    content_disposition?: string | null;
+    content_id?: string | null;
+    size?: number | null;
+  }>;
+};
+
+function safeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
 export async function normalizeResendEmailReceivedEvent(args: {
   event: unknown;
   providerEventId: string | null;
@@ -79,42 +106,45 @@ export async function normalizeResendEmailReceivedEvent(args: {
     throw new ResendInboundEmailFetchError(message);
   }
 
-  const headers = (data as unknown as { headers?: Record<string, unknown> }).headers ?? undefined;
-  const fromAddress = normalizeHeaderToString(headers?.["from"]) ?? (typeof data.from === "string" ? data.from : null);
+  const email = data as unknown as ResendReceivedEmail;
+  const headers = email.headers ?? undefined;
+  const fromAddress = normalizeHeaderToString(headers?.["from"]) ?? (typeof email.from === "string" ? email.from : null);
   const inReplyTo = normalizeHeaderToString(headers?.["in-reply-to"]);
   const references = parseReferences(normalizeHeaderToString(headers?.["references"]));
 
-  const receivedAtRaw = typeof data.created_at === "string" ? data.created_at : null;
+  const receivedAtRaw = typeof email.created_at === "string" ? email.created_at : null;
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : new Date();
 
-  const attachments = Array.isArray((data as any).attachments)
-    ? (data as any).attachments.map((a: any) => ({
-        id: typeof a?.id === "string" ? a.id : "",
-        filename: typeof a?.filename === "string" ? a.filename : null,
-        contentType: typeof a?.content_type === "string" ? a.content_type : null,
-        contentDisposition: typeof a?.content_disposition === "string" ? a.content_disposition : null,
-        contentId: typeof a?.content_id === "string" ? a.content_id : null,
-        size: typeof a?.size === "number" ? a.size : null,
-      })).filter((a: {id: string}) => Boolean(a.id))
+  const attachments = Array.isArray(email.attachments)
+    ? email.attachments
+        .map((a) => ({
+          id: typeof a?.id === "string" ? a.id : "",
+          filename: typeof a?.filename === "string" ? a.filename : null,
+          contentType: typeof a?.content_type === "string" ? a.content_type : null,
+          contentDisposition: typeof a?.content_disposition === "string" ? a.content_disposition : null,
+          contentId: typeof a?.content_id === "string" ? a.content_id : null,
+          size: typeof a?.size === "number" ? a.size : null,
+        }))
+        .filter((a) => Boolean(a.id))
     : null;
 
   return {
     provider: "resend",
     providerEventId: args.providerEventId,
-    providerMessageId: typeof data.id === "string" ? data.id : emailId,
+    providerMessageId: typeof email.id === "string" ? email.id : emailId,
 
     fromAddress,
-    toAddresses: Array.isArray((data as any).to) ? (data as any).to.filter((v: any) => typeof v === "string") : [],
-    ccAddresses: Array.isArray((data as any).cc) ? (data as any).cc.filter((v: any) => typeof v === "string") : [],
-    bccAddresses: Array.isArray((data as any).bcc) ? (data as any).bcc.filter((v: any) => typeof v === "string") : [],
+    toAddresses: safeStringArray(email.to),
+    ccAddresses: safeStringArray(email.cc),
+    bccAddresses: safeStringArray(email.bcc),
 
-    subject: typeof data.subject === "string" ? data.subject : parsed.data.data.subject ?? null,
-    bodyText: typeof (data as any).text === "string" ? (data as any).text : null,
-    bodyHtml: typeof (data as any).html === "string" ? (data as any).html : null,
+    subject: typeof email.subject === "string" ? email.subject : parsed.data.data.subject ?? null,
+    bodyText: typeof email.text === "string" ? email.text : null,
+    bodyHtml: typeof email.html === "string" ? email.html : null,
 
     messageIdHeader:
-      typeof (data as any).message_id === "string"
-        ? (data as any).message_id
+      typeof email.message_id === "string"
+        ? email.message_id
         : (parsed.data.data.message_id ?? null),
     inReplyTo,
     references,
