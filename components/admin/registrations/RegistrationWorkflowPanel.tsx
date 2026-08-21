@@ -249,7 +249,6 @@ export default function RegistrationWorkflowPanel({
   canEdit,
   locale = "de-CH",
   timezone = "Europe/Zurich",
-  assignableUsers,
   eligibleCoordinators = [],
   targetGroups,
   orgUnits = [],
@@ -449,7 +448,7 @@ export default function RegistrationWorkflowPanel({
           onClose={() => setShowWaitingListDialog(false)}
           registration={registration}
           tenantSlug={tenantSlug}
-          eligibleCoordinators={eligibleCoordinators.length > 0 ? eligibleCoordinators : assignableUsers}
+          eligibleCoordinators={eligibleCoordinators}
           targetGroups={targetGroups}
           orgUnits={orgUnits}
           teamSeasons={teamSeasons}
@@ -494,35 +493,28 @@ export default function RegistrationWorkflowPanel({
         </div>
       )}
 
-      {/* Goal 1: Team recommendation actions */}
-      <PanelSection title="Empfehlung" icon={Lightbulb}>
-        <div className={cn("rounded-[var(--radius-lg)] border p-3.5", groupColors.border, groupColors.bg)}>
-          <div className="flex items-center gap-2">
-            <span className={cn("h-2.5 w-2.5 rounded-full flex-shrink-0", groupColors.dot)} aria-hidden />
-            <span className={cn("text-sm font-bold", groupColors.text)}>{classification.targetGroupLabel}</span>
-            {registration.targetGroup && (
-              <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-800">
-                <CheckCircle2 className="h-3 w-3" aria-hidden />
-                Team zugewiesen: {registration.targetGroup.name}
-              </span>
+      {/* Goal 1: Team recommendation actions — compact operational surface */}
+      <PanelSection title="Ziel / Team" icon={Lightbulb}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+              groupColors.border,
+              groupColors.bg,
+              groupColors.text,
             )}
-          </div>
-          <div className="mt-2 grid gap-1.5 text-xs">
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Altersgruppe</span>
-              <span className={cn("font-medium", groupColors.text)}>
-                {registration.birthYear ? `Jahrgang ${registration.birthYear}` : "Kein Jahrgang angegeben"}
-              </span>
-            </div>
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Grund</span>
-              <span className={cn("font-medium", groupColors.text)}>{classification.reasoning}</span>
-            </div>
-            <div className="flex gap-1.5">
-              <span className="w-24 flex-shrink-0 text-[0.68rem] font-semibold uppercase tracking-wide opacity-60">Zuständig</span>
-              <span className={cn("font-medium", groupColors.text)}>{classification.coordinatorRole}</span>
-            </div>
-          </div>
+          >
+            <span className={cn("h-2 w-2 rounded-full", groupColors.dot)} aria-hidden />
+            {classification.targetGroupLabel}
+          </span>
+          {registration.targetGroup ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-[0.65rem] font-semibold text-emerald-800">
+              <CheckCircle2 className="h-3 w-3" aria-hidden />
+              {registration.targetGroup.name}
+            </span>
+          ) : (
+            <span className="text-xs text-[var(--muted)]">{classification.reasoning}</span>
+          )}
         </div>
 
         {canAdvance && (
@@ -675,10 +667,10 @@ export default function RegistrationWorkflowPanel({
       </PanelSection>
 
       {/* Goal 4: Assignment workflow — canonical searchable coordinator picker */}
-      <PanelSection title="Zuweisung" icon={UserCheck}>
+      <PanelSection title="Verantwortlich" icon={UserCheck}>
         {canEdit ? (
           <WaitingListCoordinatorPicker
-            eligibleCoordinators={eligibleCoordinators.length > 0 ? eligibleCoordinators : assignableUsers}
+            eligibleCoordinators={eligibleCoordinators}
             selectedUserId={registration.assignedToUserId}
             onSelect={(userId) => patch({ assignedToUserId: userId }, "assign-user")}
             disabled={busy === "assign-user"}

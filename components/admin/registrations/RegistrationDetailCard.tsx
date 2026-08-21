@@ -53,6 +53,7 @@ import {
 } from "@/lib/registrations/status";
 import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
+import { RegistrationWorkflowSteps } from "./RegistrationWorkflowSteps";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
@@ -340,6 +341,8 @@ export default function RegistrationDetailCard({
       <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
         {/* Main column */}
         <div className="space-y-5">
+          <RegistrationWorkflowSteps registration={registration} locale={locale} timezone={timezone} />
+
           {/* REGISTRATION-01F: team recommendation actions, person lookup/
               creation, assignment workflow, duplicate workflow, timeline. */}
           <RegistrationWorkflowPanel

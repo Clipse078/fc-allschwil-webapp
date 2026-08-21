@@ -37,7 +37,6 @@ import {
   classifyRegistration,
   extractGenderFromPayload,
   getGenderLabel,
-  TARGET_GROUP_COLORS,
 } from "@/lib/registrations/classification";
 import {
   formatDate,
@@ -57,10 +56,10 @@ import {
 import {
   STATUS_LABELS as SHARED_STATUS_LABELS,
   STATUS_BADGE_CLASS,
-  STATUS_DOT_CLASS,
 } from "@/lib/registrations/status";
 import type { AssignableUser, OrgUnitOption, TargetGroupOption, TeamSeasonOption } from "@/lib/registrations/workflow-types";
 import RegistrationWorkflowPanel from "./RegistrationWorkflowPanel";
+import { RegistrationWorkflowSteps } from "./RegistrationWorkflowSteps";
 import RegistrationDeleteControl from "./RegistrationDeleteControl";
 
 const NOT_PROVIDED = "Nicht angegeben";
@@ -168,7 +167,6 @@ const TYPE_CONFIG: Record<string, TypeCfg> = {
 // Waiting/Accepted/Rejected/Archived only needs to be edited once.
 const STATUS_LABELS = SHARED_STATUS_LABELS;
 const STATUS_BADGE = STATUS_BADGE_CLASS;
-const STATUS_DOT = STATUS_DOT_CLASS;
 
 // Goal 6 (REGISTRATION-01E): presentation-only icon per source key — display
 // only, ingestion is untouched (see lib/registrations/source.ts).
@@ -306,71 +304,6 @@ function getContactName(payloadJson: unknown): string | null {
   return typeof contactName === "string" && contactName.trim()
     ? contactName
     : null;
-}
-
-// ── Classification section ────────────────────────────────────────────────────
-
-function ClassificationSection({
-  classification,
-  genderLabel,
-}: {
-  classification: ReturnType<typeof classifyRegistration>;
-  genderLabel: string | null;
-}) {
-  const colors = TARGET_GROUP_COLORS[classification.colorToken];
-
-  return (
-    <div className="px-5 pt-5 pb-4 border-b border-[var(--border)]">
-      <SectionLabel icon={Lightbulb}>Vorgeschlagene Zuordnung</SectionLabel>
-
-      <div
-        className={cn(
-          "rounded-[var(--radius-lg)] border p-3.5",
-          colors.border,
-          colors.bg,
-        )}
-      >
-        {/* Target group */}
-        <div className="flex items-center gap-2 mb-2">
-          <span
-            className={cn("h-2.5 w-2.5 rounded-full flex-shrink-0", colors.dot)}
-            aria-hidden
-          />
-          <span className={cn("text-sm font-bold", colors.text)}>
-            {classification.targetGroupLabel}
-          </span>
-        </div>
-
-        <div className="grid gap-2 text-xs">
-          {/* Reasoning */}
-          <div className="flex gap-1.5">
-            <span className="text-[0.68rem] font-semibold uppercase tracking-wide opacity-60 w-20 flex-shrink-0">
-              Begründung
-            </span>
-            <span className={cn("font-medium", colors.text)}>
-              {classification.reasoning}
-              {/* Bugfix while touching this section (REGISTRATION-01E): avoid
-                  duplicating the gender label when it's already part of the
-                  reasoning string (e.g. "Jahrgang 2015 · Mädchen"). */}
-              {genderLabel && !classification.reasoning.includes(genderLabel)
-                ? ` · ${genderLabel}`
-                : ""}
-            </span>
-          </div>
-
-          {/* Responsible coordinator */}
-          <div className="flex gap-1.5">
-            <span className="text-[0.68rem] font-semibold uppercase tracking-wide opacity-60 w-20 flex-shrink-0">
-              Zuständig
-            </span>
-            <span className={cn("font-medium", colors.text)}>
-              {classification.coordinatorRole}
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ── Main drawer ───────────────────────────────────────────────────────────────
@@ -540,17 +473,10 @@ export default function RegistrationDetailDrawer({
             </div>
           </div>
 
-          {/* Goal 4 (REGISTRATION-01E): compact registration summary — what /
-              where / when / status / suggested allocation — all answered in
-              one glance, right below the header, before any scrolling. */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 px-6 pb-4">
             <SummaryItem icon={TypeIcon}>{typeConfig.label}</SummaryItem>
-            {sourceInfo && <SummaryItem icon={SourceIcon ?? Globe}>{sourceInfo.label}</SummaryItem>}
             <SummaryItem icon={Calendar}>
               {formatDateTimeCompact(registration.submittedAt, cfg)}
-            </SummaryItem>
-            <SummaryItem dotClassName={STATUS_DOT[registration.status]}>
-              {STATUS_LABELS[registration.status]}
             </SummaryItem>
             <SummaryItem icon={Lightbulb}>{classification.targetGroupLabel}</SummaryItem>
           </div>
@@ -558,12 +484,14 @@ export default function RegistrationDetailDrawer({
 
         {/* ── Scrollable body ──────────────────────────────────────────────── */}
         <div className="flex-1 overflow-y-auto">
+          <div className="border-b border-[var(--border)] px-6 py-5">
+            <RegistrationWorkflowSteps
+              registration={registration}
+              locale={locale}
+              timezone={timezone}
+            />
+          </div>
 
-          {/* Classification / routing suggestion */}
-          <ClassificationSection classification={classification} genderLabel={genderDisplayLabel} />
-
-          {/* REGISTRATION-01F: team recommendation actions, person lookup/
-              creation, assignment workflow, duplicate workflow, timeline. */}
           <div className="px-6 pt-5 pb-5 border-b border-[var(--border)]">
             <RegistrationWorkflowPanel
               registration={registration}

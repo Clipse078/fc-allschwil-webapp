@@ -34,6 +34,7 @@
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.20",
     "@hookform/resolvers": "^5.2.2",
     "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
