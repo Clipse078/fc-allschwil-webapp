@@ -246,6 +246,40 @@ enum CommunicationTemplateStatus {
   ARCHIVED
 }
 
+// COMM-01A: Generic communication/collaboration foundation — target types
+// supported incrementally; REGISTRATION and WAITING_LIST_ENTRY are the
+// first consumers (registration lifecycle family).
+enum CommunicationTargetType {
+  REGISTRATION
+  WAITING_LIST_ENTRY
+  PERSON
+  TEAM
+  TRAINING
+  MATCH
+  TOURNAMENT
+  DOCUMENT
+  MEETING
+  INITIATIVE
+}
+
+enum CommunicationMessageDirection {
+  OUTBOUND
+  INBOUND
+}
+
+enum CommunicationMessageChannel {
+  EMAIL
+}
+
+enum CommunicationMessageStatus {
+  DRAFT
+  QUEUED
+  SENT
+  DELIVERED
+  FAILED
+  RECEIVED
+}
+
 enum MeetingStatus {
   PLANNED
   COMPLETED
@@ -613,24 +647,29 @@ model Tenant {
   auditLogs         AuditLog[]
 
   // INFOBOARD-V2: unlimited tenant-managed Infoboard displays
-  infoboards        Infoboard[]
+  infoboards Infoboard[]
 
   // PERSONS-01: canonical tenant-scoped person directory
-  persons           Person[]    @relation("TenantPersons")
+  persons                 Person[]                 @relation("TenantPersons")
   // PERSONS-02: canonical tenant-scoped person assignments
-  personAssignments PersonAssignment[] @relation("TenantPersonAssignments")
+  personAssignments       PersonAssignment[]       @relation("TenantPersonAssignments")
   // PERSON-UX-04: canonical club membership history
-  personMemberships PersonMembership[] @relation("TenantPersonMemberships")
+  personMemberships       PersonMembership[]       @relation("TenantPersonMemberships")
   // PERSON-UX-05: development assessment foundation
-  developmentCriteria   DevelopmentCriterion[]   @relation("TenantDevelopmentCriteria")
-  developmentAssessments DevelopmentAssessment[] @relation("TenantDevelopmentAssessments")
+  developmentCriteria     DevelopmentCriterion[]   @relation("TenantDevelopmentCriteria")
+  developmentAssessments  DevelopmentAssessment[]  @relation("TenantDevelopmentAssessments")
   // PERSON-UX-07: person-bound private documents
-  personDocuments PersonDocument[] @relation("TenantPersonDocuments")
+  personDocuments         PersonDocument[]         @relation("TenantPersonDocuments")
   // PERSON-UX-10: canonical guardian relationships and emergency contacts
-  guardianRelationships   GuardianRelationship[]    @relation("TenantGuardianRelationships")
-  personEmergencyContacts PersonEmergencyContact[]  @relation("TenantPersonEmergencyContacts")
+  guardianRelationships   GuardianRelationship[]   @relation("TenantGuardianRelationships")
+  personEmergencyContacts PersonEmergencyContact[] @relation("TenantPersonEmergencyContacts")
   // REG-WAIT-01: canonical waiting list entries for this tenant
-  waitingListEntries      WaitingListEntry[]        @relation("TenantWaitingListEntries")
+  waitingListEntries      WaitingListEntry[]       @relation("TenantWaitingListEntries")
+  // COMM-01A: tenant-scoped communication/collaboration foundation
+  communicationThreads    CommunicationThread[]
+  communicationMessages   CommunicationMessage[]
+  internalComments        InternalComment[]
+  commentMentions         CommentMention[]
 
   @@index([status])
   @@index([name])
@@ -684,7 +723,7 @@ model User {
   updatedWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentUpdatedBy")
   createdWorkspaceDocumentVersions WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersionCreatedBy")
   // PERSON-UX-07: person-bound documents uploaded by this user
-  uploadedPersonDocuments PersonDocument[] @relation("PersonDocumentUploadedBy")
+  uploadedPersonDocuments          PersonDocument[]           @relation("PersonDocumentUploadedBy")
 
   /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
   /// every User that isn't the linked application account of a Person.
@@ -697,6 +736,12 @@ model User {
   responsibleWaitingListEntries WaitingListEntry[] @relation("WaitingListEntryResponsibleUser")
   addedWaitingListEntries       WaitingListEntry[] @relation("WaitingListEntryAddedByUser")
   resolvedWaitingListEntries    WaitingListEntry[] @relation("WaitingListEntryResolvedByUser")
+
+  // COMM-01A: communication foundation back-relations
+  createdCommunicationThreads  CommunicationThread[]  @relation("CommunicationThreadCreatedBy")
+  createdCommunicationMessages CommunicationMessage[] @relation("CommunicationMessageCreatedBy")
+  authoredInternalComments     InternalComment[]      @relation("InternalCommentAuthor")
+  commentMentionsReceived      CommentMention[]       @relation("CommentMentionUser")
 
   @@index([isActive])
   @@index([tenantId])
@@ -795,6 +840,9 @@ model Registration {
   // that were created from this registration (see Goal 3).
   createdPersons     Person[]     @relation("PersonCreatedFromRegistration")
 
+  // REG-WAIT-01: back-relation — waiting list entries created from this registration.
+  waitingListEntries WaitingListEntry[]
+
   @@index([tenantId, status])
   @@index([tenantId, type])
   @@index([tenantId, createdAt])
@@ -803,9 +851,6 @@ model Registration {
   @@index([tenantId, source])
   @@index([personId])
   @@index([duplicateIgnoredById])
-
-  // REG-WAIT-01: back-relation — waiting list entries created from this registration.
-  waitingListEntries WaitingListEntry[]
 }
 
 // ---------------------------------------------------------------------------
@@ -862,11 +907,11 @@ model WaitingListEntry {
   // Scope — exactly one of the three FKs must be set, matching scopeType.
   scopeType     WaitingListScopeType
   targetGroupId String?
-  targetGroup   TargetGroup? @relation("WaitingListEntryTargetGroup", fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  targetGroup   TargetGroup?         @relation("WaitingListEntryTargetGroup", fields: [targetGroupId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   orgUnitId     String?
-  orgUnit       OrgUnit?     @relation("WaitingListEntryOrgUnit", fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orgUnit       OrgUnit?             @relation("WaitingListEntryOrgUnit", fields: [orgUnitId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   teamSeasonId  String?
-  teamSeason    TeamSeason?  @relation("WaitingListEntryTeamSeason", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teamSeason    TeamSeason?          @relation("WaitingListEntryTeamSeason", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   // Lifecycle
   status   WaitingListStatus   @default(WAITING)
@@ -881,14 +926,14 @@ model WaitingListEntry {
   internalNote String?
 
   // Lifecycle timestamps
-  addedAt         DateTime  @default(now())
-  addedByUserId   String?
-  addedByUser     User?     @relation("WaitingListEntryAddedByUser", fields: [addedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  lastContactedAt DateTime?
-  offeredAt       DateTime?
-  resolvedAt      DateTime?
+  addedAt          DateTime  @default(now())
+  addedByUserId    String?
+  addedByUser      User?     @relation("WaitingListEntryAddedByUser", fields: [addedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  lastContactedAt  DateTime?
+  offeredAt        DateTime?
+  resolvedAt       DateTime?
   resolvedByUserId String?
-  resolvedByUser   User?    @relation("WaitingListEntryResolvedByUser", fields: [resolvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  resolvedByUser   User?     @relation("WaitingListEntryResolvedByUser", fields: [resolvedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   tenant Tenant @relation("TenantWaitingListEntries", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
@@ -973,8 +1018,8 @@ model UserRole {
   // Uniqueness is enforced via two partial DB indexes (see migration):
   //   (userId, roleId) WHERE orgUnitId IS NULL  — one tenant-wide row per role
   //   (userId, roleId, orgUnitId) WHERE orgUnitId IS NOT NULL — one scoped row per (role, orgUnit)
-  orgUnitId  String?
-  scopeMode  OrgUnitScopeMode?
+  orgUnitId String?
+  scopeMode OrgUnitScopeMode?
 
   user    User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   role    Role     @relation(fields: [roleId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -1074,13 +1119,13 @@ model Season {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  teamSeasons        TeamSeason[]
-  events             Event[]
-  eventImportRuns    EventImportRun[]
-  orgUnitMemberships OrgUnitMembership[]
-  trainingPlans      TrainingPlan[]
+  teamSeasons            TeamSeason[]
+  events                 Event[]
+  eventImportRuns        EventImportRun[]
+  orgUnitMemberships     OrgUnitMembership[]
+  trainingPlans          TrainingPlan[]
   // PERSONS-02: person assignment back-relation
-  personAssignments  PersonAssignment[]  @relation("SeasonPersonAssignments")
+  personAssignments      PersonAssignment[]      @relation("SeasonPersonAssignments")
   // PERSON-UX-05: development assessments in this season
   developmentAssessments DevelopmentAssessment[] @relation("SeasonDevelopmentAssessments")
 
@@ -1210,9 +1255,9 @@ model Person {
   /// They are INDEPENDENT of authorization (no automatic permissions)
   /// and INDEPENDENT of assignment (no automatic team/org placement).
   /// Multiple capacities may be true simultaneously.
-  isFunctionary   Boolean  @default(false) // Funktionär/in
-  isVolunteer     Boolean  @default(false) // Freiwillige/r
-  isReferee       Boolean  @default(false) // Schiedsrichter/in
+  isFunctionary    Boolean @default(false) // Funktionär/in
+  isVolunteer      Boolean @default(false) // Freiwillige/r
+  isReferee        Boolean @default(false) // Schiedsrichter/in
   isSponsorContact Boolean @default(false) // Sponsor-/Partner-Kontakt
 
   /// PERSON-UX-07: club-specific custom functions ("Weitere Funktion").
@@ -1222,8 +1267,8 @@ model Person {
   /// Empty array = no custom functions active.
   customFunctions String[] @default([])
 
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   /// PERSONS-01: canonical tenant scoping — every Person created via the
   /// Persons module belongs to exactly one tenant. NOT NULL: Person records
@@ -1279,21 +1324,35 @@ model Person {
 
   createdRegistration Registration? @relation("PersonCreatedFromRegistration", fields: [createdRegistrationId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  playerSquadMembers   PlayerSquadMember[]
-  trainerTeamMembers   TrainerTeamMember[]
-  orgUnitMemberships   OrgUnitMembership[]
+  playerSquadMembers     PlayerSquadMember[]
+  trainerTeamMembers     TrainerTeamMember[]
+  orgUnitMemberships     OrgUnitMembership[]
   // PERSONS-02: canonical person assignments (dedicated model, separate from OrgUnitMembership)
-  personAssignments    PersonAssignment[]
+  personAssignments      PersonAssignment[]
   // PERSON-UX-04: canonical club membership history
-  personMemberships    PersonMembership[]
+  personMemberships      PersonMembership[]
   // PERSON-UX-05: development assessment history
   developmentAssessments DevelopmentAssessment[] @relation("PersonDevelopmentAssessments")
-  authoredNewsArticles NewsArticle[]       @relation("NewsArticleAuthorPerson")
-  authoredWebsitePages WebsitePage[]       @relation("WebsitePageAuthorPerson")
+  authoredNewsArticles   NewsArticle[]           @relation("NewsArticleAuthorPerson")
+  authoredWebsitePages   WebsitePage[]           @relation("WebsitePageAuthorPerson")
   // Registrations currently linked to this Person (Goal 2/3 — may include
   // registrations linked via manual "existing person" match, not only the
   // one that created this Person; see createdRegistrationId above).
-  linkedRegistrations  Registration[]      @relation("RegistrationPerson")
+  linkedRegistrations    Registration[]          @relation("RegistrationPerson")
+
+  /// PERSON-UX-07: private person-bound documents (SEPARATE from WorkspaceDocument)
+  personDocuments PersonDocument[] @relation("PersonDocuments")
+
+  // PERSON-UX-10: canonical guardian relationships.
+  // This Person is the CHILD in these relationships.
+  // INVARIANT: These relations carry NO authorization/access implications.
+  guardianRelationshipsAsChild    GuardianRelationship[]   @relation("PersonAsChild")
+  // This Person is the GUARDIAN in these relationships.
+  guardianRelationshipsAsGuardian GuardianRelationship[]   @relation("PersonAsGuardian")
+  // PERSON-UX-10: standalone emergency contacts (NOT Person records)
+  emergencyContacts               PersonEmergencyContact[] @relation("PersonEmergencyContacts")
+  // REG-WAIT-01: waiting list entries linked to this Person
+  waitingListEntries              WaitingListEntry[]       @relation("WaitingListEntryPerson")
 
   @@index([lastName, firstName])
   @@index([email])
@@ -1308,20 +1367,6 @@ model Person {
   @@index([tenantId])
   @@index([tenantId, isActive])
   @@index([tenantId, lastName, firstName])
-
-  /// PERSON-UX-07: private person-bound documents (SEPARATE from WorkspaceDocument)
-  personDocuments PersonDocument[] @relation("PersonDocuments")
-
-  // PERSON-UX-10: canonical guardian relationships.
-  // This Person is the CHILD in these relationships.
-  // INVARIANT: These relations carry NO authorization/access implications.
-  guardianRelationshipsAsChild    GuardianRelationship[] @relation("PersonAsChild")
-  // This Person is the GUARDIAN in these relationships.
-  guardianRelationshipsAsGuardian GuardianRelationship[] @relation("PersonAsGuardian")
-  // PERSON-UX-10: standalone emergency contacts (NOT Person records)
-  emergencyContacts PersonEmergencyContact[] @relation("PersonEmergencyContacts")
-  // REG-WAIT-01: waiting list entries linked to this Person
-  waitingListEntries WaitingListEntry[] @relation("WaitingListEntryPerson")
 }
 
 // ---------------------------------------------------------------------------
@@ -1342,14 +1387,14 @@ model Person {
 // ---------------------------------------------------------------------------
 
 enum PersonDocumentCategory {
-  IDENTITY_DOCUMENT   // Reisepass, Ausweis
-  CONSENT             // Einwilligungserklärung
-  CERTIFICATE         // Bescheinigung, Urkunde
-  QUALIFICATION       // Qualifikation, Lizenz
-  CONTRACT            // Vertrag
-  PERMIT              // Genehmigung, Bewilligung
-  CORRESPONDENCE      // Korrespondenz
-  OTHER               // Sonstiges
+  IDENTITY_DOCUMENT // Reisepass, Ausweis
+  CONSENT // Einwilligungserklärung
+  CERTIFICATE // Bescheinigung, Urkunde
+  QUALIFICATION // Qualifikation, Lizenz
+  CONTRACT // Vertrag
+  PERMIT // Genehmigung, Bewilligung
+  CORRESPONDENCE // Korrespondenz
+  OTHER // Sonstiges
 }
 
 model PersonDocument {
@@ -1358,7 +1403,7 @@ model PersonDocument {
   personId String
 
   category PersonDocumentCategory @default(OTHER)
-  title    String                 // Display name (e.g. "Reisepass")
+  title    String // Display name (e.g. "Reisepass")
 
   /// Opaque storage key in the private Vercel Blob store.
   /// Never expose this directly to clients.
@@ -1378,8 +1423,8 @@ model PersonDocument {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  person        Person  @relation("PersonDocuments", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  tenant        Tenant  @relation("TenantPersonDocuments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person         Person @relation("PersonDocuments", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant         Tenant @relation("TenantPersonDocuments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   uploadedByUser User?  @relation("PersonDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
@@ -1557,20 +1602,20 @@ model TeamSeason {
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 
-  team               Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  season             Season                  @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  playerSquadMembers PlayerSquadMember[]
-  trainerTeamMembers TrainerTeamMember[]
+  team                   Team                    @relation(fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  season                 Season                  @relation(fields: [seasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  playerSquadMembers     PlayerSquadMember[]
+  trainerTeamMembers     TrainerTeamMember[]
   // TEAM-CORE-02: canonical many-to-many Organisationseinheit assignment
-  orgUnits           TeamSeasonOrgUnit[]
+  orgUnits               TeamSeasonOrgUnit[]
   // TEAM-CORE-02: seasonal link on external provider mappings
-  externalMappings   TeamExternalMapping[]
+  externalMappings       TeamExternalMapping[]
   // COMPETITION-01: optional competitions for this TeamSeason
-  competitions       TeamSeasonCompetition[]
+  competitions           TeamSeasonCompetition[]
   // TRAINING-CORE-01: canonical recurring training series for this TeamSeason
-  trainingSeries     TrainingSeries[]
+  trainingSeries         TrainingSeries[]
   // TRAININGCENTER-02: canonical generated training sessions for this TeamSeason
-  trainingSessions   TrainingSession[]
+  trainingSessions       TrainingSession[]
   // PERSON-UX-05: optional team context for development assessments
   developmentAssessments DevelopmentAssessment[] @relation("TeamSeasonDevelopmentAssessments")
   // REG-WAIT-01: waiting list entries scoped to this TeamSeason
@@ -2049,11 +2094,11 @@ model PersonAssignment {
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 
-  tenant   Tenant   @relation("TenantPersonAssignments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  person   Person   @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  orgUnit  OrgUnit  @relation("OrgUnitPersonAssignments", fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  team     Team?    @relation("TeamPersonAssignments", fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  season   Season?  @relation("SeasonPersonAssignments", fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant  Tenant  @relation("TenantPersonAssignments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person  Person  @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  orgUnit OrgUnit @relation("OrgUnitPersonAssignments", fields: [orgUnitId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  team    Team?   @relation("TeamPersonAssignments", fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  season  Season? @relation("SeasonPersonAssignments", fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@index([tenantId])
   @@index([personId])
@@ -2081,17 +2126,17 @@ model PersonAssignment {
 // Future chain: PersonMembership → ContributionObligation → Invoice → Payment
 // (contribution obligations and finance are NOT implemented in this slice).
 model PersonMembership {
-  id           String                  @id @default(cuid())
-  tenantId     String
-  personId     String
-  membershipType PersonMembershipType  @default(ACTIVE_MEMBER)
-  status       PersonMembershipStatus  @default(ACTIVE)
-  memberNumber String?
-  startsAt     DateTime
-  endsAt       DateTime?
-  notes        String?
-  createdAt    DateTime                @default(now())
-  updatedAt    DateTime                @updatedAt
+  id             String                 @id @default(cuid())
+  tenantId       String
+  personId       String
+  membershipType PersonMembershipType   @default(ACTIVE_MEMBER)
+  status         PersonMembershipStatus @default(ACTIVE)
+  memberNumber   String?
+  startsAt       DateTime
+  endsAt         DateTime?
+  notes          String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
   tenant Tenant @relation("TenantPersonMemberships", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
@@ -2152,6 +2197,126 @@ model CommunicationTemplate {
   @@index([status])
   @@index([moduleKey])
   @@index([reviewStage])
+}
+
+// ---------------------------------------------------------------------------
+// COMM-01A — Tenant-safe communication/collaboration foundation
+//
+// A CommunicationThread attaches to exactly one tenant-owned business object
+// via generic targetType + targetId. Target ownership is validated at the
+// service layer before any thread is created or accessed.
+//
+// Security: every row carries explicit tenantId for defensive querying,
+// indexing, and cross-tenant testability — even when tenant could be inferred
+// through relations.
+// ---------------------------------------------------------------------------
+
+model CommunicationThread {
+  id       String @id @default(cuid())
+  tenantId String
+
+  targetType CommunicationTargetType
+  targetId   String
+
+  /// Opaque routing token for future inbound email (COMM-01D). Never expose
+  /// raw DB ids in reply addresses. Generated at thread creation.
+  inboundReplyToken String @unique
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser User?  @relation("CommunicationThreadCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  messages         CommunicationMessage[]
+  internalComments InternalComment[]
+
+  @@unique([tenantId, targetType, targetId])
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+}
+
+model CommunicationMessage {
+  id       String @id @default(cuid())
+  tenantId String
+  threadId String
+
+  direction CommunicationMessageDirection
+  channel   CommunicationMessageChannel   @default(EMAIL)
+
+  subject  String?
+  bodyText String?
+  bodyHtml String?
+
+  fromAddress String?
+  /// JSON array of recipient email addresses.
+  toAddresses Json?
+
+  /// Provider identifier (e.g. "resend"). Kept as string for extensibility.
+  provider          String?
+  providerMessageId String?
+  messageIdHeader   String?
+  inReplyTo         String?
+  /// JSON array of Message-ID references for threading.
+  references        Json?
+
+  status     CommunicationMessageStatus @default(DRAFT)
+  sentAt     DateTime?
+  receivedAt DateTime?
+
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  thread        CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser User?               @relation("CommunicationMessageCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, threadId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, providerMessageId])
+}
+
+model InternalComment {
+  id       String @id @default(cuid())
+  tenantId String
+  threadId String
+
+  authorUserId String
+  body         String
+
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  thread     CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  authorUser User                @relation("InternalCommentAuthor", fields: [authorUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  mentions CommentMention[]
+
+  @@index([tenantId])
+  @@index([tenantId, threadId])
+  @@index([tenantId, createdAt])
+}
+
+model CommentMention {
+  id       String @id @default(cuid())
+  tenantId String
+
+  commentId       String
+  mentionedUserId String
+  createdAt       DateTime @default(now())
+
+  tenant        Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  comment       InternalComment @relation(fields: [commentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  mentionedUser User            @relation("CommentMentionUser", fields: [mentionedUserId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([commentId, mentionedUserId])
+  @@index([tenantId])
+  @@index([tenantId, commentId])
 }
 
 model MeetingAgendaItem {
@@ -3431,11 +3596,11 @@ model MatchExternalMapping {
 // re-creation risk.
 // ---------------------------------------------------------------------------
 model SfvMatchDeletionTombstone {
-  id       String @id @default(cuid())
+  id               String   @id @default(cuid())
   /// Owning tenant. All queries must be scoped by tenantId.
-  tenantId String
+  tenantId         String
   /// External provider identifier, e.g. "SFV". Matches MatchExternalMapping.provider.
-  provider String
+  provider         String
   /// The provider's matchId that was intentionally, permanently deleted.
   /// Matches MatchExternalMapping.externalMatchId — never reused for a
   /// different local Match.
@@ -3444,10 +3609,10 @@ model SfvMatchDeletionTombstone {
   /// suppression identity (a provider matchId is never reused across seasons).
   externalSeasonId Int
   /// When the permanent deletion (and this suppression) occurred.
-  deletedAt DateTime @default(now())
+  deletedAt        DateTime @default(now())
   /// The user who performed the permanent deletion, if resolvable. Never a
   /// hard dependency — deletion must never fail because this is unknown.
-  deletedByUserId String?
+  deletedByUserId  String?
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
@@ -4801,9 +4966,9 @@ model WeekplannerPlanActivityOverride {
 // Delete: permanent, no cascade to planning data.
 // ---------------------------------------------------------------------------
 model Infoboard {
-  id       String          @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant   Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   // Identity
   name String
@@ -4882,20 +5047,20 @@ model Infoboard {
 /// PERSON-UX-06 adds: ratingMode, qualitativeLabels, showTeamBenchmark,
 /// showJahrgangBenchmark.
 model DevelopmentCriterion {
-  id          String   @id @default(cuid())
-  tenantId    String
+  id                    String   @id @default(cuid())
+  tenantId              String
   /// Display name shown in assessments and admin UIs.
-  name        String
+  name                  String
   /// Optional longer description of what is being rated.
-  description String?
+  description           String?
   /// Optional grouping label (e.g. "Technik", "Taktik", "Fitness").
   /// Free text — no enum — supports any sport or development framework.
-  category    String?
+  category              String?
   /// Lower = shown earlier in lists.
-  sortOrder   Int      @default(0)
+  sortOrder             Int      @default(0)
   /// Inactive criteria are hidden from new-assessment forms but historical
   /// ratings that reference them remain fully interpretable.
-  isActive    Boolean  @default(true)
+  isActive              Boolean  @default(true)
   /// PERSON-UX-06: Rating input/display mode. One of:
   ///   SCORE_0_100   — direct 0..100 integer (canonical = same value)
   ///   QUALITATIVE_5 — five-level selector (canonical: 0/25/50/75/100)
@@ -4903,19 +5068,19 @@ model DevelopmentCriterion {
   ///   PERCENTAGE    — 0..100 percentage (canonical = same value)
   /// Stored as a plain String so no DB enum migration is required for
   /// future modes. Validated server-side.
-  ratingMode  String   @default("SCORE_0_100")
+  ratingMode            String   @default("SCORE_0_100")
   /// PERSON-UX-06: Custom qualitative labels for QUALITATIVE_5 mode.
   /// Stored as JSON array of 5 label strings. Null = use system defaults.
   /// Example: ["Entwicklungsbedarf","Basis","Solide","Stark","Herausragend"]
-  qualitativeLabels Json?
+  qualitativeLabels     Json?
   /// PERSON-UX-06: Show Team benchmark for this criterion.
   showTeamBenchmark     Boolean  @default(false)
   /// PERSON-UX-06: Show Jahrgang (birth-year cohort) benchmark.
   showJahrgangBenchmark Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  tenant  Tenant                      @relation("TenantDevelopmentCriteria", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant  Tenant                        @relation("TenantDevelopmentCriteria", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   ratings DevelopmentAssessmentRating[]
 
   @@index([tenantId, isActive, sortOrder])
@@ -4931,7 +5096,7 @@ model DevelopmentCriterion {
 /// Assessment history is permanent: person/team/squad changes after the
 /// fact must never destroy or invalidate existing records.
 model DevelopmentAssessment {
-  id             String    @id @default(cuid())
+  id             String   @id @default(cuid())
   tenantId       String
   personId       String
   seasonId       String
@@ -4944,14 +5109,14 @@ model DevelopmentAssessment {
   assessorUserId String?
   /// Free-text summary / general notes for this assessment.
   notes          String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  tenant     Tenant                       @relation("TenantDevelopmentAssessments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  person     Person                       @relation("PersonDevelopmentAssessments", fields: [personId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  season     Season                       @relation("SeasonDevelopmentAssessments", fields: [seasonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  teamSeason TeamSeason?                  @relation("TeamSeasonDevelopmentAssessments", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  assessor   User?                        @relation("AssessorDevelopmentAssessments", fields: [assessorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant     Tenant                        @relation("TenantDevelopmentAssessments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person     Person                        @relation("PersonDevelopmentAssessments", fields: [personId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  season     Season                        @relation("SeasonDevelopmentAssessments", fields: [seasonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  teamSeason TeamSeason?                   @relation("TeamSeasonDevelopmentAssessments", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  assessor   User?                         @relation("AssessorDevelopmentAssessments", fields: [assessorUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   ratings    DevelopmentAssessmentRating[]
 
   @@index([tenantId, personId, assessedAt])
@@ -4977,11 +5142,11 @@ model DevelopmentAssessment {
 /// These snapshot fields guarantee that changing a criterion's mode or labels
 /// does NOT reinterpret historical data.
 model DevelopmentAssessmentRating {
-  id           String   @id @default(cuid())
-  assessmentId String
-  criterionId  String
+  id                        String   @id @default(cuid())
+  assessmentId              String
+  criterionId               String
   /// 0–100 inclusive. 0 is valid. Server-side range validation required.
-  normalizedScore Int
+  normalizedScore           Int
   /// Snapshot of criterion name at time of rating creation.
   /// Never use the live DevelopmentCriterion.name for historical display.
   criterionNameSnapshot     String
@@ -4998,9 +5163,9 @@ model DevelopmentAssessmentRating {
   /// QUALITATIVE_5 level 4). Null when the mode has no named levels.
   rawLabelSnapshot          String?
   /// Optional qualitative comment for this criterion.
-  comment      String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  comment                   String?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
 
   assessment DevelopmentAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   criterion  DevelopmentCriterion  @relation(fields: [criterionId], references: [id], onDelete: Restrict, onUpdate: Cascade)
@@ -5047,19 +5212,19 @@ enum GuardianRelationshipType {
 }
 
 model GuardianRelationship {
-  id               String                  @id @default(cuid())
+  id               String                   @id @default(cuid())
   tenantId         String
   childPersonId    String
   guardianPersonId String
   relationshipType GuardianRelationshipType @default(OTHER)
-  isPrimary        Boolean                 @default(false)
-  notes            String?                 @db.VarChar(500)
-  createdAt        DateTime                @default(now())
-  updatedAt        DateTime                @updatedAt
+  isPrimary        Boolean                  @default(false)
+  notes            String?                  @db.VarChar(500)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
 
-  tenant          Tenant @relation("TenantGuardianRelationships", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  childPerson     Person @relation("PersonAsChild", fields: [childPersonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  guardianPerson  Person @relation("PersonAsGuardian", fields: [guardianPersonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  tenant         Tenant @relation("TenantGuardianRelationships", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  childPerson    Person @relation("PersonAsChild", fields: [childPersonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  guardianPerson Person @relation("PersonAsGuardian", fields: [guardianPersonId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
   @@unique([childPersonId, guardianPersonId])
   @@index([tenantId])
