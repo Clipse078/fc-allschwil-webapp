@@ -100,7 +100,8 @@ export function EmailCommunicationPanel({
   const [bodyText, setBodyText] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const requestGenerationRef = useRef(0);
 
@@ -114,9 +115,12 @@ export function EmailCommunicationPanel({
       if (!response.ok) {
         throw new Error(payload.error ?? "E-Mail-Verlauf konnte nicht geladen werden.");
       }
+      if (!payload.recipient) {
+        throw new Error("E-Mail-Verlauf konnte nicht geladen werden.");
+      }
       if (generation !== requestGenerationRef.current) return;
       setMessages(Array.isArray(payload.messages) ? payload.messages : []);
-      setRecipient(payload.recipient ?? null);
+      setRecipient(payload.recipient);
     },
     [tenantSlug],
   );
@@ -124,7 +128,8 @@ export function EmailCommunicationPanel({
   const initialize = useCallback(async () => {
     const generation = ++requestGenerationRef.current;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
+    setSendError(null);
     try {
       const query = `targetType=${encodeURIComponent(targetType)}&targetId=${encodeURIComponent(targetId)}`;
       const existingResponse = await fetch(
@@ -167,8 +172,9 @@ export function EmailCommunicationPanel({
       }
     } catch (loadError) {
       if (generation !== requestGenerationRef.current) return;
-      setMessages([]);
-      setError(loadError instanceof Error ? loadError.message : "E-Mail-Verlauf konnte nicht geladen werden.");
+      setMessages(null);
+      setRecipient(null);
+      setLoadError(loadError instanceof Error ? loadError.message : "E-Mail-Verlauf konnte nicht geladen werden.");
     } finally {
       if (generation === requestGenerationRef.current) setLoading(false);
     }
@@ -196,7 +202,7 @@ export function EmailCommunicationPanel({
     const generation = requestGenerationRef.current;
     const sendingThreadId = threadId;
     setSending(true);
-    setError(null);
+    setSendError(null);
     try {
       const response = await fetch(
         `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(sendingThreadId)}/messages/email`,
@@ -216,7 +222,7 @@ export function EmailCommunicationPanel({
       await loadHistory(sendingThreadId, generation);
     } catch (sendError) {
       if (generation !== requestGenerationRef.current) return;
-      setError(sendError instanceof Error ? sendError.message : "Die E-Mail konnte nicht gesendet werden.");
+      setSendError(sendError instanceof Error ? sendError.message : "Die E-Mail konnte nicht gesendet werden.");
       await loadHistory(sendingThreadId, generation).catch(() => undefined);
     } finally {
       if (generation === requestGenerationRef.current) setSending(false);
@@ -239,10 +245,13 @@ export function EmailCommunicationPanel({
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           E-Mails werden geladen…
         </div>
-      ) : error && !threadId ? (
+      ) : loadError ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
           <AlertCircle className="h-5 w-5 text-rose-500" aria-hidden />
-          <p className="text-sm text-rose-600">{error}</p>
+          <div>
+            <p className="text-sm font-medium text-rose-600">{loadError}</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">Bitte versuche es erneut.</p>
+          </div>
           <button
             type="button"
             onClick={() => void initialize()}
@@ -272,6 +281,7 @@ export function EmailCommunicationPanel({
             )}
           </section>
 
+          {recipient ? (
           <section aria-label="E-Mail verfassen" className="mt-5 border-t border-[var(--border)] pt-5">
             <div className="mb-4">
               <p className="text-sm font-semibold text-[var(--foreground)]">Neue E-Mail</p>
@@ -316,7 +326,7 @@ export function EmailCommunicationPanel({
                 <span>{disabledReason}</span>
               </div>
             ) : null}
-            {error ? <p className="mt-3 text-xs text-rose-600">{error}</p> : null}
+            {sendError ? <p className="mt-3 text-xs text-rose-600">{sendError}</p> : null}
 
             <div className="mt-4 flex justify-end">
               <button
@@ -330,6 +340,7 @@ export function EmailCommunicationPanel({
               </button>
             </div>
           </section>
+          ) : null}
         </>
       )}
     </div>
