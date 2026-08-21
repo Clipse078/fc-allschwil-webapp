@@ -93,6 +93,22 @@ function mapAuditLog(entry: {
         occurredAt,
       };
 
+    case "EMAIL_SENT":
+      return {
+        id: entry.id,
+        label: "E-Mail gesendet",
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "EMAIL_FAILED":
+      return {
+        id: entry.id,
+        label: "E-Mail-Versand fehlgeschlagen",
+        actorName: actor,
+        occurredAt,
+      };
+
     case "INTERNAL_COMMENT_CREATED":
       return {
         id: entry.id,
@@ -212,7 +228,19 @@ export async function getWaitingListTimeline(
   if (!entry) return [];
 
   const logs = await prisma.auditLog.findMany({
-    where: { entityType: "WaitingListEntry", entityId: entry.id },
+    where: {
+      entityType: "WaitingListEntry",
+      entityId: entry.id,
+      // Preserve legacy business events only after resolving the tenant-owned
+      // entry. Communication events always require an explicit matching tenant.
+      OR: [
+        { tenantId: tenant.id },
+        {
+          tenantId: null,
+          action: { notIn: ["EMAIL_SENT", "EMAIL_FAILED", "EMAIL_DELIVERED", "EMAIL_RECEIVED"] },
+        },
+      ],
+    },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,

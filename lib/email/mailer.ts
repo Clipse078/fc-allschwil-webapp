@@ -40,6 +40,12 @@ export type MailMessage = {
   subject: string;
   html: string;
   text?: string;
+  idempotencyKey?: string;
+};
+
+export type MailDeliveryResult = {
+  providerMessageId: string;
+  from: string;
 };
 
 /**
@@ -62,7 +68,7 @@ export class MailConfigurationError extends Error {
  *
  * Never logs the message body, reset tokens, or reset URLs.
  */
-export async function sendMail(message: MailMessage): Promise<void> {
+export async function sendMail(message: MailMessage): Promise<MailDeliveryResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     throw new MailConfigurationError(
@@ -79,15 +85,24 @@ export async function sendMail(message: MailMessage): Promise<void> {
 
   const resend = new Resend(apiKey);
 
-  const { error } = await resend.emails.send({
-    from,
-    to: message.to,
-    subject: message.subject,
-    html: message.html,
-    text: message.text,
-  });
+  const { data, error } = await resend.emails.send(
+    {
+      from,
+      to: message.to,
+      subject: message.subject,
+      html: message.html,
+      text: message.text,
+    },
+    message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined,
+  );
 
   if (error) {
     throw new Error(`Resend delivery error: ${error.name} — ${error.message}`);
   }
+
+  if (!data?.id) {
+    throw new Error("Resend delivery error: response did not include a message id.");
+  }
+
+  return { providerMessageId: data.id, from };
 }

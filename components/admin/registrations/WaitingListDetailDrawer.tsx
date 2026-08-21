@@ -43,10 +43,10 @@ import {
   REGISTRATION_DRAWER_TAB_CONTENT_CLASS,
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
-  RegistrationEmailTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
 import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
+import { EmailCommunicationPanel } from "@/components/admin/communications/EmailCommunicationPanel";
 import type { WaitingListPriority } from "@prisma/client";
 
 // ── Section helper ────────────────────────────────────────────────────────────
@@ -765,7 +765,18 @@ export function WaitingListDetailDrawer({
           </div>
         ) : null}
 
-        {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
+        {activeTab === "email" ? (
+          <EmailCommunicationPanel
+            tenantSlug={tenantSlug}
+            targetType="WAITING_LIST_ENTRY"
+            targetId={entry.id}
+            canEdit={canEdit}
+            lifecycleAllowsSend={!terminal}
+            locale={locale}
+            timezone={timezone}
+            enabled={activeTab === "email"}
+          />
+        ) : null}
 
         {activeTab === "internalComments" ? (
           <InternalCommentsPanel

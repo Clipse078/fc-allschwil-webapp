@@ -33,6 +33,7 @@ const messageSelect = {
   toAddresses: true,
   provider: true,
   providerMessageId: true,
+  deliveryError: true,
   messageIdHeader: true,
   inReplyTo: true,
   references: true,
@@ -58,6 +59,7 @@ export type CreateCommunicationMessageInput = {
   toAddresses?: string[] | null;
   provider?: string | null;
   providerMessageId?: string | null;
+  deliveryError?: string | null;
   messageIdHeader?: string | null;
   inReplyTo?: string | null;
   references?: string[] | null;
@@ -113,6 +115,7 @@ export async function createCommunicationMessage(
       toAddresses: input.toAddresses ?? undefined,
       provider: input.provider ?? null,
       providerMessageId: input.providerMessageId ?? null,
+      deliveryError: input.deliveryError ?? null,
       messageIdHeader: input.messageIdHeader ?? null,
       inReplyTo: input.inReplyTo ?? null,
       references: input.references ?? undefined,

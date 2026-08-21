@@ -33,6 +33,8 @@ export type TimelineEntryKind =
   | "PERSON_UNLINKED"
   | "DUPLICATE_IGNORED"
   | "WAITING_LIST_ADDED"
+  | "EMAIL_SENT"
+  | "EMAIL_FAILED"
   | "INTERNAL_COMMENT_CREATED"
   | "INTERNAL_COMMENT_UPDATED"
   | "INTERNAL_COMMENT_DELETED"
@@ -205,6 +207,26 @@ function mapAuditEntry(entry: {
         occurredAt,
       };
 
+    case "EMAIL_SENT":
+      return {
+        id: entry.id,
+        kind: "EMAIL_SENT",
+        label: "E-Mail gesendet",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "EMAIL_FAILED":
+      return {
+        id: entry.id,
+        kind: "EMAIL_FAILED",
+        label: "E-Mail-Versand fehlgeschlagen",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
     case "INTERNAL_COMMENT_CREATED":
       return {
         id: entry.id,
@@ -267,7 +289,20 @@ export async function getRegistrationTimeline(
   if (!registration) return [];
 
   const logs = await prisma.auditLog.findMany({
-    where: { entityType: "Registration", entityId: registration.id },
+    where: {
+      entityType: "Registration",
+      entityId: registration.id,
+      // Legacy business events predate AuditLog.tenantId and are admitted only
+      // after the tenant-owned registration above is resolved. Communication
+      // events are never read without an explicit matching tenantId.
+      OR: [
+        { tenantId: tenant.id },
+        {
+          tenantId: null,
+          action: { notIn: ["EMAIL_SENT", "EMAIL_FAILED", "EMAIL_DELIVERED", "EMAIL_RECEIVED"] },
+        },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,

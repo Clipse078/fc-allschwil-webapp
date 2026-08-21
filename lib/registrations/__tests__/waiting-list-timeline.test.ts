@@ -150,4 +150,31 @@ describe("getWaitingListTimeline", () => {
     expect(result.map((e) => e.label)).toEqual(["Auf Warteliste gesetzt", "Kontaktiert"]);
     expect(result.every((e) => e.actorName === "Michael Duijster")).toBe(true);
   });
+
+  it("includes successful outbound email with the human actor", async () => {
+    mocks.waitingListEntryFindFirst.mockResolvedValueOnce({
+      id: "entry-1",
+      addedAt: new Date("2026-08-20T20:59:00.000Z"),
+      lastContactedAt: null,
+      offeredAt: null,
+      resolvedAt: null,
+      status: "WAITING",
+      addedByUser: linkedActor(),
+      resolvedByUser: null,
+    });
+    mocks.auditLogFindMany.mockResolvedValueOnce([
+      {
+        id: "log-1",
+        action: "EMAIL_SENT",
+        afterJson: { communicationEntityId: "message-1" },
+        createdAt: new Date("2026-08-21T10:00:00.000Z"),
+        actorUser: linkedActor(),
+      },
+    ]);
+
+    const result = await getWaitingListTimeline("fc-allschwil", "entry-1");
+    expect(result.find((event) => event.label === "E-Mail gesendet")).toMatchObject({
+      actorName: "Michael Duijster",
+    });
+  });
 });

@@ -47,6 +47,7 @@ export async function recordCommunicationAuditEvent(
   const { entityType, entityId } = resolveAuditEntity(input.targetType, input.targetId);
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId ?? null,
     moduleKey: "registrations",
     entityType,
@@ -56,7 +57,7 @@ export async function recordCommunicationAuditEvent(
       threadId: input.threadId,
       targetType: input.targetType,
       targetId: input.targetId,
-      commentId: input.entityId,
+      communicationEntityId: input.entityId,
       summary: input.summary,
     },
   });

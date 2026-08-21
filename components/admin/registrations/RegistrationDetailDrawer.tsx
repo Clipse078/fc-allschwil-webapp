@@ -64,10 +64,10 @@ import RegistrationDeleteControl from "./RegistrationDeleteControl";
 import {
   RegistrationDrawerTabBody,
   RegistrationDrawerTabStrip,
-  RegistrationEmailTabPlaceholder,
   type RegistrationDrawerTab,
 } from "./RegistrationDrawerTabShell";
 import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
+import { EmailCommunicationPanel } from "@/components/admin/communications/EmailCommunicationPanel";
 import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
 
 const NOT_PROVIDED = "Nicht angegeben";
@@ -774,7 +774,18 @@ export default function RegistrationDetailDrawer({
             />
           ) : null}
 
-          {activeTab === "email" ? <RegistrationEmailTabPlaceholder /> : null}
+          {activeTab === "email" ? (
+            <EmailCommunicationPanel
+              tenantSlug={tenantSlug}
+              targetType="REGISTRATION"
+              targetId={registration.id}
+              canEdit={canEdit}
+              lifecycleAllowsSend={!["ACCEPTED", "REJECTED", "ARCHIVED"].includes(registration.status)}
+              locale={locale}
+              timezone={timezone}
+              enabled={activeTab === "email"}
+            />
+          ) : null}
 
           {activeTab === "internalComments" ? (
             <InternalCommentsPanel
