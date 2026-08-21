@@ -1,27 +1,23 @@
 /**
  * lib/communication/audit-integration.ts
  *
- * COMM-01A: Integration point for future Verlauf / AuditLog events.
+ * COMM-01B: Verlauf / AuditLog integration for communication events.
  *
- * Deferred in COMM-01A — no audit rows are written yet. Future slices will call
- * these helpers after successful communication mutations:
- *
- *   - E-Mail gesendet / zugestellt / fehlgeschlagen
- *   - Antwort eingegangen
- *   - Interner Kommentar erstellt
- *
- * Audit entries should reference/summarize the business event — never duplicate
+ * Audit entries reference/summarize the business event — never duplicate
  * full email/comment bodies into AuditLog.
  */
 
 import type { CommunicationTargetType } from "@prisma/client";
+import { logAction } from "@/lib/audit/log-action";
 
 export type CommunicationAuditEventKind =
   | "EMAIL_SENT"
   | "EMAIL_DELIVERED"
   | "EMAIL_FAILED"
   | "EMAIL_RECEIVED"
-  | "INTERNAL_COMMENT_CREATED";
+  | "INTERNAL_COMMENT_CREATED"
+  | "INTERNAL_COMMENT_UPDATED"
+  | "INTERNAL_COMMENT_DELETED";
 
 export type CommunicationAuditEventInput = {
   tenantId: string;
@@ -34,12 +30,34 @@ export type CommunicationAuditEventInput = {
   summary: string;
 };
 
-/**
- * Placeholder for COMM-01B+ Verlauf integration. Intentionally no-op in COMM-01A.
- */
+function resolveAuditEntity(targetType: CommunicationTargetType, targetId: string) {
+  switch (targetType) {
+    case "REGISTRATION":
+      return { entityType: "Registration", entityId: targetId };
+    case "WAITING_LIST_ENTRY":
+      return { entityType: "WaitingListEntry", entityId: targetId };
+    default:
+      return { entityType: "CommunicationThread", entityId: targetId };
+  }
+}
+
 export async function recordCommunicationAuditEvent(
   input: CommunicationAuditEventInput,
 ): Promise<void> {
-  void input;
-  // Deferred — see module header.
+  const { entityType, entityId } = resolveAuditEntity(input.targetType, input.targetId);
+
+  await logAction({
+    actorUserId: input.actorUserId ?? null,
+    moduleKey: "registrations",
+    entityType,
+    entityId,
+    action: input.kind,
+    afterJson: {
+      threadId: input.threadId,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      commentId: input.entityId,
+      summary: input.summary,
+    },
+  });
 }

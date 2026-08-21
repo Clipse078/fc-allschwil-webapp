@@ -15,6 +15,7 @@ import {
   Link2,
   Loader2,
   Mail,
+  MessageSquare,
   ShieldAlert,
   UserCheck,
   UserPlus,
@@ -37,6 +38,9 @@ const TIMELINE_ICON: Record<TimelineEntryKind, ComponentType<{ className?: strin
   PERSON_UNLINKED: Link2,
   DUPLICATE_IGNORED: ShieldAlert,
   WAITING_LIST_ADDED: ClipboardList,
+  INTERNAL_COMMENT_CREATED: MessageSquare,
+  INTERNAL_COMMENT_UPDATED: MessageSquare,
+  INTERNAL_COMMENT_DELETED: MessageSquare,
   OTHER: Clock,
 };
 

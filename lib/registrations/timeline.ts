@@ -33,6 +33,9 @@ export type TimelineEntryKind =
   | "PERSON_UNLINKED"
   | "DUPLICATE_IGNORED"
   | "WAITING_LIST_ADDED"
+  | "INTERNAL_COMMENT_CREATED"
+  | "INTERNAL_COMMENT_UPDATED"
+  | "INTERNAL_COMMENT_DELETED"
   | "OTHER";
 
 export type TimelineEntry = {
@@ -197,6 +200,36 @@ function mapAuditEntry(entry: {
         id: entry.id,
         kind: "WAITING_LIST_ADDED",
         label: "Auf Warteliste gesetzt",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "INTERNAL_COMMENT_CREATED":
+      return {
+        id: entry.id,
+        kind: "INTERNAL_COMMENT_CREATED",
+        label: "Interner Kommentar erstellt",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "INTERNAL_COMMENT_UPDATED":
+      return {
+        id: entry.id,
+        kind: "INTERNAL_COMMENT_UPDATED",
+        label: "Interner Kommentar bearbeitet",
+        detail: null,
+        actorName: actor,
+        occurredAt,
+      };
+
+    case "INTERNAL_COMMENT_DELETED":
+      return {
+        id: entry.id,
+        kind: "INTERNAL_COMMENT_DELETED",
+        label: "Interner Kommentar gelöscht",
         detail: null,
         actorName: actor,
         occurredAt,

@@ -684,6 +684,7 @@ export function WaitingListWorkspace({
             onClose={() => setSelectedEntry(null)}
             onUpdate={handleUpdate}
             onDelete={handleDelete}
+            currentUserId={currentUserId}
           />
         </div>
       ) : null}

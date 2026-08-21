@@ -4,6 +4,7 @@ export type CommunicationServiceErrorCode =
   | "THREAD_NOT_FOUND"
   | "MESSAGE_NOT_FOUND"
   | "COMMENT_NOT_FOUND"
+  | "COMMENT_FORBIDDEN"
   | "TENANT_FORBIDDEN"
   | "MENTION_FORBIDDEN"
   | "UNSUPPORTED_TARGET_TYPE";
