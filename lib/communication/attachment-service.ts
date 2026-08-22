@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
@@ -10,6 +10,7 @@ import {
 } from "@/lib/communication/attachment-storage";
 import {
   MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
+  MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE,
   validateCommunicationAttachment,
   validateCommunicationAttachmentSet,
 } from "@/lib/communication/attachment-validation";
@@ -174,6 +175,195 @@ export async function createUploadedAttachment(input: {
     ingestionMetadata: input.ingestionMetadata,
     storage: input.storage ?? communicationAttachmentStorage,
   });
+}
+
+export type OutboundCommunicationAttachment = {
+  attachmentId: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  content: Buffer;
+};
+
+function requireUniqueAttachmentIds(attachmentIds: string[]): string[] {
+  const normalized = attachmentIds.map((id) => required(id, "attachmentId"));
+  if (normalized.length > MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE) {
+    throw new CommunicationAttachmentServiceError(
+      "INVALID_INPUT",
+      "Eine Nachricht darf höchstens 10 Anhänge enthalten.",
+    );
+  }
+  if (new Set(normalized).size !== normalized.length) {
+    throw new CommunicationAttachmentServiceError(
+      "INVALID_INPUT",
+      "Jeder Anhang darf nur einmal ausgewählt werden.",
+    );
+  }
+  return normalized;
+}
+
+/**
+ * Resolves a composer selection from persistence before a message is created.
+ *
+ * Transitional scan policy: READY attachments with PENDING are eligible while
+ * no malware scanner is configured. PENDING means validated, not malware-safe.
+ * CLEAN is eligible; QUARANTINED and FAILED are always blocked.
+ */
+export async function validateOutboundAttachmentSelection(input: {
+  tenantId: string;
+  actorUserId: string;
+  attachmentIds: string[];
+}) {
+  const tenantId = required(input.tenantId, "tenantId");
+  const actorUserId = required(input.actorUserId, "actorUserId");
+  const attachmentIds = requireUniqueAttachmentIds(input.attachmentIds);
+  await requireTenantActor(tenantId, actorUserId);
+  if (attachmentIds.length === 0) return [];
+
+  const attachments = await prisma.communicationAttachment.findMany({
+    where: { tenantId, id: { in: attachmentIds } },
+    select: {
+      id: true,
+      lifecycleStatus: true,
+      scanStatus: true,
+      sizeBytes: true,
+    },
+  });
+  const byId = new Map(attachments.map((attachment) => [attachment.id, attachment]));
+  const ordered = attachmentIds.map((id) => byId.get(id));
+  if (ordered.some((attachment) => !attachment)) {
+    throw new CommunicationAttachmentServiceError(
+      "ATTACHMENT_NOT_FOUND",
+      "Ein ausgewählter Anhang ist nicht mehr verfügbar.",
+    );
+  }
+  for (const attachment of ordered) {
+    if (!attachment || attachment.lifecycleStatus !== "READY") {
+      throw new CommunicationAttachmentServiceError(
+        "ATTACHMENT_UNAVAILABLE",
+        "Eine Datei steht noch nicht für den Versand bereit.",
+      );
+    }
+    if (attachment.scanStatus === "QUARANTINED") {
+      throw new CommunicationAttachmentServiceError(
+        "ATTACHMENT_UNAVAILABLE",
+        "Eine Datei wurde gesperrt und darf nicht versendet werden.",
+      );
+    }
+    if (attachment.scanStatus === "FAILED") {
+      throw new CommunicationAttachmentServiceError(
+        "ATTACHMENT_UNAVAILABLE",
+        "Eine Datei konnte nicht geprüft werden und darf nicht versendet werden.",
+      );
+    }
+  }
+  validateCommunicationAttachmentSet(
+    ordered.map((attachment) => ({ sizeBytes: attachment?.sizeBytes ?? -1 })),
+  );
+  return attachmentIds;
+}
+
+export async function attachSelectionToMessage(input: {
+  tenantId: string;
+  actorUserId: string;
+  messageId: string;
+  attachmentIds: string[];
+}) {
+  const attachmentIds = await validateOutboundAttachmentSelection(input);
+  const links = [];
+  for (const [sortOrder, attachmentId] of attachmentIds.entries()) {
+    links.push(
+      await attachToMessage({
+        tenantId: input.tenantId,
+        actorUserId: input.actorUserId,
+        messageId: input.messageId,
+        attachmentId,
+        sortOrder,
+      }),
+    );
+  }
+  return links;
+}
+
+/**
+ * Loads the exact immutable objects associated with a message for provider
+ * delivery. Storage metadata and checksums are verified before bytes leave SCE.
+ */
+export async function loadMessageAttachmentsForDelivery(input: {
+  tenantId: string;
+  messageId: string;
+  storage?: CommunicationAttachmentStorage;
+}): Promise<OutboundCommunicationAttachment[]> {
+  const tenantId = required(input.tenantId, "tenantId");
+  const messageId = required(input.messageId, "messageId");
+  const links = await prisma.communicationMessageAttachment.findMany({
+    where: { tenantId, messageId },
+    select: {
+      attachmentId: true,
+      sortOrder: true,
+      attachment: {
+        select: {
+          storageKey: true,
+          sanitizedFilename: true,
+          contentType: true,
+          sizeBytes: true,
+          checksumSha256: true,
+          lifecycleStatus: true,
+          scanStatus: true,
+        },
+      },
+    },
+    orderBy: { sortOrder: "asc" },
+  });
+  validateCommunicationAttachmentSet(links.map((link) => link.attachment));
+  const storage = input.storage ?? communicationAttachmentStorage;
+  const result: OutboundCommunicationAttachment[] = [];
+
+  for (const link of links) {
+    const attachment = link.attachment;
+    if (
+      attachment.lifecycleStatus !== "READY" ||
+      attachment.scanStatus === "QUARANTINED" ||
+      attachment.scanStatus === "FAILED"
+    ) {
+      throw new CommunicationAttachmentServiceError(
+        "ATTACHMENT_UNAVAILABLE",
+        "Eine Datei steht nicht für den Versand bereit.",
+      );
+    }
+    try {
+      const stored = await storage.download({
+        storageKey: attachment.storageKey,
+        filename: attachment.sanitizedFilename,
+        contentType: attachment.contentType,
+      });
+      const bytes = await readStorageStream(
+        stored.stream,
+        MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
+      );
+      const checksum = createHash("sha256").update(bytes).digest("hex");
+      if (
+        bytes.byteLength !== attachment.sizeBytes ||
+        stored.sizeBytes !== attachment.sizeBytes ||
+        checksum !== attachment.checksumSha256
+      ) {
+        throw new Error("Stored attachment integrity mismatch.");
+      }
+      result.push({
+        attachmentId: link.attachmentId,
+        filename: attachment.sanitizedFilename,
+        contentType: attachment.contentType,
+        sizeBytes: attachment.sizeBytes,
+        content: Buffer.from(bytes),
+      });
+    } catch {
+      throw new CommunicationAttachmentServiceError(
+        "ATTACHMENT_UNAVAILABLE",
+        "Ein Anhang konnte nicht für den Versand geladen werden.",
+      );
+    }
+  }
+  return result;
 }
 
 export async function snapshotWorkspaceDocumentVersion(input: {

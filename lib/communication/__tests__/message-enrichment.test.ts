@@ -1,14 +1,25 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ userFindMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  userFindMany: vi.fn(),
+  attachmentLinksFindMany: vi.fn(),
+}));
 
 vi.mock("@/lib/db/prisma", () => ({
-  prisma: { user: { findMany: mocks.userFindMany } },
+  prisma: {
+    user: { findMany: mocks.userFindMany },
+    communicationMessageAttachment: {
+      findMany: mocks.attachmentLinksFindMany,
+    },
+  },
 }));
 
 import { toPublicEmailThreadMessages, toPublicOutboundEmailMessages } from "@/lib/communication/message-enrichment";
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.attachmentLinksFindMany.mockResolvedValue([]);
+});
 
 describe("COMM-01C public email history", () => {
   it("returns actor and display fields without provider or internal tenant identifiers", async () => {
@@ -22,6 +33,18 @@ describe("COMM-01C public email history", () => {
           firstName: "Michael",
           lastName: "Duijster",
           displayName: null,
+        },
+      },
+    ]);
+    mocks.attachmentLinksFindMany.mockResolvedValue([
+      {
+        messageId: "message-a",
+        attachmentId: "attachment-a",
+        sortOrder: 0,
+        attachment: {
+          sanitizedFilename: "vertrag.pdf",
+          contentType: "application/pdf",
+          sizeBytes: 1234,
         },
       },
     ]);
@@ -61,6 +84,16 @@ describe("COMM-01C public email history", () => {
       senderDisplayName: "Michael Duijster",
       to: "anna@example.com",
       status: "SENT",
+      attachmentCount: 1,
+      attachments: [
+        {
+          id: "attachment-a",
+          filename: "vertrag.pdf",
+          contentType: "application/pdf",
+          size: 1234,
+          downloadAvailable: true,
+        },
+      ],
     });
     expect(result).not.toHaveProperty("tenantId");
     expect(result).not.toHaveProperty("threadId");
@@ -85,7 +118,16 @@ describe("COMM-01C public email history", () => {
         providerEventId: null,
         providerMessageId: null,
         replyToAddress: null,
-        attachments: null,
+        attachments: [
+          {
+            id: "legacy-a",
+            filename: "legacy.pdf",
+            contentType: "application/pdf",
+            contentDisposition: "attachment",
+            contentId: null,
+            size: 99,
+          },
+        ],
         deliveryError: null,
         messageIdHeader: null,
         inReplyTo: null,
@@ -100,6 +142,15 @@ describe("COMM-01C public email history", () => {
     ]);
 
     expect(result.to).toBe("max.mustermann@gmail.com");
+    expect(result.attachments).toEqual([
+      {
+        id: "legacy-a",
+        filename: "legacy.pdf",
+        contentType: "application/pdf",
+        size: 99,
+        downloadAvailable: false,
+      },
+    ]);
   });
 
   it("sorts mixed inbound/outbound messages by timeline timestamp deterministically", async () => {

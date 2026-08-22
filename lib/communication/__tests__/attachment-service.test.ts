@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createHash } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({
   tenantMembershipFindFirst: vi.fn(),
   attachmentCreate: vi.fn(),
   attachmentFindFirst: vi.fn(),
+  attachmentFindMany: vi.fn(),
   messageFindFirst: vi.fn(),
   messageFindMany: vi.fn(),
   linkFindMany: vi.fn(),
@@ -34,7 +36,9 @@ vi.mock("@/lib/db/prisma", () => ({
     communicationAttachment: {
       create: mocks.attachmentCreate,
       findFirst: mocks.attachmentFindFirst,
+      findMany: mocks.attachmentFindMany,
     },
+    communicationMessageAttachment: { findMany: mocks.linkFindMany },
     workspaceDocumentVersion: { findFirst: mocks.versionFindFirst },
     $transaction: vi.fn((callback) => callback(tx)),
   },
@@ -47,7 +51,9 @@ import {
   attachToMessage,
   cloneMessageAttachmentsForRetry,
   createUploadedAttachment,
+  loadMessageAttachmentsForDelivery,
   snapshotWorkspaceDocumentVersion,
+  validateOutboundAttachmentSelection,
 } from "@/lib/communication/attachment-service";
 
 const pdf = new TextEncoder().encode("%PDF-1.7\nattachment");
@@ -230,6 +236,148 @@ describe("communication attachment domain service", () => {
       }),
     ).resolves.toEqual(existing);
     expect(mocks.linkCreate).not.toHaveBeenCalled();
+  });
+
+  it("allows validated PENDING and CLEAN selections while preserving client order", async () => {
+    mocks.attachmentFindMany.mockResolvedValue([
+      {
+        id: "clean",
+        lifecycleStatus: "READY",
+        scanStatus: "CLEAN",
+        sizeBytes: 2,
+      },
+      {
+        id: "pending",
+        lifecycleStatus: "READY",
+        scanStatus: "PENDING",
+        sizeBytes: 1,
+      },
+    ]);
+
+    await expect(
+      validateOutboundAttachmentSelection({
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
+        attachmentIds: ["pending", "clean"],
+      }),
+    ).resolves.toEqual(["pending", "clean"]);
+    expect(mocks.attachmentFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { tenantId: "tenant-a", id: { in: ["pending", "clean"] } } }),
+    );
+  });
+
+  it.each(["QUARANTINED", "FAILED"] as const)(
+    "blocks %s attachments from outbound delivery",
+    async (scanStatus) => {
+      mocks.attachmentFindMany.mockResolvedValue([
+        {
+          id: "blocked",
+          lifecycleStatus: "READY",
+          scanStatus,
+          sizeBytes: 1,
+        },
+      ]);
+      await expect(
+        validateOutboundAttachmentSelection({
+          tenantId: "tenant-a",
+          actorUserId: "user-a",
+          attachmentIds: ["blocked"],
+        }),
+      ).rejects.toMatchObject({ code: "ATTACHMENT_UNAVAILABLE" });
+    },
+  );
+
+  it("enforces outbound count, total size, duplicate, and tenant-scoped existence", async () => {
+    await expect(
+      validateOutboundAttachmentSelection({
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
+        attachmentIds: Array.from({ length: 11 }, (_, index) => `a-${index}`),
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    await expect(
+      validateOutboundAttachmentSelection({
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
+        attachmentIds: ["same", "same"],
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+
+    mocks.attachmentFindMany.mockResolvedValueOnce([]);
+    await expect(
+      validateOutboundAttachmentSelection({
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
+        attachmentIds: ["foreign"],
+      }),
+    ).rejects.toMatchObject({ code: "ATTACHMENT_NOT_FOUND" });
+
+    mocks.attachmentFindMany.mockResolvedValueOnce([
+      {
+        id: "a",
+        lifecycleStatus: "READY",
+        scanStatus: "PENDING",
+        sizeBytes: 10 * 1024 * 1024 + 1,
+      },
+      {
+        id: "b",
+        lifecycleStatus: "READY",
+        scanStatus: "CLEAN",
+        sizeBytes: 10 * 1024 * 1024,
+      },
+    ]);
+    await expect(
+      validateOutboundAttachmentSelection({
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
+        attachmentIds: ["a", "b"],
+      }),
+    ).rejects.toMatchObject({ code: "TOTAL_SIZE_EXCEEDED" });
+  });
+
+  it("loads exact associated bytes in sort order and verifies immutable integrity", async () => {
+    const bytes = new TextEncoder().encode("immutable attachment");
+    mocks.linkFindMany.mockResolvedValue([
+      {
+        attachmentId: "attachment-a",
+        sortOrder: 0,
+        attachment: {
+          storageKey: "communication/tenant-a/attachment-a/file.txt",
+          sanitizedFilename: "file.txt",
+          contentType: "text/plain",
+          sizeBytes: bytes.byteLength,
+          checksumSha256: createHash("sha256").update(bytes).digest("hex"),
+          lifecycleStatus: "READY",
+          scanStatus: "PENDING",
+        },
+      },
+    ]);
+    const provider = storage();
+    provider.download.mockResolvedValue({
+      stream: new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(bytes);
+          controller.close();
+        },
+      }),
+      contentType: "text/plain",
+      sizeBytes: bytes.byteLength,
+    });
+
+    const result = await loadMessageAttachmentsForDelivery({
+      tenantId: "tenant-a",
+      messageId: "message-a",
+      storage: provider,
+    });
+    expect(result).toEqual([
+      {
+        attachmentId: "attachment-a",
+        filename: "file.txt",
+        contentType: "text/plain",
+        sizeBytes: bytes.byteLength,
+        content: Buffer.from(bytes),
+      },
+    ]);
   });
 
   it("clones ordered associations to the same objects and leaves source untouched", async () => {

@@ -15,6 +15,7 @@ import {
 import { CommunicationServiceError } from "@/lib/communication/errors";
 import { toPublicOutboundEmailMessages } from "@/lib/communication/message-enrichment";
 import { sendOutboundEmailForThread } from "@/lib/communication/outbound-email-service";
+import { MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE } from "@/lib/communication/attachment-validation";
 
 type Context = { params: Promise<{ tenantSlug: string; threadId: string }> };
 
@@ -22,6 +23,10 @@ const emailInputSchema = z
   .object({
     subject: z.string().trim().min(1).max(MAX_EMAIL_SUBJECT_LENGTH),
     bodyText: z.string().trim().min(1).max(MAX_EMAIL_BODY_LENGTH),
+    attachmentIds: z
+      .array(z.string().trim().min(1))
+      .max(MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE)
+      .default([]),
   })
   .strict();
 
@@ -77,6 +82,7 @@ export async function POST(request: NextRequest, context: Context) {
       actorUserId,
       subject: parsed.data.subject,
       bodyText: parsed.data.bodyText,
+      attachmentIds: parsed.data.attachmentIds,
     });
     const [publicMessage] = await toPublicOutboundEmailMessages(
       tenantResult.tenantId,

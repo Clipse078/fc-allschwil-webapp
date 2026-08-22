@@ -520,4 +520,144 @@ describe("COMM-01C email communication UX", () => {
     expect(await screen.findByText("Gesendet")).toBeInTheDocument();
     expect(historyCalls).toBeGreaterThanOrEqual(2);
   });
+
+  it("uploads multiple attachments, blocks premature send, removes one, and sends ordered IDs", async () => {
+    let resolveSecondUpload: (() => void) | undefined;
+    const secondUpload = new Promise<void>((resolve) => {
+      resolveSecondUpload = resolve;
+    });
+    let sentBody: Record<string, unknown> | null = null;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/communications/attachments")) {
+        const file = (init?.body as FormData).get("file") as File;
+        if (file.name === "einladung.pdf") await secondUpload;
+        return jsonResponse(
+          {
+            attachment: {
+              attachmentId: file.name === "vertrag.pdf" ? "attachment-a" : "attachment-b",
+              filename: file.name,
+              contentType: file.type,
+              size: file.size,
+              status: "READY",
+              scanStatus: "PENDING",
+            },
+          },
+          201,
+        );
+      }
+      if (url.endsWith("/messages/email")) {
+        sentBody = JSON.parse(String(init?.body));
+        return jsonResponse({ message: { id: "sent" } }, 201);
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({ messages: [], recipient: baseRecipient });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Betreff"), "Dokumente");
+    await user.type(screen.getByLabelText("Nachricht"), "Im Anhang");
+    await user.upload(screen.getByLabelText("Dateien hinzufügen"), [
+      new File(["pdf-a"], "vertrag.pdf", { type: "application/pdf" }),
+      new File(["pdf-b"], "einladung.pdf", { type: "application/pdf" }),
+    ]);
+
+    expect(await screen.findByText("vertrag.pdf")).toBeInTheDocument();
+    expect(screen.getByText("einladung.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/2\/10/)).toBeInTheDocument();
+    expect(screen.getByText("Wird hochgeladen…")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "E-Mail senden" })).toBeDisabled();
+
+    resolveSecondUpload?.();
+    await waitFor(() =>
+      expect(screen.queryByText("Wird hochgeladen…")).not.toBeInTheDocument(),
+    );
+    await user.click(screen.getByRole("button", { name: "einladung.pdf entfernen" }));
+    expect(screen.queryByText("einladung.pdf")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "E-Mail senden" }));
+
+    await waitFor(() =>
+      expect(sentBody).toMatchObject({ attachmentIds: ["attachment-a"] }),
+    );
+  });
+
+  it("renders secure relational downloads and explicit legacy metadata fallback", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      return jsonResponse({
+        recipient: baseRecipient,
+        messages: [
+          {
+            id: "m-sent",
+            direction: "OUTBOUND",
+            subject: "Mit Anhängen",
+            body: "Siehe Anhang",
+            from: null,
+            to: "anna@example.com",
+            status: "SENT",
+            senderDisplayName: "Club Admin",
+            sentAt: "2026-08-21T10:00:00.000Z",
+            receivedAt: null,
+            createdAt: "2026-08-21T10:00:00.000Z",
+            deliveryError: null,
+            attachmentCount: 2,
+            attachments: [
+              {
+                id: "attachment-a",
+                filename: "vertrag.pdf",
+                contentType: "application/pdf",
+                size: 1234,
+                downloadAvailable: true,
+              },
+              {
+                id: "legacy-a",
+                filename: "legacy.pdf",
+                contentType: "application/pdf",
+                size: 99,
+                downloadAvailable: false,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    renderPanel();
+    const download = await screen.findByRole("link", { name: "Herunterladen" });
+    expect(download).toHaveAttribute(
+      "href",
+      "/api/tenants/fc-a/communications/attachments/attachment-a",
+    );
+    expect(screen.getByText(/vertrag\.pdf/)).toBeInTheDocument();
+    expect(screen.getByText(/legacy\.pdf/)).toBeInTheDocument();
+    expect(screen.getByText("Nur Metadaten verfügbar")).toBeInTheDocument();
+  });
+
+  it("shows client-side size validation before starting an upload", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    const oversized = new File(["x"], "zu-gross.pdf", {
+      type: "application/pdf",
+    });
+    Object.defineProperty(oversized, "size", { value: 10 * 1024 * 1024 + 1 });
+    await user.upload(screen.getByLabelText("Dateien hinzufügen"), oversized);
+
+    expect(screen.getByText("Die Datei überschreitet 10 MiB.")).toBeInTheDocument();
+    expect(
+      vi.mocked(fetch).mock.calls.some(([url]) =>
+        String(url).endsWith("/communications/attachments"),
+      ),
+    ).toBe(false);
+  });
 });

@@ -1,9 +1,15 @@
 import { fileTypeFromBuffer } from "file-type";
 import { sanitizeWorkspaceFilename } from "@/lib/workspace/upload-types";
-
-export const MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024;
-export const MAX_COMMUNICATION_ATTACHMENT_TOTAL_BYTES = 20 * 1024 * 1024;
-export const MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE = 10;
+export {
+  MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
+  MAX_COMMUNICATION_ATTACHMENT_TOTAL_BYTES,
+  MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE,
+} from "@/lib/communication/attachment-constants";
+import {
+  MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
+  MAX_COMMUNICATION_ATTACHMENT_TOTAL_BYTES,
+  MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE,
+} from "@/lib/communication/attachment-constants";
 
 const ALLOWED_TYPES = {
   pdf: "application/pdf",

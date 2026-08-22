@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   recordAudit: vi.fn(),
   getMessageByIdForTenant: vi.fn(),
   resolveRecipient: vi.fn(),
+  cloneAttachments: vi.fn(),
+  loadAttachments: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -45,6 +47,13 @@ vi.mock("@/lib/communication/message-service", () => ({
 
 vi.mock("@/lib/communication/recipient-resolver", () => ({
   resolveCommunicationRecipientForTarget: mocks.resolveRecipient,
+}));
+vi.mock("@/lib/communication/attachment-service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/communication/attachment-service")>()),
+  cloneMessageAttachmentsForRetry: mocks.cloneAttachments,
+  loadMessageAttachmentsForDelivery: mocks.loadAttachments,
+  validateOutboundAttachmentSelection: vi.fn(),
+  attachSelectionToMessage: vi.fn(),
 }));
 
 import { retryFailedOutboundEmailForThread } from "@/lib/communication/outbound-email-service";
@@ -111,6 +120,8 @@ beforeEach(() => {
   mocks.state.messages.clear();
   process.env.EMAIL_INBOUND_DOMAIN = INBOUND_DOMAIN;
   mocks.recordAudit.mockResolvedValue(undefined);
+  mocks.cloneAttachments.mockResolvedValue([]);
+  mocks.loadAttachments.mockResolvedValue([]);
   mocks.resolveSender.mockResolvedValue({
     displayName: "FC Allschwil",
     emailAddress: "info@fcallschwil.ch",
@@ -160,6 +171,7 @@ beforeEach(() => {
       providerEventId: null,
       providerMessageId: null,
       replyToAddress: data.replyToAddress ?? null,
+      retryOfMessageId: data.retryOfMessageId ?? null,
       attachments: null,
       deliveryError: null,
       messageIdHeader: null,
@@ -208,6 +220,7 @@ describe("COMM-03A retry failed outbound email", () => {
     expect(result.message.id).not.toBe("message-failed-a");
     expect(result.message.status).toBe("SENT");
     expect(result.message.toAddresses).toEqual(["correct@example.com"]);
+    expect(result.message.retryOfMessageId).toBe("message-failed-a");
 
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -235,6 +248,44 @@ describe("COMM-03A retry failed outbound email", () => {
         (call) => String(call[0]?.where?.id) !== "message-failed-a",
       ),
     ).toBe(true);
+  });
+
+  it("clones source associations and sends the same immutable attachment bytes", async () => {
+    storeMessage(failedOutboundMessage());
+    const content = Buffer.from("same immutable bytes");
+    mocks.cloneAttachments.mockResolvedValue([
+      { attachmentId: "attachment-a", sortOrder: 0 },
+    ]);
+    mocks.loadAttachments.mockResolvedValue([
+      {
+        attachmentId: "attachment-a",
+        filename: "vertrag.pdf",
+        contentType: "application/pdf",
+        sizeBytes: content.byteLength,
+        content,
+      },
+    ]);
+
+    const result = await retryFailedOutboundEmailForThread({
+      tenantId: TENANT_A,
+      threadId: THREAD_A,
+      actorUserId: ACTOR_A,
+      sourceMessageId: "message-failed-a",
+      idempotencyKey: "req-attachments",
+    });
+
+    expect(mocks.cloneAttachments).toHaveBeenCalledWith({
+      tenantId: TENANT_A,
+      actorUserId: ACTOR_A,
+      sourceMessageId: "message-failed-a",
+      retryMessageId: result.message.id,
+    });
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [{ filename: "vertrag.pdf", contentType: "application/pdf", content }],
+      }),
+    );
+    expect(getStoredMessage("message-failed-a")?.status).toBe("FAILED");
   });
 
   it("blocks retry when the current authoritative email is missing/invalid", async () => {

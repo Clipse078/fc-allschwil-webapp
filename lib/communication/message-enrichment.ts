@@ -4,6 +4,15 @@
 import { prisma } from "@/lib/db/prisma";
 import { resolveAuditActorDisplayName } from "@/lib/registrations/actor-display";
 import type { CommunicationMessageRecord } from "@/lib/communication/message-service";
+import { summarizeCommunicationAttachments } from "@/lib/communication/attachment-metadata";
+
+export type PublicEmailThreadAttachment = {
+  id: string;
+  filename: string;
+  contentType: string | null;
+  size: number | null;
+  downloadAvailable: boolean;
+};
 
 export type PublicEmailThreadMessage = {
   id: string;
@@ -19,6 +28,7 @@ export type PublicEmailThreadMessage = {
   createdAt: string;
   deliveryError: string | null;
   attachmentCount: number;
+  attachments: PublicEmailThreadAttachment[];
 };
 
 function firstAddress(value: unknown): string | null {
@@ -55,10 +65,6 @@ function safeEmailBodyForDisplay(message: CommunicationMessageRecord): string {
   if (typeof message.bodyText === "string" && message.bodyText.trim()) return message.bodyText;
   if (typeof message.bodyHtml === "string" && message.bodyHtml.trim()) return htmlToPlainText(message.bodyHtml);
   return "";
-}
-
-function attachmentCount(value: unknown): number {
-  return Array.isArray(value) ? value.length : 0;
 }
 
 function timelineTimestamp(message: CommunicationMessageRecord): Date {
@@ -100,6 +106,47 @@ export async function toPublicEmailThreadMessages(
   const actorNames = new Map(
     users.map((user) => [user.id, resolveAuditActorDisplayName(user)]),
   );
+  const messageIds = emailMessages.map((message) => message.id);
+  const attachmentLinks =
+    messageIds.length === 0
+      ? []
+      : await prisma.communicationMessageAttachment.findMany({
+          where: { tenantId, messageId: { in: messageIds } },
+          select: {
+            messageId: true,
+            attachmentId: true,
+            sortOrder: true,
+            attachment: {
+              select: {
+                sanitizedFilename: true,
+                contentType: true,
+                sizeBytes: true,
+              },
+            },
+          },
+          orderBy: [{ messageId: "asc" }, { sortOrder: "asc" }],
+        });
+  const linksByMessage = new Map<
+    string,
+    Array<{
+      attachmentId: string;
+      filename: string;
+      contentType: string;
+      sizeBytes: number;
+      sortOrder: number;
+    }>
+  >();
+  for (const link of attachmentLinks) {
+    const existing = linksByMessage.get(link.messageId) ?? [];
+    existing.push({
+      attachmentId: link.attachmentId,
+      filename: link.attachment.sanitizedFilename,
+      contentType: link.attachment.contentType,
+      sizeBytes: link.attachment.sizeBytes,
+      sortOrder: link.sortOrder,
+    });
+    linksByMessage.set(link.messageId, existing);
+  }
 
   const sorted = [...emailMessages].sort((a, b) => {
     const tA = timelineTimestamp(a).getTime();
@@ -111,30 +158,53 @@ export async function toPublicEmailThreadMessages(
     return a.id.localeCompare(b.id);
   });
 
-  return sorted.map((message) => ({
-    id: message.id,
-    direction: message.direction,
-    subject: message.subject ?? "",
-    body: safeEmailBodyForDisplay(message),
-    from: message.fromAddress ?? null,
-    to: firstAddress(message.toAddresses),
-    status:
-      message.direction === "INBOUND"
-        ? "RECEIVED"
-        : message.status === "SENT" || message.status === "DELIVERED"
-          ? "SENT"
-          : message.status === "FAILED"
-            ? "FAILED"
-            : "QUEUED",
-    senderDisplayName: message.createdByUserId
-      ? (actorNames.get(message.createdByUserId) ?? null)
-      : null,
-    sentAt: message.sentAt?.toISOString() ?? null,
-    receivedAt: message.receivedAt?.toISOString() ?? null,
-    createdAt: message.createdAt.toISOString(),
-    deliveryError: message.status === "FAILED" ? message.deliveryError : null,
-    attachmentCount: attachmentCount(message.attachments),
-  }));
+  return sorted.map((message) => {
+    const summary = summarizeCommunicationAttachments({
+      legacyJson: message.attachments,
+      relational: linksByMessage.get(message.id),
+    });
+    const attachments: PublicEmailThreadAttachment[] = [
+      ...summary.relational.map((attachment) => ({
+        id: attachment.attachmentId,
+        filename: attachment.filename,
+        contentType: attachment.contentType,
+        size: attachment.sizeBytes,
+        downloadAvailable: true,
+      })),
+      ...summary.legacy.map((attachment) => ({
+        id: attachment.id,
+        filename: attachment.filename ?? "Anhang",
+        contentType: attachment.contentType,
+        size: attachment.size,
+        downloadAvailable: false,
+      })),
+    ];
+    return {
+      id: message.id,
+      direction: message.direction,
+      subject: message.subject ?? "",
+      body: safeEmailBodyForDisplay(message),
+      from: message.fromAddress ?? null,
+      to: firstAddress(message.toAddresses),
+      status:
+        message.direction === "INBOUND"
+          ? "RECEIVED"
+          : message.status === "SENT" || message.status === "DELIVERED"
+            ? "SENT"
+            : message.status === "FAILED"
+              ? "FAILED"
+              : "QUEUED",
+      senderDisplayName: message.createdByUserId
+        ? (actorNames.get(message.createdByUserId) ?? null)
+        : null,
+      sentAt: message.sentAt?.toISOString() ?? null,
+      receivedAt: message.receivedAt?.toISOString() ?? null,
+      createdAt: message.createdAt.toISOString(),
+      deliveryError: message.status === "FAILED" ? message.deliveryError : null,
+      attachmentCount: summary.count,
+      attachments,
+    };
+  });
 }
 
 export async function toPublicOutboundEmailMessages(

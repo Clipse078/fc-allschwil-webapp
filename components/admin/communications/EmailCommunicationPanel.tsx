@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CommunicationTargetType } from "@prisma/client";
-import { AlertCircle, CheckCircle2, Clock3, Loader2, Mail, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, Download, Loader2, Mail, Paperclip, Send } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   MAX_EMAIL_BODY_LENGTH,
@@ -15,6 +15,16 @@ import type { PublicEmailThreadMessage } from "@/lib/communication/message-enric
 import type { CommunicationRecipient } from "@/lib/communication/recipient-resolver";
 import { formatDateTimeCompact } from "@/lib/tenant-runtime/formatters";
 import { REGISTRATION_DRAWER_TAB_CONTENT_CLASS } from "@/components/admin/registrations/RegistrationDrawerTabShell";
+import {
+  EmailAttachmentComposer,
+  formatAttachmentSize,
+  type ComposerAttachment,
+} from "@/components/admin/communications/EmailAttachmentComposer";
+import {
+  MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE,
+  MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
+  MAX_COMMUNICATION_ATTACHMENT_TOTAL_BYTES,
+} from "@/lib/communication/attachment-constants";
 
 type Props = {
   tenantSlug: string;
@@ -31,6 +41,17 @@ type ThreadResponse = { thread?: { id: string }; error?: string };
 type HistoryResponse = {
   messages?: PublicEmailThreadMessage[];
   recipient?: CommunicationRecipient;
+  error?: string;
+};
+type AttachmentUploadResponse = {
+  attachment?: {
+    attachmentId: string;
+    filename: string;
+    contentType: string;
+    size: number;
+    status: "READY";
+    scanStatus: "PENDING" | "CLEAN";
+  };
   error?: string;
 };
 
@@ -50,6 +71,7 @@ function EmailHistoryCard({
   showRetrySpinner,
   retryError,
   onRetry,
+  tenantSlug,
 }: {
   message: PublicEmailThreadMessage;
   locale: string;
@@ -59,6 +81,7 @@ function EmailHistoryCard({
   showRetrySpinner: boolean;
   retryError: string | null;
   onRetry: (messageId: string) => void;
+  tenantSlug: string;
 }) {
   const status = STATUS[message.status];
   const { Icon } = status;
@@ -86,6 +109,34 @@ function EmailHistoryCard({
       <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--text-2)]">
         {message.body}
       </p>
+      {(message.attachments ?? []).length > 0 ? (
+        <div className="mt-3 border-t border-[var(--border)] pt-3">
+          <p className="text-xs font-semibold text-[var(--text-2)]">Anhänge</p>
+          <ul className="mt-2 space-y-2">
+            {(message.attachments ?? []).map((attachment) => (
+              <li key={`${message.id}:${attachment.id}`} className="flex items-center gap-2 text-xs">
+                <Paperclip className="h-3.5 w-3.5 flex-shrink-0 text-[var(--muted)]" aria-hidden />
+                <span className="min-w-0 flex-1 truncate text-[var(--text-2)]">
+                  {attachment.filename} · {formatAttachmentSize(attachment.size)}
+                </span>
+                {attachment.downloadAvailable ? (
+                  <a
+                    href={`/api/tenants/${encodeURIComponent(tenantSlug)}/communications/attachments/${encodeURIComponent(attachment.id)}`}
+                    className="inline-flex flex-shrink-0 items-center gap-1 font-semibold text-[var(--primary)] hover:underline"
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden />
+                    Herunterladen
+                  </a>
+                ) : (
+                  <span className="flex-shrink-0 text-[var(--muted)]">
+                    Nur Metadaten verfügbar
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
       <div className="mt-3 border-t border-[var(--border)] pt-2 text-[0.7rem] text-[var(--muted)]">
         {formatDateTimeCompact(timestamp, { locale, timezone })}
         {!isInbound && message.senderDisplayName ? ` · ${message.senderDisplayName}` : ""}
@@ -129,6 +180,7 @@ export function EmailThreadTimeline({
   retryErrorMessageId,
   retryError,
   onRetry,
+  tenantSlug,
 }: {
   messages: PublicEmailThreadMessage[];
   locale: string;
@@ -138,6 +190,7 @@ export function EmailThreadTimeline({
   retryErrorMessageId: string | null;
   retryError: string | null;
   onRetry: (messageId: string) => void;
+  tenantSlug: string;
 }) {
   const retryLocked = retryingMessageId !== null;
   return (
@@ -153,6 +206,7 @@ export function EmailThreadTimeline({
           showRetrySpinner={retryingMessageId === message.id}
           retryError={retryErrorMessageId === message.id ? retryError : null}
           onRetry={onRetry}
+          tenantSlug={tenantSlug}
         />
       ))}
     </div>
@@ -174,6 +228,8 @@ function EmailCommunicationPanelInner({
   const [recipient, setRecipient] = useState<CommunicationRecipient | null>(null);
   const [subject, setSubject] = useState("");
   const [bodyText, setBodyText] = useState("");
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -276,8 +332,111 @@ function EmailCommunicationPanelInner({
     if (messages?.length) endRef.current?.scrollIntoView({ block: "nearest" });
   }, [messages?.length]);
 
+  const uploadAttachment = async (file: File, localId: string) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch(
+        `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/attachments`,
+        { method: "POST", body: formData },
+      );
+      const payload = (await response.json()) as AttachmentUploadResponse;
+      if (!response.ok || !payload.attachment) {
+        throw new Error(payload.error ?? "Upload fehlgeschlagen.");
+      }
+      setAttachments((current) =>
+        current.map((attachment) =>
+          attachment.localId === localId
+            ? {
+                ...attachment,
+                attachmentId: payload.attachment?.attachmentId ?? null,
+                filename: payload.attachment?.filename ?? attachment.filename,
+                contentType: payload.attachment?.contentType ?? attachment.contentType,
+                size: payload.attachment?.size ?? attachment.size,
+                status: "READY",
+                error: undefined,
+              }
+            : attachment,
+        ),
+      );
+    } catch (error) {
+      setAttachments((current) =>
+        current.map((attachment) =>
+          attachment.localId === localId
+            ? {
+                ...attachment,
+                status: "ERROR",
+                error: error instanceof Error ? error.message : "Upload fehlgeschlagen.",
+              }
+            : attachment,
+        ),
+      );
+    }
+  };
+
+  const addAttachmentFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    setAttachmentError(null);
+    const next = [...attachments];
+    const fingerprints = new Set(
+      next.map((attachment) =>
+        `${attachment.filename.toLowerCase()}:${attachment.size}:${attachment.contentType}`,
+      ),
+    );
+    let projectedTotal = next.reduce((sum, attachment) => sum + attachment.size, 0);
+    const uploads: Array<{ file: File; localId: string }> = [];
+    let nextError: string | null = null;
+
+    for (const file of files) {
+      const fingerprint = `${file.name.toLowerCase()}:${file.size}:${file.type}`;
+      if (fingerprints.has(fingerprint)) {
+        nextError = "Diese Datei ist bereits ausgewählt.";
+        continue;
+      }
+      if (next.length >= MAX_COMMUNICATION_ATTACHMENTS_PER_MESSAGE) {
+        nextError = "Eine Nachricht darf höchstens 10 Anhänge enthalten.";
+        break;
+      }
+      if (file.size > MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES) {
+        nextError = "Die Datei überschreitet 10 MiB.";
+        continue;
+      }
+      if (projectedTotal + file.size > MAX_COMMUNICATION_ATTACHMENT_TOTAL_BYTES) {
+        nextError = "Die Anhänge dürfen zusammen höchstens 20 MiB umfassen.";
+        continue;
+      }
+
+      const localId =
+        globalThis.crypto && "randomUUID" in globalThis.crypto
+          ? `${globalThis.crypto.randomUUID()}-${next.length}`
+          : `${Date.now()}-${Math.random()}`;
+      next.push({
+        localId,
+        attachmentId: null,
+        filename: file.name,
+        contentType: file.type,
+        size: file.size,
+        status: "UPLOADING",
+      });
+      fingerprints.add(fingerprint);
+      projectedTotal += file.size;
+      uploads.push({ file, localId });
+    }
+
+    setAttachments(next);
+    setAttachmentError(nextError);
+    for (const upload of uploads) {
+      void uploadAttachment(upload.file, upload.localId);
+    }
+  };
+
   const submit = async () => {
-    if (!threadId || !recipient?.sendAllowed || sending) return;
+    if (
+      !threadId ||
+      !recipient?.sendAllowed ||
+      sending ||
+      attachments.some((attachment) => attachment.status !== "READY")
+    ) return;
     const generation = requestGenerationRef.current;
     const sendingThreadId = threadId;
     setSending(true);
@@ -288,7 +447,13 @@ function EmailCommunicationPanelInner({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ subject, bodyText }),
+          body: JSON.stringify({
+            subject,
+            bodyText,
+            attachmentIds: attachments.flatMap((attachment) =>
+              attachment.attachmentId ? [attachment.attachmentId] : [],
+            ),
+          }),
         },
       );
       const payload = (await response.json()) as { error?: string };
@@ -298,6 +463,8 @@ function EmailCommunicationPanelInner({
       if (generation !== requestGenerationRef.current) return;
       setSubject("");
       setBodyText("");
+      setAttachments([]);
+      setAttachmentError(null);
       await loadHistory(sendingThreadId, generation);
     } catch (sendError) {
       if (generation !== requestGenerationRef.current) return;
@@ -310,6 +477,9 @@ function EmailCommunicationPanelInner({
 
   const canSend = canEdit && lifecycleAllowsSend && recipient?.sendAllowed === true;
   const canRetryFailedOutbound = canSend;
+  const hasUnreadyAttachments = attachments.some(
+    (attachment) => attachment.status !== "READY",
+  );
   const disabledReason =
     recipient?.unavailableReason ??
     (!canEdit
@@ -377,6 +547,8 @@ function EmailCommunicationPanelInner({
               setThreadId(null);
               setSubject("");
               setBodyText("");
+              setAttachments([]);
+              setAttachmentError(null);
               void initialize();
             }}
             className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)]"
@@ -398,6 +570,7 @@ function EmailCommunicationPanelInner({
                   retryErrorMessageId={retryErrorMessageId}
                   retryError={retryError}
                   onRetry={(id) => void retryFailed(id)}
+                  tenantSlug={tenantSlug}
                 />
                 <div ref={endRef} />
               </div>
@@ -451,6 +624,19 @@ function EmailCommunicationPanelInner({
               />
             </label>
 
+            <EmailAttachmentComposer
+              attachments={attachments}
+              disabled={!canSend || sending}
+              error={attachmentError}
+              onAddFiles={addAttachmentFiles}
+              onRemove={(localId) => {
+                setAttachments((current) =>
+                  current.filter((attachment) => attachment.localId !== localId),
+                );
+                setAttachmentError(null);
+              }}
+            />
+
             {disabledReason && !canSend ? (
               <div className="mt-3 flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" aria-hidden />
@@ -463,7 +649,13 @@ function EmailCommunicationPanelInner({
               <button
                 type="button"
                 onClick={() => void submit()}
-                disabled={!canSend || !subject.trim() || !bodyText.trim() || sending}
+                disabled={
+                  !canSend ||
+                  !subject.trim() ||
+                  !bodyText.trim() ||
+                  sending ||
+                  hasUnreadyAttachments
+                }
                 className="fca-button-primary gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}

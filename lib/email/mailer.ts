@@ -35,6 +35,14 @@
 
 import { Resend } from "resend";
 
+export const RESEND_MAX_ENCODED_MESSAGE_BYTES = 40 * 1024 * 1024;
+
+export type MailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+};
+
 export type MailMessage = {
   /** Optional provider-authorized sender. Unusable custom senders fall back to EMAIL_FROM. */
   from?: string;
@@ -44,6 +52,7 @@ export type MailMessage = {
   text?: string;
   replyTo?: string;
   idempotencyKey?: string;
+  attachments?: MailAttachment[];
 };
 
 export type MailDeliveryResult = {
@@ -63,6 +72,28 @@ export class MailConfigurationError extends Error {
     super(message);
     this.name = "MailConfigurationError";
   }
+}
+
+export class MailAttachmentPreflightError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MailAttachmentPreflightError";
+  }
+}
+
+function estimateEncodedMessageBytes(message: MailMessage): number {
+  const textBytes = Buffer.byteLength(
+    `${message.from ?? ""}${message.to}${message.subject}${message.html}${message.text ?? ""}${message.replyTo ?? ""}`,
+    "utf8",
+  );
+  const attachmentBytes = (message.attachments ?? []).reduce(
+    (total, attachment) =>
+      total +
+      4 * Math.ceil(attachment.content.byteLength / 3) +
+      Buffer.byteLength(attachment.filename + attachment.contentType, "utf8"),
+    0,
+  );
+  return textBytes + attachmentBytes;
 }
 
 function extractEmailDomain(value: string): string | null {
@@ -118,6 +149,12 @@ export async function getSenderDomainAuthorization(
  * Never logs the message body, reset tokens, or reset URLs.
  */
 export async function sendMail(message: MailMessage): Promise<MailDeliveryResult> {
+  if (estimateEncodedMessageBytes(message) > RESEND_MAX_ENCODED_MESSAGE_BYTES) {
+    throw new MailAttachmentPreflightError(
+      "The encoded email payload exceeds Resend's 40 MiB message limit.",
+    );
+  }
+
   const apiKey = process.env.RESEND_API_KEY?.trim();
   if (!apiKey) {
     throw new MailConfigurationError(
@@ -151,6 +188,7 @@ export async function sendMail(message: MailMessage): Promise<MailDeliveryResult
       html: message.html,
       text: message.text,
       replyTo: message.replyTo,
+      attachments: message.attachments,
     },
     message.idempotencyKey ? { idempotencyKey: message.idempotencyKey } : undefined,
   );

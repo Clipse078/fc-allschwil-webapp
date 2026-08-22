@@ -14,6 +14,7 @@ vi.mock("resend", () => ({
 
 import {
   getSenderDomainAuthorization,
+  MailAttachmentPreflightError,
   sendMail,
 } from "@/lib/email/mailer";
 
@@ -92,5 +93,52 @@ describe("Resend sender authorization", () => {
       undefined,
     );
     expect(result.from).toBe(from);
+  });
+
+  it("passes Buffer content, filename, and MIME type to Resend", async () => {
+    const content = Buffer.from("pdf-bytes");
+    await sendMail({
+      to: "recipient@example.com",
+      subject: "Attachment",
+      html: "<p>Attachment</p>",
+      attachments: [
+        {
+          filename: "vertrag.pdf",
+          contentType: "application/pdf",
+          content,
+        },
+      ],
+    });
+
+    expect(mocks.emailsSend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [
+          {
+            filename: "vertrag.pdf",
+            contentType: "application/pdf",
+            content,
+          },
+        ],
+      }),
+      undefined,
+    );
+  });
+
+  it("rejects a payload that would exceed Resend's encoded 40 MiB limit", async () => {
+    await expect(
+      sendMail({
+        to: "recipient@example.com",
+        subject: "Too large",
+        html: "<p>Too large</p>",
+        attachments: [
+          {
+            filename: "large.pdf",
+            contentType: "application/pdf",
+            content: Buffer.alloc(31 * 1024 * 1024),
+          },
+        ],
+      }),
+    ).rejects.toBeInstanceOf(MailAttachmentPreflightError);
+    expect(mocks.emailsSend).not.toHaveBeenCalled();
   });
 });

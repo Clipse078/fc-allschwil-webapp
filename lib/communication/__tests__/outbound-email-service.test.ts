@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   sendMail: vi.fn(),
   resolveSender: vi.fn(),
   recordAudit: vi.fn(),
+  validateAttachments: vi.fn(),
+  attachSelection: vi.fn(),
+  loadAttachments: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -37,6 +40,13 @@ vi.mock("@/lib/communication/email-sender-service", () => ({
 
 vi.mock("@/lib/communication/audit-integration", () => ({
   recordCommunicationAuditEvent: mocks.recordAudit,
+}));
+vi.mock("@/lib/communication/attachment-service", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/communication/attachment-service")>()),
+  validateOutboundAttachmentSelection: mocks.validateAttachments,
+  attachSelectionToMessage: mocks.attachSelection,
+  loadMessageAttachmentsForDelivery: mocks.loadAttachments,
+  cloneMessageAttachmentsForRetry: vi.fn(),
 }));
 
 import {
@@ -119,6 +129,11 @@ beforeEach(() => {
   process.env.EMAIL_INBOUND_DOMAIN = INBOUND_DOMAIN;
   mocks.state.message = null;
   mocks.recordAudit.mockResolvedValue(undefined);
+  mocks.validateAttachments.mockImplementation(
+    async ({ attachmentIds }: { attachmentIds: string[] }) => attachmentIds,
+  );
+  mocks.attachSelection.mockResolvedValue([]);
+  mocks.loadAttachments.mockResolvedValue([]);
   mocks.resolveSender.mockResolvedValue({
     displayName: "FC Allschwil",
     emailAddress: "info@fcallschwil.ch",
@@ -280,6 +295,47 @@ describe("COMM-01C outbound delivery", () => {
     );
   });
 
+  it("links selected attachments in order and sends their exact immutable bytes", async () => {
+    const content = Buffer.from("immutable-pdf");
+    mocks.threadFindFirst.mockResolvedValue(thread("REGISTRATION", "reg-a"));
+    mocks.registrationFindFirst.mockResolvedValue(registration());
+    mocks.loadAttachments.mockResolvedValue([
+      {
+        attachmentId: "attachment-a",
+        filename: "vertrag.pdf",
+        contentType: "application/pdf",
+        sizeBytes: content.byteLength,
+        content,
+      },
+    ]);
+
+    await sendOutboundEmailForThread({
+      tenantId: TENANT_A,
+      threadId: THREAD_A,
+      actorUserId: ACTOR_A,
+      subject: "Vertrag",
+      bodyText: "Im Anhang",
+      attachmentIds: ["attachment-a"],
+    });
+
+    expect(mocks.validateAttachments).toHaveBeenCalledWith({
+      tenantId: TENANT_A,
+      actorUserId: ACTOR_A,
+      attachmentIds: ["attachment-a"],
+    });
+    expect(mocks.attachSelection).toHaveBeenCalledWith({
+      tenantId: TENANT_A,
+      actorUserId: ACTOR_A,
+      messageId: "message-a",
+      attachmentIds: ["attachment-a"],
+    });
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attachments: [{ filename: "vertrag.pdf", contentType: "application/pdf", content }],
+      }),
+    );
+  });
+
   it("K/L — provider failure persists FAILED and never emits false sent audit", async () => {
     mocks.sendMail.mockRejectedValue(new Error("provider secret detail"));
 
@@ -296,6 +352,31 @@ describe("COMM-01C outbound delivery", () => {
     expect(mocks.recordAudit).not.toHaveBeenCalledWith(
       expect.objectContaining({ kind: "EMAIL_SENT" }),
     );
+  });
+
+  it("keeps attachment associations on the failed historical message", async () => {
+    mocks.threadFindFirst.mockResolvedValue(thread("REGISTRATION", "reg-a"));
+    mocks.registrationFindFirst.mockResolvedValue(registration());
+    mocks.sendMail.mockRejectedValue(new Error("provider rejected payload"));
+
+    await expect(
+      sendOutboundEmailForThread({
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        actorUserId: ACTOR_A,
+        subject: "Vertrag",
+        bodyText: "Im Anhang",
+        attachmentIds: ["attachment-a"],
+      }),
+    ).rejects.toMatchObject({ code: "PROVIDER_FAILED" });
+
+    expect(mocks.attachSelection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        messageId: "message-a",
+        attachmentIds: ["attachment-a"],
+      }),
+    );
+    expect(mocks.state.message).toMatchObject({ id: "message-a", status: "FAILED" });
   });
 
   it("O — missing or invalid recipient blocks provider delivery", async () => {

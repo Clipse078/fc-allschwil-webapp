@@ -79,7 +79,41 @@ describe("COMM-01C email POST authorization and client-control boundary", () => 
       actorUserId: "actor-a",
       subject: "Hallo",
       bodyText: "Nachricht",
+      attachmentIds: [],
     });
+  });
+
+  it("forwards only ordered attachment IDs inside the authoritative tenant context", async () => {
+    const response = await POST(
+      request({
+        subject: "Hallo",
+        bodyText: "Nachricht",
+        attachmentIds: ["attachment-a", "attachment-b"],
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(201);
+    expect(mocks.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tenantId: "tenant-a",
+        attachmentIds: ["attachment-a", "attachment-b"],
+      }),
+    );
+  });
+
+  it("rejects more than ten attachment IDs before service execution", async () => {
+    const response = await POST(
+      request({
+        subject: "Hallo",
+        bodyText: "Nachricht",
+        attachmentIds: Array.from({ length: 11 }, (_, index) => `attachment-${index}`),
+      }),
+      context,
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.send).not.toHaveBeenCalled();
   });
 
   it.each([

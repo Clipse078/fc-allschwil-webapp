@@ -1,7 +1,11 @@
 /**
  * COMM-01C: Auditable, tenant-scoped outbound email orchestration.
  */
-import { MailConfigurationError, sendMail } from "@/lib/email/mailer";
+import {
+  MailAttachmentPreflightError,
+  MailConfigurationError,
+  sendMail,
+} from "@/lib/email/mailer";
 import { prisma } from "@/lib/db/prisma";
 import { createHash } from "crypto";
 import {
@@ -20,6 +24,14 @@ import {
   ensureStableInboundReplyTokenForThread,
 } from "@/lib/communication/thread-service";
 import { buildInboundReplyToAddress } from "@/lib/communication/reply-routing";
+import {
+  attachSelectionToMessage,
+  cloneMessageAttachmentsForRetry,
+  CommunicationAttachmentServiceError,
+  loadMessageAttachmentsForDelivery,
+  validateOutboundAttachmentSelection,
+} from "@/lib/communication/attachment-service";
+import { CommunicationAttachmentValidationError } from "@/lib/communication/attachment-validation";
 
 export type SendOutboundEmailInput = {
   tenantId: string;
@@ -27,6 +39,7 @@ export type SendOutboundEmailInput = {
   actorUserId: string;
   subject: string;
   bodyText: string;
+  attachmentIds?: string[];
 };
 
 export type RetryFailedOutboundEmailInput = {
@@ -78,9 +91,25 @@ function normalizeContent(input: SendOutboundEmailInput) {
 }
 
 function safeFailureSummary(error: unknown): string {
+  if (error instanceof CommunicationAttachmentServiceError) {
+    return error.message;
+  }
+  if (error instanceof MailAttachmentPreflightError) {
+    return "Die E-Mail mit Anhängen überschreitet die zulässige Providergrösse.";
+  }
   return error instanceof MailConfigurationError
     ? "Der E-Mail-Versand ist derzeit nicht konfiguriert."
     : "Der E-Mail-Dienst konnte die Nachricht nicht versenden.";
+}
+
+function attachmentSelectionError(error: unknown): never {
+  if (
+    error instanceof CommunicationAttachmentServiceError ||
+    error instanceof CommunicationAttachmentValidationError
+  ) {
+    throw new CommunicationServiceError("INVALID_INPUT", error.message);
+  }
+  throw error;
 }
 
 function isPrismaUniqueConstraintError(error: unknown): boolean {
@@ -110,6 +139,16 @@ export async function sendOutboundEmailForThread(
   }
 
   const { subject, bodyText } = normalizeContent(input);
+  let attachmentIds: string[];
+  try {
+    attachmentIds = await validateOutboundAttachmentSelection({
+      tenantId,
+      actorUserId,
+      attachmentIds: input.attachmentIds ?? [],
+    });
+  } catch (error) {
+    attachmentSelectionError(error);
+  }
   // Ensure reply-token survives common email address normalization.
   const thread = await ensureStableInboundReplyTokenForThread(tenantId, input.threadId);
   const recipient = await resolveCommunicationRecipientForTarget({
@@ -152,6 +191,16 @@ export async function sendOutboundEmailForThread(
 
   let deliveryResult;
   try {
+    await attachSelectionToMessage({
+      tenantId,
+      actorUserId,
+      messageId: pending.id,
+      attachmentIds,
+    });
+    const attachments = await loadMessageAttachmentsForDelivery({
+      tenantId,
+      messageId: pending.id,
+    });
     deliveryResult = await sendMail({
       from: sender.formattedFrom,
       to: recipient.email,
@@ -160,6 +209,11 @@ export async function sendOutboundEmailForThread(
       html: plainTextToSafeHtml(bodyText),
       replyTo: replyToAddress ?? undefined,
       idempotencyKey: pending.id,
+      attachments: attachments.map(({ filename, contentType, content }) => ({
+        filename,
+        contentType,
+        content,
+      })),
     });
   } catch (error) {
     const deliveryError = safeFailureSummary(error);
@@ -345,6 +399,16 @@ export async function retryFailedOutboundEmailForThread(
 
   let deliveryResult;
   try {
+    await cloneMessageAttachmentsForRetry({
+      tenantId,
+      actorUserId,
+      sourceMessageId: source.id,
+      retryMessageId: pending.id,
+    });
+    const attachments = await loadMessageAttachmentsForDelivery({
+      tenantId,
+      messageId: pending.id,
+    });
     deliveryResult = await sendMail({
       from: sender.formattedFrom,
       to: recipientEmail,
@@ -353,6 +417,11 @@ export async function retryFailedOutboundEmailForThread(
       html: plainTextToSafeHtml(bodyText),
       replyTo: replyToAddress ?? undefined,
       idempotencyKey: pending.id,
+      attachments: attachments.map(({ filename, contentType, content }) => ({
+        filename,
+        contentType,
+        content,
+      })),
     });
   } catch (error) {
     const deliveryError = safeFailureSummary(error);
