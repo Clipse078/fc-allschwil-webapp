@@ -188,6 +188,13 @@ describe("NAV_SECTIONS static structure", () => {
     const betrieb = findSection("Betrieb");
     const communication = betrieb!.items.find((i) => i.key === "communication");
 
+    expect(betrieb!.items.map((item) => item.key)).toEqual([
+      "planung",
+      "workspace",
+      "anmeldungen",
+      "communication",
+      "infoboard",
+    ]);
     expect(communication?.label).toBe("Kommunikation");
     expect(communication?.href).toBe("/dashboard/communication");
     expect(communication?.permissionKeys).toEqual([
@@ -212,6 +219,13 @@ describe("NAV_SECTIONS static structure", () => {
     const fuehrung = findSection("Führung");
     const sponsoring = fuehrung!.items.find((i) => i.key === "sponsoring");
 
+    expect(fuehrung!.items.map((item) => item.key)).toEqual([
+      "meetings",
+      "club-entwicklung",
+      "material",
+      "finanzen",
+      "sponsoring",
+    ]);
     expect(sponsoring).toEqual(expect.objectContaining({
       label: "Sponsoring",
       href: "/dashboard/sponsoring",
