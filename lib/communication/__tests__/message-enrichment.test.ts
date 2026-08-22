@@ -68,6 +68,40 @@ describe("COMM-01C public email history", () => {
     expect(result).not.toHaveProperty("providerMessageId");
   });
 
+  it("derives outbound 'to' from a string fallback when toAddresses is not an array", async () => {
+    const [result] = await toPublicOutboundEmailMessages("tenant-a", [
+      {
+        id: "message-a",
+        tenantId: "tenant-a",
+        threadId: "thread-a",
+        direction: "OUTBOUND",
+        channel: "EMAIL",
+        subject: "Subject",
+        bodyText: "Body",
+        bodyHtml: null,
+        fromAddress: null,
+        toAddresses: "max.mustermann@gmail.com",
+        provider: "resend",
+        providerEventId: null,
+        providerMessageId: null,
+        replyToAddress: null,
+        attachments: null,
+        deliveryError: null,
+        messageIdHeader: null,
+        inReplyTo: null,
+        references: null,
+        status: "FAILED",
+        sentAt: null,
+        receivedAt: null,
+        createdByUserId: null,
+        createdAt: new Date("2026-08-21T09:59:00.000Z"),
+        updatedAt: new Date("2026-08-21T10:00:00.000Z"),
+      },
+    ]);
+
+    expect(result.to).toBe("max.mustermann@gmail.com");
+  });
+
   it("sorts mixed inbound/outbound messages by timeline timestamp deterministically", async () => {
     const messages = await toPublicEmailThreadMessages("tenant-a", [
       {
