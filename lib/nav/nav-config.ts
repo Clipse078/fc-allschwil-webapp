@@ -443,6 +443,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
+            key: "admin-communications",
+            label: "Kommunikation",
+            href: "/dashboard/admin/communications",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+          {
             // USER-ADMIN-02A: tenant-scoped Benutzer overview.
             // Gated by USERS_VIEW | USERS_MANAGE so Club Admins with
             // view-only rights can also reach the page. The page itself

@@ -546,6 +546,12 @@ model Tenant {
   primaryColor   String?
   secondaryColor String?
 
+  // Tenant-wide visible sender identity — COMM-03B.
+  // Nullable so unconfigured or provider-unusable identities safely fall back
+  // to the platform EMAIL_FROM sender.
+  emailSenderDisplayName String?
+  emailSenderAddress     String?
+
   // Infoboard display preference — INFOBOARD-INTEGRATION-01B
   // Presentation-only: which visual theme the public Infoboard displays use.
   // Nullable, no DB default — application code (resolveInfoboardDisplayTheme in

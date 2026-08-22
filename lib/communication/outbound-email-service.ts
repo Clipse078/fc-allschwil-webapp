@@ -15,6 +15,7 @@ import {
   type CommunicationMessageRecord,
 } from "@/lib/communication/message-service";
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
+import { resolveTenantEmailSender } from "@/lib/communication/email-sender-service";
 import {
   ensureStableInboundReplyTokenForThread,
 } from "@/lib/communication/thread-service";
@@ -131,6 +132,7 @@ export async function sendOutboundEmailForThread(
   }
 
   const replyToAddress = buildInboundReplyToAddress(thread.inboundReplyToken);
+  const sender = await resolveTenantEmailSender(tenantId);
 
   const pending = await prisma.communicationMessage.create({
     data: {
@@ -151,6 +153,7 @@ export async function sendOutboundEmailForThread(
   let deliveryResult;
   try {
     deliveryResult = await sendMail({
+      from: sender.formattedFrom,
       to: recipient.email,
       subject,
       text: bodyText,
@@ -297,6 +300,7 @@ export async function retryFailedOutboundEmailForThread(
   }
 
   const replyToAddress = buildInboundReplyToAddress(thread.inboundReplyToken);
+  const sender = await resolveTenantEmailSender(tenantId);
   const retryMessageId = deriveRetryAttemptMessageId(sourceMessageId, idempotencyKey);
 
   let pending: { id: string };
@@ -341,6 +345,7 @@ export async function retryFailedOutboundEmailForThread(
   let deliveryResult;
   try {
     deliveryResult = await sendMail({
+      from: sender.formattedFrom,
       to: recipientEmail,
       subject,
       text: bodyText,

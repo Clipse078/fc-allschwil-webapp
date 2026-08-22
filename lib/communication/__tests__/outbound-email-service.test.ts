@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   messageUpdateMany: vi.fn(),
   messageFindFirst: vi.fn(),
   sendMail: vi.fn(),
+  resolveSender: vi.fn(),
   recordAudit: vi.fn(),
 }));
 
@@ -28,6 +29,10 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("@/lib/email/mailer", () => ({
   MailConfigurationError: class MailConfigurationError extends Error {},
   sendMail: mocks.sendMail,
+}));
+
+vi.mock("@/lib/communication/email-sender-service", () => ({
+  resolveTenantEmailSender: mocks.resolveSender,
 }));
 
 vi.mock("@/lib/communication/audit-integration", () => ({
@@ -114,9 +119,16 @@ beforeEach(() => {
   process.env.EMAIL_INBOUND_DOMAIN = INBOUND_DOMAIN;
   mocks.state.message = null;
   mocks.recordAudit.mockResolvedValue(undefined);
+  mocks.resolveSender.mockResolvedValue({
+    displayName: "FC Allschwil",
+    emailAddress: "info@fcallschwil.ch",
+    formattedFrom: "FC Allschwil <info@fcallschwil.ch>",
+    source: "TENANT",
+    providerStatus: "VERIFIED",
+  });
   mocks.sendMail.mockResolvedValue({
     providerMessageId: "resend-message-1",
-    from: "SportClubEvo <noreply@mail.sportclubevo.com>",
+    from: "FC Allschwil <info@fcallschwil.ch>",
   });
   mocks.messageCreate.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
     mocks.state.message = storedMessage(data);
@@ -200,6 +212,7 @@ describe("COMM-01C outbound delivery", () => {
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: "anna@example.com",
+        from: "FC Allschwil <info@fcallschwil.ch>",
         subject: "Willkommen",
         text: "Hallo Anna",
         html: "<p>Hallo Anna</p>",
@@ -224,6 +237,7 @@ describe("COMM-01C outbound delivery", () => {
     });
     expect(result).toMatchObject({
       status: "SENT",
+      fromAddress: "FC Allschwil <info@fcallschwil.ch>",
       provider: "resend",
       providerMessageId: "resend-message-1",
       createdByUserId: ACTOR_A,
@@ -251,7 +265,10 @@ describe("COMM-01C outbound delivery", () => {
     });
 
     expect(mocks.sendMail).toHaveBeenCalledWith(
-      expect.objectContaining({ to: "wait@example.com" }),
+      expect.objectContaining({
+        to: "wait@example.com",
+        from: "FC Allschwil <info@fcallschwil.ch>",
+      }),
     );
     expect(mocks.waitingListEntryFindFirst).toHaveBeenCalledWith(
       expect.objectContaining({

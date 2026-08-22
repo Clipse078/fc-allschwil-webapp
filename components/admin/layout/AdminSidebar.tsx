@@ -27,6 +27,7 @@ import {
   Layers,
   LayoutDashboard,
   LayoutTemplate,
+  Mail,
   MapPin,
   Menu,
   Monitor,
@@ -111,6 +112,7 @@ function getNavIcon(label: string) {
     case "Feld & Ressourcen":           return Layers;
     // Administration children
     case "Darstellung":                 return Palette;
+    case "Kommunikation":               return Mail;
     case "Anlagen & Ressourcen":        return Building2;
     case "Benutzer":                    return Users;
     case "Rollen":                      return ShieldCheck;
