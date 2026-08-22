@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import EmailSenderSettingsForm from "@/components/admin/communications/EmailSenderSettingsForm";
 import { Badge } from "@/components/ui/Badge";
 import { PageBreadcrumbs, PageHeader, PageShell } from "@/components/ui/page";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import { getTenantEmailSenderSettings } from "@/lib/communication/email-sender-service";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { TENANT_ADMINISTRATION_PERMISSIONS } from "@/lib/permissions/tenant-administration";
@@ -31,7 +32,9 @@ export default async function EmailSenderPage() {
         description="Wie erscheinen E-Mails, die Ihr Verein über SportClubEvo versendet?"
         badge={<Badge variant="success">Verfügbar</Badge>}
       />
-      <EmailSenderSettingsForm initialSettings={settings} />
+      <ToastProvider>
+        <EmailSenderSettingsForm initialSettings={settings} />
+      </ToastProvider>
     </PageShell>
   );
 }
