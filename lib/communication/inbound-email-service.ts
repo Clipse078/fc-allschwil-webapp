@@ -1,6 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
 import { recordCommunicationAuditEvent } from "@/lib/communication/audit-integration";
-import { CommunicationServiceError } from "@/lib/communication/errors";
 import type { NormalizedInboundEmail } from "@/lib/communication/inbound-email-types";
 import {
   extractInboundReplyTokenFromAddresses,
