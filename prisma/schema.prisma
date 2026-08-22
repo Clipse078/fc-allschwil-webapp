@@ -280,6 +280,27 @@ enum CommunicationMessageStatus {
   RECEIVED
 }
 
+enum CommunicationAttachmentSourceType {
+  UPLOAD
+  WORKSPACE_DOCUMENT_VERSION
+  GENERATED_DOCUMENT
+  INBOUND
+}
+
+enum CommunicationAttachmentLifecycleStatus {
+  STAGED
+  READY
+  FAILED
+  QUARANTINED
+}
+
+enum CommunicationAttachmentScanStatus {
+  PENDING
+  CLEAN
+  QUARANTINED
+  FAILED
+}
+
 enum MeetingStatus {
   PLANNED
   COMPLETED
@@ -656,26 +677,28 @@ model Tenant {
   infoboards Infoboard[]
 
   // PERSONS-01: canonical tenant-scoped person directory
-  persons                 Person[]                 @relation("TenantPersons")
+  persons                         Person[]                         @relation("TenantPersons")
   // PERSONS-02: canonical tenant-scoped person assignments
-  personAssignments       PersonAssignment[]       @relation("TenantPersonAssignments")
+  personAssignments               PersonAssignment[]               @relation("TenantPersonAssignments")
   // PERSON-UX-04: canonical club membership history
-  personMemberships       PersonMembership[]       @relation("TenantPersonMemberships")
+  personMemberships               PersonMembership[]               @relation("TenantPersonMemberships")
   // PERSON-UX-05: development assessment foundation
-  developmentCriteria     DevelopmentCriterion[]   @relation("TenantDevelopmentCriteria")
-  developmentAssessments  DevelopmentAssessment[]  @relation("TenantDevelopmentAssessments")
+  developmentCriteria             DevelopmentCriterion[]           @relation("TenantDevelopmentCriteria")
+  developmentAssessments          DevelopmentAssessment[]          @relation("TenantDevelopmentAssessments")
   // PERSON-UX-07: person-bound private documents
-  personDocuments         PersonDocument[]         @relation("TenantPersonDocuments")
+  personDocuments                 PersonDocument[]                 @relation("TenantPersonDocuments")
   // PERSON-UX-10: canonical guardian relationships and emergency contacts
-  guardianRelationships   GuardianRelationship[]   @relation("TenantGuardianRelationships")
-  personEmergencyContacts PersonEmergencyContact[] @relation("TenantPersonEmergencyContacts")
+  guardianRelationships           GuardianRelationship[]           @relation("TenantGuardianRelationships")
+  personEmergencyContacts         PersonEmergencyContact[]         @relation("TenantPersonEmergencyContacts")
   // REG-WAIT-01: canonical waiting list entries for this tenant
-  waitingListEntries      WaitingListEntry[]       @relation("TenantWaitingListEntries")
+  waitingListEntries              WaitingListEntry[]               @relation("TenantWaitingListEntries")
   // COMM-01A: tenant-scoped communication/collaboration foundation
-  communicationThreads    CommunicationThread[]
-  communicationMessages   CommunicationMessage[]
-  internalComments        InternalComment[]
-  commentMentions         CommentMention[]
+  communicationThreads            CommunicationThread[]
+  communicationMessages           CommunicationMessage[]
+  communicationAttachments        CommunicationAttachment[]
+  communicationMessageAttachments CommunicationMessageAttachment[]
+  internalComments                InternalComment[]
+  commentMentions                 CommentMention[]
 
   @@index([status])
   @@index([name])
@@ -728,6 +751,7 @@ model User {
   createdWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentCreatedBy")
   updatedWorkspaceDocuments        WorkspaceDocument[]        @relation("WorkspaceDocumentUpdatedBy")
   createdWorkspaceDocumentVersions WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersionCreatedBy")
+  createdCommunicationAttachments  CommunicationAttachment[]  @relation("CommunicationAttachmentCreatedBy")
   // PERSON-UX-07: person-bound documents uploaded by this user
   uploadedPersonDocuments          PersonDocument[]           @relation("PersonDocumentUploadedBy")
 
@@ -2281,13 +2305,18 @@ model CommunicationMessage {
   sentAt     DateTime?
   receivedAt DateTime?
 
-  createdByUserId String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  /// Immutable retry ancestry. Retry attempts preserve the source message.
+  retryOfMessageId String?
+  createdByUserId  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  thread        CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  createdByUser User?               @relation("CommunicationMessageCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  tenant          Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  thread          CommunicationThread              @relation(fields: [threadId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser   User?                            @relation("CommunicationMessageCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  retryOfMessage  CommunicationMessage?            @relation("CommunicationMessageRetryAncestry", fields: [retryOfMessageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  retryAttempts   CommunicationMessage[]           @relation("CommunicationMessageRetryAncestry")
+  attachmentLinks CommunicationMessageAttachment[]
 
   @@unique([provider, providerMessageId])
   @@unique([provider, providerEventId])
@@ -2295,8 +2324,68 @@ model CommunicationMessage {
   @@index([tenantId, threadId])
   @@index([tenantId, createdAt])
   @@index([tenantId, providerMessageId])
+  @@index([tenantId, retryOfMessageId])
   @@index([provider, providerMessageId])
   @@index([provider, providerEventId])
+}
+
+/// Immutable tenant-owned metadata for communication files. Binary content is
+/// stored in the dedicated private Workspace Blob store, never PostgreSQL.
+model CommunicationAttachment {
+  id       String @id @default(cuid())
+  tenantId String
+
+  storageKey        String @unique
+  originalFilename  String
+  sanitizedFilename String
+  contentType       String
+  sizeBytes         Int
+  checksumSha256    String
+
+  sourceType              CommunicationAttachmentSourceType
+  sourceDocumentId        String?
+  sourceDocumentVersionId String?
+  ingestionMetadata       Json?
+
+  lifecycleStatus CommunicationAttachmentLifecycleStatus @default(STAGED)
+  scanStatus      CommunicationAttachmentScanStatus      @default(PENDING)
+  createdByUserId String?
+  createdAt       DateTime                               @default(now())
+
+  tenant                Tenant                           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  createdByUser         User?                            @relation("CommunicationAttachmentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceDocument        WorkspaceDocument?               @relation("CommunicationAttachmentSourceDocument", fields: [sourceDocumentId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  sourceDocumentVersion WorkspaceDocumentVersion?        @relation("CommunicationAttachmentSourceVersion", fields: [sourceDocumentVersionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  messageLinks          CommunicationMessageAttachment[]
+
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, checksumSha256])
+  @@index([tenantId, lifecycleStatus, scanStatus])
+  @@index([tenantId, sourceDocumentId])
+  @@index([tenantId, sourceDocumentVersionId])
+  @@index([createdByUserId])
+}
+
+/// Ordered message association. Tenant identity is duplicated defensively and
+/// validated by the domain service before every write.
+model CommunicationMessageAttachment {
+  id           String   @id @default(cuid())
+  tenantId     String
+  messageId    String
+  attachmentId String
+  sortOrder    Int
+  createdAt    DateTime @default(now())
+
+  tenant     Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  message    CommunicationMessage    @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  attachment CommunicationAttachment @relation(fields: [attachmentId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([messageId, attachmentId])
+  @@unique([messageId, sortOrder])
+  @@index([tenantId])
+  @@index([tenantId, messageId, sortOrder])
+  @@index([tenantId, attachmentId])
 }
 
 model InternalComment {
@@ -3216,8 +3305,9 @@ model WorkspaceDocument {
   tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   folder WorkspaceFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
-  currentVersion WorkspaceDocumentVersion?  @relation("WorkspaceDocumentCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  versions       WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersions")
+  currentVersion                   WorkspaceDocumentVersion?  @relation("WorkspaceDocumentCurrentVersion", fields: [currentVersionId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  versions                         WorkspaceDocumentVersion[] @relation("WorkspaceDocumentVersions")
+  communicationAttachmentSnapshots CommunicationAttachment[]  @relation("CommunicationAttachmentSourceDocument")
 
   createdByUser User? @relation("WorkspaceDocumentCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   updatedByUser User? @relation("WorkspaceDocumentUpdatedBy", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -3258,7 +3348,8 @@ model WorkspaceDocumentVersion {
   tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   document WorkspaceDocument @relation("WorkspaceDocumentVersions", fields: [documentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
-  currentForDocument WorkspaceDocument? @relation("WorkspaceDocumentCurrentVersion")
+  currentForDocument               WorkspaceDocument?        @relation("WorkspaceDocumentCurrentVersion")
+  communicationAttachmentSnapshots CommunicationAttachment[] @relation("CommunicationAttachmentSourceVersion")
 
   createdByUser User? @relation("WorkspaceDocumentVersionCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 

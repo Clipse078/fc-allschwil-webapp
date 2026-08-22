@@ -145,6 +145,42 @@ function getErrorDetails(error: unknown): {
 export class VercelBlobWorkspaceStorage
   implements WorkspaceStorageProvider
 {
+  /**
+   * Shared low-level primitive for immutable objects in the dedicated private
+   * Workspace Blob store. Domain adapters own namespace construction and
+   * validation; this method never returns a Blob URL.
+   */
+  async uploadImmutable(input: {
+    storageKey: string;
+    contentType: string;
+    buffer: Uint8Array;
+  }): Promise<{
+    storageKey: string;
+    checksumSha256: string;
+    sizeBytes: number;
+  }> {
+    const storageKey = input.storageKey.trim();
+    if (!storageKey || input.buffer.byteLength === 0) {
+      throw new Error("A storage key and non-empty buffer are required.");
+    }
+
+    const blobConfig = getWorkspaceBlobConfig();
+    const blob = await put(storageKey, Buffer.from(input.buffer), {
+      access: "private",
+      token: blobConfig.token,
+      storeId: blobConfig.storeId,
+      contentType: input.contentType,
+      addRandomSuffix: false,
+      allowOverwrite: false,
+    });
+
+    return {
+      storageKey: blob.pathname ?? storageKey,
+      checksumSha256: calculateWorkspaceChecksum(input.buffer),
+      sizeBytes: input.buffer.byteLength,
+    };
+  }
+
   async upload(
     input: WorkspaceStorageUploadInput,
   ): Promise<WorkspaceStorageUploadResult> {

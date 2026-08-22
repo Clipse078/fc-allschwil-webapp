@@ -318,6 +318,7 @@ export async function retryFailedOutboundEmailForThread(
         provider: "resend",
         status: "QUEUED",
         replyToAddress,
+        retryOfMessageId: source.id,
         createdByUserId: actorUserId,
       },
       select: { id: true },

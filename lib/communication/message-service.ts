@@ -46,6 +46,7 @@ const messageSelect = {
   status: true,
   sentAt: true,
   receivedAt: true,
+  retryOfMessageId: true,
   createdByUserId: true,
   createdAt: true,
   updatedAt: true,
