@@ -7,7 +7,7 @@ import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permi
 import { requireApiTenantContextForSlug } from "@/lib/tenants/active-tenant";
 import { CommunicationServiceError } from "@/lib/communication/errors";
 import { listCommunicationMessages } from "@/lib/communication/message-service";
-import { toPublicOutboundEmailMessages } from "@/lib/communication/message-enrichment";
+import { toPublicEmailThreadMessages } from "@/lib/communication/message-enrichment";
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
 import { requireCommunicationThreadForTenant } from "@/lib/communication/thread-service";
 
@@ -50,7 +50,7 @@ export async function GET(_request: NextRequest, context: Context) {
     ]);
 
     return NextResponse.json({
-      messages: await toPublicOutboundEmailMessages(tenantResult.tenantId, messages),
+      messages: await toPublicEmailThreadMessages(tenantResult.tenantId, messages),
       recipient,
     });
   } catch (error) {

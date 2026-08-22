@@ -11,6 +11,13 @@ import { CommunicationServiceError, assertTenantId } from "@/lib/communication/e
 import { generateInboundReplyToken } from "@/lib/communication/inbound-token";
 import { resolveCommunicationTargetForTenant } from "@/lib/communication/target-resolver";
 
+function isStableInboundReplyToken(token: string): boolean {
+  // Lower-case hex survives common email address normalization.
+  // Token length is constrained to fit the Reply-To local-part budget:
+  // `reply+` prefix (6) + token (48) = 54 <= 64.
+  return /^[a-f0-9]{48}$/.test(token);
+}
+
 const threadSelect = {
   id: true,
   tenantId: true,
@@ -145,4 +152,77 @@ export async function getCommunicationThreadByInboundTokenForTenant(
     where: { tenantId, inboundReplyToken: token },
     select: threadSelect,
   });
+}
+
+/**
+ * Resolves a thread by inbound reply token without trusting tenant context.
+ * The token is cryptographically strong and globally unique in the DB.
+ *
+ * Used for inbound webhook routing: tenantId is derived from the resolved thread.
+ */
+export async function getCommunicationThreadByInboundToken(
+  inboundReplyToken: string,
+): Promise<CommunicationThreadRecord | null> {
+  const token = inboundReplyToken.trim();
+  if (!token) {
+    throw new CommunicationServiceError("INVALID_INPUT", "inboundReplyToken ist erforderlich.");
+  }
+
+  const thread = await prisma.communicationThread.findFirst({
+    where: { inboundReplyToken: token },
+    select: threadSelect,
+  });
+  if (thread) return thread;
+
+  // Backward compatibility: if a token was rotated after an outbound message was
+  // sent, the reply address in the delivered email still contains the old token.
+  // Resolve the owning thread via the stored outbound message metadata without
+  // trusting any webhook-supplied tenant context.
+  const message = await prisma.communicationMessage.findFirst({
+    where: { replyToAddress: { startsWith: `reply+${token}@` } },
+    select: { threadId: true, tenantId: true },
+  });
+  if (!message) return null;
+
+  return prisma.communicationThread.findFirst({
+    where: { id: message.threadId, tenantId: message.tenantId },
+    select: threadSelect,
+  });
+}
+
+/**
+ * Ensures a thread uses a reply token that survives common email address
+ * normalization (lower-case hex). Safe because inbound reply tokens are not
+ * exposed in any existing outbound emails before COMM-02.
+ */
+export async function ensureStableInboundReplyTokenForThread(
+  tenantId: string,
+  threadId: string,
+): Promise<CommunicationThreadRecord> {
+  const thread = await requireCommunicationThreadForTenant(tenantId, threadId);
+  if (isStableInboundReplyToken(thread.inboundReplyToken)) {
+    return thread;
+  }
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const nextToken = generateInboundReplyToken();
+    if (!isStableInboundReplyToken(nextToken)) {
+      continue;
+    }
+
+    try {
+      const updated = await prisma.communicationThread.update({
+        where: { id: thread.id },
+        data: { inboundReplyToken: nextToken },
+        select: threadSelect,
+      });
+      return updated;
+    } catch (err) {
+      // Extremely unlikely: unique collision. Retry.
+      if (attempt === 2) throw err;
+    }
+  }
+
+  // Should be unreachable.
+  return requireCommunicationThreadForTenant(tenantId, threadId);
 }

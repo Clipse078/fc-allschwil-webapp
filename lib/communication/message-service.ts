@@ -19,6 +19,9 @@ import {
   requireCommunicationThreadForTenant,
 } from "@/lib/communication/thread-service";
 import type { CommunicationTargetType } from "@prisma/client";
+import type {
+  CommunicationAttachmentMetadataList,
+} from "@/lib/communication/attachment-metadata";
 
 const messageSelect = {
   id: true,
@@ -32,7 +35,10 @@ const messageSelect = {
   fromAddress: true,
   toAddresses: true,
   provider: true,
+  providerEventId: true,
   providerMessageId: true,
+  replyToAddress: true,
+  attachments: true,
   deliveryError: true,
   messageIdHeader: true,
   inReplyTo: true,
@@ -58,7 +64,10 @@ export type CreateCommunicationMessageInput = {
   fromAddress?: string | null;
   toAddresses?: string[] | null;
   provider?: string | null;
+  providerEventId?: string | null;
   providerMessageId?: string | null;
+  replyToAddress?: string | null;
+  attachments?: CommunicationAttachmentMetadataList | null;
   deliveryError?: string | null;
   messageIdHeader?: string | null;
   inReplyTo?: string | null;
@@ -114,7 +123,10 @@ export async function createCommunicationMessage(
       fromAddress: input.fromAddress ?? null,
       toAddresses: input.toAddresses ?? undefined,
       provider: input.provider ?? null,
+      providerEventId: input.providerEventId ?? null,
       providerMessageId: input.providerMessageId ?? null,
+      replyToAddress: input.replyToAddress ?? null,
+      attachments: input.attachments ?? undefined,
       deliveryError: input.deliveryError ?? null,
       messageIdHeader: input.messageIdHeader ?? null,
       inReplyTo: input.inReplyTo ?? null,
