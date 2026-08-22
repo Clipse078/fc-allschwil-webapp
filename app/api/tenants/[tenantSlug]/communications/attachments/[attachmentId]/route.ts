@@ -10,6 +10,8 @@ import {
   CommunicationAttachmentServiceError,
 } from "@/lib/communication/attachment-service";
 
+export const runtime = "nodejs";
+
 type Context = {
   params: Promise<{ tenantSlug: string; attachmentId: string }>;
 };
