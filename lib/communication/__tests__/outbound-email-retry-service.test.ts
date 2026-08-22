@@ -219,6 +219,30 @@ describe("COMM-03A retry failed outbound email", () => {
     ).toBe(true);
   });
 
+  it("blocks retry when the current authoritative email is missing/invalid", async () => {
+    storeMessage(failedOutboundMessage());
+    mocks.resolveRecipient.mockResolvedValueOnce({
+      email: null,
+      displayName: "Anna Muster",
+      available: false,
+      sendAllowed: false,
+      unavailableReason: "Für diese Person ist keine gültige E-Mail-Adresse verfügbar.",
+    });
+
+    await expect(
+      retryFailedOutboundEmailForThread({
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        actorUserId: ACTOR_A,
+        sourceMessageId: "message-failed-a",
+        idempotencyKey: "req-1",
+      }),
+    ).rejects.toMatchObject({ code: "RECIPIENT_UNAVAILABLE" });
+
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
   it("rejects retry when the source message is not FAILED", async () => {
     storeMessage(failedOutboundMessage({ status: "SENT" }));
 
