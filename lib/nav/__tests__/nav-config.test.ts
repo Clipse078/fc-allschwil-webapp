@@ -190,7 +190,10 @@ describe("NAV_SECTIONS static structure", () => {
 
     expect(communication?.label).toBe("Kommunikation");
     expect(communication?.href).toBe("/dashboard/communication");
-    expect(communication?.permissionKeys).toEqual([PERMISSIONS.USERS_MANAGE]);
+    expect(communication?.permissionKeys).toEqual([
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+    ]);
     expect(communication?.children).toEqual([
       expect.objectContaining({
         key: "communication-email-sender",
@@ -212,7 +215,10 @@ describe("NAV_SECTIONS static structure", () => {
     expect(sponsoring).toEqual(expect.objectContaining({
       label: "Sponsoring",
       href: "/dashboard/sponsoring",
-      permissionKeys: [PERMISSIONS.USERS_MANAGE],
+      permissionKeys: [
+        PERMISSIONS.USERS_MANAGE,
+        PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+      ],
     }));
   });
 });
@@ -310,16 +316,25 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(planungItem).toBeUndefined();
   });
 
-  it("shows Kommunikation and Sponsoring only with the reused users.manage permission", () => {
-    const authorized = getVisibleNavSections([PERMISSIONS.USERS_MANAGE]);
-    expect(findItemByKey(authorized, "communication")).not.toBeNull();
-    expect(findItemByKey(authorized, "communication-email-sender")).not.toBeNull();
-    expect(findItemByKey(authorized, "sponsoring")).not.toBeNull();
+  it("shows top-level Kommunikation and Sponsoring to tenant Club Admins without exposing the protected sender child", () => {
+    const tenantAdmin = getVisibleNavSections([
+      PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+    ]);
+    expect(findItemByKey(tenantAdmin, "communication")).not.toBeNull();
+    expect(findItemByKey(tenantAdmin, "communication-email-sender")).toBeNull();
+    expect(findItemByKey(tenantAdmin, "sponsoring")).not.toBeNull();
 
     const unauthorized = getVisibleNavSections([PERMISSIONS.USERS_VIEW]);
     expect(findItemByKey(unauthorized, "communication")).toBeNull();
     expect(findItemByKey(unauthorized, "communication-email-sender")).toBeNull();
     expect(findItemByKey(unauthorized, "sponsoring")).toBeNull();
+  });
+
+  it("keeps the protected sender child visible to platform user administrators", () => {
+    const platformAdmin = getVisibleNavSections([PERMISSIONS.USERS_MANAGE]);
+    expect(findItemByKey(platformAdmin, "communication")).not.toBeNull();
+    expect(findItemByKey(platformAdmin, "communication-email-sender")).not.toBeNull();
+    expect(findItemByKey(platformAdmin, "sponsoring")).not.toBeNull();
   });
 
   it("Veranstaltungen nav entry points to /dashboard/veranstaltungen with label Veranstaltungen", () => {

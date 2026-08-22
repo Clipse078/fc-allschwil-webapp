@@ -332,11 +332,15 @@ export const NAV_SECTIONS: NavSection[] = [
       {
         // COMM-03B-UX-01: first-class communication module shell. The real
         // tenant sender identity remains guarded by the existing users.manage
-        // permission; future capabilities shown on the landing page are static.
+        // permission. COMM-03B-UX-02: tenant Club Admins must still discover
+        // the top-level module; the protected sender child remains platform-only.
         key: "communication",
         label: "Kommunikation",
         href: "/dashboard/communication",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        permissionKeys: [
+          PERMISSIONS.USERS_MANAGE,
+          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+        ],
         children: [
           {
             key: "communication-email-sender",
@@ -404,11 +408,15 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         // COMM-03B-UX-01: demo-only commercial sponsoring module. Reuses an
-        // existing tenant-admin permission and contains no persistence.
+        // existing admin permission and contains no persistence. Both platform
+        // and tenant Club Admins can discover it without changing route access.
         key: "sponsoring",
         label: "Sponsoring",
         href: "/dashboard/sponsoring",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        permissionKeys: [
+          PERMISSIONS.USERS_MANAGE,
+          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+        ],
       },
     ],
   },
