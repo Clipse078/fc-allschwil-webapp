@@ -265,7 +265,16 @@ describe("COMM-01C email communication UX", () => {
             receivedAt: null,
             createdAt: "2026-08-21T10:00:00.000Z",
             deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
-            attachmentCount: 0,
+            attachmentCount: 1,
+            attachments: [
+              {
+                id: "attachment-archived",
+                filename: "archiv.pdf",
+                contentType: "application/pdf",
+                size: 1024,
+                downloadAvailable: true,
+              },
+            ],
           },
         ],
       });
@@ -278,6 +287,10 @@ describe("COMM-01C email communication UX", () => {
     expect(container.querySelector("p.whitespace-pre-wrap")?.textContent).toBe(longBody);
     expect(screen.getByText(/Michael Duijster/)).toBeInTheDocument();
     expect(screen.getByLabelText("Nachricht")).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Herunterladen" })).toHaveAttribute(
+      "href",
+      "/api/tenants/fc-a/communications/attachments/attachment-archived",
+    );
     expect(container.querySelector("script")).toBeNull();
     await waitFor(() =>
       expect(screen.getByText("Dieser Eintrag ist abgeschlossen.")).toBeInTheDocument(),
@@ -572,12 +585,12 @@ describe("COMM-01C email communication UX", () => {
     expect(await screen.findByText("vertrag.pdf")).toBeInTheDocument();
     expect(screen.getByText("einladung.pdf")).toBeInTheDocument();
     expect(screen.getByText(/2\/10/)).toBeInTheDocument();
-    expect(screen.getByText("Wird hochgeladen…")).toBeInTheDocument();
+    expect(screen.getByText(/Wird hochgeladen/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "E-Mail senden" })).toBeDisabled();
 
     resolveSecondUpload?.();
     await waitFor(() =>
-      expect(screen.queryByText("Wird hochgeladen…")).not.toBeInTheDocument(),
+      expect(screen.queryByText(/Wird hochgeladen/)).not.toBeInTheDocument(),
     );
     await user.click(screen.getByRole("button", { name: "einladung.pdf entfernen" }));
     expect(screen.queryByText("einladung.pdf")).not.toBeInTheDocument();
@@ -659,5 +672,16 @@ describe("COMM-01C email communication UX", () => {
         String(url).endsWith("/communications/attachments"),
       ),
     ).toBe(false);
+  });
+
+  it("exposes the same shared attachment composer for Waiting List communication", async () => {
+    renderPanel({ targetType: "WAITING_LIST_ENTRY", targetId: "wait-a" });
+
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    expect(screen.getByLabelText("Dateien hinzufügen")).toBeEnabled();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("targetType=WAITING_LIST_ENTRY"),
+      expect.anything(),
+    );
   });
 });

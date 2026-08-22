@@ -30,6 +30,7 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/email/mailer", () => ({
   MailConfigurationError: class MailConfigurationError extends Error {},
+  MailAttachmentPreflightError: class MailAttachmentPreflightError extends Error {},
   sendMail: mocks.sendMail,
 }));
 

@@ -16,8 +16,12 @@ vi.mock("@/lib/permissions/require-api-any-permission", () => ({
   requireApiAnyPermission: mocks.permission,
 }));
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
-vi.mock("@/lib/communication/attachment-service", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/communication/attachment-service")>()),
+vi.mock("@/lib/communication/attachment-service", () => ({
+  CommunicationAttachmentServiceError: class CommunicationAttachmentServiceError extends Error {
+    constructor(readonly code: string, message: string) {
+      super(message);
+    }
+  },
   createUploadedAttachment: mocks.createUploaded,
 }));
 
