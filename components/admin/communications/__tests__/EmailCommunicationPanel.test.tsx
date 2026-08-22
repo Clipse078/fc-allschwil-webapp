@@ -23,6 +23,7 @@ const baseRecipient = {
 
 beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
+  vi.stubGlobal("crypto", { randomUUID: () => "idem-1" });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string | URL | Request) => {
@@ -346,11 +347,177 @@ describe("COMM-01C email communication UX", () => {
     expect(await screen.findByText("Fehlgeschlagen")).toBeInTheDocument();
     expect(screen.getByText("Gesendet")).toBeInTheDocument();
     expect(screen.getByText("Empfangen")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Erneut senden" })).toBeInTheDocument();
 
     expect(screen.getByText("Der E-Mail-Dienst konnte die Nachricht nicht versenden.")).toBeInTheDocument();
     expect(container.querySelectorAll("p.text-rose-600")).toHaveLength(1);
 
     const headings = Array.from(container.querySelectorAll("h3")).map((node) => node.textContent);
     expect(headings).toEqual(["OLD FAIL", "TEST3", "Re: TEST3"]);
+  });
+
+  it("shows 'Erneut senden' only for FAILED outbound emails", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      return jsonResponse({
+        recipient: baseRecipient,
+        messages: [
+          {
+            id: "m-failed",
+            direction: "OUTBOUND",
+            subject: "FAIL",
+            body: "Fehlversuch",
+            from: null,
+            to: "anna@example.com",
+            status: "FAILED",
+            senderDisplayName: "Club Admin",
+            sentAt: null,
+            receivedAt: null,
+            createdAt: "2026-08-21T09:00:00.000Z",
+            deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
+            attachmentCount: 0,
+          },
+          {
+            id: "m-sent",
+            direction: "OUTBOUND",
+            subject: "SENT",
+            body: "Hallo",
+            from: null,
+            to: "anna@example.com",
+            status: "SENT",
+            senderDisplayName: "Club Admin",
+            sentAt: "2026-08-21T10:00:00.000Z",
+            receivedAt: null,
+            createdAt: "2026-08-21T09:59:00.000Z",
+            deliveryError: null,
+            attachmentCount: 0,
+          },
+          {
+            id: "m-in",
+            direction: "INBOUND",
+            subject: "Re: SENT",
+            body: "Hallo",
+            from: "someone@example.com",
+            to: null,
+            status: "RECEIVED",
+            senderDisplayName: null,
+            sentAt: null,
+            receivedAt: "2026-08-21T10:05:00.000Z",
+            createdAt: "2026-08-21T10:06:00.000Z",
+            deliveryError: null,
+            attachmentCount: 0,
+          },
+        ],
+      });
+    });
+
+    renderPanel();
+    expect(await screen.findByText("FAIL")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Erneut senden" })).toHaveLength(1);
+  });
+
+  it("disables retry while pending and refreshes the timeline after success", async () => {
+    let historyCalls = 0;
+    let resolveRetry: (() => void) | undefined;
+    const retryPromise = new Promise<void>((resolve) => {
+      resolveRetry = resolve;
+    });
+
+    vi.mocked(fetch).mockImplementation(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/messages/m-failed/retry")) {
+        const headerValue = (init?.headers as Record<string, string> | undefined)?.["Idempotency-Key"];
+        expect(typeof headerValue).toBe("string");
+        expect(String(headerValue || "").trim().length).toBeGreaterThan(0);
+        await retryPromise;
+        return jsonResponse({ message: { id: "m-retry", status: "SENT" } }, 201);
+      }
+      if (url.endsWith("/messages")) {
+        historyCalls += 1;
+        return historyCalls === 1
+          ? jsonResponse({
+              messages: [
+                {
+                  id: "m-failed",
+                  direction: "OUTBOUND",
+                  subject: "FAIL",
+                  body: "Fehlversuch",
+                  from: null,
+                  to: "anna@example.com",
+                  status: "FAILED",
+                  senderDisplayName: "Club Admin",
+                  sentAt: null,
+                  receivedAt: null,
+                  createdAt: "2026-08-21T09:00:00.000Z",
+                  deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
+                  attachmentCount: 0,
+                },
+              ],
+              recipient: baseRecipient,
+            })
+          : jsonResponse({
+              messages: [
+                {
+                  id: "m-failed",
+                  direction: "OUTBOUND",
+                  subject: "FAIL",
+                  body: "Fehlversuch",
+                  from: null,
+                  to: "anna@example.com",
+                  status: "FAILED",
+                  senderDisplayName: "Club Admin",
+                  sentAt: null,
+                  receivedAt: null,
+                  createdAt: "2026-08-21T09:00:00.000Z",
+                  deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
+                  attachmentCount: 0,
+                },
+                {
+                  id: "m-retry",
+                  direction: "OUTBOUND",
+                  subject: "FAIL",
+                  body: "Fehlversuch",
+                  from: null,
+                  to: "anna@example.com",
+                  status: "SENT",
+                  senderDisplayName: "Club Admin",
+                  sentAt: "2026-08-21T10:00:00.000Z",
+                  receivedAt: null,
+                  createdAt: "2026-08-21T10:00:00.000Z",
+                  deliveryError: null,
+                  attachmentCount: 0,
+                },
+              ],
+              recipient: baseRecipient,
+            });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(await screen.findByText("FAIL")).toBeInTheDocument();
+    const retryButton = screen.getByRole("button", { name: "Erneut senden" });
+    expect(retryButton).toBeEnabled();
+
+    const clickPromise = user.click(retryButton);
+    await waitFor(() => expect(retryButton).toBeDisabled());
+
+    // Double-click protection: retry stays disabled while pending.
+    await user.click(retryButton);
+    expect(vi.mocked(fetch).mock.calls.filter(([u]) => String(u).includes("/retry"))).toHaveLength(1);
+
+    resolveRetry?.();
+    await clickPromise;
+
+    expect(await screen.findByText("Gesendet")).toBeInTheDocument();
+    expect(historyCalls).toBeGreaterThanOrEqual(2);
   });
 });

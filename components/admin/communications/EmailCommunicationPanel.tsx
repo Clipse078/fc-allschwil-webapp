@@ -45,10 +45,20 @@ function EmailHistoryCard({
   message,
   locale,
   timezone,
+  canRetry,
+  retrying,
+  showRetrySpinner,
+  retryError,
+  onRetry,
 }: {
   message: PublicEmailThreadMessage;
   locale: string;
   timezone: string;
+  canRetry: boolean;
+  retrying: boolean;
+  showRetrySpinner: boolean;
+  retryError: string | null;
+  onRetry: (messageId: string) => void;
 }) {
   const status = STATUS[message.status];
   const { Icon } = status;
@@ -82,9 +92,29 @@ function EmailHistoryCard({
         {message.attachmentCount ? ` · ${message.attachmentCount} Anhänge` : ""}
       </div>
       {message.status === "FAILED" ? (
-        <p className="mt-2 text-xs text-rose-600">
-          {message.deliveryError ?? "Die E-Mail konnte nicht gesendet werden."}
-        </p>
+        <>
+          <p className="mt-2 text-xs text-rose-600">
+            {message.deliveryError ?? "Die E-Mail konnte nicht gesendet werden."}
+          </p>
+          {canRetry && !isInbound ? (
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => onRetry(message.id)}
+                disabled={retrying}
+                className="inline-flex items-center gap-2 rounded-md border border-[var(--border)] px-2.5 py-1 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {showRetrySpinner ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                ) : null}
+                Erneut senden
+              </button>
+              {retryError ? (
+                <span className="text-xs text-rose-600">{retryError}</span>
+              ) : null}
+            </div>
+          ) : null}
+        </>
       ) : null}
     </article>
   );
@@ -94,11 +124,22 @@ export function EmailThreadTimeline({
   messages,
   locale,
   timezone,
+  canRetryFailedOutbound,
+  retryingMessageId,
+  retryErrorMessageId,
+  retryError,
+  onRetry,
 }: {
   messages: PublicEmailThreadMessage[];
   locale: string;
   timezone: string;
+  canRetryFailedOutbound: boolean;
+  retryingMessageId: string | null;
+  retryErrorMessageId: string | null;
+  retryError: string | null;
+  onRetry: (messageId: string) => void;
 }) {
+  const retryLocked = retryingMessageId !== null;
   return (
     <div className="space-y-3">
       {messages.map((message) => (
@@ -107,6 +148,11 @@ export function EmailThreadTimeline({
           message={message}
           locale={locale}
           timezone={timezone}
+          canRetry={canRetryFailedOutbound && message.direction === "OUTBOUND" && message.status === "FAILED"}
+          retrying={retryLocked}
+          showRetrySpinner={retryingMessageId === message.id}
+          retryError={retryErrorMessageId === message.id ? retryError : null}
+          onRetry={onRetry}
         />
       ))}
     </div>
@@ -129,8 +175,11 @@ function EmailCommunicationPanelInner({
   const [subject, setSubject] = useState("");
   const [bodyText, setBodyText] = useState("");
   const [sending, setSending] = useState(false);
+  const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [retryError, setRetryError] = useState<string | null>(null);
+  const [retryErrorMessageId, setRetryErrorMessageId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const requestGenerationRef = useRef(0);
 
@@ -260,6 +309,7 @@ function EmailCommunicationPanelInner({
   };
 
   const canSend = canEdit && lifecycleAllowsSend && recipient?.sendAllowed === true;
+  const canRetryFailedOutbound = canSend;
   const disabledReason =
     recipient?.unavailableReason ??
     (!canEdit
@@ -267,6 +317,43 @@ function EmailCommunicationPanelInner({
       : !lifecycleAllowsSend
         ? "Dieser Eintrag ist abgeschlossen. Der E-Mail-Verlauf bleibt lesbar."
         : null);
+
+  const retryFailed = async (messageId: string) => {
+    if (!threadId || !canRetryFailedOutbound || retryingMessageId) return;
+    const generation = requestGenerationRef.current;
+    const resolvedThreadId = threadId;
+    const idempotencyKey =
+      globalThis.crypto && "randomUUID" in globalThis.crypto
+        ? (globalThis.crypto as Crypto).randomUUID()
+        : `${Date.now()}-${Math.random()}`;
+    setRetryingMessageId(messageId);
+    setRetryError(null);
+    setRetryErrorMessageId(null);
+    try {
+      const response = await fetch(
+        `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(resolvedThreadId)}/messages/${encodeURIComponent(messageId)}/retry`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": idempotencyKey },
+        },
+      );
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Die E-Mail konnte nicht erneut gesendet werden.");
+      }
+      if (generation !== requestGenerationRef.current) return;
+      await loadHistory(resolvedThreadId, generation);
+    } catch (error) {
+      if (generation !== requestGenerationRef.current) return;
+      setRetryErrorMessageId(messageId);
+      setRetryError(
+        error instanceof Error ? error.message : "Die E-Mail konnte nicht erneut gesendet werden.",
+      );
+      await loadHistory(resolvedThreadId, generation).catch(() => undefined);
+    } finally {
+      if (generation === requestGenerationRef.current) setRetryingMessageId(null);
+    }
+  };
 
   return (
     <div className={cn(REGISTRATION_DRAWER_TAB_CONTENT_CLASS, "flex min-h-[360px] flex-col")}>
@@ -302,7 +389,16 @@ function EmailCommunicationPanelInner({
           <section aria-label="E-Mail-Verlauf" className="flex-1">
             {messages && messages.length > 0 ? (
               <div>
-                <EmailThreadTimeline messages={messages} locale={locale} timezone={timezone} />
+                <EmailThreadTimeline
+                  messages={messages}
+                  locale={locale}
+                  timezone={timezone}
+                  canRetryFailedOutbound={canRetryFailedOutbound}
+                  retryingMessageId={retryingMessageId}
+                  retryErrorMessageId={retryErrorMessageId}
+                  retryError={retryError}
+                  onRetry={(id) => void retryFailed(id)}
+                />
                 <div ref={endRef} />
               </div>
             ) : (
