@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail, ShieldCheck } from "lucide-react";
 import { SectionCard } from "@/components/ui/page";
 import { StatusIndicator } from "@/components/ui/StatusIndicator";
 import { useToast } from "@/hooks/use-toast";
@@ -27,13 +27,31 @@ const labelClass =
 function providerStatusPresentation(status: ProviderStatus) {
   switch (status) {
     case "VERIFIED":
-      return { label: "Verifiziert", variant: "success" as const };
+      return {
+        label: "Vereinsabsender aktiv",
+        variant: "success" as const,
+        message: "E-Mails werden mit dem konfigurierten Vereinsabsender versendet.",
+      };
     case "NOT_VERIFIED":
-      return { label: "Nicht verifiziert", variant: "warning" as const };
+      return {
+        label: "SportClubEvo-Standardabsender aktiv",
+        variant: "warning" as const,
+        message: "Für diese Absenderadresse wird aktuell der SportClubEvo-Standardabsender verwendet.",
+      };
     case "UNKNOWN":
-      return { label: "Verifizierung unbekannt", variant: "warning" as const };
+      return {
+        label: "SportClubEvo-Standardabsender aktiv",
+        variant: "warning" as const,
+        message:
+          "Die Versandfreigabe für diese Absenderadresse konnte aktuell nicht bestätigt werden. Deshalb wird der SportClubEvo-Standardabsender verwendet.",
+      };
     case "NOT_CONFIGURED":
-      return { label: "Nicht konfiguriert", variant: "neutral" as const };
+      return {
+        label: "SportClubEvo-Standardabsender aktiv",
+        variant: "neutral" as const,
+        message:
+          "Noch ist kein Vereinsabsender konfiguriert. E-Mails werden mit dem SportClubEvo-Standardabsender versendet.",
+      };
   }
 }
 
@@ -89,9 +107,45 @@ export default function EmailSenderSettingsForm({ initialSettings }: Props) {
   return (
     <SectionCard
       title="E-Mail-Absender"
-      description="Diese Angaben werden als Absender für E-Mails Ihres Vereins verwendet."
+      description="Legen Sie fest, welchen Namen und welche Adresse Empfänger bei Vereins-E-Mails sehen."
     >
       <form onSubmit={handleSubmit} noValidate className="space-y-5" data-testid="email-sender-form">
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
+            <div className="flex items-center gap-2 text-[var(--muted)]">
+              <Mail className="h-4 w-4" aria-hidden />
+              <p className={labelClass}>Konfigurierter Absender</p>
+            </div>
+            {settings.displayName && settings.emailAddress ? (
+              <>
+                <p className="mt-2 font-semibold text-[var(--foreground)]">
+                  {settings.displayName}
+                </p>
+                <p className="mt-0.5 break-all text-sm text-[var(--text-2)]">
+                  {settings.emailAddress}
+                </p>
+              </>
+            ) : (
+              <p className="mt-2 text-sm text-[var(--text-2)]">
+                Noch kein Vereinsabsender hinterlegt.
+              </p>
+            )}
+          </div>
+
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
+            <div className="flex items-center gap-2 text-[var(--muted)]">
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <p className={labelClass}>Versandstatus</p>
+            </div>
+            <div className="mt-2">
+              <StatusIndicator variant={status.variant} label={status.label} />
+            </div>
+            <p className="mt-3 text-sm leading-5 text-[var(--text-2)]">
+              {status.message}
+            </p>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="email-sender-display-name" className={labelClass}>
             Absendername
@@ -121,7 +175,7 @@ export default function EmailSenderSettingsForm({ initialSettings }: Props) {
 
         <div>
           <label htmlFor="email-sender-address" className={labelClass}>
-            Absender-E-Mail
+            Absender-E-Mail-Adresse
           </label>
           <input
             id="email-sender-address"
@@ -147,20 +201,8 @@ export default function EmailSenderSettingsForm({ initialSettings }: Props) {
           ) : null}
         </div>
 
-        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] p-4">
-          <p className={labelClass}>Status</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <StatusIndicator variant={status.variant} label={status.label} />
-            {settings.platformFallbackActive ? (
-              <StatusIndicator variant="neutral" label="Plattform-Absender aktiv" />
-            ) : null}
-          </div>
-          {settings.platformFallbackActive && settings.providerStatus !== "NOT_CONFIGURED" ? (
-            <p className="mt-3 text-sm text-[var(--text-2)]">
-              Bis zur Verifizierung wird der SportClubEvo-Absender verwendet.
-            </p>
-          ) : null}
-          <p className="mt-3 text-sm text-[var(--text-2)]">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+          <p className="text-sm text-[var(--text-2)]">
             Antworten werden weiterhin automatisch dem richtigen Vorgang in SportClubEvo zugeordnet.
           </p>
         </div>

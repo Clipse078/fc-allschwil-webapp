@@ -34,8 +34,11 @@ describe("COMM-03B email sender settings UI", () => {
   it("renders tenant-wide sender fields and Reply-To explanation", () => {
     render(<EmailSenderSettingsForm initialSettings={configured} />);
     expect(screen.getByLabelText("Absendername")).toHaveValue("FC Allschwil");
-    expect(screen.getByLabelText("Absender-E-Mail")).toHaveValue("info@fcallschwil.ch");
-    expect(screen.getByText("Verifiziert")).toBeInTheDocument();
+    expect(screen.getByLabelText("Absender-E-Mail-Adresse")).toHaveValue("info@fcallschwil.ch");
+    expect(screen.getByText("Vereinsabsender aktiv")).toBeInTheDocument();
+    expect(screen.getByText("Konfigurierter Absender")).toBeInTheDocument();
+    expect(screen.getByText("FC Allschwil")).toBeInTheDocument();
+    expect(screen.getByText("info@fcallschwil.ch")).toBeInTheDocument();
     expect(screen.getByText(/Antworten werden weiterhin automatisch/)).toBeInTheDocument();
   });
 
@@ -51,9 +54,8 @@ describe("COMM-03B email sender settings UI", () => {
         }}
       />,
     );
-    expect(screen.getByText("Nicht verifiziert")).toBeInTheDocument();
-    expect(screen.getByText("Plattform-Absender aktiv")).toBeInTheDocument();
-    expect(screen.getByText(/Bis zur Verifizierung/)).toBeInTheDocument();
+    expect(screen.getByText("SportClubEvo-Standardabsender aktiv")).toBeInTheDocument();
+    expect(screen.getByText(/Für diese Absenderadresse wird aktuell/)).toBeInTheDocument();
   });
 
   it("edits and saves sender identity without a client tenantId", async () => {
@@ -73,7 +75,7 @@ describe("COMM-03B email sender settings UI", () => {
     fireEvent.change(screen.getByLabelText("Absendername"), {
       target: { value: "Neuer Club" },
     });
-    fireEvent.change(screen.getByLabelText("Absender-E-Mail"), {
+    fireEvent.change(screen.getByLabelText("Absender-E-Mail-Adresse"), {
       target: { value: "mail@neuer-club.ch" },
     });
     fireEvent.click(screen.getByRole("button", { name: "E-Mail-Absender speichern" }));

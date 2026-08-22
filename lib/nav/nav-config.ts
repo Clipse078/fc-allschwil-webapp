@@ -330,6 +330,23 @@ export const NAV_SECTIONS: NavSection[] = [
         ],
       },
       {
+        // COMM-03B-UX-01: first-class communication module shell. The real
+        // tenant sender identity remains guarded by the existing users.manage
+        // permission; future capabilities shown on the landing page are static.
+        key: "communication",
+        label: "Kommunikation",
+        href: "/dashboard/communication",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        children: [
+          {
+            key: "communication-email-sender",
+            label: "E-Mail-Absender",
+            href: "/dashboard/communication/email-sender",
+            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+          },
+        ],
+      },
+      {
         key: "infoboard",
         label: "Infoboard",
         href: "/dashboard/infoboard",
@@ -384,6 +401,14 @@ export const NAV_SECTIONS: NavSection[] = [
         key: "finanzen",
         label: "Finanzen",
         href: "/vereinsleitung/finanzen",
+      },
+      {
+        // COMM-03B-UX-01: demo-only commercial sponsoring module. Reuses an
+        // existing tenant-admin permission and contains no persistence.
+        key: "sponsoring",
+        label: "Sponsoring",
+        href: "/dashboard/sponsoring",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
       },
     ],
   },
@@ -440,12 +465,6 @@ export const NAV_SECTIONS: NavSection[] = [
             key: "admin-branding",
             label: "Darstellung",
             href: "/dashboard/admin/branding",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
-          },
-          {
-            key: "admin-communications",
-            label: "Kommunikation",
-            href: "/dashboard/admin/communications",
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {

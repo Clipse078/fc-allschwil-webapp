@@ -16,7 +16,7 @@ vi.mock("@/lib/communication/email-sender-service", () => ({
   getTenantEmailSenderSettings: mocks.getSettings,
 }));
 
-import CommunicationsSettingsPage from "../page";
+import EmailSenderPage from "../../../communication/email-sender/page";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,16 +32,16 @@ beforeEach(() => {
   });
 });
 
-describe("COMM-03B communications settings page authorization", () => {
+describe("COMM-03B canonical email sender page authorization", () => {
   it("loads the active tenant settings for an authorized tenant admin", async () => {
-    await CommunicationsSettingsPage();
+    await EmailSenderPage();
     expect(mocks.requirePermission).toHaveBeenCalledWith(["users.manage"]);
     expect(mocks.getSettings).toHaveBeenCalledWith("tenant-a");
   });
 
   it("does not load or expose settings when authorization fails", async () => {
     mocks.requirePermission.mockRejectedValue(new Error("Forbidden"));
-    await expect(CommunicationsSettingsPage()).rejects.toThrow("Forbidden");
+    await expect(EmailSenderPage()).rejects.toThrow("Forbidden");
     expect(mocks.getActiveTenant).not.toHaveBeenCalled();
     expect(mocks.getSettings).not.toHaveBeenCalled();
   });

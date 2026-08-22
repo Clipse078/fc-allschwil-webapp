@@ -183,6 +183,38 @@ describe("NAV_SECTIONS static structure", () => {
       "admin-facilities",
     ]);
   });
+
+  it("exposes Kommunikation as a first-class Betrieb module with the canonical sender child", () => {
+    const betrieb = findSection("Betrieb");
+    const communication = betrieb!.items.find((i) => i.key === "communication");
+
+    expect(communication?.label).toBe("Kommunikation");
+    expect(communication?.href).toBe("/dashboard/communication");
+    expect(communication?.permissionKeys).toEqual([PERMISSIONS.USERS_MANAGE]);
+    expect(communication?.children).toEqual([
+      expect.objectContaining({
+        key: "communication-email-sender",
+        label: "E-Mail-Absender",
+        href: "/dashboard/communication/email-sender",
+        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+      }),
+    ]);
+
+    const system = findSection("System");
+    const administration = system!.items.find((i) => i.key === "administration");
+    expect(administration?.children?.some((child) => child.key === "admin-communications")).toBe(false);
+  });
+
+  it("exposes Sponsoring as a permission-gated Führung future module", () => {
+    const fuehrung = findSection("Führung");
+    const sponsoring = fuehrung!.items.find((i) => i.key === "sponsoring");
+
+    expect(sponsoring).toEqual(expect.objectContaining({
+      label: "Sponsoring",
+      href: "/dashboard/sponsoring",
+      permissionKeys: [PERMISSIONS.USERS_MANAGE],
+    }));
+  });
 });
 
 // ── Permission-based visibility ───────────────────────────────────────────────
@@ -276,6 +308,18 @@ describe("getVisibleNavSections permission filtering", () => {
       .flatMap((s) => s.items)
       .find((i) => i.key === "planung");
     expect(planungItem).toBeUndefined();
+  });
+
+  it("shows Kommunikation and Sponsoring only with the reused users.manage permission", () => {
+    const authorized = getVisibleNavSections([PERMISSIONS.USERS_MANAGE]);
+    expect(findItemByKey(authorized, "communication")).not.toBeNull();
+    expect(findItemByKey(authorized, "communication-email-sender")).not.toBeNull();
+    expect(findItemByKey(authorized, "sponsoring")).not.toBeNull();
+
+    const unauthorized = getVisibleNavSections([PERMISSIONS.USERS_VIEW]);
+    expect(findItemByKey(unauthorized, "communication")).toBeNull();
+    expect(findItemByKey(unauthorized, "communication-email-sender")).toBeNull();
+    expect(findItemByKey(unauthorized, "sponsoring")).toBeNull();
   });
 
   it("Veranstaltungen nav entry points to /dashboard/veranstaltungen with label Veranstaltungen", () => {

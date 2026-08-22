@@ -20,6 +20,7 @@ import {
   Flag,
   FolderClosed,
   Globe,
+  Handshake,
   Home,
   ImageIcon,
   Inbox,
@@ -83,6 +84,8 @@ function getNavIcon(label: string) {
     case "Infoboard":                   return Monitor;
     case "MatchCenter":                 return Volleyball;
     case "Administration":              return Settings2;
+    case "Kommunikation":               return Mail;
+    case "Sponsoring":                  return Handshake;
     // Organisation children
     case "Organisationseinheiten":      return Building2;
     case "Zielgruppen":                 return Target;
@@ -112,7 +115,7 @@ function getNavIcon(label: string) {
     case "Feld & Ressourcen":           return Layers;
     // Administration children
     case "Darstellung":                 return Palette;
-    case "Kommunikation":               return Mail;
+    case "E-Mail-Absender":             return Mail;
     case "Anlagen & Ressourcen":        return Building2;
     case "Benutzer":                    return Users;
     case "Rollen":                      return ShieldCheck;
