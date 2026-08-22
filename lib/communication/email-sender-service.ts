@@ -76,6 +76,14 @@ export function validateTenantEmailSenderInput(input: {
     );
   }
 
+  if (unsafeHeaderCharacter.test(input.displayName)) {
+    throw new EmailSenderSettingsError(
+      "INVALID_INPUT",
+      "Absendername enthält unzulässige Zeichen.",
+      "displayName",
+    );
+  }
+
   const displayName = input.displayName.trim();
   if (!displayName) {
     throw new EmailSenderSettingsError(
@@ -91,14 +99,6 @@ export function validateTenantEmailSenderInput(input: {
       "displayName",
     );
   }
-  if (unsafeHeaderCharacter.test(displayName)) {
-    throw new EmailSenderSettingsError(
-      "INVALID_INPUT",
-      "Absendername enthält unzulässige Zeichen.",
-      "displayName",
-    );
-  }
-
   if (typeof input.emailAddress !== "string") {
     throw new EmailSenderSettingsError(
       "INVALID_INPUT",
@@ -107,11 +107,18 @@ export function validateTenantEmailSenderInput(input: {
     );
   }
 
+  if (unsafeHeaderCharacter.test(input.emailAddress)) {
+    throw new EmailSenderSettingsError(
+      "INVALID_INPUT",
+      "Bitte geben Sie eine gültige Absender-E-Mail ein.",
+      "emailAddress",
+    );
+  }
+
   const emailAddress = input.emailAddress.trim().toLowerCase();
   if (
     !emailAddress ||
     emailAddress.length > MAX_EMAIL_SENDER_ADDRESS_LENGTH ||
-    unsafeHeaderCharacter.test(emailAddress) ||
     !senderEmailSchema.safeParse(emailAddress).success
   ) {
     throw new EmailSenderSettingsError(
