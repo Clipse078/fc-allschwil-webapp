@@ -9,6 +9,7 @@ vi.mock("@/lib/permissions/require-any-permission", () => ({
 }));
 
 import SponsoringPage from "../page";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -19,6 +20,10 @@ describe("Sponsoring future module landing page", () => {
   it("shows the planned commercial lifecycle without functional controls", async () => {
     render(await SponsoringPage());
 
+    expect(requirePermission).toHaveBeenCalledWith([
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+    ]);
     expect(screen.getByRole("heading", { level: 1, name: "Sponsoring" })).toBeInTheDocument();
     expect(screen.getByText(/Demo-Ansicht · Noch nicht funktional/)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Sponsoren" })).toBeInTheDocument();

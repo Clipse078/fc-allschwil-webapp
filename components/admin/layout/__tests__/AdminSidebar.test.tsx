@@ -113,6 +113,10 @@ describe("AdminSidebar", () => {
       name: "Kommunikation",
     });
     expect(communication).toHaveAttribute("href", "/dashboard/communication");
+    expect(within(betrieb!).getByRole("link", { name: "E-Mail-Absender" })).toHaveAttribute(
+      "href",
+      "/dashboard/communication/email-sender",
+    );
 
     const sponsoring = within(fuehrung!).getByRole("link", {
       name: "Sponsoring",

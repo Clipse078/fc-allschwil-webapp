@@ -7,8 +7,8 @@ const mocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.permission,
+vi.mock("@/lib/permissions/require-api-any-permission", () => ({
+  requireApiAnyPermission: mocks.permission,
 }));
 
 vi.mock("@/lib/communication/email-sender-service", async (importOriginal) => {
@@ -22,6 +22,7 @@ vi.mock("@/lib/communication/email-sender-service", async (importOriginal) => {
 });
 
 import { GET, PATCH } from "../route";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 const TENANT_A = "tenant-a";
 const settings = {
@@ -64,7 +65,10 @@ describe("GET /api/admin/communications/email-sender", () => {
     const response = await GET();
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ settings });
-    expect(mocks.permission).toHaveBeenCalledWith("users.manage");
+    expect(mocks.permission).toHaveBeenCalledWith([
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+    ]);
     expect(mocks.getSettings).toHaveBeenCalledWith(TENANT_A);
   });
 

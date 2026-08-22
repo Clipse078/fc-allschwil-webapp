@@ -17,8 +17,8 @@ import {
 import { ModuleCapabilityCard } from "@/components/admin/future-modules/ModuleCapabilityCard";
 import { Badge } from "@/components/ui/Badge";
 import { PageBreadcrumbs, PageHeader, PageShell, SectionCard } from "@/components/ui/page";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { TENANT_ADMINISTRATION_PERMISSIONS } from "@/lib/permissions/tenant-administration";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +31,7 @@ const activationFlow = [
 ];
 
 export default async function SponsoringPage() {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission(TENANT_ADMINISTRATION_PERMISSIONS);
 
   return (
     <PageShell>

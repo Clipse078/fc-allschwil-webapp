@@ -6,6 +6,7 @@
  */
 
 import { PERMISSIONS, type PermissionKey } from "@/lib/permissions/permissions";
+import { TENANT_ADMINISTRATION_PERMISSIONS } from "@/lib/permissions/tenant-administration";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -331,22 +332,19 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         // COMM-03B-UX-01: first-class communication module shell. The real
-        // tenant sender identity remains guarded by the existing users.manage
-        // permission. COMM-03B-UX-02: tenant Club Admins must still discover
-        // the top-level module; the protected sender child remains platform-only.
+        // tenant sender identity and the module shell share the established
+        // tenant-administration authority. Platform user administrators retain
+        // access through the same policy.
         key: "communication",
         label: "Kommunikation",
         href: "/dashboard/communication",
-        permissionKeys: [
-          PERMISSIONS.USERS_MANAGE,
-          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
-        ],
+        permissionKeys: TENANT_ADMINISTRATION_PERMISSIONS,
         children: [
           {
             key: "communication-email-sender",
             label: "E-Mail-Absender",
             href: "/dashboard/communication/email-sender",
-            permissionKeys: [PERMISSIONS.USERS_MANAGE],
+            permissionKeys: TENANT_ADMINISTRATION_PERMISSIONS,
           },
         ],
       },
@@ -413,10 +411,7 @@ export const NAV_SECTIONS: NavSection[] = [
         key: "sponsoring",
         label: "Sponsoring",
         href: "/dashboard/sponsoring",
-        permissionKeys: [
-          PERMISSIONS.USERS_MANAGE,
-          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
-        ],
+        permissionKeys: TENANT_ADMINISTRATION_PERMISSIONS,
       },
     ],
   },

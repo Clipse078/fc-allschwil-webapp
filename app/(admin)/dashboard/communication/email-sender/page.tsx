@@ -3,14 +3,14 @@ import EmailSenderSettingsForm from "@/components/admin/communications/EmailSend
 import { Badge } from "@/components/ui/Badge";
 import { PageBreadcrumbs, PageHeader, PageShell } from "@/components/ui/page";
 import { getTenantEmailSenderSettings } from "@/lib/communication/email-sender-service";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
+import { TENANT_ADMINISTRATION_PERMISSIONS } from "@/lib/permissions/tenant-administration";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmailSenderPage() {
-  await requireAnyPermission([PERMISSIONS.USERS_MANAGE]);
+  await requireAnyPermission(TENANT_ADMINISTRATION_PERMISSIONS);
   const tenant = await getActiveTenant();
   if (!tenant) notFound();
 

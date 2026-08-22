@@ -206,7 +206,10 @@ describe("NAV_SECTIONS static structure", () => {
         key: "communication-email-sender",
         label: "E-Mail-Absender",
         href: "/dashboard/communication/email-sender",
-        permissionKeys: [PERMISSIONS.USERS_MANAGE],
+        permissionKeys: [
+          PERMISSIONS.USERS_MANAGE,
+          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+        ],
       }),
     ]);
 
@@ -330,12 +333,12 @@ describe("getVisibleNavSections permission filtering", () => {
     expect(planungItem).toBeUndefined();
   });
 
-  it("shows top-level Kommunikation and Sponsoring to tenant Club Admins without exposing the protected sender child", () => {
+  it("shows Kommunikation, its protected sender child, and Sponsoring to tenant Club Admins", () => {
     const tenantAdmin = getVisibleNavSections([
       PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
     ]);
     expect(findItemByKey(tenantAdmin, "communication")).not.toBeNull();
-    expect(findItemByKey(tenantAdmin, "communication-email-sender")).toBeNull();
+    expect(findItemByKey(tenantAdmin, "communication-email-sender")).not.toBeNull();
     expect(findItemByKey(tenantAdmin, "sponsoring")).not.toBeNull();
 
     const unauthorized = getVisibleNavSections([PERMISSIONS.USERS_VIEW]);

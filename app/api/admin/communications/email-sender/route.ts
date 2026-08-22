@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import {
   EmailSenderSettingsError,
   getTenantEmailSenderSettings,
   updateTenantEmailSenderSettings,
 } from "@/lib/communication/email-sender-service";
+import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { TENANT_ADMINISTRATION_PERMISSIONS } from "@/lib/permissions/tenant-administration";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ function serviceErrorResponse(error: unknown): NextResponse {
 }
 
 export async function GET(): Promise<NextResponse> {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiAnyPermission(TENANT_ADMINISTRATION_PERMISSIONS);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
@@ -44,7 +44,7 @@ export async function GET(): Promise<NextResponse> {
 }
 
 export async function PATCH(request: NextRequest): Promise<NextResponse> {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requireApiAnyPermission(TENANT_ADMINISTRATION_PERMISSIONS);
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }

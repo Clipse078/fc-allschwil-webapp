@@ -9,6 +9,7 @@ vi.mock("@/lib/permissions/require-any-permission", () => ({
 }));
 
 import CommunicationPage from "../page";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -19,6 +20,10 @@ describe("Kommunikation module landing page", () => {
   it("distinguishes the functional sender settings from future capabilities", async () => {
     render(await CommunicationPage());
 
+    expect(requirePermission).toHaveBeenCalledWith([
+      PERMISSIONS.USERS_MANAGE,
+      PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+    ]);
     expect(screen.getByRole("heading", { level: 1, name: "Kommunikation" })).toBeInTheDocument();
     expect(screen.getByText("E-Mail-Absender ist bereits verfügbar.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Absender verwalten/ })).toHaveAttribute(
