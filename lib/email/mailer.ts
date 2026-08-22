@@ -36,6 +36,8 @@
 import { Resend } from "resend";
 
 export type MailMessage = {
+  /** Optional provider-authorized sender. Unusable custom senders fall back to EMAIL_FROM. */
+  from?: string;
   to: string;
   subject: string;
   html: string;
@@ -49,6 +51,8 @@ export type MailDeliveryResult = {
   from: string;
 };
 
+export type SenderDomainAuthorization = "VERIFIED" | "NOT_VERIFIED" | "UNKNOWN";
+
 /**
  * Thrown when required email configuration (RESEND_API_KEY or EMAIL_FROM)
  * is absent or empty. Callers should log this as an operational/configuration
@@ -59,6 +63,50 @@ export class MailConfigurationError extends Error {
     super(message);
     this.name = "MailConfigurationError";
   }
+}
+
+function extractEmailDomain(value: string): string | null {
+  const address = value.match(/<([^<>]+)>$/)?.[1] ?? value;
+  const at = address.lastIndexOf("@");
+  if (at <= 0 || at === address.length - 1) return null;
+  return address.slice(at + 1).trim().toLowerCase();
+}
+
+/**
+ * Checks the exact sender domain against Resend without mutating provider state.
+ * Restricted/missing provider credentials are UNKNOWN and must never authorize.
+ */
+export async function getSenderDomainAuthorization(
+  emailAddress: string,
+): Promise<SenderDomainAuthorization> {
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  const domain = extractEmailDomain(emailAddress.trim());
+  if (!apiKey || !domain) return "UNKNOWN";
+
+  try {
+    const resend = new Resend(apiKey);
+    let after: string | undefined;
+
+    for (let page = 0; page < 100; page += 1) {
+      const { data, error } = await resend.domains.list({ limit: 100, after });
+      if (error || !data) return "UNKNOWN";
+
+      const match = data.data.find((candidate) => candidate.name.toLowerCase() === domain);
+      if (match) {
+        return match.status === "verified" && match.capabilities.sending === "enabled"
+          ? "VERIFIED"
+          : "NOT_VERIFIED";
+      }
+
+      if (!data.has_more || data.data.length === 0) return "NOT_VERIFIED";
+      after = data.data.at(-1)?.id;
+      if (!after) return "UNKNOWN";
+    }
+  } catch {
+    return "UNKNOWN";
+  }
+
+  return "UNKNOWN";
 }
 
 /**
@@ -77,11 +125,20 @@ export async function sendMail(message: MailMessage): Promise<MailDeliveryResult
     );
   }
 
-  const from = process.env.EMAIL_FROM?.trim();
-  if (!from) {
+  const platformFrom = process.env.EMAIL_FROM?.trim();
+  if (!platformFrom) {
     throw new MailConfigurationError(
       "EMAIL_FROM is not configured. Email delivery is unavailable.",
     );
+  }
+
+  let from = platformFrom;
+  const requestedFrom = message.from?.trim();
+  if (requestedFrom && requestedFrom !== platformFrom) {
+    const authorization = await getSenderDomainAuthorization(requestedFrom);
+    if (authorization === "VERIFIED") {
+      from = requestedFrom;
+    }
   }
 
   const resend = new Resend(apiKey);

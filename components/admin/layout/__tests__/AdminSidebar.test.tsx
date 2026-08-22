@@ -8,7 +8,7 @@
  *   - permission-driven visibility is preserved
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -87,6 +87,49 @@ describe("AdminSidebar", () => {
     expect(trainingIdx).toBeGreaterThan(-1);
     expect(trainingIdx).toBeLessThan(matchIdx);
     expect(matchIdx).toBeLessThan(tournamentIdx);
+  });
+
+  it("renders Kommunikation and Sponsoring once in the Club Admin runtime sidebar groups", () => {
+    render(
+      <AdminSidebar
+        firstName="Michael"
+        lastName="Duft"
+        email="michael@fc-allschwil.ch"
+        permissionKeys={[
+          PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
+          PERMISSIONS.ROLES_VIEW,
+        ]}
+        clubName="FC Allschwil"
+        logoUrl={null}
+      />,
+    );
+
+    const betrieb = screen.getByText("Betrieb").parentElement;
+    const fuehrung = screen.getByText("Führung").parentElement;
+    expect(betrieb).not.toBeNull();
+    expect(fuehrung).not.toBeNull();
+
+    const communication = within(betrieb!).getByRole("link", {
+      name: "Kommunikation",
+    });
+    expect(communication).toHaveAttribute("href", "/dashboard/communication");
+    expect(within(betrieb!).getByRole("link", { name: "E-Mail-Absender" })).toHaveAttribute(
+      "href",
+      "/dashboard/communication/email-sender",
+    );
+
+    const sponsoring = within(fuehrung!).getByRole("link", {
+      name: "Sponsoring",
+    });
+    expect(sponsoring).toHaveAttribute("href", "/dashboard/sponsoring");
+
+    expect(screen.getAllByRole("link", { name: "Kommunikation" })).toHaveLength(1);
+    expect(screen.getAllByRole("link", { name: "Sponsoring" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Meetings" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Club Entwicklung" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Material & Inventar" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Finanzen" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Administration" })).toBeInTheDocument();
   });
 
   it("hides permission-gated sections the user lacks access to (Club Admin still sees Administration)", () => {
