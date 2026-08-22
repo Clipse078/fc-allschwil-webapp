@@ -48,6 +48,7 @@ import {
 import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
 import { EmailCommunicationPanel } from "@/components/admin/communications/EmailCommunicationPanel";
 import type { WaitingListPriority } from "@prisma/client";
+import { ContactEmailEditDialog } from "@/components/admin/registrations/ContactEmailEditDialog";
 
 // ── Section helper ────────────────────────────────────────────────────────────
 
@@ -135,6 +136,8 @@ export function WaitingListDetailDrawer({
 }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailToast, setEmailToast] = useState<string | null>(null);
   const [showPlacePanel, setShowPlacePanel] = useState(false);
   const [placeTeamSeasonId, setPlaceTeamSeasonId] = useState("");
   const [teamSeasonOptions, setTeamSeasonOptions] = useState<TeamSeasonOption[]>([]);
@@ -350,12 +353,28 @@ export function WaitingListDetailDrawer({
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <p className="font-semibold text-[var(--foreground)]">{personName}</p>
                   {entry.registration.email ? (
-                    <a
-                      href={`mailto:${entry.registration.email}`}
-                      className="block text-xs text-[var(--tenant-primary)] hover:underline"
-                    >
-                      {entry.registration.email}
-                    </a>
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={`mailto:${entry.registration.email}`}
+                        className="block text-xs text-[var(--tenant-primary)] hover:underline break-all"
+                      >
+                        {entry.registration.email}
+                      </a>
+                      {canEdit ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingEmail(true)}
+                          className="rounded-md border border-[var(--border)] px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+                        >
+                          E-Mail-Adresse ändern
+                        </button>
+                      ) : null}
+                      {emailToast ? (
+                        <span className="text-[0.65rem] font-medium text-emerald-700">
+                          {emailToast}
+                        </span>
+                      ) : null}
+                    </div>
                   ) : null}
                   {birthYear ? (
                     <p className="text-xs text-[var(--muted)]">Jahrgang {birthYear}</p>
@@ -375,6 +394,26 @@ export function WaitingListDetailDrawer({
                 </div>
               </div>
             </Section>
+
+            <ContactEmailEditDialog
+              open={editingEmail}
+              onClose={() => setEditingEmail(false)}
+              tenantSlug={tenantSlug}
+              registrationId={entry.registration.id}
+              currentEmail={entry.registration.email}
+              canEdit={canEdit}
+              onSaved={(nextEmail) => {
+                setEmailToast("E-Mail-Adresse aktualisiert.");
+                window.setTimeout(() => setEmailToast(null), 2500);
+                onUpdate({
+                  ...entry,
+                  registration: {
+                    ...entry.registration,
+                    email: nextEmail,
+                  },
+                });
+              }}
+            />
 
             {/* Wartelisten-Eintrag */}
             <Section title="Wartelisten-Eintrag" icon={ClipboardList}>

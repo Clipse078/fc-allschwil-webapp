@@ -219,12 +219,6 @@ function deriveRetryAttemptMessageId(sourceMessageId: string, idempotencyKey: st
   return `retry_${digest.slice(0, 24)}`;
 }
 
-function firstRecipientAddress(value: unknown): string | null {
-  if (!Array.isArray(value)) return null;
-  const first = value[0];
-  return typeof first === "string" && first.trim() ? first.trim() : null;
-}
-
 export async function retryFailedOutboundEmailForThread(
   input: RetryFailedOutboundEmailInput,
 ): Promise<RetryFailedOutboundEmailResult> {
@@ -258,7 +252,6 @@ export async function retryFailedOutboundEmailForThread(
       status: true,
       subject: true,
       bodyText: true,
-      toAddresses: true,
     },
   });
   if (!source) {
@@ -275,10 +268,28 @@ export async function retryFailedOutboundEmailForThread(
     );
   }
 
-  const recipientEmail = firstRecipientAddress(source.toAddresses);
+  const recipient = await resolveCommunicationRecipientForTarget({
+    tenantId,
+    targetType: thread.targetType,
+    targetId: thread.targetId,
+  });
+  if (!recipient.available || !recipient.email) {
+    throw new CommunicationServiceError(
+      "RECIPIENT_UNAVAILABLE",
+      recipient.unavailableReason ?? "Keine gültige E-Mail-Adresse verfügbar.",
+    );
+  }
+  if (!recipient.sendAllowed) {
+    throw new CommunicationServiceError(
+      "SEND_FORBIDDEN",
+      recipient.unavailableReason ?? "Für diesen Eintrag können keine E-Mails gesendet werden.",
+    );
+  }
+
+  const recipientEmail = recipient.email;
   const subject = source.subject?.trim() ?? "";
   const bodyText = source.bodyText?.trim() ?? "";
-  if (!recipientEmail || !subject || !bodyText) {
+  if (!subject || !bodyText) {
     throw new CommunicationServiceError(
       "INVALID_INPUT",
       "Diese fehlgeschlagene E-Mail enthält nicht alle benötigten Versanddaten.",

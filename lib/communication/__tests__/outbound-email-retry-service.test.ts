@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   sendMail: vi.fn(),
   recordAudit: vi.fn(),
   getMessageByIdForTenant: vi.fn(),
+  resolveRecipient: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -35,6 +36,10 @@ vi.mock("@/lib/communication/audit-integration", () => ({
 
 vi.mock("@/lib/communication/message-service", () => ({
   getCommunicationMessageByIdForTenant: mocks.getMessageByIdForTenant,
+}));
+
+vi.mock("@/lib/communication/recipient-resolver", () => ({
+  resolveCommunicationRecipientForTarget: mocks.resolveRecipient,
 }));
 
 import { retryFailedOutboundEmailForThread } from "@/lib/communication/outbound-email-service";
@@ -69,7 +74,7 @@ function failedOutboundMessage(overrides: Record<string, unknown> = {}) {
     channel: "EMAIL",
     subject: "TEST2",
     bodyText: "Hallo Anna",
-    toAddresses: ["anna@example.com"],
+    toAddresses: ["wrong@example.com"],
     provider: "resend",
     status: "FAILED",
     replyToAddress: `reply+${"b".repeat(64)}@${INBOUND_DOMAIN}`,
@@ -100,6 +105,13 @@ beforeEach(() => {
   mocks.state.messages.clear();
   process.env.EMAIL_INBOUND_DOMAIN = INBOUND_DOMAIN;
   mocks.recordAudit.mockResolvedValue(undefined);
+  mocks.resolveRecipient.mockResolvedValue({
+    email: "correct@example.com",
+    displayName: "Anna Muster",
+    available: true,
+    sendAllowed: true,
+    unavailableReason: null,
+  });
   mocks.sendMail.mockResolvedValue({
     providerMessageId: "resend-message-2",
     from: "SportClubEvo <noreply@mail.sportclubevo.com>",
@@ -182,10 +194,11 @@ describe("COMM-03A retry failed outbound email", () => {
     expect(isRetryId(result.message.id)).toBe(true);
     expect(result.message.id).not.toBe("message-failed-a");
     expect(result.message.status).toBe("SENT");
+    expect(result.message.toAddresses).toEqual(["correct@example.com"]);
 
     expect(mocks.sendMail).toHaveBeenCalledWith(
       expect.objectContaining({
-        to: "anna@example.com",
+        to: "correct@example.com",
         subject: "TEST2",
         text: "Hallo Anna",
         replyTo: `reply+${STABLE_TOKEN}@${INBOUND_DOMAIN}`,
@@ -198,6 +211,7 @@ describe("COMM-03A retry failed outbound email", () => {
 
     // Original failed record must remain unchanged.
     expect(getStoredMessage("message-failed-a")?.status).toBe("FAILED");
+    expect(getStoredMessage("message-failed-a")?.toAddresses).toEqual(["wrong@example.com"]);
     expect(
       mocks.messageUpdateMany.mock.calls.every(
         (call) => String(call[0]?.where?.id) !== "message-failed-a",

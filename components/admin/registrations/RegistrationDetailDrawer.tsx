@@ -69,6 +69,7 @@ import {
 import { InternalCommentsPanel } from "@/components/admin/communications/InternalCommentsPanel";
 import { EmailCommunicationPanel } from "@/components/admin/communications/EmailCommunicationPanel";
 import RegistrationTimelinePanel from "./RegistrationTimelinePanel";
+import { ContactEmailEditDialog } from "@/components/admin/registrations/ContactEmailEditDialog";
 
 const NOT_PROVIDED = "Nicht angegeben";
 
@@ -349,6 +350,8 @@ export default function RegistrationDetailDrawer({
   const [registration, setRegistration] = useState(initialRegistration);
   const [isVisible, setIsVisible] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailToast, setEmailToast] = useState<string | null>(null);
 
   // Sync when parent changes the selected registration
   useEffect(() => {
@@ -473,6 +476,22 @@ export default function RegistrationDetailDrawer({
               <p className="mt-1 text-xs text-[var(--muted)] break-all">
                 {registration.email}
               </p>
+              {canEdit ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingEmail(true)}
+                    className="inline-flex items-center gap-1 rounded-md border border-[var(--border)] px-2 py-1 text-[0.7rem] font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+                  >
+                    E-Mail-Adresse ändern
+                  </button>
+                  {emailToast ? (
+                    <span className="text-[0.7rem] font-medium text-emerald-700">
+                      {emailToast}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             <div className="flex-shrink-0 flex items-center gap-1">
@@ -803,6 +822,22 @@ export default function RegistrationDetailDrawer({
             </>
           )}
         </RegistrationDetailDrawerTabs>
+
+        <ContactEmailEditDialog
+          open={editingEmail}
+          onClose={() => setEditingEmail(false)}
+          tenantSlug={tenantSlug}
+          registrationId={registration.id}
+          currentEmail={registration.email}
+          canEdit={canEdit}
+          onSaved={(nextEmail) => {
+            setEmailToast("E-Mail-Adresse aktualisiert.");
+            window.setTimeout(() => setEmailToast(null), 2500);
+            const updated = { ...registration, email: nextEmail };
+            setRegistration(updated);
+            onUpdate(updated);
+          }}
+        />
 
         {/* ── Footer ──────────────────────────────────────────────────────── */}
         <div className="flex-shrink-0 flex items-center justify-between gap-3 px-6 py-4 border-t border-[var(--border)] bg-[var(--surface-2)]">
