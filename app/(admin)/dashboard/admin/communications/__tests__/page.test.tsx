@@ -35,7 +35,10 @@ beforeEach(() => {
 describe("COMM-03B canonical email sender page authorization", () => {
   it("loads the active tenant settings for an authorized tenant admin", async () => {
     await EmailSenderPage();
-    expect(mocks.requirePermission).toHaveBeenCalledWith(["users.manage"]);
+    expect(mocks.requirePermission).toHaveBeenCalledWith([
+      "users.manage",
+      "users.manage_memberships",
+    ]);
     expect(mocks.getSettings).toHaveBeenCalledWith("tenant-a");
   });
 
