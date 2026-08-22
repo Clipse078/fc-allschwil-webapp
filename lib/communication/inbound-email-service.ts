@@ -10,8 +10,15 @@ import { getCommunicationThreadByInboundToken } from "@/lib/communication/thread
 export type InboundEmailPersistResult =
   | { ok: true; kind: "PERSISTED"; messageId: string; threadId: string; tenantId: string }
   | { ok: true; kind: "DUPLICATE"; messageId: string; threadId: string; tenantId: string }
+  | { ok: true; kind: "IDEMPOTENCY_CONFLICT" }
   | { ok: true; kind: "UNKNOWN_TOKEN" }
   | { ok: false; kind: "INVALID_INPUT"; error: string };
+
+function isPrismaUniqueConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? (error as { code?: unknown }).code : undefined;
+  return code === "P2002";
+}
 
 export async function persistInboundEmailReply(
   email: NormalizedInboundEmail,
@@ -49,10 +56,11 @@ export async function persistInboundEmailReply(
   if (existing) {
     // Defensive: never leak cross-tenant linkage; resolved thread is authoritative.
     if (existing.tenantId !== thread.tenantId || existing.threadId !== thread.id) {
-      throw new CommunicationServiceError(
-        "INVALID_INPUT",
-        "Inbound email idempotency conflict.",
-      );
+      console.error("Inbound email idempotency conflict ignored:", {
+        provider,
+        providerMessageId: email.providerMessageId.trim(),
+      });
+      return { ok: true, kind: "IDEMPOTENCY_CONFLICT" };
     }
     return {
       ok: true,
@@ -63,30 +71,64 @@ export async function persistInboundEmailReply(
     };
   }
 
-  const created = await prisma.communicationMessage.create({
-    data: {
-      tenantId: thread.tenantId,
-      threadId: thread.id,
-      direction: "INBOUND",
-      channel: "EMAIL",
-      subject: email.subject?.trim() || null,
-      bodyText: email.bodyText ?? null,
-      bodyHtml: email.bodyHtml ?? null,
-      fromAddress: email.fromAddress ?? null,
-      toAddresses: email.toAddresses,
+  let created: { id: string };
+  try {
+    created = await prisma.communicationMessage.create({
+      data: {
+        tenantId: thread.tenantId,
+        threadId: thread.id,
+        direction: "INBOUND",
+        channel: "EMAIL",
+        subject: email.subject?.trim() || null,
+        bodyText: email.bodyText ?? null,
+        bodyHtml: email.bodyHtml ?? null,
+        fromAddress: email.fromAddress ?? null,
+        toAddresses: email.toAddresses,
+        provider,
+        providerEventId: email.providerEventId?.trim() || null,
+        providerMessageId: email.providerMessageId.trim(),
+        messageIdHeader: email.messageIdHeader ?? null,
+        inReplyTo: email.inReplyTo ?? null,
+        references: email.references ?? undefined,
+        status: "RECEIVED",
+        receivedAt: email.receivedAt,
+        attachments: email.attachments ?? undefined,
+        createdByUserId: null,
+      },
+      select: { id: true },
+    });
+  } catch (error) {
+    // Race-safe idempotency: if two webhook deliveries arrive concurrently, the second
+    // insert can hit the unique(provider, providerMessageId) constraint.
+    if (!isPrismaUniqueConstraintError(error)) {
+      throw error;
+    }
+
+    const raced = await prisma.communicationMessage.findFirst({
+      where: {
+        provider,
+        providerMessageId: email.providerMessageId.trim(),
+      },
+      select: { id: true, tenantId: true, threadId: true },
+    });
+    if (raced && raced.tenantId === thread.tenantId && raced.threadId === thread.id) {
+      return {
+        ok: true,
+        kind: "DUPLICATE",
+        messageId: raced.id,
+        threadId: raced.threadId,
+        tenantId: raced.tenantId,
+      };
+    }
+
+    // Defensive: the unique constraint is global, so a conflict here must not result
+    // in cross-tenant writes and should not trigger infinite provider retries.
+    console.error("Inbound email unique-constraint conflict ignored:", {
       provider,
-      providerEventId: email.providerEventId?.trim() || null,
       providerMessageId: email.providerMessageId.trim(),
-      messageIdHeader: email.messageIdHeader ?? null,
-      inReplyTo: email.inReplyTo ?? null,
-      references: email.references ?? undefined,
-      status: "RECEIVED",
-      receivedAt: email.receivedAt,
-      attachments: email.attachments ?? undefined,
-      createdByUserId: null,
-    },
-    select: { id: true },
-  });
+    });
+    return { ok: true, kind: "IDEMPOTENCY_CONFLICT" };
+  }
 
   await recordCommunicationAuditEvent({
     tenantId: thread.tenantId,

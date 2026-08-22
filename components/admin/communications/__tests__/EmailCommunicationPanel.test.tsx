@@ -282,4 +282,75 @@ describe("COMM-01C email communication UX", () => {
       expect(screen.getByText("Dieser Eintrag ist abgeschlossen.")).toBeInTheDocument(),
     );
   });
+
+  it("renders mixed FAILED/SENT/RECEIVED items with scoped errors and deterministic order", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      return jsonResponse({
+        recipient: baseRecipient,
+        messages: [
+          {
+            id: "m-failed",
+            direction: "OUTBOUND",
+            subject: "OLD FAIL",
+            body: "Fehlversuch",
+            from: null,
+            to: "anna@example.com",
+            status: "FAILED",
+            senderDisplayName: "Club Admin",
+            sentAt: null,
+            receivedAt: null,
+            createdAt: "2026-08-21T09:00:00.000Z",
+            deliveryError: "Der E-Mail-Dienst konnte die Nachricht nicht versenden.",
+            attachmentCount: 0,
+          },
+          {
+            id: "m-sent",
+            direction: "OUTBOUND",
+            subject: "TEST3",
+            body: "Hallo",
+            from: null,
+            to: "anna@example.com",
+            status: "SENT",
+            senderDisplayName: "Club Admin",
+            sentAt: "2026-08-21T10:00:00.000Z",
+            receivedAt: null,
+            createdAt: "2026-08-21T09:59:00.000Z",
+            deliveryError: null,
+            attachmentCount: 0,
+          },
+          {
+            id: "m-in",
+            direction: "INBOUND",
+            subject: "Re: TEST3",
+            body: "Hallo\n\n> quoted",
+            from: "m.s.duijster@gmail.com",
+            to: null,
+            status: "RECEIVED",
+            senderDisplayName: null,
+            sentAt: null,
+            receivedAt: "2026-08-21T10:05:00.000Z",
+            createdAt: "2026-08-21T10:06:00.000Z",
+            deliveryError: null,
+            attachmentCount: 0,
+          },
+        ],
+      });
+    });
+
+    const { container } = renderPanel();
+
+    expect(await screen.findByText("Fehlgeschlagen")).toBeInTheDocument();
+    expect(screen.getByText("Gesendet")).toBeInTheDocument();
+    expect(screen.getByText("Empfangen")).toBeInTheDocument();
+
+    expect(screen.getByText("Der E-Mail-Dienst konnte die Nachricht nicht versenden.")).toBeInTheDocument();
+    expect(container.querySelectorAll("p.text-rose-600")).toHaveLength(1);
+
+    const headings = Array.from(container.querySelectorAll("h3")).map((node) => node.textContent);
+    expect(headings).toEqual(["OLD FAIL", "TEST3", "Re: TEST3"]);
+  });
 });

@@ -50,6 +50,14 @@ function attachmentCount(value: unknown): number {
   return Array.isArray(value) ? value.length : 0;
 }
 
+function timelineTimestamp(message: CommunicationMessageRecord): Date {
+  // Mirror the UI timeline timestamp selection to keep ordering intuitive and deterministic.
+  // For outbound: prefer sentAt; for inbound: prefer receivedAt; fall back to createdAt.
+  const preferred =
+    message.direction === "INBOUND" ? message.receivedAt : message.sentAt;
+  return preferred ?? message.createdAt;
+}
+
 export async function toPublicEmailThreadMessages(
   tenantId: string,
   messages: CommunicationMessageRecord[],
@@ -82,7 +90,17 @@ export async function toPublicEmailThreadMessages(
     users.map((user) => [user.id, resolveAuditActorDisplayName(user)]),
   );
 
-  return emailMessages.map((message) => ({
+  const sorted = [...emailMessages].sort((a, b) => {
+    const tA = timelineTimestamp(a).getTime();
+    const tB = timelineTimestamp(b).getTime();
+    if (tA !== tB) return tA - tB;
+    const cA = a.createdAt.getTime();
+    const cB = b.createdAt.getTime();
+    if (cA !== cB) return cA - cB;
+    return a.id.localeCompare(b.id);
+  });
+
+  return sorted.map((message) => ({
     id: message.id,
     direction: message.direction,
     subject: message.subject ?? "",

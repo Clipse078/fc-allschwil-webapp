@@ -131,26 +131,25 @@ describe("COMM-02 inbound email persistence", () => {
   it("blocks cross-tenant idempotency conflicts safely", async () => {
     mocks.messageFindFirst.mockResolvedValue({ id: "msg-in-1", tenantId: "tenant-b", threadId: "thread-b" });
 
-    await expect(
-      persistInboundEmailReply({
-        provider: "resend",
-        providerEventId: "evt-1",
-        providerMessageId: "email-1",
-        fromAddress: "customer@example.com",
-        toAddresses: [`reply+${TOKEN_A}@inbound.example.com`],
-        ccAddresses: [],
-        bccAddresses: [],
-        subject: "Re: Hallo",
-        bodyText: "Danke!",
-        bodyHtml: null,
-        messageIdHeader: "<m1@example.com>",
-        inReplyTo: "<m0@example.com>",
-        references: ["<m0@example.com>"],
-        receivedAt: new Date("2026-08-21T11:00:00.000Z"),
-        attachments: null,
-      }),
-    ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    const result = await persistInboundEmailReply({
+      provider: "resend",
+      providerEventId: "evt-1",
+      providerMessageId: "email-1",
+      fromAddress: "customer@example.com",
+      toAddresses: [`reply+${TOKEN_A}@inbound.example.com`],
+      ccAddresses: [],
+      bccAddresses: [],
+      subject: "Re: Hallo",
+      bodyText: "Danke!",
+      bodyHtml: null,
+      messageIdHeader: "<m1@example.com>",
+      inReplyTo: "<m0@example.com>",
+      references: ["<m0@example.com>"],
+      receivedAt: new Date("2026-08-21T11:00:00.000Z"),
+      attachments: null,
+    });
 
+    expect(result).toMatchObject({ ok: true, kind: "IDEMPOTENCY_CONFLICT" });
     expect(mocks.messageCreate).not.toHaveBeenCalled();
     expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
@@ -178,6 +177,34 @@ describe("COMM-02 inbound email persistence", () => {
 
     expect(result).toMatchObject({ ok: true, kind: "DUPLICATE", messageId: "msg-in-1" });
     expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.recordAudit).not.toHaveBeenCalled();
+  });
+
+  it("treats concurrent unique-constraint races as duplicates (safe replay)", async () => {
+    mocks.messageFindFirst
+      .mockResolvedValueOnce(null) // initial idempotency lookup
+      .mockResolvedValueOnce({ id: "msg-in-1", tenantId: TENANT_A, threadId: THREAD_A }); // lookup after P2002
+    mocks.messageCreate.mockRejectedValue({ code: "P2002" });
+
+    const result = await persistInboundEmailReply({
+      provider: "resend",
+      providerEventId: "evt-1",
+      providerMessageId: "email-1",
+      fromAddress: "customer@example.com",
+      toAddresses: [`reply+${TOKEN_A}@inbound.example.com`],
+      ccAddresses: [],
+      bccAddresses: [],
+      subject: "Re: Hallo",
+      bodyText: "Danke!",
+      bodyHtml: null,
+      messageIdHeader: "<m1@example.com>",
+      inReplyTo: "<m0@example.com>",
+      references: ["<m0@example.com>"],
+      receivedAt: new Date("2026-08-21T11:00:00.000Z"),
+      attachments: null,
+    });
+
+    expect(result).toMatchObject({ ok: true, kind: "DUPLICATE", messageId: "msg-in-1" });
     expect(mocks.recordAudit).not.toHaveBeenCalled();
   });
 
