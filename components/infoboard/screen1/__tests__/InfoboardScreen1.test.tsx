@@ -1063,7 +1063,7 @@ describe("4-team tournament allocation", () => {
     expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
 
-  it("logo strip uses centered-group layout and caps at four logos", () => {
+  it("logo strip stays left-aligned and caps at four logos", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
@@ -1071,9 +1071,10 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const logoArea = screen.getByTestId("tournament-participants");
-    expect(logoArea.getAttribute("data-layout")).toBe("centered-group");
+    expect(logoArea.getAttribute("data-layout")).toBeNull();
     expect(logoArea.className).toContain("tournamentParticipantLogos");
     expect(logoArea.querySelectorAll("img").length).toBe(4);
+    expect(logoArea.textContent?.trim()).toBe("");
   });
 
   it("tournament title keeps dedicated overflow handling class", () => {
@@ -1089,21 +1090,21 @@ describe("4-team tournament allocation", () => {
   });
 });
 
-describe("Tournament logo strip centering — INFOBOARD-LOGO-08", () => {
+describe("Tournament logo strip alignment — INFOBOARD-LOGO-08A", () => {
   function renderTournamentWithLogoCount(count: number) {
     const allocations = PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS[0].participantAllocations
       .slice(0, count)
       .map((participant, index) => ({
         ...participant,
-        id: `center-test-${index + 1}`,
+        id: `align-test-${index + 1}`,
       }));
 
     const feed = makeFeed({
       current: [
         makeEvent({
-          id: "evt-center-test",
+          id: "evt-align-test",
           type: "TOURNAMENT",
-          displayTitle: "Centering Test Turnier",
+          displayTitle: "Alignment Test Turnier",
           allocation: {
             pitchLabel: "Kunstrasen 1",
             homeDressingRoomLabel: null,
@@ -1118,7 +1119,7 @@ describe("Tournament logo strip centering — INFOBOARD-LOGO-08", () => {
     render(
       <InfoboardScreen1
         feed={feed}
-        eventPresentation={makeEventPresentation("evt-center-test", allocations)}
+        eventPresentation={makeEventPresentation("evt-align-test", allocations)}
       />,
     );
 
@@ -1126,10 +1127,10 @@ describe("Tournament logo strip centering — INFOBOARD-LOGO-08", () => {
   }
 
   it.each([1, 2, 3, 4])(
-    "keeps %i-logo tournament strip as a centered group container",
+    "keeps %i-logo tournament strip left-aligned without participant text",
     (count) => {
       const logoArea = renderTournamentWithLogoCount(count);
-      expect(logoArea.getAttribute("data-layout")).toBe("centered-group");
+      expect(logoArea.getAttribute("data-layout")).toBeNull();
       expect(logoArea.className).toContain("tournamentParticipantLogos");
       expect(logoArea.querySelectorAll("img").length).toBe(count);
       expect(logoArea.textContent?.trim()).toBe("");

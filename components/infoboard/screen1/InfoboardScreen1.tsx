@@ -1042,7 +1042,6 @@ function EventCard({
               <div
                 className={styles.tournamentParticipantLogos}
                 data-testid="tournament-participants"
-                data-layout="centered-group"
               >
                 {participantAllocations.slice(0, 4).map((participant) => (
                   <MatchClubLogo
