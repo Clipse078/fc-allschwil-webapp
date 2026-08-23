@@ -19,6 +19,9 @@ import {
   InfoboardScreen1,
   computeTrainingGroupDemand,
   computeEventDemand,
+  computeMatchDemand,
+  computeTournamentDemand,
+  computeTournamentParticipantDisplayRows,
   densityTier,
   layoutModeTier,
   LAYOUT_MODE_SPARSE_THRESHOLD,
@@ -26,7 +29,11 @@ import {
   CARD_DEMAND_TRAINING_BASE,
   CARD_DEMAND_TRAINING_ROW,
   CARD_DEMAND_MATCH,
+  CARD_DEMAND_MATCH_SUB_TEAM,
+  CARD_DEMAND_MATCH_END_TIME,
   CARD_DEMAND_TOURNAMENT_BASE,
+  CARD_DEMAND_TOURNAMENT_DISPLAY_ROW,
+  CARD_DEMAND_TOURNAMENT_PARTICIPANT,
   CARD_DEMAND_PAGE_MAX,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import type { DisplayItem, FlatEvent } from "@/components/infoboard/screen1/InfoboardScreen1";
@@ -2868,6 +2875,254 @@ describe("Content-demand — computeEventDemand", () => {
   it("TRAINING type (solo event) returns CARD_DEMAND_MATCH as fallback", () => {
     // Solo trainings rendered as EventCard also use computeEventDemand via the demand path
     expect(computeEventDemand("TRAINING")).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+});
+
+describe("Content-demand — computeMatchDemand", () => {
+  it("simple match without sub-team lines gets baseline demand", () => {
+    const event = makeEvent({
+      type: "MATCH",
+      endAt: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: "/logo.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: "/logo2.png",
+        },
+      },
+    });
+    expect(computeMatchDemand(event)).toBeCloseTo(CARD_DEMAND_MATCH);
+  });
+
+  it("richer match with sub-team lines gets greater demand", () => {
+    const simple = makeEvent({
+      type: "MATCH",
+      endAt: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+      },
+    });
+    const richer = makeEvent({
+      type: "MATCH",
+      endAt: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+      },
+    });
+    expect(computeMatchDemand(richer)).toBeGreaterThan(computeMatchDemand(simple));
+    expect(computeMatchDemand(richer)).toBeCloseTo(
+      CARD_DEMAND_MATCH + 2 * CARD_DEMAND_MATCH_SUB_TEAM,
+    );
+  });
+
+  it("logo availability alone does not change demand", () => {
+    const withoutLogo = makeEvent({
+      type: "MATCH",
+      endAt: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+      },
+    });
+    const withLogo = makeEvent({
+      ...withoutLogo,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: "/logo.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: "/logo2.png",
+        },
+      },
+    });
+    expect(computeMatchDemand(withLogo)).toBeCloseTo(computeMatchDemand(withoutLogo));
+  });
+
+  it("end time line adds a bounded demand increment", () => {
+    const withoutEnd = makeEvent({ type: "MATCH", endAt: null });
+    const withEnd = makeEvent({
+      type: "MATCH",
+      startAt: "2026-09-12T08:00:00.000Z",
+      endAt: "2026-09-12T09:30:00.000Z",
+    });
+    expect(computeMatchDemand(withEnd)).toBeCloseTo(
+      computeMatchDemand(withoutEnd) + CARD_DEMAND_MATCH_END_TIME,
+    );
+  });
+});
+
+describe("Content-demand — computeTournamentDemand", () => {
+  it("small tournament with no participants gets base demand", () => {
+    expect(computeTournamentDemand(undefined)).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE);
+    expect(computeTournamentDemand([])).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE);
+  });
+
+  it("participant-rich tournament demand exceeds small tournament", () => {
+    const small = computeTournamentDemand([
+      { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: null },
+      { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: null },
+    ]);
+    const rich = computeTournamentDemand([
+      { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: "Kabine 1" },
+      { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: "Kabine 2" },
+      { id: "p3", teamDisplayName: "Team C", dressingRoomLabel: "Kabine 3" },
+      { id: "p4", teamDisplayName: "Team D", dressingRoomLabel: "Kabine 4" },
+    ]);
+    expect(rich).toBeGreaterThan(small);
+    expect(rich).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE + 4 * CARD_DEMAND_TOURNAMENT_PARTICIPANT);
+  });
+
+  it("participant display rows follow two-column layout", () => {
+    expect(computeTournamentParticipantDisplayRows(1)).toBe(1);
+    expect(computeTournamentParticipantDisplayRows(2)).toBe(1);
+    expect(computeTournamentParticipantDisplayRows(3)).toBe(2);
+    expect(computeTournamentParticipantDisplayRows(4)).toBe(2);
+    expect(computeTournamentParticipantDisplayRows(5)).toBe(3);
+    expect(computeTournamentParticipantDisplayRows(6)).toBe(3);
+  });
+
+  it("small tournament uses display-row demand without allocation matrix", () => {
+    const demand = computeTournamentDemand([
+      { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: null },
+      { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: null },
+    ]);
+    expect(demand).toBeCloseTo(
+      CARD_DEMAND_TOURNAMENT_BASE + CARD_DEMAND_TOURNAMENT_DISPLAY_ROW,
+    );
+  });
+
+  it("demand remains deterministic for identical inputs", () => {
+    const allocations = [
+      { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: "Kabine 1" },
+      { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: "Kabine 2" },
+      { id: "p3", teamDisplayName: "Team C", dressingRoomLabel: "Kabine 3" },
+    ];
+    expect(computeTournamentDemand(allocations)).toBeCloseTo(
+      computeTournamentDemand(allocations),
+    );
+  });
+});
+
+describe("Content-demand — training regression (unchanged)", () => {
+  it("1-row training demand unchanged", () => {
+    expect(computeTrainingGroupDemand(1)).toBeCloseTo(
+      CARD_DEMAND_TRAINING_BASE + CARD_DEMAND_TRAINING_ROW,
+    );
+  });
+
+  it("6-row training demand unchanged", () => {
+    expect(computeTrainingGroupDemand(6)).toBeCloseTo(
+      CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW,
+    );
+  });
+});
+
+describe("Content-demand — layout mode and pagination", () => {
+  it("sparse simple match stays sparse", () => {
+    const event = makeEvent({ type: "MATCH", endAt: null });
+    expect(layoutModeTier(computeMatchDemand(event))).toBe("sparse");
+  });
+
+  it("sparse small tournament stays sparse", () => {
+    const demand = computeTournamentDemand([
+      { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: null },
+      { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: null },
+    ]);
+    expect(layoutModeTier(demand)).toBe("sparse");
+  });
+
+  it("richer match still below fill threshold when alone", () => {
+    const event = makeEvent({
+      type: "MATCH",
+      startAt: "2026-09-12T08:00:00.000Z",
+      endAt: "2026-09-12T09:30:00.000Z",
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+      },
+    });
+    expect(layoutModeTier(computeMatchDemand(event))).toBe("sparse");
+  });
+
+  it("mixed content demand totals correctly for fill mode", () => {
+    const trainingDemand = computeTrainingGroupDemand(6);
+    const matchDemand = computeMatchDemand(makeEvent({ type: "MATCH", endAt: null }));
+    const tournamentDemand = computeTournamentDemand([
+      { id: "p1", teamDisplayName: "A", dressingRoomLabel: "K1" },
+      { id: "p2", teamDisplayName: "B", dressingRoomLabel: "K2" },
+      { id: "p3", teamDisplayName: "C", dressingRoomLabel: "K3" },
+      { id: "p4", teamDisplayName: "D", dressingRoomLabel: "K4" },
+    ]);
+    const total = trainingDemand + matchDemand + tournamentDemand;
+    expect(layoutModeTier(total)).toBe("fill");
+    expect(total).toBeCloseTo(4.3 + 1.5 + 2.7, 1);
+  });
+
+  it("pagination still respects CARD_DEMAND_PAGE_MAX", () => {
+    const items = Array.from({ length: 9 }, (_, i) => ({
+      kind: "event" as const,
+      item: {
+        event: makeEvent({
+          id: `m${i}`,
+          type: "MATCH" as const,
+          startAt: `2026-09-12T${String(8 + i).padStart(2, "0")}:00:00.000Z`,
+        }),
+        temporal: "later" as const,
+      },
+    }));
+    const demands = items.map((item) => computeMatchDemand(item.item.event));
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    expect(pages.length).toBeGreaterThan(1);
+    for (const page of pages) {
+      const pageDemand = page.reduce(
+        (sum, item) => sum + computeMatchDemand(item.item.event),
+        0,
+      );
+      expect(pageDemand).toBeLessThanOrEqual(CARD_DEMAND_PAGE_MAX + 0.01);
+    }
   });
 });
 
