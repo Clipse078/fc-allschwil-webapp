@@ -21,11 +21,12 @@ export type PublicEmailThreadMessage = {
   body: string;
   from: string | null;
   to: string | null;
-  status: "QUEUED" | "SENT" | "FAILED" | "RECEIVED";
+  status: "DRAFT" | "QUEUED" | "SENT" | "FAILED" | "RECEIVED";
   senderDisplayName: string | null;
   sentAt: string | null;
   receivedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   deliveryError: string | null;
   attachmentCount: number;
   attachments: PublicEmailThreadAttachment[];
@@ -189,6 +190,8 @@ export async function toPublicEmailThreadMessages(
       status:
         message.direction === "INBOUND"
           ? "RECEIVED"
+          : message.status === "DRAFT"
+            ? "DRAFT"
           : message.status === "SENT" || message.status === "DELIVERED"
             ? "SENT"
             : message.status === "FAILED"
@@ -200,6 +203,7 @@ export async function toPublicEmailThreadMessages(
       sentAt: message.sentAt?.toISOString() ?? null,
       receivedAt: message.receivedAt?.toISOString() ?? null,
       createdAt: message.createdAt.toISOString(),
+      updatedAt: message.updatedAt.toISOString(),
       deliveryError: message.status === "FAILED" ? message.deliveryError : null,
       attachmentCount: summary.count,
       attachments,

@@ -79,7 +79,7 @@ describe("COMM-01C email communication UX", () => {
     expect(screen.queryByText("Noch keine E-Mails.")).not.toBeInTheDocument();
     expect(screen.queryByText("Keine E-Mail-Adresse verfügbar")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Betreff")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "E-Mail senden" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Senden" })).not.toBeInTheDocument();
   });
 
   it("B — shows the calm empty state and read-only canonical recipient", async () => {
@@ -89,7 +89,7 @@ describe("COMM-01C email communication UX", () => {
     expect(screen.getByText("anna@example.com")).toBeInTheDocument();
     expect(screen.getByLabelText("Betreff")).toBeEnabled();
     expect(screen.getByLabelText("Nachricht")).toBeEnabled();
-    expect(screen.getByRole("button", { name: "E-Mail senden" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeDisabled();
   });
 
   it("C — blocks composing when the canonical target has no recipient", async () => {
@@ -115,7 +115,7 @@ describe("COMM-01C email communication UX", () => {
     expect(await screen.findByText("Keine E-Mail-Adresse verfügbar")).toBeInTheDocument();
     expect(screen.getByText("Für diese Person ist keine gültige E-Mail-Adresse verfügbar.")).toBeInTheDocument();
     expect(screen.getByLabelText("Betreff")).toBeDisabled();
-    expect(screen.getByRole("button", { name: "E-Mail senden" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeDisabled();
   });
 
   it("D — preserves loaded context when sending fails", async () => {
@@ -139,7 +139,7 @@ describe("COMM-01C email communication UX", () => {
     expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
     await user.type(screen.getByLabelText("Betreff"), "Willkommen");
     await user.type(screen.getByLabelText("Nachricht"), "Hallo Anna");
-    await user.click(screen.getByRole("button", { name: "E-Mail senden" }));
+    await user.click(screen.getByRole("button", { name: "Senden" }));
 
     expect(await screen.findByText("Die E-Mail konnte nicht gesendet werden.")).toBeInTheDocument();
     expect(screen.getByText("anna@example.com")).toBeInTheDocument();
@@ -586,7 +586,7 @@ describe("COMM-01C email communication UX", () => {
     expect(screen.getByText("einladung.pdf")).toBeInTheDocument();
     expect(screen.getByText(/2\/10/)).toBeInTheDocument();
     expect(screen.getByText(/Wird hochgeladen/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "E-Mail senden" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeDisabled();
 
     resolveSecondUpload?.();
     await waitFor(() =>
@@ -594,7 +594,7 @@ describe("COMM-01C email communication UX", () => {
     );
     await user.click(screen.getByRole("button", { name: "einladung.pdf entfernen" }));
     expect(screen.queryByText("einladung.pdf")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "E-Mail senden" }));
+    await user.click(screen.getByRole("button", { name: "Senden" }));
 
     await waitFor(() =>
       expect(sentBody).toMatchObject({ attachmentIds: ["attachment-a"] }),
@@ -679,9 +679,203 @@ describe("COMM-01C email communication UX", () => {
 
     expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
     expect(screen.getByLabelText("Dateien hinzufügen")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Entwurf speichern" })).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining("targetType=WAITING_LIST_ENTRY"),
       expect.anything(),
     );
+  });
+
+  it("creates one draft, updates the same explicit ID, and never calls the provider send route", async () => {
+    const savedBodies: Array<{ url: string; method: string; body: Record<string, unknown> }> = [];
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({ messages: [], draft: null, recipient: baseRecipient });
+      }
+      if (url.endsWith("/drafts") || url.endsWith("/drafts/draft-a")) {
+        const body = JSON.parse(String(init?.body));
+        savedBodies.push({ url, method: String(init?.method), body });
+        return jsonResponse(
+          {
+            draft: {
+              id: "draft-a",
+              direction: "OUTBOUND",
+              subject: body.subject,
+              body: body.bodyText,
+              from: null,
+              to: "anna@example.com",
+              status: "DRAFT",
+              senderDisplayName: "Admin",
+              sentAt: null,
+              receivedAt: null,
+              createdAt: "2026-08-23T05:00:00.000Z",
+              updatedAt: "2026-08-23T05:15:00.000Z",
+              deliveryError: null,
+              attachmentCount: 0,
+              attachments: [],
+            },
+          },
+          url.endsWith("/drafts") ? 201 : 200,
+        );
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Betreff"), "Trainingsanmeldung");
+    await user.type(screen.getByLabelText("Nachricht"), "Hallo Anna");
+    await user.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+
+    expect(await screen.findByText("Entwurf gespeichert")).toBeInTheDocument();
+    expect(screen.getByText("Entwurf")).toBeInTheDocument();
+    expect(savedBodies[0]).toMatchObject({
+      method: "POST",
+      body: { subject: "Trainingsanmeldung", bodyText: "Hallo Anna", attachmentIds: [] },
+    });
+
+    await user.type(screen.getByLabelText("Betreff"), " aktualisiert");
+    await user.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+    expect(await screen.findByText("Änderungen gespeichert")).toBeInTheDocument();
+    expect(savedBodies[1]).toMatchObject({
+      method: "PATCH",
+      url: expect.stringContaining("/drafts/draft-a"),
+    });
+    expect(
+      vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith("/messages/email")),
+    ).toBe(false);
+  });
+
+  it("reopens a draft with ordered attachment metadata and sends that same message", async () => {
+    let sentBody: Record<string, unknown> | null = null;
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/drafts/draft-a/send")) {
+        sentBody = JSON.parse(String(init?.body));
+        return jsonResponse({ message: { id: "draft-a", status: "SENT" } });
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({
+          messages: [],
+          recipient: baseRecipient,
+          draft: {
+            id: "draft-a",
+            direction: "OUTBOUND",
+            subject: "Gespeicherter Betreff",
+            body: "Gespeicherter Inhalt",
+            from: null,
+            to: "anna@example.com",
+            status: "DRAFT",
+            senderDisplayName: "Admin",
+            sentAt: null,
+            receivedAt: null,
+            createdAt: "2026-08-23T05:00:00.000Z",
+            updatedAt: "2026-08-23T05:15:00.000Z",
+            deliveryError: null,
+            attachmentCount: 2,
+            attachments: [
+              {
+                id: "attachment-b",
+                filename: "b.pdf",
+                contentType: "application/pdf",
+                size: 2,
+                downloadAvailable: true,
+              },
+              {
+                id: "attachment-a",
+                filename: "a.pdf",
+                contentType: "application/pdf",
+                size: 1,
+                downloadAvailable: true,
+              },
+            ],
+          },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+
+    expect(await screen.findByDisplayValue("Gespeicherter Betreff")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Gespeicherter Inhalt")).toBeInTheDocument();
+    expect(screen.getAllByText(/\.pdf/).map((node) => node.textContent)).toEqual([
+      expect.stringContaining("b.pdf"),
+      expect.stringContaining("a.pdf"),
+    ]);
+    expect(screen.getByRole("button", { name: "Entwurf speichern" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Senden" }));
+    await waitFor(() =>
+      expect(sentBody).toMatchObject({
+        subject: "Gespeicherter Betreff",
+        bodyText: "Gespeicherter Inhalt",
+        attachmentIds: ["attachment-b", "attachment-a"],
+      }),
+    );
+  });
+
+  it("warns only for dirty composer closes and clears dirty state after save", async () => {
+    const confirm = vi.fn(() => false);
+    vi.stubGlobal("confirm", confirm);
+    vi.mocked(fetch).mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({ messages: [], draft: null, recipient: baseRecipient });
+      }
+      if (url.endsWith("/drafts")) {
+        const body = JSON.parse(String(init?.body));
+        return jsonResponse({
+          draft: {
+            id: "draft-a",
+            direction: "OUTBOUND",
+            subject: body.subject,
+            body: body.bodyText,
+            from: null,
+            to: "anna@example.com",
+            status: "DRAFT",
+            senderDisplayName: "Admin",
+            sentAt: null,
+            receivedAt: null,
+            createdAt: "2026-08-23T05:00:00.000Z",
+            updatedAt: "2026-08-23T05:00:00.000Z",
+            deliveryError: null,
+            attachmentCount: 0,
+            attachments: [],
+          },
+        }, 201);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    renderPanel();
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Betreff"), "Entwurf");
+    await user.type(screen.getByLabelText("Nachricht"), "Inhalt");
+
+    await user.click(screen.getByRole("button", { name: "E-Mail-Editor schliessen" }));
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText("Betreff")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Entwurf speichern" }));
+    expect(await screen.findByText("Entwurf gespeichert")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "E-Mail-Editor schliessen" }));
+
+    expect(confirm).toHaveBeenCalledTimes(1);
+    expect(screen.queryByLabelText("Betreff")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Weiter bearbeiten" })).toBeInTheDocument();
   });
 });

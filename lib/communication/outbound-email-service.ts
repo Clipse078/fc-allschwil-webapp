@@ -7,6 +7,7 @@ import {
   sendMail,
 } from "@/lib/email/mailer";
 import { prisma } from "@/lib/db/prisma";
+import type { CommunicationTargetType } from "@prisma/client";
 import { createHash } from "crypto";
 import {
   MAX_EMAIL_BODY_LENGTH,
@@ -18,6 +19,7 @@ import {
   getCommunicationMessageByIdForTenant,
   type CommunicationMessageRecord,
 } from "@/lib/communication/message-service";
+import { updateCommunicationDraft } from "@/lib/communication/draft-service";
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
 import { resolveTenantEmailSender } from "@/lib/communication/email-sender-service";
 import {
@@ -40,6 +42,10 @@ export type SendOutboundEmailInput = {
   subject: string;
   bodyText: string;
   attachmentIds?: string[];
+};
+
+export type SendCommunicationDraftInput = SendOutboundEmailInput & {
+  draftId: string;
 };
 
 export type RetryFailedOutboundEmailInput = {
@@ -129,6 +135,96 @@ async function requireUpdatedMessage(
   return message;
 }
 
+async function deliverQueuedOutboundMessage(input: {
+  tenantId: string;
+  threadId: string;
+  targetType: CommunicationTargetType;
+  targetId: string;
+  actorUserId: string;
+  messageId: string;
+  recipientEmail: string;
+  formattedFrom: string;
+  subject: string;
+  bodyText: string;
+  replyToAddress: string | null;
+  prepareAttachments?: () => Promise<unknown>;
+}): Promise<CommunicationMessageRecord> {
+  let deliveryResult;
+  try {
+    await input.prepareAttachments?.();
+    const attachments = await loadMessageAttachmentsForDelivery({
+      tenantId: input.tenantId,
+      messageId: input.messageId,
+    });
+    deliveryResult = await sendMail({
+      from: input.formattedFrom,
+      to: input.recipientEmail,
+      subject: input.subject,
+      text: input.bodyText,
+      html: plainTextToSafeHtml(input.bodyText),
+      replyTo: input.replyToAddress ?? undefined,
+      idempotencyKey: input.messageId,
+      attachments: attachments.map(({ filename, contentType, content }) => ({
+        filename,
+        contentType,
+        content,
+      })),
+    });
+  } catch (error) {
+    const deliveryError = safeFailureSummary(error);
+    await prisma.communicationMessage.updateMany({
+      where: { id: input.messageId, tenantId: input.tenantId, threadId: input.threadId },
+      data: { deliveryError, status: "FAILED" },
+    });
+
+    await recordCommunicationAuditEvent({
+      tenantId: input.tenantId,
+      actorUserId: input.actorUserId,
+      kind: "EMAIL_FAILED",
+      threadId: input.threadId,
+      targetType: input.targetType,
+      targetId: input.targetId,
+      entityId: input.messageId,
+      summary: "E-Mail-Versand fehlgeschlagen",
+    });
+
+    throw new CommunicationServiceError(
+      "PROVIDER_FAILED",
+      "Die E-Mail konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+    );
+  }
+
+  const updated = await prisma.communicationMessage.updateMany({
+    where: { id: input.messageId, tenantId: input.tenantId, threadId: input.threadId },
+    data: {
+      fromAddress: deliveryResult.from,
+      providerMessageId: deliveryResult.providerMessageId,
+      deliveryError: null,
+      status: "SENT",
+      sentAt: new Date(),
+    },
+  });
+  if (updated.count !== 1) {
+    throw new CommunicationServiceError(
+      "MESSAGE_NOT_FOUND",
+      "Der Versand wurde angenommen, der Nachrichtenstatus konnte aber nicht aktualisiert werden.",
+    );
+  }
+
+  await recordCommunicationAuditEvent({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    kind: "EMAIL_SENT",
+    threadId: input.threadId,
+    targetType: input.targetType,
+    targetId: input.targetId,
+    entityId: input.messageId,
+    summary: "E-Mail gesendet",
+  });
+
+  return requireUpdatedMessage(input.tenantId, input.messageId);
+}
+
 export async function sendOutboundEmailForThread(
   input: SendOutboundEmailInput,
 ): Promise<CommunicationMessageRecord> {
@@ -189,85 +285,112 @@ export async function sendOutboundEmailForThread(
     },
   });
 
-  let deliveryResult;
-  try {
-    await attachSelectionToMessage({
+  return deliverQueuedOutboundMessage({
+    tenantId,
+    threadId: thread.id,
+    targetType: thread.targetType,
+    targetId: thread.targetId,
+    actorUserId,
+    messageId: pending.id,
+    recipientEmail: recipient.email,
+    formattedFrom: sender.formattedFrom,
+    subject,
+    bodyText,
+    replyToAddress,
+    prepareAttachments: () =>
+      attachSelectionToMessage({
       tenantId,
       actorUserId,
       messageId: pending.id,
       attachmentIds,
-    });
-    const attachments = await loadMessageAttachmentsForDelivery({
-      tenantId,
-      messageId: pending.id,
-    });
-    deliveryResult = await sendMail({
-      from: sender.formattedFrom,
-      to: recipient.email,
-      subject,
-      text: bodyText,
-      html: plainTextToSafeHtml(bodyText),
-      replyTo: replyToAddress ?? undefined,
-      idempotencyKey: pending.id,
-      attachments: attachments.map(({ filename, contentType, content }) => ({
-        filename,
-        contentType,
-        content,
-      })),
-    });
-  } catch (error) {
-    const deliveryError = safeFailureSummary(error);
-    await prisma.communicationMessage.updateMany({
-      where: { id: pending.id, tenantId, threadId: thread.id },
-      data: { deliveryError, status: "FAILED" },
-    });
+      }),
+  });
+}
 
-    await recordCommunicationAuditEvent({
-      tenantId,
-      actorUserId,
-      kind: "EMAIL_FAILED",
-      threadId: thread.id,
-      targetType: thread.targetType,
-      targetId: thread.targetId,
-      entityId: pending.id,
-      summary: "E-Mail-Versand fehlgeschlagen",
-    });
+export async function sendCommunicationDraftForThread(
+  input: SendCommunicationDraftInput,
+): Promise<CommunicationMessageRecord> {
+  const tenantId = assertTenantId(input.tenantId);
+  const actorUserId = input.actorUserId.trim();
+  const draftId = input.draftId.trim();
+  if (!actorUserId) {
+    throw new CommunicationServiceError("SEND_FORBIDDEN", "Nicht authentifiziert.");
+  }
+  if (!draftId) {
+    throw new CommunicationServiceError("INVALID_INPUT", "draftId ist erforderlich.");
+  }
 
+  const { subject, bodyText } = normalizeContent(input);
+  await updateCommunicationDraft({
+    tenantId,
+    threadId: input.threadId,
+    actorUserId,
+    draftId,
+    subject,
+    bodyText,
+    attachmentIds: input.attachmentIds ?? [],
+  });
+
+  const thread = await ensureStableInboundReplyTokenForThread(tenantId, input.threadId);
+  const recipient = await resolveCommunicationRecipientForTarget({
+    tenantId,
+    targetType: thread.targetType,
+    targetId: thread.targetId,
+  });
+  if (!recipient.available || !recipient.email) {
     throw new CommunicationServiceError(
-      "PROVIDER_FAILED",
-      "Die E-Mail konnte nicht gesendet werden. Bitte versuchen Sie es erneut.",
+      "RECIPIENT_UNAVAILABLE",
+      recipient.unavailableReason ?? "Keine gültige E-Mail-Adresse verfügbar.",
+    );
+  }
+  if (!recipient.sendAllowed) {
+    throw new CommunicationServiceError(
+      "SEND_FORBIDDEN",
+      recipient.unavailableReason ?? "Für diesen Eintrag können keine E-Mails gesendet werden.",
     );
   }
 
-  const updated = await prisma.communicationMessage.updateMany({
-    where: { id: pending.id, tenantId, threadId: thread.id },
+  const replyToAddress = buildInboundReplyToAddress(thread.inboundReplyToken);
+  const sender = await resolveTenantEmailSender(tenantId);
+  const claimed = await prisma.communicationMessage.updateMany({
+    where: {
+      id: draftId,
+      tenantId,
+      threadId: thread.id,
+      direction: "OUTBOUND",
+      channel: "EMAIL",
+      status: "DRAFT",
+    },
     data: {
-      fromAddress: deliveryResult.from,
-      providerMessageId: deliveryResult.providerMessageId,
+      subject,
+      bodyText,
+      toAddresses: [recipient.email],
+      provider: "resend",
+      replyToAddress,
       deliveryError: null,
-      status: "SENT",
-      sentAt: new Date(),
+      status: "QUEUED",
     },
   });
-  if (updated.count !== 1) {
+  if (claimed.count !== 1) {
     throw new CommunicationServiceError(
       "MESSAGE_NOT_FOUND",
-      "Der Versand wurde angenommen, der Nachrichtenstatus konnte aber nicht aktualisiert werden.",
+      "Entwurf wurde bereits gesendet oder ist nicht mehr verfügbar.",
     );
   }
 
-  await recordCommunicationAuditEvent({
+  return deliverQueuedOutboundMessage({
     tenantId,
-    actorUserId,
-    kind: "EMAIL_SENT",
     threadId: thread.id,
     targetType: thread.targetType,
     targetId: thread.targetId,
-    entityId: pending.id,
-    summary: "E-Mail gesendet",
+    actorUserId,
+    messageId: draftId,
+    recipientEmail: recipient.email,
+    formattedFrom: sender.formattedFrom,
+    subject,
+    bodyText,
+    replyToAddress,
   });
-
-  return requireUpdatedMessage(tenantId, pending.id);
 }
 
 function deriveRetryAttemptMessageId(sourceMessageId: string, idempotencyKey: string): string {

@@ -3,9 +3,9 @@
 /**
  * COMM-01C — Shared outbound email history and composer for registration-family drawers.
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommunicationTargetType } from "@prisma/client";
-import { AlertCircle, CheckCircle2, Clock3, Download, Loader2, Mail, Paperclip, Send } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock3, Download, FilePenLine, Loader2, Mail, Paperclip, Save, Send, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import {
   MAX_EMAIL_BODY_LENGTH,
@@ -40,7 +40,12 @@ type Props = {
 type ThreadResponse = { thread?: { id: string }; error?: string };
 type HistoryResponse = {
   messages?: PublicEmailThreadMessage[];
+  draft?: PublicEmailThreadMessage | null;
   recipient?: CommunicationRecipient;
+  error?: string;
+};
+type DraftSaveResponse = {
+  draft?: PublicEmailThreadMessage;
   error?: string;
 };
 type AttachmentUploadResponse = {
@@ -56,11 +61,39 @@ type AttachmentUploadResponse = {
 };
 
 const STATUS = {
+  DRAFT: { label: "Entwurf", Icon: FilePenLine, className: "bg-amber-50 text-amber-800" },
   SENT: { label: "Gesendet", Icon: CheckCircle2, className: "bg-emerald-50 text-emerald-700" },
   FAILED: { label: "Fehlgeschlagen", Icon: AlertCircle, className: "bg-rose-50 text-rose-700" },
   QUEUED: { label: "Wird gesendet", Icon: Clock3, className: "bg-amber-50 text-amber-700" },
   RECEIVED: { label: "Empfangen", Icon: Mail, className: "bg-slate-50 text-slate-700" },
 } as const;
+
+function composerAttachmentsFromDraft(
+  draft: PublicEmailThreadMessage | null | undefined,
+): ComposerAttachment[] {
+  return (draft?.attachments ?? [])
+    .filter((attachment) => attachment.downloadAvailable)
+    .map((attachment, index) => ({
+      localId: `draft-${draft?.id}-${attachment.id}-${index}`,
+      attachmentId: attachment.id,
+      filename: attachment.filename,
+      contentType: attachment.contentType ?? "application/octet-stream",
+      size: attachment.size ?? 0,
+      status: "READY",
+    }));
+}
+
+function composerSnapshot(
+  subject: string,
+  bodyText: string,
+  attachments: ComposerAttachment[],
+): string {
+  return JSON.stringify({
+    subject,
+    bodyText,
+    attachments: attachments.map((attachment) => attachment.attachmentId ?? attachment.localId),
+  });
+}
 
 function EmailHistoryCard({
   message,
@@ -225,11 +258,18 @@ function EmailCommunicationPanelInner({
 }: Props) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [messages, setMessages] = useState<PublicEmailThreadMessage[] | null>(null);
+  const [draft, setDraft] = useState<PublicEmailThreadMessage | null>(null);
   const [recipient, setRecipient] = useState<CommunicationRecipient | null>(null);
   const [subject, setSubject] = useState("");
   const [bodyText, setBodyText] = useState("");
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
+  const [savedSnapshot, setSavedSnapshot] = useState(() => composerSnapshot("", "", []));
+  const [composerOpen, setComposerOpen] = useState(true);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<
+    "CREATED" | "UPDATED" | "ERROR" | null
+  >(null);
   const [sending, setSending] = useState(false);
   const [retryingMessageId, setRetryingMessageId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -238,6 +278,13 @@ function EmailCommunicationPanelInner({
   const [retryErrorMessageId, setRetryErrorMessageId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const requestGenerationRef = useRef(0);
+  const draftHydratedRef = useRef(false);
+
+  const currentSnapshot = useMemo(
+    () => composerSnapshot(subject, bodyText, attachments),
+    [attachments, bodyText, subject],
+  );
+  const hasUnsavedChanges = currentSnapshot !== savedSnapshot;
 
   const loadHistory = useCallback(
     async (resolvedThreadId: string, generation: number) => {
@@ -254,6 +301,20 @@ function EmailCommunicationPanelInner({
       }
       if (generation !== requestGenerationRef.current) return;
       setMessages(Array.isArray(payload.messages) ? payload.messages : []);
+      const loadedDraft = payload.draft ?? null;
+      setDraft(loadedDraft);
+      if (!draftHydratedRef.current) {
+        const restoredAttachments = composerAttachmentsFromDraft(loadedDraft);
+        const restoredSubject = loadedDraft?.subject ?? "";
+        const restoredBody = loadedDraft?.body ?? "";
+        setSubject(restoredSubject);
+        setBodyText(restoredBody);
+        setAttachments(restoredAttachments);
+        setSavedSnapshot(
+          composerSnapshot(restoredSubject, restoredBody, restoredAttachments),
+        );
+        draftHydratedRef.current = true;
+      }
       setRecipient(payload.recipient);
     },
     [tenantSlug],
@@ -332,6 +393,15 @@ function EmailCommunicationPanelInner({
     if (messages?.length) endRef.current?.scrollIntoView({ block: "nearest" });
   }, [messages?.length]);
 
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => window.removeEventListener("beforeunload", warnBeforeUnload);
+  }, [hasUnsavedChanges]);
+
   const uploadAttachment = async (file: File, localId: string) => {
     try {
       const formData = new FormData();
@@ -377,6 +447,7 @@ function EmailCommunicationPanelInner({
   const addAttachmentFiles = (files: File[]) => {
     if (files.length === 0) return;
     setAttachmentError(null);
+    setSaveFeedback(null);
     const next = [...attachments];
     const fingerprints = new Set(
       next.map((attachment) =>
@@ -430,11 +501,82 @@ function EmailCommunicationPanelInner({
     }
   };
 
+  const saveDraft = async () => {
+    if (
+      !threadId ||
+      !canEdit ||
+      !lifecycleAllowsSend ||
+      saving ||
+      sending ||
+      attachments.some((attachment) => attachment.status !== "READY")
+    ) return;
+
+    const generation = requestGenerationRef.current;
+    const existingDraftId = draft?.id ?? null;
+    setSaving(true);
+    setSaveFeedback(null);
+    try {
+      const response = await fetch(
+        existingDraftId
+          ? `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(threadId)}/drafts/${encodeURIComponent(existingDraftId)}`
+          : `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(threadId)}/drafts`,
+        {
+          method: existingDraftId ? "PATCH" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            subject,
+            bodyText,
+            attachmentIds: attachments.flatMap((attachment) =>
+              attachment.attachmentId ? [attachment.attachmentId] : [],
+            ),
+          }),
+        },
+      );
+      const payload = (await response.json()) as DraftSaveResponse;
+      if (!response.ok || !payload.draft) {
+        throw new Error(payload.error ?? "Fehler beim Speichern des Entwurfs.");
+      }
+      if (generation !== requestGenerationRef.current) return;
+      setDraft(payload.draft);
+      setSavedSnapshot(composerSnapshot(subject, bodyText, attachments));
+      setSaveFeedback(existingDraftId ? "UPDATED" : "CREATED");
+    } catch {
+      if (generation !== requestGenerationRef.current) return;
+      setSaveFeedback("ERROR");
+    } finally {
+      if (generation === requestGenerationRef.current) setSaving(false);
+    }
+  };
+
+  const restoreLastSavedState = () => {
+    const restoredAttachments = composerAttachmentsFromDraft(draft);
+    const restoredSubject = draft?.subject ?? "";
+    const restoredBody = draft?.body ?? "";
+    setSubject(restoredSubject);
+    setBodyText(restoredBody);
+    setAttachments(restoredAttachments);
+    setAttachmentError(null);
+    setSaveFeedback(null);
+    setSavedSnapshot(composerSnapshot(restoredSubject, restoredBody, restoredAttachments));
+  };
+
+  const closeComposer = () => {
+    if (
+      hasUnsavedChanges &&
+      !window.confirm("Nicht gespeicherte Änderungen gehen verloren. Trotzdem schliessen?")
+    ) {
+      return;
+    }
+    if (hasUnsavedChanges) restoreLastSavedState();
+    setComposerOpen(false);
+  };
+
   const submit = async () => {
     if (
       !threadId ||
       !recipient?.sendAllowed ||
       sending ||
+      saving ||
       attachments.some((attachment) => attachment.status !== "READY")
     ) return;
     const generation = requestGenerationRef.current;
@@ -442,8 +584,11 @@ function EmailCommunicationPanelInner({
     setSending(true);
     setSendError(null);
     try {
+      const existingDraftId = draft?.id ?? null;
       const response = await fetch(
-        `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(sendingThreadId)}/messages/email`,
+        existingDraftId
+          ? `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(sendingThreadId)}/drafts/${encodeURIComponent(existingDraftId)}/send`
+          : `/api/tenants/${encodeURIComponent(tenantSlug)}/communications/threads/${encodeURIComponent(sendingThreadId)}/messages/email`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -465,6 +610,9 @@ function EmailCommunicationPanelInner({
       setBodyText("");
       setAttachments([]);
       setAttachmentError(null);
+      setDraft(null);
+      setSavedSnapshot(composerSnapshot("", "", []));
+      setSaveFeedback(null);
       await loadHistory(sendingThreadId, generation);
     } catch (sendError) {
       if (generation !== requestGenerationRef.current) return;
@@ -476,6 +624,7 @@ function EmailCommunicationPanelInner({
   };
 
   const canSend = canEdit && lifecycleAllowsSend && recipient?.sendAllowed === true;
+  const canSaveDraft = canSend;
   const canRetryFailedOutbound = canSend;
   const hasUnreadyAttachments = attachments.some(
     (attachment) => attachment.status !== "READY",
@@ -548,6 +697,9 @@ function EmailCommunicationPanelInner({
               setSubject("");
               setBodyText("");
               setAttachments([]);
+              setDraft(null);
+              setSavedSnapshot(composerSnapshot("", "", []));
+              draftHydratedRef.current = false;
               setAttachmentError(null);
               void initialize();
             }}
@@ -585,11 +737,70 @@ function EmailCommunicationPanelInner({
             )}
           </section>
 
-          {recipient ? (
+          {draft ? (
+            <section
+              aria-label="Gespeicherter Entwurf"
+              className="mt-5 rounded-[var(--radius-lg)] border border-amber-200 bg-amber-50/70 p-4"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-800">
+                    <FilePenLine className="h-3.5 w-3.5" aria-hidden />
+                    Entwurf
+                  </p>
+                  <p className="mt-1 truncate text-sm font-semibold text-[var(--foreground)]">
+                    Betreff: {draft.subject}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-800">
+                    Zuletzt gespeichert:{" "}
+                    {formatDateTimeCompact(draft.updatedAt, { locale, timezone })}
+                  </p>
+                </div>
+                {!composerOpen && canSaveDraft ? (
+                  <button
+                    type="button"
+                    onClick={() => setComposerOpen(true)}
+                    className="rounded-md border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                  >
+                    Weiter bearbeiten
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : null}
+
+          {recipient && !composerOpen && !draft && canSaveDraft ? (
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                className="fca-button-secondary"
+              >
+                E-Mail verfassen
+              </button>
+            </div>
+          ) : null}
+
+          {recipient && composerOpen ? (
             <section aria-label="E-Mail verfassen" className="mt-5 border-t border-[var(--border)] pt-5">
-            <div className="mb-4">
-              <p className="text-sm font-semibold text-[var(--foreground)]">Neue E-Mail</p>
-              <p className="mt-0.5 text-xs text-[var(--muted)]">Direkt aus SportClubEvo senden</p>
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-[var(--foreground)]">
+                  {draft ? "Entwurf bearbeiten" : "Neue E-Mail"}
+                </p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">
+                  {draft ? "Serverseitig gespeicherter Entwurf" : "Direkt aus SportClubEvo senden"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeComposer}
+                disabled={saving || sending}
+                aria-label="E-Mail-Editor schliessen"
+                className="rounded-md p-1 text-[var(--muted)] hover:bg-[var(--surface-2)] disabled:opacity-50"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
             </div>
 
             <label className="block">
@@ -603,9 +814,12 @@ function EmailCommunicationPanelInner({
               <span className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Betreff</span>
               <input
                 value={subject}
-                onChange={(event) => setSubject(event.target.value)}
+                onChange={(event) => {
+                  setSubject(event.target.value);
+                  setSaveFeedback(null);
+                }}
                 maxLength={MAX_EMAIL_SUBJECT_LENGTH}
-                disabled={!canSend || sending}
+                disabled={!canSend || sending || saving}
                 className="fca-input w-full"
                 placeholder="Betreff eingeben"
               />
@@ -615,9 +829,12 @@ function EmailCommunicationPanelInner({
               <span className="mb-1.5 block text-xs font-semibold text-[var(--text-2)]">Nachricht</span>
               <textarea
                 value={bodyText}
-                onChange={(event) => setBodyText(event.target.value)}
+                onChange={(event) => {
+                  setBodyText(event.target.value);
+                  setSaveFeedback(null);
+                }}
                 maxLength={MAX_EMAIL_BODY_LENGTH}
-                disabled={!canSend || sending}
+                disabled={!canSend || sending || saving}
                 rows={7}
                 className="fca-textarea w-full resize-y"
                 placeholder="Nachricht verfassen…"
@@ -626,7 +843,7 @@ function EmailCommunicationPanelInner({
 
             <EmailAttachmentComposer
               attachments={attachments}
-              disabled={!canSend || sending}
+              disabled={!canSend || sending || saving}
               error={attachmentError}
               onAddFiles={addAttachmentFiles}
               onRemove={(localId) => {
@@ -634,6 +851,7 @@ function EmailCommunicationPanelInner({
                   current.filter((attachment) => attachment.localId !== localId),
                 );
                 setAttachmentError(null);
+                setSaveFeedback(null);
               }}
             />
 
@@ -644,8 +862,43 @@ function EmailCommunicationPanelInner({
               </div>
             ) : null}
             {sendError ? <p className="mt-3 text-xs text-rose-600">{sendError}</p> : null}
+            {saveFeedback ? (
+              <p
+                className={cn(
+                  "mt-3 text-xs",
+                  saveFeedback === "ERROR" ? "text-rose-600" : "text-emerald-700",
+                )}
+              >
+                {saveFeedback === "CREATED"
+                  ? "Entwurf gespeichert"
+                  : saveFeedback === "UPDATED"
+                    ? "Änderungen gespeichert"
+                    : "Fehler beim Speichern des Entwurfs"}
+              </p>
+            ) : null}
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => void saveDraft()}
+                disabled={
+                  !canSaveDraft ||
+                  !subject.trim() ||
+                  !bodyText.trim() ||
+                  saving ||
+                  sending ||
+                  hasUnreadyAttachments ||
+                  !hasUnsavedChanges
+                }
+                className="fca-button-secondary gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                ) : (
+                  <Save className="h-4 w-4" aria-hidden />
+                )}
+                {saving ? "Speichern..." : "Entwurf speichern"}
+              </button>
               <button
                 type="button"
                 onClick={() => void submit()}
@@ -654,12 +907,13 @@ function EmailCommunicationPanelInner({
                   !subject.trim() ||
                   !bodyText.trim() ||
                   sending ||
+                  saving ||
                   hasUnreadyAttachments
                 }
                 className="fca-button-primary gap-2 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {sending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Send className="h-4 w-4" aria-hidden />}
-                {sending ? "Wird gesendet…" : "E-Mail senden"}
+                {sending ? "Wird gesendet…" : "Senden"}
               </button>
             </div>
             </section>

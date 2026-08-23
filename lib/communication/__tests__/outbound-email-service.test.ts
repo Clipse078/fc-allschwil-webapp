@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   validateAttachments: vi.fn(),
   attachSelection: vi.fn(),
   loadAttachments: vi.fn(),
+  updateDraft: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -49,9 +50,13 @@ vi.mock("@/lib/communication/attachment-service", async (importOriginal) => ({
   loadMessageAttachmentsForDelivery: mocks.loadAttachments,
   cloneMessageAttachmentsForRetry: vi.fn(),
 }));
+vi.mock("@/lib/communication/draft-service", () => ({
+  updateCommunicationDraft: mocks.updateDraft,
+}));
 
 import {
   plainTextToSafeHtml,
+  sendCommunicationDraftForThread,
   sendOutboundEmailForThread,
 } from "@/lib/communication/outbound-email-service";
 import { resolveCommunicationRecipientForTarget } from "@/lib/communication/recipient-resolver";
@@ -135,6 +140,7 @@ beforeEach(() => {
   );
   mocks.attachSelection.mockResolvedValue([]);
   mocks.loadAttachments.mockResolvedValue([]);
+  mocks.updateDraft.mockResolvedValue(storedMessage({ id: "draft-a", status: "DRAFT" }));
   mocks.resolveSender.mockResolvedValue({
     displayName: "FC Allschwil",
     emailAddress: "info@fcallschwil.ch",
@@ -378,6 +384,72 @@ describe("COMM-01C outbound delivery", () => {
       }),
     );
     expect(mocks.state.message).toMatchObject({ id: "message-a", status: "FAILED" });
+  });
+
+  it("sends an existing draft through the normal provider lifecycle without creating a second message", async () => {
+    mocks.threadFindFirst.mockResolvedValue(thread("REGISTRATION", "reg-a"));
+    mocks.registrationFindFirst.mockResolvedValue(registration());
+    mocks.state.message = storedMessage({ id: "draft-a", status: "DRAFT", provider: null });
+
+    const result = await sendCommunicationDraftForThread({
+      tenantId: TENANT_A,
+      threadId: THREAD_A,
+      draftId: "draft-a",
+      actorUserId: ACTOR_A,
+      subject: "Aktualisierter Entwurf",
+      bodyText: "Bereit zum Senden",
+      attachmentIds: ["attachment-a"],
+    });
+
+    expect(mocks.updateDraft).toHaveBeenCalledWith({
+      tenantId: TENANT_A,
+      threadId: THREAD_A,
+      draftId: "draft-a",
+      actorUserId: ACTOR_A,
+      subject: "Aktualisierter Entwurf",
+      bodyText: "Bereit zum Senden",
+      attachmentIds: ["attachment-a"],
+    });
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(mocks.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: "draft-a",
+        to: "anna@example.com",
+        replyTo: `reply+${STABLE_TOKEN}@${INBOUND_DOMAIN}`,
+      }),
+    );
+    expect(result).toMatchObject({
+      id: "draft-a",
+      status: "SENT",
+      providerMessageId: "resend-message-1",
+    });
+  });
+
+  it("turns a failed draft send into one historically accurate FAILED message", async () => {
+    mocks.threadFindFirst.mockResolvedValue(thread("REGISTRATION", "reg-a"));
+    mocks.registrationFindFirst.mockResolvedValue(registration());
+    mocks.state.message = storedMessage({ id: "draft-a", status: "DRAFT", provider: null });
+    mocks.sendMail.mockRejectedValue(new Error("provider detail"));
+
+    await expect(
+      sendCommunicationDraftForThread({
+        tenantId: TENANT_A,
+        threadId: THREAD_A,
+        draftId: "draft-a",
+        actorUserId: ACTOR_A,
+        subject: "Entwurf",
+        bodyText: "Inhalt",
+      }),
+    ).rejects.toMatchObject({ code: "PROVIDER_FAILED" });
+
+    expect(mocks.messageCreate).not.toHaveBeenCalled();
+    expect(mocks.sendMail).toHaveBeenCalledTimes(1);
+    expect(mocks.state.message).toMatchObject({
+      id: "draft-a",
+      status: "FAILED",
+      providerMessageId: null,
+    });
   });
 
   it("O — missing or invalid recipient blocks provider delivery", async () => {

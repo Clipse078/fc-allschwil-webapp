@@ -49,8 +49,10 @@ export async function GET(_request: NextRequest, context: Context) {
       }),
     ]);
 
+    const publicMessages = await toPublicEmailThreadMessages(tenantResult.tenantId, messages);
     return NextResponse.json({
-      messages: await toPublicEmailThreadMessages(tenantResult.tenantId, messages),
+      messages: publicMessages.filter((message) => message.status !== "DRAFT"),
+      draft: publicMessages.find((message) => message.status === "DRAFT") ?? null,
       recipient,
     });
   } catch (error) {
