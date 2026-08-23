@@ -229,6 +229,27 @@ export async function ingestInboundAttachment(input: {
     );
   }
 
+  const findExistingLink = () =>
+    prisma.communicationMessageAttachment.findFirst({
+      where: {
+        tenantId,
+        messageId,
+        attachment: {
+          tenantId,
+          sourceType: "INBOUND",
+          ingestionMetadata: {
+            path: ["providerAttachmentId"],
+            equals: providerAttachmentId,
+          },
+        },
+      },
+      include: { attachment: true },
+    });
+  const existing = await findExistingLink();
+  if (existing) {
+    return { attachment: existing.attachment, link: existing };
+  }
+
   const storage = input.storage ?? communicationAttachmentStorage;
   const attachment = await persistBytes({
     tenantId,
@@ -282,6 +303,10 @@ export async function ingestInboundAttachment(input: {
       .delete({ where: { id: attachment.id } })
       .catch(() => undefined);
     await storage.delete(attachment.storageKey).catch(() => undefined);
+    const raced = await findExistingLink();
+    if (raced) {
+      return { attachment: raced.attachment, link: raced };
+    }
     throw error;
   }
 }

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   attachmentFindMany: vi.fn(),
   messageFindFirst: vi.fn(),
   messageFindMany: vi.fn(),
+  linkFindFirst: vi.fn(),
   linkFindMany: vi.fn(),
   linkCreate: vi.fn(),
   linkCreateMany: vi.fn(),
@@ -41,7 +42,10 @@ vi.mock("@/lib/db/prisma", () => ({
       findMany: mocks.attachmentFindMany,
     },
     communicationMessage: { findFirst: mocks.messageFindFirst },
-    communicationMessageAttachment: { findMany: mocks.linkFindMany },
+    communicationMessageAttachment: {
+      findFirst: mocks.linkFindFirst,
+      findMany: mocks.linkFindMany,
+    },
     workspaceDocumentVersion: { findFirst: mocks.versionFindFirst },
     $transaction: vi.fn((callback) => callback(tx)),
   },
@@ -79,6 +83,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
   mocks.attachmentDelete.mockResolvedValue({ id: "attachment-a" });
+  mocks.linkFindFirst.mockResolvedValue(null);
   mocks.logAction.mockResolvedValue(undefined);
 });
 
@@ -151,6 +156,89 @@ describe("communication attachment domain service", () => {
       }),
     );
     expect(mocks.tenantMembershipFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("reuses the existing inbound provider attachment on webhook replay", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    const existingAttachment = {
+      id: "attachment-existing",
+      tenantId: "tenant-a",
+      sourceType: "INBOUND",
+    };
+    mocks.linkFindFirst.mockResolvedValue({
+      id: "link-existing",
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      attachmentId: "attachment-existing",
+      sortOrder: 0,
+      attachment: existingAttachment,
+    });
+
+    await expect(
+      ingestInboundAttachment({
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        provider: "resend",
+        providerMessageId: "email-a",
+        providerAttachmentId: "provider-attachment-a",
+        filename: "Antwort.pdf",
+        declaredContentType: "application/pdf",
+        buffer: pdf,
+        sortOrder: 0,
+        storage: provider,
+      }),
+    ).resolves.toMatchObject({
+      attachment: existingAttachment,
+      link: { id: "link-existing" },
+    });
+    expect(provider.upload).not.toHaveBeenCalled();
+    expect(mocks.attachmentCreate).not.toHaveBeenCalled();
+    expect(mocks.linkCreate).not.toHaveBeenCalled();
+  });
+
+  it("cleans up a raced blob and reuses the winning inbound link", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    mocks.attachmentCreate.mockImplementation(async ({ data }) => data);
+    mocks.linkFindMany.mockResolvedValue([
+      {
+        id: "link-winner",
+        attachmentId: "attachment-winner",
+        sortOrder: 0,
+        attachment: { sizeBytes: pdf.byteLength },
+      },
+    ]);
+    mocks.linkFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "link-winner",
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        attachmentId: "attachment-winner",
+        sortOrder: 0,
+        attachment: { id: "attachment-winner", sourceType: "INBOUND" },
+      });
+
+    await expect(
+      ingestInboundAttachment({
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        provider: "resend",
+        providerMessageId: "email-a",
+        providerAttachmentId: "provider-attachment-a",
+        filename: "Antwort.pdf",
+        declaredContentType: "application/pdf",
+        buffer: pdf,
+        sortOrder: 0,
+        storage: provider,
+      }),
+    ).resolves.toMatchObject({
+      attachment: { id: "attachment-winner" },
+      link: { id: "link-winner" },
+    });
+    expect(mocks.attachmentDelete).toHaveBeenCalled();
+    expect(provider.delete).toHaveBeenCalled();
   });
 
   it("best-effort deletes the private object when metadata persistence fails", async () => {

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid inbound email." }, { status: 400 });
     }
     if (
-      result.kind === "PERSISTED" &&
+      (result.kind === "PERSISTED" || result.kind === "DUPLICATE") &&
       normalized.attachments &&
       normalized.attachments.length > 0
     ) {

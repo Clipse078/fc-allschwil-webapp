@@ -122,7 +122,7 @@ describe("COMM-02 Resend inbound webhook", () => {
     expect(mocks.persist).toHaveBeenCalled();
   });
 
-  it("processes attachments only for the newly persisted inbound message", async () => {
+  it("processes new and duplicate deliveries through the idempotent attachment service", async () => {
     const attachment = {
       id: "attachment-a",
       filename: "Antwort.pdf",
@@ -182,6 +182,6 @@ describe("COMM-02 Resend inbound webhook", () => {
     await POST(
       signedRequest(JSON.stringify({ type: "email.received", data: { email_id: "email-1" } })) as never,
     );
-    expect(mocks.processAttachments).toHaveBeenCalledTimes(1);
+    expect(mocks.processAttachments).toHaveBeenCalledTimes(2);
   });
 });
