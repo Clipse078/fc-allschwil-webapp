@@ -44,6 +44,14 @@ const PREVIEW_TENANT = {
   timezone: "Europe/Zurich",
 } as const;
 
+/** Preview-only square crest placeholders for opponent clubs (not production data). */
+export const PREVIEW_OPPONENT_LOGOS = {
+  fcBinningen: "/images/logos/preview/fc-binningen.svg",
+  scBaslerNord: "/images/logos/preview/sc-basler-nord.svg",
+  fcTherwil: "/images/logos/preview/fc-therwil.svg",
+  fcAesch: "/images/logos/preview/fc-aesch.svg",
+} as const;
+
 // ── Main preview fixture — 5 rows matching PP-02B-H target ───────────────────
 
 export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
@@ -71,7 +79,7 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
         away: {
           clubDisplayName: "FC BINNINGEN",
           teamSubDisplayName: "E1",
-          clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+          clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcBinningen,
         },
       },
       organizerDisplayName: null,
@@ -165,7 +173,7 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
         away: {
           clubDisplayName: "SC BASLER NORD",
           teamSubDisplayName: "D1",
-          clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+          clubLogoUrl: PREVIEW_OPPONENT_LOGOS.scBaslerNord,
         },
       },
       organizerDisplayName: null,
@@ -335,13 +343,13 @@ export const PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS: readonly InfoboardEventPresent
         id: "pa4-3",
         teamDisplayName: "FC Binningen",
         dressingRoomLabel: "Kabine C",
-        clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+        clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcBinningen,
       },
       {
         id: "pa4-4",
         teamDisplayName: "FC Aesch",
         dressingRoomLabel: "Kabine D",
-        clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+        clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcAesch,
       },
     ],
   },

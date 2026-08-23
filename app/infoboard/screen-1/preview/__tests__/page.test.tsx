@@ -149,7 +149,7 @@ describe("Screen 1 acceptance preview routes", () => {
         "/images/logos/fc-allschwil.png",
       );
       expect(currentMatch.matchPresentation?.away?.clubLogoUrl).toBe(
-        "/images/branding/sportclubevo_logo.png",
+        "/images/logos/preview/fc-binningen.svg",
       );
       expect(currentMatch.matchPresentation?.home.clubDisplayName).toBe("FC ALLSCHWIL");
       expect(currentMatch.matchPresentation?.home.teamSubDisplayName).toBe("E1");

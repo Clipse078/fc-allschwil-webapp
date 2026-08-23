@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="FC Therwil preview crest">
+  <rect width="64" height="64" rx="10" fill="#166534"/>
+  <path d="M32 12 L48 48 H16 Z" fill="#FACC15"/>
+  <text x="32" y="58" text-anchor="middle" fill="#FFFFFF" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="700" letter-spacing="0.06em">THERWIL</text>
+</svg>

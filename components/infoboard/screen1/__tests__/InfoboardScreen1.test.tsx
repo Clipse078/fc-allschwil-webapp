@@ -1058,10 +1058,83 @@ describe("4-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
       />,
     );
-    // Team names appear in both tournament-participants and participant-allocation-block
+    // Team names appear in kabinen allocation block only — not beside logos.
     expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
+
+  it("logo strip uses centered-group layout and caps at four logos", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
+        eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
+      />,
+    );
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(logoArea.getAttribute("data-layout")).toBe("centered-group");
+    expect(logoArea.className).toContain("tournamentParticipantLogos");
+    expect(logoArea.querySelectorAll("img").length).toBe(4);
+  });
+
+  it("tournament title keeps dedicated overflow handling class", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
+        eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
+      />,
+    );
+    expect(screen.getByText("Kinderfussball E-Junioren Turnier").className).toContain(
+      "tournamentTitle",
+    );
+  });
+});
+
+describe("Tournament logo strip centering — INFOBOARD-LOGO-08", () => {
+  function renderTournamentWithLogoCount(count: number) {
+    const allocations = PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS[0].participantAllocations
+      .slice(0, count)
+      .map((participant, index) => ({
+        ...participant,
+        id: `center-test-${index + 1}`,
+      }));
+
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "evt-center-test",
+          type: "TOURNAMENT",
+          displayTitle: "Centering Test Turnier",
+          allocation: {
+            pitchLabel: "Kunstrasen 1",
+            homeDressingRoomLabel: null,
+            awayDressingRoomLabel: null,
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        eventPresentation={makeEventPresentation("evt-center-test", allocations)}
+      />,
+    );
+
+    return screen.getByTestId("tournament-participants");
+  }
+
+  it.each([1, 2, 3, 4])(
+    "keeps %i-logo tournament strip as a centered group container",
+    (count) => {
+      const logoArea = renderTournamentWithLogoCount(count);
+      expect(logoArea.getAttribute("data-layout")).toBe("centered-group");
+      expect(logoArea.className).toContain("tournamentParticipantLogos");
+      expect(logoArea.querySelectorAll("img").length).toBe(count);
+      expect(logoArea.textContent?.trim()).toBe("");
+    },
+  );
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

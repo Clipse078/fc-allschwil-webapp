@@ -415,6 +415,7 @@ type MatchClubLogoProps = {
   logoUrl: string | null | undefined;
   clubName: string;
   testId?: string;
+  presentation?: "match" | "tournament";
 };
 
 /**
@@ -426,7 +427,17 @@ function MatchClubLogo({
   logoUrl,
   clubName,
   testId,
+  presentation = "match",
 }: MatchClubLogoProps): ReactElement {
+  const logoClassName =
+    presentation === "tournament"
+      ? logoUrl
+        ? styles.tournamentClubLogo
+        : styles.tournamentClubLogoPlaceholder
+      : logoUrl
+        ? styles.matchClubLogo
+        : styles.matchClubLogoPlaceholder;
+
   if (logoUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URLs from SCE configuration.
@@ -434,7 +445,7 @@ function MatchClubLogo({
         src={logoUrl}
         alt=""
         aria-hidden="true"
-        className={styles.matchClubLogo}
+        className={logoClassName}
         data-testid={testId}
       />
     );
@@ -442,7 +453,7 @@ function MatchClubLogo({
 
   return (
     <span
-      className={styles.matchClubLogoPlaceholder}
+      className={logoClassName}
       aria-hidden="true"
       data-testid={testId ? `${testId}-placeholder` : undefined}
       title={clubName}
@@ -1025,12 +1036,13 @@ function EventCard({
           </div>
         ) : isTournament ? (
           <div className={styles.tournamentIdentity}>
-            <span className={styles.eventTeamMain}>{event.displayTitle}</span>
+            <span className={styles.tournamentTitle}>{event.displayTitle}</span>
 
             {participantAllocations !== undefined && participantAllocations.length > 0 && (
               <div
                 className={styles.tournamentParticipantLogos}
                 data-testid="tournament-participants"
+                data-layout="centered-group"
               >
                 {participantAllocations.slice(0, 4).map((participant) => (
                   <MatchClubLogo
@@ -1038,6 +1050,7 @@ function EventCard({
                     logoUrl={participant.clubLogoUrl ?? null}
                     clubName={participant.teamDisplayName}
                     testId={`tournament-participant-logo-${participant.id}`}
+                    presentation="tournament"
                   />
                 ))}
               </div>
