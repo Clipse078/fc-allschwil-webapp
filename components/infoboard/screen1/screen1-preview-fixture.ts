@@ -62,7 +62,18 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
       teamDisplayName: "FC Allschwil E1",
       opponentDisplayName: "FC Binningen E1",
       opponentLogoUrl: null,
-      matchPresentation: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: "/images/logos/fc-allschwil.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+        },
+      },
       organizerDisplayName: null,
       competitionLabel: "Meisterschaft",
       startAt: "2026-09-12T15:00:00.000Z",
@@ -145,7 +156,18 @@ export const PREVIEW_FIXTURE: InfoboardScreen1Feed = {
       teamDisplayName: "FC Allschwil D1",
       opponentDisplayName: "SC Basler Nord D1",
       opponentLogoUrl: null,
-      matchPresentation: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "D1",
+          clubLogoUrl: "/images/logos/fc-allschwil.png",
+        },
+        away: {
+          clubDisplayName: "SC BASLER NORD",
+          teamSubDisplayName: "D1",
+          clubLogoUrl: "/images/branding/sportclubevo_logo.png",
+        },
+      },
       organizerDisplayName: null,
       competitionLabel: "Meisterschaft",
       startAt: "2026-09-12T18:15:00.000Z",
@@ -313,11 +335,13 @@ export const PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS: readonly InfoboardEventPresent
         id: "pa4-3",
         teamDisplayName: "FC Binningen",
         dressingRoomLabel: "Kabine C",
+        clubLogoUrl: "/images/branding/sportclubevo_logo.png",
       },
       {
         id: "pa4-4",
         teamDisplayName: "FC Aesch",
         dressingRoomLabel: "Kabine D",
+        clubLogoUrl: "/images/branding/sportclubevo_logo.png",
       },
     ],
   },
