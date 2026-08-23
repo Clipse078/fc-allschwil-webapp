@@ -75,7 +75,7 @@ function storage() {
       sizeBytes: buffer.byteLength,
     })),
     download: vi.fn(),
-    delete: vi.fn(),
+    delete: vi.fn().mockResolvedValue(undefined),
   };
 }
 
