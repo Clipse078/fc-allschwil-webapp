@@ -148,20 +148,57 @@ export async function normalizeResendEmailReceivedEvent(args: {
   const receivedAtRaw = typeof email.created_at === "string" ? email.created_at : null;
   const receivedAt = receivedAtRaw ? new Date(receivedAtRaw) : new Date();
 
-  const attachments = Array.isArray(email.attachments)
-    ? email.attachments
-        .map((a, index) => ({
-          id:
-            typeof a?.id === "string" && a.id.trim()
-              ? a.id
-              : `invalid-provider-attachment-${index + 1}`,
-          filename: typeof a?.filename === "string" ? a.filename : null,
-          contentType: typeof a?.content_type === "string" ? a.content_type : null,
-          contentDisposition: typeof a?.content_disposition === "string" ? a.content_disposition : null,
-          contentId: typeof a?.content_id === "string" ? a.content_id : null,
-          size: typeof a?.size === "number" ? a.size : null,
-        }))
-    : null;
+  const mapAttachment = (
+    a: {
+      id?: string;
+      filename?: string | null;
+      content_type?: string | null;
+      content_disposition?: string | null;
+      content_id?: string | null;
+      size?: number | null;
+    },
+    index: number,
+  ) => ({
+    id:
+      typeof a?.id === "string" && a.id.trim()
+        ? a.id
+        : `invalid-provider-attachment-${index + 1}`,
+    filename: typeof a?.filename === "string" ? a.filename : null,
+    contentType: typeof a?.content_type === "string" ? a.content_type : null,
+    contentDisposition:
+      typeof a?.content_disposition === "string" ? a.content_disposition : null,
+    contentId: typeof a?.content_id === "string" ? a.content_id : null,
+    size: typeof a?.size === "number" ? a.size : null,
+  });
+
+  const receivingAttachments = Array.isArray(email.attachments)
+    ? email.attachments.map(mapAttachment)
+    : [];
+  const webhookAttachments = Array.isArray(parsed.data.data.attachments)
+    ? parsed.data.data.attachments.map(mapAttachment)
+    : [];
+  const attachmentsById = new Map<string, ReturnType<typeof mapAttachment>>();
+  for (const attachment of webhookAttachments) {
+    attachmentsById.set(attachment.id, attachment);
+  }
+  for (const attachment of receivingAttachments) {
+    const existing = attachmentsById.get(attachment.id);
+    attachmentsById.set(
+      attachment.id,
+      existing
+        ? {
+            ...attachment,
+            filename: attachment.filename ?? existing.filename,
+            contentType: attachment.contentType ?? existing.contentType,
+            contentDisposition:
+              attachment.contentDisposition ?? existing.contentDisposition,
+            contentId: attachment.contentId ?? existing.contentId,
+            size: attachment.size ?? existing.size,
+          }
+        : attachment,
+    );
+  }
+  const attachments = [...attachmentsById.values()];
 
   return {
     provider: "resend",
@@ -185,6 +222,6 @@ export async function normalizeResendEmailReceivedEvent(args: {
     references,
 
     receivedAt,
-    attachments: attachments && attachments.length ? attachments : null,
+    attachments: attachments.length ? attachments : null,
   };
 }

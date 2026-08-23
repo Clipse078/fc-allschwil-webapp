@@ -67,7 +67,7 @@ describe("Resend inbound attachment provider boundary", () => {
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL("https://attachments.example.test/signed"),
-      { redirect: "error" },
+      { redirect: "follow" },
     );
     expect(result).toEqual({
       providerAttachmentId: "attachment-a",
@@ -77,6 +77,42 @@ describe("Resend inbound attachment provider boundary", () => {
       buffer: pdf,
     });
     expect(result).not.toHaveProperty("downloadUrl");
+  });
+
+  it("follows provider redirects when downloading signed attachment content", async () => {
+    mocks.attachmentGet.mockResolvedValue({
+      data: {
+        object: "attachment",
+        id: metadata.id,
+        filename: metadata.filename,
+        size: pdf.byteLength,
+        content_type: metadata.contentType,
+        content_disposition: "attachment",
+        download_url: "https://attachments.example.test/redirect",
+        expires_at: "2026-08-23T08:00:00.000Z",
+      },
+      error: null,
+    });
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(pdf, {
+        headers: { "content-length": String(pdf.byteLength) },
+      }),
+    );
+
+    const retrieve = createResendInboundAttachmentRetriever({
+      emailId: "email-a",
+      apiKey: "re_test",
+      fetchImpl,
+    });
+    await expect(retrieve({ ...metadata, contentType: null, size: null })).resolves
+      .toMatchObject({
+        providerAttachmentId: "attachment-a",
+        sizeBytes: pdf.byteLength,
+      });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL("https://attachments.example.test/redirect"),
+      { redirect: "follow" },
+    );
   });
 
   it("fails safely when dedicated metadata conflicts with the received email", async () => {
@@ -97,7 +133,11 @@ describe("Resend inbound attachment provider boundary", () => {
     const retrieve = createResendInboundAttachmentRetriever({
       emailId: "email-a",
       apiKey: "re_test",
-      fetchImpl: vi.fn(),
+      fetchImpl: vi.fn().mockResolvedValue(
+        new Response(pdf, {
+          headers: { "content-length": String(pdf.byteLength) },
+        }),
+      ),
     });
     await expect(retrieve(metadata)).rejects.toBeInstanceOf(
       ResendInboundAttachmentRetrievalError,
@@ -111,7 +151,7 @@ describe("Resend inbound attachment provider boundary", () => {
       fetchImpl: vi.fn(),
     });
     await expect(
-      retrieve({ ...metadata, contentType: null }),
+      retrieve({ ...metadata, id: "  " }),
     ).rejects.toBeInstanceOf(ResendInboundAttachmentRetrievalError);
     expect(mocks.attachmentGet).not.toHaveBeenCalled();
   });

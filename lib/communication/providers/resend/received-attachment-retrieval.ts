@@ -18,25 +18,15 @@ export class ResendInboundAttachmentRetrievalError extends Error {
   }
 }
 
-function requiredMetadata(
+function requiredAttachmentId(
   emailId: string,
   attachment: InboundEmailAttachment,
-): { id: string; filename: string; contentType: string; sizeBytes: number } {
+): string {
   const id = attachment.id.trim();
-  const filename = attachment.filename?.trim() ?? "";
-  const contentType = attachment.contentType?.trim().toLowerCase() ?? "";
-  const sizeBytes = attachment.size;
-  if (
-    !id ||
-    !filename ||
-    !contentType ||
-    typeof sizeBytes !== "number" ||
-    !Number.isSafeInteger(sizeBytes) ||
-    sizeBytes < 0
-  ) {
+  if (!id) {
     throw new ResendInboundAttachmentRetrievalError(emailId, id);
   }
-  return { id, filename, contentType, sizeBytes };
+  return id;
 }
 
 async function readResponseBytes(
@@ -97,28 +87,30 @@ export function createResendInboundAttachmentRetriever(input: {
   return async (
     attachment: InboundEmailAttachment,
   ): Promise<RetrievedInboundEmailAttachment> => {
-    const metadata = requiredMetadata(emailId, attachment);
+    const attachmentId = requiredAttachmentId(emailId, attachment);
     if (!emailId || !apiKey) {
-      throw new ResendInboundAttachmentRetrievalError(emailId, metadata.id);
+      throw new ResendInboundAttachmentRetrievalError(emailId, attachmentId);
     }
 
     try {
       const resend = new Resend(apiKey);
       const { data, error } = await resend.emails.receiving.attachments.get({
         emailId,
-        id: metadata.id,
+        id: attachmentId,
       });
       if (error || !data) throw new Error("Attachment metadata unavailable.");
 
       const filename = data.filename?.trim() ?? "";
       const contentType = data.content_type?.trim().toLowerCase() ?? "";
       if (
-        data.id !== metadata.id ||
-        filename !== metadata.filename ||
-        contentType !== metadata.contentType ||
-        data.size !== metadata.sizeBytes
+        data.id !== attachmentId ||
+        !filename ||
+        !contentType ||
+        typeof data.size !== "number" ||
+        !Number.isSafeInteger(data.size) ||
+        data.size < 0
       ) {
-        throw new Error("Attachment metadata mismatch.");
+        throw new Error("Attachment metadata unavailable.");
       }
 
       const downloadUrl = new URL(data.download_url);
@@ -130,21 +122,21 @@ export function createResendInboundAttachmentRetriever(input: {
         throw new Error("Unsafe attachment download URL.");
       }
       const buffer = await readResponseBytes(
-        await fetchImpl(downloadUrl, { redirect: "error" }),
+        await fetchImpl(downloadUrl, { redirect: "follow" }),
         MAX_COMMUNICATION_ATTACHMENT_SIZE_BYTES,
       );
       if (buffer.byteLength !== data.size) {
         throw new Error("Attachment size mismatch.");
       }
       return {
-        providerAttachmentId: metadata.id,
+        providerAttachmentId: attachmentId,
         filename,
         contentType,
         sizeBytes: data.size,
         buffer,
       };
     } catch {
-      throw new ResendInboundAttachmentRetrievalError(emailId, metadata.id);
+      throw new ResendInboundAttachmentRetrievalError(emailId, attachmentId);
     }
   };
 }

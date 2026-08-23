@@ -5,7 +5,17 @@ const mocks = vi.hoisted(() => ({
   normalize: vi.fn(),
   persist: vi.fn(),
   processAttachments: vi.fn(),
+  resolveAttachments: vi.fn(),
   createRetriever: vi.fn(),
+  messageFindFirst: vi.fn(),
+}));
+
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    communicationMessage: {
+      findFirst: mocks.messageFindFirst,
+    },
+  },
 }));
 
 vi.mock("@/lib/communication/providers/resend/received-normalization", () => ({
@@ -18,6 +28,7 @@ vi.mock("@/lib/communication/inbound-email-service", () => ({
 }));
 vi.mock("@/lib/communication/inbound-attachment-service", () => ({
   processInboundEmailAttachments: mocks.processAttachments,
+  resolveInboundAttachmentsToProcess: mocks.resolveAttachments,
 }));
 vi.mock("@/lib/communication/providers/resend/received-attachment-retrieval", () => ({
   createResendInboundAttachmentRetriever: mocks.createRetriever,
@@ -51,6 +62,8 @@ beforeEach(() => {
   mocks.normalize.mockResolvedValue(null);
   mocks.persist.mockResolvedValue({ ok: true, kind: "UNKNOWN_TOKEN" });
   mocks.processAttachments.mockResolvedValue({ processed: 1, failed: 0 });
+  mocks.resolveAttachments.mockResolvedValue([]);
+  mocks.messageFindFirst.mockResolvedValue({ attachments: null });
   mocks.createRetriever.mockReturnValue(vi.fn());
 });
 
@@ -156,6 +169,8 @@ describe("COMM-02 Resend inbound webhook", () => {
       threadId: "thread-a",
       tenantId: "tenant-a",
     });
+    mocks.messageFindFirst.mockResolvedValue({ attachments: [attachment] });
+    mocks.resolveAttachments.mockResolvedValue([attachment]);
     const retrieve = vi.fn();
     mocks.createRetriever.mockReturnValue(retrieve);
 
@@ -163,6 +178,12 @@ describe("COMM-02 Resend inbound webhook", () => {
       signedRequest(JSON.stringify({ type: "email.received", data: { email_id: "email-1" } })) as never,
     );
     expect(res.status).toBe(200);
+    expect(mocks.resolveAttachments).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      messageId: "message-a",
+      normalizedAttachments: [attachment],
+      legacyAttachments: [attachment],
+    });
     expect(mocks.processAttachments).toHaveBeenCalledWith({
       tenantId: "tenant-a",
       messageId: "message-a",
@@ -179,9 +200,59 @@ describe("COMM-02 Resend inbound webhook", () => {
       threadId: "thread-a",
       tenantId: "tenant-a",
     });
+    mocks.resolveAttachments.mockResolvedValue([]);
     await POST(
       signedRequest(JSON.stringify({ type: "email.received", data: { email_id: "email-1" } })) as never,
     );
-    expect(mocks.processAttachments).toHaveBeenCalledTimes(2);
+    expect(mocks.processAttachments).toHaveBeenCalledTimes(1);
+  });
+
+  it("resumes metadata-only attachments from persisted inbound messages", async () => {
+    const attachment = {
+      id: "attachment-a",
+      filename: "COMM-04D-test.txt.txt",
+      contentType: "text/plain",
+      contentDisposition: "attachment",
+      contentId: null,
+      size: 17,
+    };
+    mocks.normalize.mockResolvedValue({
+      provider: "resend",
+      providerEventId: "msg_123",
+      providerMessageId: "email-1",
+      fromAddress: "customer@example.com",
+      toAddresses: ["reply+token@inbound.example.com"],
+      ccAddresses: [],
+      bccAddresses: [],
+      subject: "Re: Hallo",
+      bodyText: "Mit Anhang",
+      bodyHtml: null,
+      messageIdHeader: "<m1@example.com>",
+      inReplyTo: null,
+      references: null,
+      receivedAt: new Date("2026-08-21T11:00:00.000Z"),
+      attachments: null,
+    });
+    mocks.persist.mockResolvedValue({
+      ok: true,
+      kind: "DUPLICATE",
+      messageId: "message-a",
+      threadId: "thread-a",
+      tenantId: "tenant-a",
+    });
+    mocks.messageFindFirst.mockResolvedValue({ attachments: [attachment] });
+    mocks.resolveAttachments.mockResolvedValue([attachment]);
+
+    const res = await POST(
+      signedRequest(JSON.stringify({ type: "email.received", data: { email_id: "email-1" } })) as never,
+    );
+    expect(res.status).toBe(200);
+    expect(mocks.resolveAttachments).toHaveBeenCalledWith(
+      expect.objectContaining({
+        normalizedAttachments: null,
+        legacyAttachments: [attachment],
+      }),
+    );
+    expect(mocks.processAttachments).toHaveBeenCalled();
   });
 });

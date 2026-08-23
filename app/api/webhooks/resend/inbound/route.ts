@@ -15,6 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
 import { persistInboundEmailReply } from "@/lib/communication/inbound-email-service";
 import {
   getResendWebhookEventId,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/communication/providers/resend/received-attachment-retrieval";
 import {
   processInboundEmailAttachments,
+  resolveInboundAttachmentsToProcess,
 } from "@/lib/communication/inbound-attachment-service";
 
 export async function POST(request: NextRequest) {
@@ -74,21 +76,33 @@ export async function POST(request: NextRequest) {
     if (!result.ok) {
       return NextResponse.json({ error: "Invalid inbound email." }, { status: 400 });
     }
-    if (
-      (result.kind === "PERSISTED" || result.kind === "DUPLICATE") &&
-      normalized.attachments &&
-      normalized.attachments.length > 0
-    ) {
-      await processInboundEmailAttachments({
+    if (result.kind === "PERSISTED" || result.kind === "DUPLICATE") {
+      const message = await prisma.communicationMessage.findFirst({
+        where: {
+          id: result.messageId,
+          tenantId: result.tenantId,
+          direction: "INBOUND",
+        },
+        select: { attachments: true },
+      });
+      const attachmentsToProcess = await resolveInboundAttachmentsToProcess({
         tenantId: result.tenantId,
         messageId: result.messageId,
-        provider: normalized.provider,
-        providerMessageId: normalized.providerMessageId,
-        attachments: normalized.attachments,
-        retrieve: createResendInboundAttachmentRetriever({
-          emailId: normalized.providerMessageId,
-        }),
+        normalizedAttachments: normalized.attachments,
+        legacyAttachments: message?.attachments,
       });
+      if (attachmentsToProcess.length > 0) {
+        await processInboundEmailAttachments({
+          tenantId: result.tenantId,
+          messageId: result.messageId,
+          provider: normalized.provider,
+          providerMessageId: normalized.providerMessageId,
+          attachments: attachmentsToProcess,
+          retrieve: createResendInboundAttachmentRetriever({
+            emailId: normalized.providerMessageId,
+          }),
+        });
+      }
     }
 
     // Unknown tokens are accepted but ignored (safe retry behavior).

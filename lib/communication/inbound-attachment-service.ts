@@ -6,6 +6,9 @@ import type {
   CommunicationAttachmentStorage,
 } from "@/lib/communication/attachment-storage";
 import {
+  readLegacyCommunicationAttachments,
+} from "@/lib/communication/attachment-metadata";
+import {
   validateCommunicationAttachmentSet,
 } from "@/lib/communication/attachment-validation";
 import type {
@@ -17,6 +20,95 @@ export type InboundAttachmentProcessingResult = {
   processed: number;
   failed: number;
 };
+
+function mergeInboundAttachmentMetadata(
+  primary: InboundEmailAttachment,
+  fallback?: InboundEmailAttachment,
+): InboundEmailAttachment {
+  if (!fallback) return primary;
+  return {
+    id: primary.id,
+    filename: primary.filename ?? fallback.filename,
+    contentType: primary.contentType ?? fallback.contentType,
+    contentDisposition: primary.contentDisposition ?? fallback.contentDisposition,
+    contentId: primary.contentId ?? fallback.contentId,
+    size: primary.size ?? fallback.size,
+    processingStatus: primary.processingStatus ?? fallback.processingStatus,
+  };
+}
+
+function dedupeInboundAttachments(
+  attachments: InboundEmailAttachment[],
+): InboundEmailAttachment[] {
+  const byId = new Map<string, InboundEmailAttachment>();
+  for (const attachment of attachments) {
+    const id = attachment.id.trim();
+    if (!id) continue;
+    byId.set(id, mergeInboundAttachmentMetadata(attachment, byId.get(id)));
+  }
+  return [...byId.values()];
+}
+
+/**
+ * Merges provider-normalized references with any legacy metadata already stored
+ * on the inbound message, then excludes attachments that already have durable
+ * relational storage.
+ */
+export async function resolveInboundAttachmentsToProcess(input: {
+  tenantId: string;
+  messageId: string;
+  normalizedAttachments: InboundEmailAttachment[] | null;
+  legacyAttachments?: unknown;
+}): Promise<InboundEmailAttachment[]> {
+  const legacy = readLegacyCommunicationAttachments(input.legacyAttachments);
+  const candidates = dedupeInboundAttachments([
+    ...(input.normalizedAttachments ?? []),
+    ...legacy.filter(
+      (attachment) => attachment.processingStatus !== "FAILED",
+    ),
+  ]);
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const storedLinks = await prisma.communicationMessageAttachment.findMany({
+    where: {
+      tenantId: input.tenantId,
+      messageId: input.messageId,
+      attachment: {
+        tenantId: input.tenantId,
+        sourceType: "INBOUND",
+      },
+    },
+    select: {
+      attachment: {
+        select: {
+          ingestionMetadata: true,
+        },
+      },
+    },
+  });
+  const storedProviderIds = new Set(
+    storedLinks.flatMap((link) => {
+      const metadata = link.attachment.ingestionMetadata;
+      if (
+        !metadata ||
+        typeof metadata !== "object" ||
+        Array.isArray(metadata)
+      ) {
+        return [];
+      }
+      const providerAttachmentId = (metadata as { providerAttachmentId?: unknown })
+        .providerAttachmentId;
+      return typeof providerAttachmentId === "string" &&
+        providerAttachmentId.trim()
+        ? [providerAttachmentId.trim()]
+        : [];
+    }),
+  );
+
+  return candidates.filter((attachment) => !storedProviderIds.has(attachment.id.trim()));
+}
 
 async function recordFailures(input: {
   tenantId: string;
@@ -30,10 +122,13 @@ async function recordFailures(input: {
       direction: "INBOUND",
     },
     data: {
-      attachments: input.failed.map((attachment) => ({
-        ...attachment,
-        processingStatus: "FAILED" as const,
-      })),
+      attachments:
+        input.failed.length === 0
+          ? []
+          : input.failed.map((attachment) => ({
+              ...attachment,
+              processingStatus: "FAILED" as const,
+            })),
     },
   });
 }
@@ -78,7 +173,6 @@ export async function processInboundEmailAttachments(input: {
       const retrieved = await input.retrieve(metadata);
       if (
         retrieved.providerAttachmentId !== metadata.id ||
-        retrieved.sizeBytes !== metadata.size ||
         retrieved.buffer.byteLength !== retrieved.sizeBytes
       ) {
         throw new Error("Provider attachment metadata mismatch.");
