@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { EmailCommunicationPanel } from "@/components/admin/communications/EmailCommunicationPanel";
@@ -599,6 +599,155 @@ describe("COMM-01C email communication UX", () => {
     await waitFor(() =>
       expect(sentBody).toMatchObject({ attachmentIds: ["attachment-a"] }),
     );
+  });
+
+  it("keeps the open composer usable through the visible picker and a 201 upload", async () => {
+    let resolveUpload: (() => void) | undefined;
+    const upload = new Promise<void>((resolve) => {
+      resolveUpload = resolve;
+    });
+    let uploadCount = 0;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({ messages: [], recipient: baseRecipient });
+      }
+      if (url.endsWith("/communications/attachments")) {
+        uploadCount += 1;
+        if (uploadCount === 1) await upload;
+        return jsonResponse({
+          attachment: {
+            attachmentId: `attachment-focus-${uploadCount}`,
+            filename: "focus.pdf",
+            contentType: "application/pdf",
+            size: 1_536,
+            status: "READY",
+            scanStatus: "PENDING",
+          },
+        }, 201);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    const { container } = render(
+      <div role="dialog" aria-modal="true" aria-label="Anmeldungsdetails">
+        {panel()}
+      </div>,
+    );
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Betreff"), "Dokumente");
+    await user.type(screen.getByLabelText("Nachricht"), "Im Anhang");
+
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    if (!input) throw new Error("File input is missing.");
+    const addButton = screen.getByRole("button", { name: "Datei hinzufügen" });
+    const openPicker = vi.spyOn(input, "click");
+    const focusButton = vi.spyOn(addButton, "focus");
+
+    await user.click(addButton);
+    expect(openPicker).toHaveBeenCalledOnce();
+    input.focus();
+
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["pdf"], "focus.pdf", { type: "application/pdf" })],
+      },
+    });
+    expect(focusButton).toHaveBeenCalledWith({ preventScroll: true });
+    expect(addButton).toHaveFocus();
+    expect(input.value).toBe("");
+    expect(screen.getByText("focus.pdf")).toBeInTheDocument();
+    expect(screen.getByText(/Wird hochgeladen/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Dokumente")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Im Anhang")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeDisabled();
+
+    resolveUpload?.();
+    await screen.findByText(/Bereit/);
+    expect(addButton).toHaveFocus();
+    expect(screen.getByLabelText("E-Mail verfassen")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Dokumente")).toBeEnabled();
+    expect(screen.getByDisplayValue("Im Anhang")).toBeEnabled();
+    expect(screen.getByLabelText("Ausgewählte Anhänge")).toHaveTextContent("2 KB");
+    expect(screen.getByRole("button", { name: "Senden" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "E-Mail-Editor schliessen" })).toBeEnabled();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(container.querySelectorAll('[aria-modal="true"]')).toHaveLength(1);
+
+    await user.type(screen.getByLabelText("Nachricht"), " – ergänzt");
+    expect(screen.getByDisplayValue("Im Anhang – ergänzt")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "focus.pdf entfernen" }));
+    expect(screen.queryByText("focus.pdf")).not.toBeInTheDocument();
+
+    await user.click(addButton);
+    fireEvent.change(input, {
+      target: {
+        files: [new File(["pdf"], "focus.pdf", { type: "application/pdf" })],
+      },
+    });
+    await screen.findByText(/Bereit/);
+    expect(uploadCount).toBe(2);
+    expect(screen.getByText("focus.pdf")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Dokumente")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Im Anhang – ergänzt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeEnabled();
+  });
+
+  it("keeps the composer usable and permits same-file retry after upload failure", async () => {
+    let uploadCount = 0;
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      if (url.endsWith("/messages")) {
+        return jsonResponse({ messages: [], recipient: baseRecipient });
+      }
+      if (url.endsWith("/communications/attachments")) {
+        uploadCount += 1;
+        return uploadCount === 1
+          ? jsonResponse({ error: "Die Datei konnte nicht hochgeladen werden." }, 500)
+          : jsonResponse({
+              attachment: {
+                attachmentId: "attachment-retry",
+                filename: "erneut.pdf",
+                contentType: "application/pdf",
+                size: 3,
+                status: "READY",
+                scanStatus: "PENDING",
+              },
+            }, 201);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+
+    const user = userEvent.setup();
+    const { container } = renderPanel();
+    expect(await screen.findByText("anna@example.com")).toBeInTheDocument();
+    await user.type(screen.getByLabelText("Betreff"), "Fehlerfall");
+    await user.type(screen.getByLabelText("Nachricht"), "Bleibt erhalten");
+    const input = container.querySelector<HTMLInputElement>('input[type="file"]');
+    expect(input).not.toBeNull();
+    if (!input) throw new Error("File input is missing.");
+    const file = new File(["pdf"], "erneut.pdf", { type: "application/pdf" });
+
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(await screen.findByText(/Die Datei konnte nicht hochgeladen werden/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Fehlerfall")).toBeEnabled();
+    expect(screen.getByDisplayValue("Bleibt erhalten")).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Datei hinzufügen" })).toBeEnabled();
+
+    await user.click(screen.getByRole("button", { name: "erneut.pdf entfernen" }));
+    fireEvent.change(input, { target: { files: [file] } });
+    await screen.findByText(/Bereit/);
+    expect(uploadCount).toBe(2);
+    expect(screen.getByText("erneut.pdf")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Senden" })).toBeEnabled();
   });
 
   it("renders secure relational downloads and explicit legacy metadata fallback", async () => {

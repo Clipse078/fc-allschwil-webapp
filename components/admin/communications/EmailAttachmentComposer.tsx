@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertCircle, Loader2, Paperclip, Plus, Trash2 } from "lucide-react";
+import { useRef } from "react";
 
 export type ComposerAttachment = {
   localId: string;
@@ -33,6 +34,8 @@ export function EmailAttachmentComposer({
   onRemove: (localId: string) => void;
 }) {
   const totalSize = attachments.reduce((sum, attachment) => sum + attachment.size, 0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
 
   return (
     <fieldset className="mt-4" disabled={disabled}>
@@ -42,22 +45,32 @@ export function EmailAttachmentComposer({
           {attachments.length}/10 · {formatAttachmentSize(totalSize)} von 20 MB
         </span>
       </div>
-      <label className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)] has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-60">
+      <button
+        ref={addButtonRef}
+        type="button"
+        disabled={disabled}
+        onClick={() => fileInputRef.current?.click()}
+        className="mt-2 inline-flex cursor-pointer items-center gap-2 rounded-md border border-[var(--border)] px-3 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:cursor-not-allowed disabled:opacity-60"
+      >
         <Plus className="h-3.5 w-3.5" aria-hidden />
         Datei hinzufügen
-        <input
-          type="file"
-          multiple
-          disabled={disabled}
-          className="sr-only"
-          aria-label="Dateien hinzufügen"
-          accept=".pdf,.docx,.xlsx,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp,.gif"
-          onChange={(event) => {
-            onAddFiles(Array.from(event.target.files ?? []));
-            event.target.value = "";
-          }}
-        />
-      </label>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        disabled={disabled}
+        tabIndex={-1}
+        className="hidden"
+        aria-label="Dateien hinzufügen"
+        accept=".pdf,.docx,.xlsx,.pptx,.txt,.csv,.jpg,.jpeg,.png,.webp,.gif"
+        onChange={(event) => {
+          const files = Array.from(event.currentTarget.files ?? []);
+          event.currentTarget.value = "";
+          addButtonRef.current?.focus({ preventScroll: true });
+          onAddFiles(files);
+        }}
+      />
 
       {attachments.length > 0 ? (
         <ul className="mt-3 space-y-2" aria-label="Ausgewählte Anhänge">
