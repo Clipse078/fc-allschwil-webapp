@@ -96,6 +96,8 @@ export type BuildScreen1FeedInput = {
   readonly dateTo?: Date;
   readonly seasonKey?: string;
   readonly teamSlug?: string;
+  /** Tenant club logo for own-team crest resolution (Tenant.logoUrl). */
+  readonly tenantLogoUrl?: string | null;
 };
 
 // ── buildInfoboardScreen1Feed ──────────────────────────────────────────────────
@@ -242,18 +244,33 @@ export async function buildInfoboardScreen1Feed(
 
   // Step 5: Map each bucket's events to DTOs.
   const current: InfoboardScreen1Event[] = grouped.current.map((event) =>
-    mapScreen1Event({ event, temporalBucket: "current" }),
+    mapScreen1Event({
+      event,
+      temporalBucket: "current",
+      tenantClubName: input.tenant.name,
+      tenantLogoUrl: input.tenantLogoUrl,
+    }),
   );
 
   const next: InfoboardScreen1Event[] = grouped.next.map((event) =>
-    mapScreen1Event({ event, temporalBucket: "next" }),
+    mapScreen1Event({
+      event,
+      temporalBucket: "next",
+      tenantClubName: input.tenant.name,
+      tenantLogoUrl: input.tenantLogoUrl,
+    }),
   );
 
   const later: InfoboardScreen1Event[] = [
     ...grouped.later,
     ...fillEvents,
   ].map((event) =>
-    mapScreen1Event({ event, temporalBucket: "later" }),
+    mapScreen1Event({
+      event,
+      temporalBucket: "later",
+      tenantClubName: input.tenant.name,
+      tenantLogoUrl: input.tenantLogoUrl,
+    }),
   );
 
   // Step 6: Assemble the feed.

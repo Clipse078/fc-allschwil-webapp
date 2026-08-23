@@ -50,6 +50,8 @@ export type InfoboardTeamAllocationPresentation = {
   readonly teamDisplayName: string;
   readonly dressingRoomLabel: string | null;
   readonly isHomeTeam?: boolean;
+  /** Canonical club crest URL for tournament logo row; null when unavailable. */
+  readonly clubLogoUrl?: string | null;
 };
 
 /**

@@ -55,6 +55,22 @@ export type InfoboardAllocationDisplay = {
   refereeDressingRoomLabel: string | null;
 };
 
+/** Club + team presentation for one side of a Screen 1 MATCH card. */
+export type InfoboardMatchSidePresentation = {
+  /** Primary club identity line (e.g. "FC Allschwil"). */
+  clubDisplayName: string;
+  /** Secondary team-specific line (e.g. "Junioren C2"), or null when absent. */
+  teamSubDisplayName: string | null;
+  /** Canonical club crest URL, or null when not configured. */
+  clubLogoUrl: string | null;
+};
+
+/** Structured MATCH presentation for Screen 1 (INFOBOARD-LOGO-02). */
+export type InfoboardMatchPresentation = {
+  home: InfoboardMatchSidePresentation;
+  away: InfoboardMatchSidePresentation | null;
+};
+
 /**
  * A single event entry in the Screen 1 temporal feed.
  * All timestamps are UTC ISO-8601 strings.
@@ -78,6 +94,11 @@ export type InfoboardScreen1Event = {
    * Never a white-background tile — only the clean canonical transparent PNG.
    */
   opponentLogoUrl: string | null;
+  /**
+   * Structured club + team presentation for MATCH cards (INFOBOARD-LOGO-02).
+   * Null for non-MATCH events or when canonical identity is unavailable.
+   */
+  matchPresentation: InfoboardMatchPresentation | null;
   /** Organizer name for external/municipal events. */
   organizerDisplayName: string | null;
   competitionLabel: string | null;

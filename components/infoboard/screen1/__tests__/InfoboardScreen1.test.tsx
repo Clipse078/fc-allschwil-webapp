@@ -88,6 +88,7 @@ function makeEvent(
     teamDisplayName: "Test Team",
     opponentDisplayName: null,
     opponentLogoUrl: null,
+    matchPresentation: null,
     organizerDisplayName: null,
     competitionLabel: null,
     startAt: "2026-09-12T08:00:00.000Z",
@@ -816,7 +817,7 @@ describe("Match row", () => {
     expect(homeIdx).toBeLessThan(awayIdx);
   });
 
-  it("home team appears before away team in allocation", () => {
+  it("home dressing room appears before away dressing room with Heim/Gast labels", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine H", awayDressingRoomLabel: "Kabine A", refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -824,7 +825,9 @@ describe("Match row", () => {
     render(<InfoboardScreen1 feed={feed} />);
     const matchAlloc = screen.getByTestId("match-allocation");
     const text = matchAlloc.textContent ?? "";
-    expect(text.indexOf("FC Home")).toBeLessThan(text.indexOf("FC Away"));
+    expect(text.indexOf("Heim")).toBeLessThan(text.indexOf("Gast"));
+    expect(text).toContain("H");
+    expect(text).toContain("A");
   });
 
   it("does not render SCHIRI label", () => {
@@ -851,25 +854,25 @@ describe("Match row", () => {
     expect(matchAlloc.textContent).toContain("E2");
   });
 
-  it("does not render HEIM label", () => {
+  it("renders Heim for home dressing room", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine E1", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null } })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.queryByText("HEIM")).toBeNull();
+    expect(screen.getByText("Heim")).toBeTruthy();
   });
 
-  it("does not render GAST label", () => {
+  it("renders Gast for away dressing room", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine E1", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null } })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    expect(screen.queryByText("GAST")).toBeNull();
+    expect(screen.getByText("Gast")).toBeTruthy();
   });
 
-  it("shows home team name text in match-home-team-row (no logo — text-first per C6)", () => {
+  it("shows legacy combined team names when matchPresentation is absent", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine E1", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -880,11 +883,42 @@ describe("Match row", () => {
         branding={{ clubLogoSrc: "/images/logos/fc-allschwil.png" }}
       />,
     );
-    // Logos are removed from match identity zone (INFOBOARD-UX-03-C6).
-    // Team name text must be present; no img element in the home row.
     const homeTeamRow = screen.getByTestId("match-home-team-row");
-    expect(homeTeamRow.querySelector("img")).toBeNull();
     expect(homeTeamRow.textContent).toContain("FC Test");
+  });
+
+  it("renders structured club + team presentation with logos when matchPresentation is present", () => {
+    const feed = makeFeed({
+      current: [makeEvent({
+        type: "MATCH",
+        teamDisplayName: "FC Allschwil Junioren C2",
+        opponentDisplayName: "FC Therwil C Gelb",
+        matchPresentation: {
+          home: {
+            clubDisplayName: "FC ALLSCHWIL",
+            teamSubDisplayName: "Junioren C2",
+            clubLogoUrl: "/tenant-logo.png",
+          },
+          away: {
+            clubDisplayName: "FC THERWIL",
+            teamSubDisplayName: "C Gelb",
+            clubLogoUrl: "https://cdn.example.com/therwil.png",
+          },
+        },
+        allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "Kabine O2", awayDressingRoomLabel: "Kabine E2", refereeDressingRoomLabel: null },
+      })],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/tenant-logo.png" }} />);
+
+    const homeRow = screen.getByTestId("match-home-team-row");
+    const awayRow = screen.getByTestId("match-away-team-row");
+    expect(homeRow.textContent).toContain("FC ALLSCHWIL");
+    expect(homeRow.textContent).toContain("Junioren C2");
+    expect(awayRow.textContent).toContain("FC THERWIL");
+    expect(awayRow.textContent).toContain("C Gelb");
+    expect(screen.getByTestId("home-team-logo")).toBeTruthy();
+    expect(screen.getByTestId("away-team-logo")).toBeTruthy();
   });
 
   it("no logo appears inside the dressing-room allocation area", () => {
@@ -929,18 +963,21 @@ describe("4-team tournament allocation", () => {
     expect(screen.getByTestId("participant-allocation-block")).toBeTruthy();
   });
 
-  it("renders all four team names", () => {
+  it("renders all four team names in kabinen allocation block only", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
         eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
       />,
     );
-    // Team names appear in both tournament-participants and participant-allocation-block
-    expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("FC Binningen").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("FC Aesch").length).toBeGreaterThan(0);
+    const block = screen.getByTestId("participant-allocation-block");
+    expect(within(block).getByText("FC Allschwil E1")).toBeTruthy();
+    expect(within(block).getByText("FC Allschwil E2")).toBeTruthy();
+    expect(within(block).getByText("FC Binningen")).toBeTruthy();
+    expect(within(block).getByText("FC Aesch")).toBeTruthy();
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(logoArea.textContent).not.toContain("FC Allschwil E1");
+    expect(logoArea.querySelectorAll("img").length).toBeGreaterThan(0);
   });
 
   it("renders all four dressing rooms", () => {
@@ -2006,60 +2043,91 @@ describe("Card-based layout — no table-row appearance", () => {
   });
 });
 
-describe("Match logo placement — text-first, no logos (INFOBOARD-UX-03-C6)", () => {
-  it("home team row shows team name text and no img element", () => {
+describe("Match logo placement — INFOBOARD-LOGO-02", () => {
+  it("home team row shows club logo when matchPresentation provides one", () => {
     const feed = makeFeed({
-      current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Home", opponentDisplayName: "FC Away", allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null } })],
+      current: [makeEvent({
+        type: "MATCH",
+        teamDisplayName: "FC Home",
+        opponentDisplayName: "FC Away",
+        matchPresentation: {
+          home: {
+            clubDisplayName: "FC HOME",
+            teamSubDisplayName: "E1",
+            clubLogoUrl: "/logo.png",
+          },
+          away: {
+            clubDisplayName: "FC AWAY",
+            teamSubDisplayName: "E1",
+            clubLogoUrl: null,
+          },
+        },
+        allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
+      })],
       isEmpty: false,
     });
-    render(
-      <InfoboardScreen1
-        feed={feed}
-        branding={{ clubLogoSrc: "/logo.png" }}
-      />,
-    );
+    render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/logo.png" }} />);
     const homeRow = screen.getByTestId("match-home-team-row");
-    // C6: logos removed from event identity zone — text must be visible, no img
-    expect(homeRow.querySelector("img")).toBeNull();
-    expect(homeRow.textContent).toContain("FC Home");
+    expect(homeRow.querySelector("img")).toBeTruthy();
+    expect(homeRow.textContent).toContain("FC HOME");
   });
 
-  it("away team row shows opponent name text and no img when opponentLogoUrl is set", () => {
+  it("away team row shows opponent logo when matchPresentation provides one", () => {
     const feed = makeFeed({
       current: [makeEvent({
         type: "MATCH",
         teamDisplayName: "FC Home",
         opponentDisplayName: "FC Schwarz-Weiss A",
         opponentLogoUrl: "https://cdn.example.com/fc-schwarz-weiss.png",
+        matchPresentation: {
+          home: {
+            clubDisplayName: "FC HOME",
+            teamSubDisplayName: null,
+            clubLogoUrl: "/logo.png",
+          },
+          away: {
+            clubDisplayName: "FC SCHWARZ-WEISS",
+            teamSubDisplayName: "A",
+            clubLogoUrl: "https://cdn.example.com/fc-schwarz-weiss.png",
+          },
+        },
         allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
       })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/logo.png" }} />);
     const awayRow = screen.getByTestId("match-away-team-row");
-    // C6: logos removed — no img in away row regardless of opponentLogoUrl
-    expect(awayRow.querySelector("img")).toBeNull();
-    expect(awayRow.querySelector("[data-testid='away-team-logo']")).toBeNull();
-    expect(awayRow.textContent).toContain("FC Schwarz-Weiss A");
+    expect(screen.getByTestId("away-team-logo")).toBeTruthy();
+    expect(awayRow.textContent).toContain("FC SCHWARZ-WEISS");
   });
 
-  it("away team row shows opponent name text and no placeholder when opponentLogoUrl is null", () => {
+  it("away team row uses placeholder slot when logo is absent", () => {
     const feed = makeFeed({
       current: [makeEvent({
         type: "MATCH",
         teamDisplayName: "FC Home",
         opponentDisplayName: "FC Away",
-        opponentLogoUrl: null,
+        matchPresentation: {
+          home: {
+            clubDisplayName: "FC HOME",
+            teamSubDisplayName: null,
+            clubLogoUrl: "/logo.png",
+          },
+          away: {
+            clubDisplayName: "FC AWAY",
+            teamSubDisplayName: null,
+            clubLogoUrl: null,
+          },
+        },
         allocation: { pitchLabel: "KR1", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: null },
       })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} branding={{ clubLogoSrc: "/logo.png" }} />);
     const awayRow = screen.getByTestId("match-away-team-row");
-    // C6: no logo and no placeholder — clean text-only presentation
     expect(awayRow.querySelector("img")).toBeNull();
-    expect(awayRow.querySelector("[data-testid='away-team-logo-placeholder']")).toBeNull();
-    expect(awayRow.textContent).toContain("FC Away");
+    expect(screen.getByTestId("away-team-logo-placeholder")).toBeTruthy();
+    expect(awayRow.textContent).toContain("FC AWAY");
   });
 
   it("no logo anywhere inside match-allocation (destination zone)", () => {
@@ -2756,6 +2824,7 @@ describe("Content-demand — paginateDisplayList", () => {
         teamDisplayName: `Team ${i}`,
         opponentDisplayName: null,
         opponentLogoUrl: null,
+    matchPresentation: null,
         organizerDisplayName: null,
         competitionLabel: null,
         startAt: "2026-09-12T16:00:00.000Z",

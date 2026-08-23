@@ -42,6 +42,7 @@ import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
+import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 
 // ── Tenant select ─────────────────────────────────────────────────────────────
 
@@ -142,7 +143,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const loader = createCanonicalInfoboardSourceLoader(db);
 
     // ── Build live payload ─────────────────────────────────────────────────
-    const payload = await buildScreen1LivePayload({ tenant, now, loader });
+    const payload = await buildScreen1LivePayload({
+      tenant,
+      now,
+      loader,
+      tournamentPresentationDatabase: {
+        tournamentParticipant: {
+          findMany: (args) =>
+            prisma.tournamentParticipant.findMany(
+              args as Parameters<typeof prisma.tournamentParticipant.findMany>[0],
+            ) as unknown as ReturnType<
+              Screen1TournamentPresentationDatabase["tournamentParticipant"]["findMany"]
+            >,
+        },
+      },
+    });
 
     // ── Response ───────────────────────────────────────────────────────────
     return NextResponse.json(payload, {
