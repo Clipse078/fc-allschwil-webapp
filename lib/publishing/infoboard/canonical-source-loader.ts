@@ -97,6 +97,7 @@ import { resolveTrainingDayWindow, resolveTrainingWeekWindow } from "@/lib/train
 import { getWeekplannerDay } from "@/lib/weekplanner/queries";
 import { getOperationalWeekplannerPlan } from "@/lib/weekplanner/plan-service";
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import type { InfoboardMatchIdentity } from "../presentation/infoboard-match-presentation";
 import type {
   WeekplannerItem,
   WeekplannerMatchItem,
@@ -127,16 +128,41 @@ export type CanonicalEventPolicyRow = {
   // INFOBOARD-C1: nullable after ADMIN-DELETE-SEASON-01-C1 (Event.seasonId uses
   // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
   readonly season: { readonly key: string } | null;
-  /**
-   * Away-side ExternalTeam → ExternalClub logo chain for opponent crest
-   * rendering on Infoboard Screen 1. Null when the match has no external
-   * mapping, or no awayExternalTeam has been linked yet by Club Directory
-   * discovery.
-   */
+  readonly team?: {
+    readonly name: string;
+    readonly shortName: string | null;
+    readonly alternativeName: string | null;
+  } | null;
   readonly matchExternalMapping?: {
-    readonly awayExternalTeam: {
+    readonly homeTeam: {
+      readonly name: string;
+      readonly shortName: string | null;
+      readonly alternativeName: string | null;
+    } | null;
+    readonly awayTeam: {
+      readonly name: string;
+      readonly shortName: string | null;
+      readonly alternativeName: string | null;
+    } | null;
+    readonly homeExternalTeam: {
+      readonly name: string;
+      readonly shortName: string | null;
+      readonly alternativeName: string | null;
       readonly logoUrl: string | null;
       readonly externalClub: {
+        readonly name: string;
+        readonly shortName: string | null;
+        readonly logoUrl: string | null;
+      };
+    } | null;
+    readonly awayExternalTeam: {
+      readonly name: string;
+      readonly shortName: string | null;
+      readonly alternativeName: string | null;
+      readonly logoUrl: string | null;
+      readonly externalClub: {
+        readonly name: string;
+        readonly shortName: string | null;
         readonly logoUrl: string | null;
       };
     } | null;
@@ -187,13 +213,56 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
   resultLabel: true,
   intermediateResultLabel: true,
   season: { select: { key: true } },
+  team: {
+    select: {
+      name: true,
+      shortName: true,
+      alternativeName: true,
+    },
+  },
   matchExternalMapping: {
     select: {
-      awayExternalTeam: {
+      homeTeam: {
         select: {
+          name: true,
+          shortName: true,
+          alternativeName: true,
+        },
+      },
+      awayTeam: {
+        select: {
+          name: true,
+          shortName: true,
+          alternativeName: true,
+        },
+      },
+      homeExternalTeam: {
+        select: {
+          name: true,
+          shortName: true,
+          alternativeName: true,
           logoUrl: true,
           externalClub: {
-            select: { logoUrl: true },
+            select: {
+              name: true,
+              shortName: true,
+              logoUrl: true,
+            },
+          },
+        },
+      },
+      awayExternalTeam: {
+        select: {
+          name: true,
+          shortName: true,
+          alternativeName: true,
+          logoUrl: true,
+          externalClub: {
+            select: {
+              name: true,
+              shortName: true,
+              logoUrl: true,
+            },
           },
         },
       },
@@ -369,6 +438,111 @@ function mapTrainingSessionStatus(raw: string | undefined): PublishingEventStatu
   }
 }
 
+type ExternalTeamPolicyRow = NonNullable<
+  NonNullable<CanonicalEventPolicyRow["matchExternalMapping"]>["awayExternalTeam"]
+>;
+
+function buildExternalSideIdentity(
+  externalTeam: ExternalTeamPolicyRow | null,
+  fallbackDisplayName: string | null,
+): InfoboardMatchIdentity["home"] {
+  if (!externalTeam) {
+    return {
+      isOwnTeam: false,
+      clubName: null,
+      clubLogoUrl: null,
+      teamName: null,
+      teamShortName: null,
+      teamAlternativeName: null,
+      fallbackDisplayName,
+    };
+  }
+
+  return {
+    isOwnTeam: false,
+    clubName: externalTeam.externalClub.name,
+    clubLogoUrl: resolveExternalTeamLogoUrl(
+      externalTeam,
+      externalTeam.externalClub,
+    ),
+    teamName: externalTeam.name,
+    teamShortName: externalTeam.shortName,
+    teamAlternativeName: externalTeam.alternativeName,
+    fallbackDisplayName,
+  };
+}
+
+function buildOwnTeamSideIdentity(
+  team:
+    | {
+        readonly name: string;
+        readonly shortName: string | null;
+        readonly alternativeName: string | null;
+      }
+    | null
+    | undefined,
+  fallbackDisplayName: string | null,
+): InfoboardMatchIdentity["home"] {
+  return {
+    isOwnTeam: true,
+    clubName: null,
+    clubLogoUrl: null,
+    teamName: team?.name ?? null,
+    teamShortName: team?.shortName ?? null,
+    teamAlternativeName: team?.alternativeName ?? null,
+    fallbackDisplayName,
+  };
+}
+
+function buildMatchIdentity(
+  policy: CanonicalEventPolicyRow | undefined,
+  item: WeekplannerMatchItem,
+): InfoboardMatchIdentity {
+  const mapping = policy?.matchExternalMapping ?? null;
+  const eventTeam = policy?.team ?? null;
+  const homeAway = (policy?.homeAway ?? "HOME").trim().toUpperCase();
+  const ownTeamIsAway = homeAway === "AWAY";
+
+  if (mapping) {
+    const homeTeam = mapping.homeTeam;
+    const awayTeam = mapping.awayTeam;
+    const homeExternal = mapping.homeExternalTeam;
+    const awayExternal = mapping.awayExternalTeam;
+
+    return {
+      home: homeTeam
+        ? buildOwnTeamSideIdentity(
+            homeTeam,
+            ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
+          )
+        : buildExternalSideIdentity(
+            homeExternal,
+            ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
+          ),
+      away: awayTeam
+        ? buildOwnTeamSideIdentity(
+            awayTeam,
+            ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
+          )
+        : buildExternalSideIdentity(
+            awayExternal,
+            ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
+          ),
+    };
+  }
+
+  return {
+    home: buildOwnTeamSideIdentity(
+      eventTeam,
+      ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
+    ),
+    away: buildExternalSideIdentity(
+      null,
+      ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
+    ),
+  };
+}
+
 function mapTrainingItem(
   item: WeekplannerTrainingItem,
   policy: CanonicalTrainingSessionPolicyRow | undefined,
@@ -415,40 +589,36 @@ function mapMatchItem(
   item: WeekplannerMatchItem,
   policy: CanonicalEventPolicyRow | undefined,
 ): Screen1SourceEvent {
-  // Resolve the canonical opponent club crest from the ExternalTeam →
-  // ExternalClub logo chain. Priority: ExternalTeam.logoUrl (per-team
-  // override, rare) → ExternalClub.logoUrl (canonical club crest). Falls
-  // back to null when no MatchExternalMapping / awayExternalTeam is linked.
   const awayExternalTeam = policy?.matchExternalMapping?.awayExternalTeam ?? null;
   const opponentLogoUrl = awayExternalTeam
     ? resolveExternalTeamLogoUrl(awayExternalTeam, awayExternalTeam.externalClub)
     : null;
+  const eventTeam = policy?.team ?? null;
 
   return {
     tenantId: item.tenantId,
     type: "MATCH",
-    // Fail closed when no policy row is found (should never happen — the
-    // eventId was itself resolved from Event by Weekplanner): excluded via
-    // STATUS_NOT_PUBLISHABLE / INFOBOARD_HIDDEN rather than defaulting to visible.
     status: (policy?.status as PublishingEventStatus | undefined) ?? "DRAFT",
     infoboardVisible: policy?.infoboardVisible ?? false,
     websiteVisible: policy?.websiteVisible ?? false,
     trainingsplanVisible: policy?.trainingsplanVisible ?? false,
-    // The RAW Event.homeAway value — deliberately NOT item.homeAway (always
-    // the literal "HOME", since Weekplanner's own HOME/AWAY filter is
-    // permissive: "not AWAY" counts as home). Publication policy requires
-    // the strict, explicit "HOME" value; reading the raw column here
-    // preserves that existing HOME_AWAY_UNKNOWN behaviour unchanged.
     homeAway: policy?.homeAway ?? null,
     startAt: item.startAt,
     endAt: item.endAt,
     id: item.id,
     title: item.title,
     seasonKey: policy?.season?.key ?? "",
-    team: { name: item.teamNames[0] ?? null },
+    team: eventTeam
+      ? {
+          name: eventTeam.name,
+          shortName: eventTeam.shortName,
+          alternativeName: eventTeam.alternativeName,
+        }
+      : { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: item.opponentName,
     opponentLogoUrl,
+    matchIdentity: buildMatchIdentity(policy, item),
     organizerName: policy?.organizerName ?? null,
     competitionLabel: policy?.competitionLabel ?? null,
     meetingTime: policy?.meetingTime ?? null,

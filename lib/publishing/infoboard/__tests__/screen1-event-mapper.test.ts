@@ -604,6 +604,47 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
   it("passes through null opponentLogoUrl when not set", () => {
     const result = mapScreen1Event(makeInput({ type: "MATCH", homeAway: "HOME" }));
     expect(result.opponentLogoUrl).toBeNull();
+    expect(result.matchPresentation).toBeNull();
+  });
+
+  it("builds matchPresentation from canonical match identity", () => {
+    const result = mapScreen1Event({
+      event: makeBaseEvent({
+        type: "MATCH",
+        homeAway: "HOME",
+        matchIdentity: {
+          home: {
+            isOwnTeam: true,
+            clubName: null,
+            clubLogoUrl: null,
+            teamName: "FC Allschwil Junioren C2",
+            teamShortName: null,
+            teamAlternativeName: "Junioren C2",
+            fallbackDisplayName: "FC Allschwil Junioren C2",
+          },
+          away: {
+            isOwnTeam: false,
+            clubName: "FC Therwil",
+            clubLogoUrl: "https://cdn.example.com/therwil.png",
+            teamName: "FC Therwil C Gelb",
+            teamShortName: "C Gelb",
+            teamAlternativeName: null,
+            fallbackDisplayName: "FC Therwil C Gelb",
+          },
+        },
+      }),
+      temporalBucket: "current",
+      tenantClubName: "FC Allschwil",
+      tenantLogoUrl: "https://cdn.example.com/tenant.png",
+    });
+
+    expect(result.matchPresentation?.home.clubDisplayName).toBe("FC Allschwil");
+    expect(result.matchPresentation?.home.teamSubDisplayName).toBe("Junioren C2");
+    expect(result.matchPresentation?.home.clubLogoUrl).toBe(
+      "https://cdn.example.com/tenant.png",
+    );
+    expect(result.matchPresentation?.away?.clubDisplayName).toBe("FC Therwil");
+    expect(result.matchPresentation?.away?.teamSubDisplayName).toBe("C Gelb");
   });
 
   it("TRAINING events always have opponentLogoUrl null", () => {

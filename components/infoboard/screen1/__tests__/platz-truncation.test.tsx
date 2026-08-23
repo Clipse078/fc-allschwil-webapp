@@ -49,6 +49,7 @@ function makeTrainingEvent(
     teamDisplayName: "1. Mannschaft",
     opponentDisplayName: null,
     opponentLogoUrl: null,
+    matchPresentation: null,
     organizerDisplayName: null,
     competitionLabel: null,
     meetingTime: null,

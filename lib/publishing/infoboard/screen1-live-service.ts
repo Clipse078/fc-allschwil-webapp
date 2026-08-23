@@ -45,6 +45,10 @@ import type {
   InfoboardAnnouncementPresentation,
   InfoboardEventPresentationExtension,
 } from "@/components/infoboard/screen1/screen1-presentation-types";
+import {
+  loadScreen1TournamentPresentationExtensions,
+  type Screen1TournamentPresentationDatabase,
+} from "./screen1-tournament-presentation";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -188,8 +192,10 @@ export async function buildScreen1LivePayload(params: {
   readonly loader: PublicationEventLoader<Screen1SourceEvent>;
   /** Optional per-board overrides (INFOBOARD-V2). */
   readonly boardConfig?: InfoboardBoardConfig | null;
+  /** Optional DB access for tournament participant presentation (INFOBOARD-LOGO-02). */
+  readonly tournamentPresentationDatabase?: Screen1TournamentPresentationDatabase | null;
 }): Promise<InfoboardScreen1LivePayload> {
-  const { tenant, now, loader, boardConfig } = params;
+  const { tenant, now, loader, boardConfig, tournamentPresentationDatabase } = params;
 
   // ── Bounded date window ───────────────────────────────────────────────────
   // No server-local midnight calculation. Fixed UTC offsets relative to `now`.
@@ -213,12 +219,27 @@ export async function buildScreen1LivePayload(params: {
     now,
     dateFrom,
     dateTo,
+    tenantLogoUrl: tenant.logoUrl ?? null,
   });
 
   // ── Presentation extensions ───────────────────────────────────────────────
-  // No canonical TournamentParticipant / EventParticipant model exists.
-  // Return an empty array. When the model is added, populate extensions here.
-  const eventPresentation: readonly InfoboardEventPresentationExtension[] = [];
+  const tournamentEventIds = [
+    ...feed.current,
+    ...feed.next,
+    ...feed.later,
+  ]
+    .filter((event) => event.type === "TOURNAMENT")
+    .map((event) => event.id);
+
+  const eventPresentation: readonly InfoboardEventPresentationExtension[] =
+    tournamentPresentationDatabase != null && tournamentEventIds.length > 0
+      ? await loadScreen1TournamentPresentationExtensions(
+          tournamentPresentationDatabase,
+          tenant.id,
+          tournamentEventIds,
+          tenant.logoUrl ?? null,
+        )
+      : [];
 
   // ── Announcement ─────────────────────────────────────────────────────────
   // Per-board announcement from boardConfig (INFOBOARD-V2), or null.

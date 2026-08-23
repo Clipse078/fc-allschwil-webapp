@@ -43,6 +43,7 @@ import type {
   InfoboardTeamAllocationPresentation,
   InfoboardEventPresentationExtension,
 } from "./screen1-presentation-types";
+import type { InfoboardMatchSidePresentation } from "@/lib/publishing/event-types";
 import {
   DEFAULT_INFOBOARD_DISPLAY_THEME,
   type InfoboardDisplayTheme,
@@ -410,6 +411,88 @@ function stripeKey(type: PublishingEventType): string {
   return "blue";
 }
 
+type MatchClubLogoProps = {
+  logoUrl: string | null | undefined;
+  clubName: string;
+  testId?: string;
+  presentation?: "match" | "tournament";
+};
+
+/**
+ * Reserved-size club crest slot for MATCH / TOURNAMENT presentation.
+ * Renders the configured logo when available; otherwise an empty slot so
+ * layout does not jump and no broken-image icon is shown.
+ */
+function MatchClubLogo({
+  logoUrl,
+  clubName,
+  testId,
+  presentation = "match",
+}: MatchClubLogoProps): ReactElement {
+  const logoClassName =
+    presentation === "tournament"
+      ? logoUrl
+        ? styles.tournamentClubLogo
+        : styles.tournamentClubLogoPlaceholder
+      : logoUrl
+        ? styles.matchClubLogo
+        : styles.matchClubLogoPlaceholder;
+
+  if (logoUrl) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URLs from SCE configuration.
+      <img
+        src={logoUrl}
+        alt=""
+        aria-hidden="true"
+        className={logoClassName}
+        data-testid={testId}
+      />
+    );
+  }
+
+  return (
+    <span
+      className={logoClassName}
+      aria-hidden="true"
+      data-testid={testId ? `${testId}-placeholder` : undefined}
+      title={clubName}
+    />
+  );
+}
+
+type MatchSideIdentityProps = {
+  side: InfoboardMatchSidePresentation;
+  rowTestId: string;
+  logoTestId: string;
+  primaryClassName: string;
+  secondaryClassName: string;
+};
+
+function MatchSideIdentity({
+  side,
+  rowTestId,
+  logoTestId,
+  primaryClassName,
+  secondaryClassName,
+}: MatchSideIdentityProps): ReactElement {
+  return (
+    <div className={styles.matchTeamRow} data-testid={rowTestId}>
+      <MatchClubLogo
+        logoUrl={side.clubLogoUrl}
+        clubName={side.clubDisplayName}
+        testId={logoTestId}
+      />
+      <div className={styles.matchTeamText}>
+        <span className={primaryClassName}>{side.clubDisplayName}</span>
+        {side.teamSubDisplayName !== null && (
+          <span className={secondaryClassName}>{side.teamSubDisplayName}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Tournament allocation block ───────────────────────────────────────────────
 
 type ParticipantAllocationBlockProps = {
@@ -482,7 +565,7 @@ function MatchDestination({ event }: MatchDestinationProps): ReactElement {
                 <span className={styles.matchAllocRoom}>
                   {formatDressingRoomLabel(homeDressingRoomLabel)}
                 </span>
-                <span className={styles.matchAllocTeam}>{event.teamDisplayName}</span>
+                <span className={styles.matchAllocRole}>Heim</span>
               </div>
             )}
 
@@ -491,7 +574,7 @@ function MatchDestination({ event }: MatchDestinationProps): ReactElement {
                 <span className={styles.matchAllocRoom}>
                   {formatDressingRoomLabel(awayDressingRoomLabel)}
                 </span>
-                <span className={styles.matchAllocTeam}>{event.opponentDisplayName}</span>
+                <span className={styles.matchAllocRole}>Gast</span>
               </div>
             )}
           </div>
@@ -913,39 +996,61 @@ function EventCard({
 
         {isMatch ? (
           <div className={styles.matchIdentity}>
-            {/* Home team — text-first, no logo */}
-            <div className={styles.matchTeamRow} data-testid="match-home-team-row">
-              <span className={styles.eventTeamMain}>
-                {event.teamDisplayName}
-              </span>
-            </div>
-            {/* VS separator */}
-            <span className={styles.vsLabel} aria-hidden="true">vs.</span>
-            {/* Away team — text-first, no logo */}
-            {event.opponentDisplayName !== null && (
-              <div className={styles.matchTeamRow} data-testid="match-away-team-row">
-                <span className={styles.eventTeamOpponent}>
-                  {event.opponentDisplayName}
-                </span>
-              </div>
+            {event.matchPresentation ? (
+              <>
+                <MatchSideIdentity
+                  side={event.matchPresentation.home}
+                  rowTestId="match-home-team-row"
+                  logoTestId="home-team-logo"
+                  primaryClassName={styles.eventTeamMain}
+                  secondaryClassName={styles.matchTeamSubName}
+                />
+                <span className={styles.vsLabel} aria-hidden="true">vs.</span>
+                {event.matchPresentation.away !== null && (
+                  <MatchSideIdentity
+                    side={event.matchPresentation.away}
+                    rowTestId="match-away-team-row"
+                    logoTestId="away-team-logo"
+                    primaryClassName={styles.eventTeamOpponent}
+                    secondaryClassName={styles.matchTeamSubNameOpponent}
+                  />
+                )}
+              </>
+            ) : (
+              <>
+                <div className={styles.matchTeamRow} data-testid="match-home-team-row">
+                  <span className={styles.eventTeamMain}>
+                    {event.teamDisplayName}
+                  </span>
+                </div>
+                <span className={styles.vsLabel} aria-hidden="true">vs.</span>
+                {event.opponentDisplayName !== null && (
+                  <div className={styles.matchTeamRow} data-testid="match-away-team-row">
+                    <span className={styles.eventTeamOpponent}>
+                      {event.opponentDisplayName}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         ) : isTournament ? (
           <div className={styles.tournamentIdentity}>
-            <span className={styles.eventTeamMain}>{event.displayTitle}</span>
+            <span className={styles.tournamentTitle}>{event.displayTitle}</span>
 
-            {participantAllocations !== undefined && (
+            {participantAllocations !== undefined && participantAllocations.length > 0 && (
               <div
-                className={styles.tournamentParticipants}
+                className={styles.tournamentParticipantLogos}
                 data-testid="tournament-participants"
               >
-                {participantAllocations.map((participant) => (
-                  <span
+                {participantAllocations.slice(0, 4).map((participant) => (
+                  <MatchClubLogo
                     key={participant.id}
-                    className={styles.tournamentParticipantName}
-                  >
-                    {participant.teamDisplayName}
-                  </span>
+                    logoUrl={participant.clubLogoUrl ?? null}
+                    clubName={participant.teamDisplayName}
+                    testId={`tournament-participant-logo-${participant.id}`}
+                    presentation="tournament"
+                  />
                 ))}
               </div>
             )}
@@ -1079,7 +1184,7 @@ export function InfoboardScreen1({
           const extension = findEventExtension(item.event.id, eventPresentation);
           const allocs = extension?.participantAllocations;
           const participantAllocations =
-            allocs !== undefined && allocs.length >= 3 ? allocs : undefined;
+            allocs !== undefined && allocs.length > 0 ? allocs : undefined;
           return (
             <EventCard
               key={item.event.id}

@@ -39,6 +39,10 @@ import {
   resolvePitchDisplay,
   resolveDressingRoomDisplay,
 } from "../presentation/allocation-display-resolver";
+import {
+  resolveInfoboardMatchPresentation,
+  type InfoboardMatchIdentity,
+} from "../presentation/infoboard-match-presentation";
 
 // ── Screen 1 source event ──────────────────────────────────────────────────────
 
@@ -90,6 +94,8 @@ export type Screen1SourceEvent = {
     readonly displayName?: string | null;
     /** TeamSeason.shortName — season-scoped abbreviated name. */
     readonly shortName?: string | null;
+    /** Team.alternativeName — canonical alternative name (INFOBOARD-LOGO-02). */
+    readonly alternativeName?: string | null;
   } | null;
 
   /** Explicit source-level team name fallback (e.g. from event import). */
@@ -116,6 +122,13 @@ export type Screen1SourceEvent = {
    * MatchExternalMapping with an awayExternalTeam exists. Null otherwise.
    */
   readonly opponentLogoUrl?: string | null;
+
+  /**
+   * Canonical home/away club + team identity for MATCH presentation
+   * (INFOBOARD-LOGO-02). Populated by the canonical source loader when
+   * Event.team and MatchExternalMapping data are available.
+   */
+  readonly matchIdentity?: InfoboardMatchIdentity | null;
 
   // ── Organizer ─────────────────────────────────────────────────────────────
   /** Event.organizerName — passed through directly to organizerDisplayName. */
@@ -207,6 +220,10 @@ export type Screen1SourceEvent = {
 export type MapScreen1EventInput = {
   readonly event: Screen1SourceEvent;
   readonly temporalBucket: TemporalBucket;
+  /** Tenant club name for own-team club line resolution. */
+  readonly tenantClubName?: string;
+  /** Tenant club logo used for own-team crest resolution (Tenant.logoUrl). */
+  readonly tenantLogoUrl?: string | null;
 };
 
 // ── mapScreen1Event ───────────────────────────────────────────────────────────
@@ -220,7 +237,7 @@ export type MapScreen1EventInput = {
 export function mapScreen1Event(
   input: MapScreen1EventInput,
 ): InfoboardScreen1Event {
-  const { event, temporalBucket } = input;
+  const { event, temporalBucket, tenantClubName, tenantLogoUrl } = input;
 
   // ── Team display name ───────────────────────────────────────────────────
   const teamDisplayName = resolveTeamDisplayName(
@@ -292,6 +309,15 @@ export function mapScreen1Event(
   const meetingTime =
     event.meetingTime != null ? event.meetingTime.toISOString() : null;
 
+  const matchPresentation =
+    event.type === "MATCH"
+      ? resolveInfoboardMatchPresentation(
+          event.matchIdentity,
+          tenantLogoUrl,
+          tenantClubName,
+        )
+      : null;
+
   return {
     id: event.id,
     type: event.type,
@@ -299,6 +325,7 @@ export function mapScreen1Event(
     teamDisplayName,
     opponentDisplayName,
     opponentLogoUrl: event.opponentLogoUrl ?? null,
+    matchPresentation,
     organizerDisplayName: event.organizerName ?? null,
     competitionLabel,
     startAt: event.startAt.toISOString(),
