@@ -94,6 +94,8 @@ export type Screen1SourceEvent = {
     readonly displayName?: string | null;
     /** TeamSeason.shortName — season-scoped abbreviated name. */
     readonly shortName?: string | null;
+    /** Team.alternativeName — canonical alternative name (INFOBOARD-LOGO-02). */
+    readonly alternativeName?: string | null;
   } | null;
 
   /** Explicit source-level team name fallback (e.g. from event import). */
