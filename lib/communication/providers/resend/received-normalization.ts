@@ -150,15 +150,17 @@ export async function normalizeResendEmailReceivedEvent(args: {
 
   const attachments = Array.isArray(email.attachments)
     ? email.attachments
-        .map((a) => ({
-          id: typeof a?.id === "string" ? a.id : "",
+        .map((a, index) => ({
+          id:
+            typeof a?.id === "string" && a.id.trim()
+              ? a.id
+              : `invalid-provider-attachment-${index + 1}`,
           filename: typeof a?.filename === "string" ? a.filename : null,
           contentType: typeof a?.content_type === "string" ? a.content_type : null,
           contentDisposition: typeof a?.content_disposition === "string" ? a.content_disposition : null,
           contentId: typeof a?.content_id === "string" ? a.content_id : null,
           size: typeof a?.size === "number" ? a.size : null,
         }))
-        .filter((a) => Boolean(a.id))
     : null;
 
   return {

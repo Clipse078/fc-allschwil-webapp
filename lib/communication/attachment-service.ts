@@ -68,11 +68,11 @@ async function requireTenantActor(tenantId: string, actorUserId: string) {
 
 type PersistBytesInput = {
   tenantId: string;
-  actorUserId: string;
+  actorUserId: string | null;
   originalFilename: string;
   declaredContentType: string;
   buffer: Uint8Array;
-  sourceType: "UPLOAD" | "WORKSPACE_DOCUMENT_VERSION";
+  sourceType: "UPLOAD" | "WORKSPACE_DOCUMENT_VERSION" | "INBOUND";
   sourceDocumentId?: string;
   sourceDocumentVersionId?: string;
   ingestionMetadata?: Prisma.InputJsonValue;
@@ -128,21 +128,23 @@ async function persistBytes(input: PersistBytesInput) {
         createdByUserId: input.actorUserId,
       },
     });
-    await logAction({
-      tenantId: input.tenantId,
-      actorUserId: input.actorUserId,
-      moduleKey: "registrations",
-      entityType: "CommunicationAttachment",
-      entityId: attachment.id,
-      action: "COMMUNICATION_ATTACHMENT_CREATED",
-      afterJson: {
-        sourceType: input.sourceType,
-        filename: validated.sanitizedFilename,
-        contentType: validated.contentType,
-        sizeBytes: uploaded.sizeBytes,
-        checksumSha256: uploaded.checksumSha256,
-      },
-    });
+    if (input.actorUserId) {
+      await logAction({
+        tenantId: input.tenantId,
+        actorUserId: input.actorUserId,
+        moduleKey: "registrations",
+        entityType: "CommunicationAttachment",
+        entityId: attachment.id,
+        action: "COMMUNICATION_ATTACHMENT_CREATED",
+        afterJson: {
+          sourceType: input.sourceType,
+          filename: validated.sanitizedFilename,
+          contentType: validated.contentType,
+          sizeBytes: uploaded.sizeBytes,
+          checksumSha256: uploaded.checksumSha256,
+        },
+      });
+    }
     return attachment;
   } catch {
     await input.storage.delete(uploaded.storageKey);
@@ -175,6 +177,113 @@ export async function createUploadedAttachment(input: {
     ingestionMetadata: input.ingestionMetadata,
     storage: input.storage ?? communicationAttachmentStorage,
   });
+}
+
+/**
+ * Trusted server-side ingestion for bytes retrieved through an inbound provider
+ * adapter. It uses the same validation, private storage and metadata pipeline
+ * as user uploads, but has no user actor.
+ */
+export async function ingestInboundAttachment(input: {
+  tenantId: string;
+  messageId: string;
+  provider: string;
+  providerMessageId: string;
+  providerAttachmentId: string;
+  filename: string;
+  declaredContentType: string;
+  buffer: Uint8Array;
+  sortOrder: number;
+  storage?: CommunicationAttachmentStorage;
+}) {
+  const tenantId = required(input.tenantId, "tenantId");
+  const messageId = required(input.messageId, "messageId");
+  const provider = required(input.provider, "provider");
+  const providerMessageId = required(input.providerMessageId, "providerMessageId");
+  const providerAttachmentId = required(
+    input.providerAttachmentId,
+    "providerAttachmentId",
+  );
+  if (!Number.isSafeInteger(input.sortOrder) || input.sortOrder < 0) {
+    throw new CommunicationAttachmentServiceError(
+      "INVALID_INPUT",
+      "sortOrder must be a non-negative safe integer.",
+    );
+  }
+
+  const message = await prisma.communicationMessage.findFirst({
+    where: {
+      id: messageId,
+      tenantId,
+      direction: "INBOUND",
+      channel: "EMAIL",
+      provider,
+      providerMessageId,
+    },
+    select: { id: true },
+  });
+  if (!message) {
+    throw new CommunicationAttachmentServiceError(
+      "MESSAGE_NOT_FOUND",
+      "Eingehende Nachricht nicht gefunden.",
+    );
+  }
+
+  const storage = input.storage ?? communicationAttachmentStorage;
+  const attachment = await persistBytes({
+    tenantId,
+    actorUserId: null,
+    originalFilename: input.filename,
+    declaredContentType: input.declaredContentType,
+    buffer: input.buffer,
+    sourceType: "INBOUND",
+    ingestionMetadata: {
+      source: "INBOUND_EMAIL",
+      provider,
+      providerMessageId,
+      providerAttachmentId,
+    },
+    storage,
+  });
+
+  try {
+    const link = await prisma.$transaction(async (tx) => {
+      const existingLinks = await tx.communicationMessageAttachment.findMany({
+        where: { tenantId, messageId },
+        select: {
+          id: true,
+          attachmentId: true,
+          sortOrder: true,
+          attachment: { select: { sizeBytes: true } },
+        },
+      });
+      if (existingLinks.some((item) => item.sortOrder === input.sortOrder)) {
+        throw new CommunicationAttachmentServiceError(
+          "ORDER_CONFLICT",
+          "Die Anhangsposition ist bereits belegt.",
+        );
+      }
+      validateCommunicationAttachmentSet([
+        ...existingLinks.map((item) => item.attachment),
+        attachment,
+      ]);
+      return tx.communicationMessageAttachment.create({
+        data: {
+          tenantId,
+          messageId,
+          attachmentId: attachment.id,
+          sortOrder: input.sortOrder,
+        },
+      });
+    });
+    return { attachment, link };
+  } catch (error) {
+    await prisma.communicationAttachment
+      .delete({ where: { id: attachment.id } })
+      .catch(() => undefined);
+    await storage.delete(attachment.storageKey).catch(() => undefined);
+    throw error;
+  }
 }
 
 export type OutboundCommunicationAttachment = {

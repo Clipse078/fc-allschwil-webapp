@@ -25,6 +25,12 @@ import {
   normalizeResendEmailReceivedEvent,
   ResendInboundEmailFetchError,
 } from "@/lib/communication/providers/resend/received-normalization";
+import {
+  createResendInboundAttachmentRetriever,
+} from "@/lib/communication/providers/resend/received-attachment-retrieval";
+import {
+  processInboundEmailAttachments,
+} from "@/lib/communication/inbound-attachment-service";
 
 export async function POST(request: NextRequest) {
   const webhookSecret = process.env.RESEND_WEBHOOK_SECRET?.trim() ?? "";
@@ -67,6 +73,22 @@ export async function POST(request: NextRequest) {
     const result = await persistInboundEmailReply(normalized);
     if (!result.ok) {
       return NextResponse.json({ error: "Invalid inbound email." }, { status: 400 });
+    }
+    if (
+      result.kind === "PERSISTED" &&
+      normalized.attachments &&
+      normalized.attachments.length > 0
+    ) {
+      await processInboundEmailAttachments({
+        tenantId: result.tenantId,
+        messageId: result.messageId,
+        provider: normalized.provider,
+        providerMessageId: normalized.providerMessageId,
+        attachments: normalized.attachments,
+        retrieve: createResendInboundAttachmentRetriever({
+          emailId: normalized.providerMessageId,
+        }),
+      });
     }
 
     // Unknown tokens are accepted but ignored (safe retry behavior).

@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 const mocks = vi.hoisted(() => ({
   tenantMembershipFindFirst: vi.fn(),
   attachmentCreate: vi.fn(),
+  attachmentDelete: vi.fn(),
   attachmentFindFirst: vi.fn(),
   attachmentFindMany: vi.fn(),
   messageFindFirst: vi.fn(),
@@ -35,9 +36,11 @@ vi.mock("@/lib/db/prisma", () => ({
     tenantMembership: { findFirst: mocks.tenantMembershipFindFirst },
     communicationAttachment: {
       create: mocks.attachmentCreate,
+      delete: mocks.attachmentDelete,
       findFirst: mocks.attachmentFindFirst,
       findMany: mocks.attachmentFindMany,
     },
+    communicationMessage: { findFirst: mocks.messageFindFirst },
     communicationMessageAttachment: { findMany: mocks.linkFindMany },
     workspaceDocumentVersion: { findFirst: mocks.versionFindFirst },
     $transaction: vi.fn((callback) => callback(tx)),
@@ -51,6 +54,7 @@ import {
   attachToMessage,
   cloneMessageAttachmentsForRetry,
   createUploadedAttachment,
+  ingestInboundAttachment,
   loadMessageAttachmentsForDelivery,
   snapshotWorkspaceDocumentVersion,
   validateOutboundAttachmentSelection,
@@ -74,6 +78,7 @@ function storage() {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
+  mocks.attachmentDelete.mockResolvedValue({ id: "attachment-a" });
   mocks.logAction.mockResolvedValue(undefined);
 });
 
@@ -104,6 +109,48 @@ describe("communication attachment domain service", () => {
     );
     expect(result.checksumSha256).toHaveLength(64);
     expect(result).not.toHaveProperty("storageUrl");
+  });
+
+  it("ingests inbound bytes through canonical validation and private storage", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    mocks.attachmentCreate.mockImplementation(async ({ data }) => data);
+    mocks.linkFindMany.mockResolvedValue([]);
+    mocks.linkCreate.mockImplementation(async ({ data }) => data);
+
+    const result = await ingestInboundAttachment({
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      provider: "resend",
+      providerMessageId: "email-a",
+      providerAttachmentId: "provider-attachment-a",
+      filename: "../Antwort Final.pdf",
+      declaredContentType: "application/pdf",
+      buffer: pdf,
+      sortOrder: 0,
+      storage: provider,
+    });
+
+    expect(result.attachment).toMatchObject({
+      tenantId: "tenant-a",
+      sanitizedFilename: "Antwort Final.pdf",
+      sourceType: "INBOUND",
+      createdByUserId: null,
+      lifecycleStatus: "READY",
+    });
+    expect(result.link).toMatchObject({
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      attachmentId: result.attachment.id,
+      sortOrder: 0,
+    });
+    expect(provider.upload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageKey: expect.stringMatching(/^communication\/tenant-a\//),
+        buffer: pdf,
+      }),
+    );
+    expect(mocks.tenantMembershipFindFirst).not.toHaveBeenCalled();
   });
 
   it("best-effort deletes the private object when metadata persistence fails", async () => {

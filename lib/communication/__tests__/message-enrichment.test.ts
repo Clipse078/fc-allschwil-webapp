@@ -126,6 +126,7 @@ describe("COMM-01C public email history", () => {
             contentDisposition: "attachment",
             contentId: null,
             size: 99,
+            processingStatus: "FAILED",
           },
         ],
         deliveryError: null,
@@ -149,6 +150,7 @@ describe("COMM-01C public email history", () => {
         contentType: "application/pdf",
         size: 99,
         downloadAvailable: false,
+        processingFailed: true,
       },
     ]);
   });

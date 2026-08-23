@@ -95,6 +95,51 @@ describe("normalizeResendEmailReceivedEvent (COMM-02B)", () => {
     });
   });
 
+  it("normalizes inbound attachment references without provider URLs or content", async () => {
+    mocks.receivingGet.mockResolvedValue({
+      data: {
+        object: "email",
+        id: "56761188-7520-42d8-8898-ff6fc54ce618",
+        to: ["reply+token@gaupreniet.resend.app"],
+        from: "customer@example.com",
+        created_at: "2026-08-21T11:00:01.000Z",
+        subject: "Re: TEST3",
+        html: null,
+        text: "Anbei",
+        headers: {},
+        message_id: "<m1@example.com>",
+        attachments: [
+          {
+            id: "attachment-a",
+            filename: "Antwort.pdf",
+            content_type: "application/pdf",
+            content_disposition: "attachment",
+            content_id: null,
+            size: 42,
+          },
+        ],
+      },
+      error: null,
+    });
+
+    const normalized = await normalizeResendEmailReceivedEvent({
+      event: makeEvent(),
+      providerEventId: "evt_123",
+    });
+    expect(normalized?.attachments).toEqual([
+      {
+        id: "attachment-a",
+        filename: "Antwort.pdf",
+        contentType: "application/pdf",
+        contentDisposition: "attachment",
+        contentId: null,
+        size: 42,
+      },
+    ]);
+    expect(normalized?.attachments?.[0]).not.toHaveProperty("downloadUrl");
+    expect(normalized?.attachments?.[0]).not.toHaveProperty("content");
+  });
+
   it("prefers RESEND_RECEIVING_API_KEY when set", async () => {
     process.env.RESEND_RECEIVING_API_KEY = "re_receiving_only";
     mocks.receivingGet.mockResolvedValue({ data: null, error: { message: "Not Found", statusCode: 404, name: "not_found" } });
