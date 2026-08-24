@@ -36,6 +36,8 @@ type SquadMember = {
 type Props = {
   teamId: string;
   canManage: boolean;
+  sectionId?: string;
+  compact?: boolean;
   teamSeason: {
     id: string;
     displayName: string;
@@ -102,6 +104,8 @@ function formatBirthDate(dateOfBirth?: string | null) {
 export default function TeamSquadManagementCard({
   teamId,
   canManage,
+  sectionId,
+  compact = false,
   teamSeason,
 }: Props) {
   const router = useRouter();
@@ -267,14 +271,28 @@ export default function TeamSquadManagementCard({
   }
 
   return (
-    <div className="fca-section-card p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div
+      id={sectionId}
+      className={
+        sectionId
+          ? "scroll-mt-20 target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
+          : undefined
+      }
+    >
+      <div className="fca-section-card p-5">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="fca-eyebrow">Spielerkader</p>
-          <h4 className="fca-subheading mt-2">{saisonLabel}</h4>
-          <p className="fca-body-muted mt-3">
-            Suche, Zuordnung und Verwaltung der Spieler dieser Team-Saison.
-          </p>
+          {!compact ? (
+            <>
+              <h4 className="fca-subheading mt-2">{saisonLabel}</h4>
+              <p className="fca-body-muted mt-3">
+                Suche, Zuordnung und Verwaltung der Spieler dieser Team-Saison.
+              </p>
+            </>
+          ) : (
+            <p className="fca-body-muted mt-2">{saisonLabel}</p>
+          )}
         </div>
 
         <span className="fca-pill">
@@ -502,6 +520,7 @@ export default function TeamSquadManagementCard({
           ))}
         </div>
       )}
+      </div>
     </div>
   );
 }

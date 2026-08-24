@@ -43,6 +43,22 @@ type TeamSeasonItem = {
       dateOfBirth?: string | null;
     };
   }>;
+  trainerTeamMembers?: Array<{
+    id: string;
+    status: string;
+    roleLabel: string | null;
+    isWebsiteVisible: boolean;
+    sortOrder: number;
+    remarks: string | null;
+    person: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      displayName: string | null;
+      email: string | null;
+      phone: string | null;
+    };
+  }>;
 };
 
 type OrgUnitOption = {
@@ -204,6 +220,7 @@ export default function TeamDetailCard({
         teamAgeGroup={team.ageGroup}
         canManage={canManage}
         teamSeasons={team.teamSeasons}
+        currentTeamSeasonId={team.currentTeamSeasonId ?? null}
       />
     </div>
   );

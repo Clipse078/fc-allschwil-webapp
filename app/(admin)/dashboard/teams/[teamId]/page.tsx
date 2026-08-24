@@ -1,7 +1,8 @@
 ﻿import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Building2, Calendar, Globe, Monitor, Shield, Trophy, Users } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import TeamDetailCard from "@/components/admin/teams/TeamDetailCard";
+import TeamCockpitOverview from "@/components/admin/teams/TeamCockpitOverview";
 import TeamLifecycleCard from "@/components/admin/teams/TeamLifecycleCard";
 import TeamSeasonDeleteButton from "@/components/admin/teams/TeamSeasonDeleteButton";
 import ScopedResponsibilitiesCard from "@/components/admin/shared/ScopedResponsibilitiesCard";
@@ -9,6 +10,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
+import { buildTeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
@@ -20,10 +22,8 @@ import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import { prisma } from "@/lib/db/prisma";
 import { PageShell } from "@/components/ui/page";
 import { DetailPagePattern } from "@/components/ui/patterns";
-import { Badge, Card } from "@/components/ui";
+import { Badge } from "@/components/ui";
 import { SectionCard } from "@/components/ui/page";
-import { PropertyGrid } from "@/components/ui/PropertyGrid";
-import { TimelinePlaceholder } from "@/components/ui/TimelinePlaceholder";
 
 const CATEGORY_LABELS: Record<string, string> = {
   KINDERFUSSBALL: "Kinderfussball",
@@ -83,7 +83,7 @@ export default async function TeamDetailPage({ params }: Props) {
 
   // ORG-ACCESS-02: resolve the team's canonical OrgUnit for scoped assignments.
   // Uses the canonical current-season OrgUnit (TEAM-SEASON-ORGUNIT-01) with
-  // legacy orgUnit as fallback — same logic as the property grid above.
+  // legacy orgUnit as fallback.
   const teamOrgUnit = team.currentSeasonOrgUnit ?? team.orgUnit ?? null;
   const teamOrgUnitId = teamOrgUnit?.id ?? null;
 
@@ -106,29 +106,25 @@ export default async function TeamDetailPage({ params }: Props) {
       : [[], [], []];
 
   const categoryLabel = CATEGORY_LABELS[team.category] ?? team.category;
-  // TEAMCENTER-UX-01C: consume the canonical current-season TeamSeason
-  // already resolved by getTeamDetailData — do not re-derive "which season
-  // is current" here (that duplication was the root cause of this page
-  // showing a different current season than the Teams list / TrainingCenter).
   const activeSeason =
     team.teamSeasons.find((ts) => ts.id === team.currentTeamSeasonId) ?? null;
 
-  // TEAM-IDENTITY-01: canonical long-name fallback (lib/teams/team-naming.ts),
-  // already resolved by getTeamDetailData. Team.name is the primary Team
-  // identity — never substituted by a seasonal displayName/provider name.
   const displayTitle = team.displayName ?? team.name;
-
-  // TEAMCENTER-UX-01B (C, I): one-line supporting metadata under the primary
-  // header — shortName · category · Liga/Wettbewerb. Never repeats the Team
-  // identity itself (that is the page title above).
   const competitionLabel = team.competition?.shortName ?? team.competition?.name ?? null;
   const metaLine = [
     team.shortName && team.shortName !== displayTitle ? team.shortName : null,
     categoryLabel,
+    activeSeason?.season.name,
     competitionLabel ?? "Kein Wettbewerb",
   ]
     .filter(Boolean)
     .join(" · ");
+
+  const cockpitMetrics = buildTeamCockpitMetrics({
+    team,
+    categoryLabels: CATEGORY_LABELS,
+    participationTypeLabels: PARTICIPATION_TYPE_LABELS,
+  });
 
   return (
     <PageShell fullWidth>
@@ -154,50 +150,6 @@ export default async function TeamDetailPage({ params }: Props) {
             Zurück zu Teams
           </Link>
         }
-        summary={
-          <Card variant="section" noPadding>
-            <div className="px-5 py-4">
-              <PropertyGrid
-                items={[
-                  { label: "Kategorie", value: categoryLabel },
-                  {
-                    label: "Aktive Saison",
-                    value: activeSeason?.season.name,
-                    icon: <Calendar className="h-3.5 w-3.5" />,
-                    emptyText: "Keine aktive Saison",
-                  },
-                  {
-                    label: "Saisoneinträge",
-                    value: `${team.teamSeasons.length}`,
-                    icon: <Shield className="h-3.5 w-3.5" />,
-                  },
-                  {
-                    // TEAM-SEASON-ORGUNIT-01: show canonical season OrgUnit;
-                    // fall back to legacy orgUnit when no season assignment exists.
-                    label: "Organisationseinheit",
-                    value: team.currentSeasonOrgUnit?.name ?? team.orgUnit?.name,
-                    href: (team.currentSeasonOrgUnit ?? team.orgUnit)
-                      ? `/dashboard/org-units/${(team.currentSeasonOrgUnit ?? team.orgUnit)!.id}`
-                      : undefined,
-                    icon: <Building2 className="h-3.5 w-3.5" />,
-                    emptyText: "Keine Einheit verknüpft",
-                  },
-                  {
-                    label: "Website",
-                    value: team.websiteVisible ? "Sichtbar" : "Versteckt",
-                    icon: <Globe className="h-3.5 w-3.5" />,
-                  },
-                  {
-                    label: "Infoboard",
-                    value: team.infoboardVisible ? "Sichtbar" : "Versteckt",
-                    icon: <Monitor className="h-3.5 w-3.5" />,
-                  },
-                ]}
-                columns={3}
-              />
-            </div>
-          </Card>
-        }
         sidebar={
           <>
             <TeamLifecycleCard
@@ -207,43 +159,6 @@ export default async function TeamDetailPage({ params }: Props) {
               canManage={canManage}
               canDelete={canDelete}
             />
-
-            {activeSeason ? (
-              <SectionCard title="Saison">
-                <PropertyGrid
-                  items={[{ label: "Saison", value: activeSeason.season.name }]}
-                  columns={1}
-                />
-              </SectionCard>
-            ) : null}
-
-            {activeSeason ? (
-              <SectionCard title="Teilnahme">
-                <PropertyGrid
-                  items={[
-                    {
-                      label: "Teilnahmetyp",
-                      value:
-                        PARTICIPATION_TYPE_LABELS[
-                          activeSeason.participationType
-                        ] ?? activeSeason.participationType,
-                      icon: <Trophy className="h-3.5 w-3.5" />,
-                    },
-                  ]}
-                  columns={1}
-                />
-              </SectionCard>
-            ) : null}
-            <SectionCard title="Kader & Stab">
-              <div className="flex items-center gap-2 text-sm text-[var(--muted)]">
-                <Users className="h-4 w-4 flex-shrink-0" />
-                <span>
-                  {team.teamSeasons.length > 0
-                    ? `${team.teamSeasons.length} Saison${team.teamSeasons.length !== 1 ? "en" : ""} mit Kader & Stab`
-                    : "Noch kein Kader erfasst."}
-                </span>
-              </div>
-            </SectionCard>
 
             {canDelete && team.teamSeasons.length > 0 ? (
               <SectionCard title="Saisonen verwalten">
@@ -269,10 +184,13 @@ export default async function TeamDetailPage({ params }: Props) {
                 </div>
               </SectionCard>
             ) : null}
-            <TimelinePlaceholder />
           </>
         }
       >
+        <TeamCockpitOverview metrics={cockpitMetrics} />
+
+        {/* TEAM-COCKPIT-02: future sport-data slot (matches, results, standings). */}
+
         <TeamDetailCard
           initialTeam={team}
           availableOrgUnits={availableOrgUnits.map((ou) => ({
@@ -289,7 +207,7 @@ export default async function TeamDetailPage({ params }: Props) {
           canManage={canManage}
         />
 
-        {/* ORG-ACCESS-02: Personen & Zuständigkeiten for this team's OrgUnit. */}
+        {/* ORG-ACCESS-02: scoped UserRole assignments — distinct from roster membership. */}
         {teamOrgUnitId ? (
           <ScopedResponsibilitiesCard
             orgUnitId={teamOrgUnitId}
@@ -303,84 +221,19 @@ export default async function TeamDetailPage({ params }: Props) {
         ) : (
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
-              <div className="flex items-center gap-2">
-                <Shield className="h-4 w-4 text-[var(--muted)]" />
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Personen &amp; Zuständigkeiten
-                </p>
-              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
+                Personen &amp; Zuständigkeiten
+              </p>
             </div>
-            <div className="px-5 py-8 text-center">
+            <div className="px-5 py-6 text-center">
               <p className="text-sm text-[var(--muted)]">
-                Kein Bereich zugeordnet. Zuerst eine Organisationseinheit verknüpfen.
+                Organisatorische Zuständigkeiten erfordern eine verknüpfte
+                Organisationseinheit. Dies ist getrennt von Spielerkader und
+                Trainerteam.
               </p>
             </div>
           </div>
         )}
-
-        {/* PERSON-UX-07: Stable anchor target for precision CTA from Person workspace.
-         * Player roster section — /dashboard/teams/:teamId#spielerkader */}
-        <section
-          id="spielerkader"
-          className="scroll-mt-20 rounded-xl border border-[var(--border)] bg-[var(--surface)] target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
-          aria-label="Spielerkader"
-        >
-          <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-4">
-            <Users className="h-4 w-4 text-[var(--sce-primary)]" />
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-              Spielerkader
-            </p>
-            {activeSeason ? (
-              <span className="ml-auto inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sce-primary)]">
-                {activeSeason.season.name}
-              </span>
-            ) : null}
-          </div>
-          <div className="px-5 py-4">
-            {activeSeason ? (
-              <p className="text-sm text-[var(--muted)]">
-                Spielerkader-Verwaltung für die Saison {activeSeason.season.name}.
-                Kader-Zuordnungen werden hier hinterlegt und verwaltet.
-              </p>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">
-                Noch keine aktive Saison vorhanden. Für die Kader-Verwaltung wird eine Team-Saison benötigt.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* PERSON-UX-07: Stable anchor target for precision CTA from Person workspace.
-         * Trainer team section — /dashboard/teams/:teamId#trainerteam */}
-        <section
-          id="trainerteam"
-          className="scroll-mt-20 rounded-xl border border-[var(--border)] bg-[var(--surface)] target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
-          aria-label="Trainerteam"
-        >
-          <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-4">
-            <Users className="h-4 w-4 text-[var(--sce-primary)]" />
-            <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-              Trainerteam
-            </p>
-            {activeSeason ? (
-              <span className="ml-auto inline-flex items-center rounded-full bg-[var(--sce-accent)] px-2 py-0.5 text-[10px] font-semibold text-[var(--sce-primary)]">
-                {activeSeason.season.name}
-              </span>
-            ) : null}
-          </div>
-          <div className="px-5 py-4">
-            {activeSeason ? (
-              <p className="text-sm text-[var(--muted)]">
-                Trainerteam-Verwaltung für die Saison {activeSeason.season.name}.
-                Trainer-Zuordnungen werden hier hinterlegt und verwaltet.
-              </p>
-            ) : (
-              <p className="text-sm text-[var(--muted)]">
-                Noch keine aktive Saison vorhanden. Für die Trainerteam-Verwaltung wird eine Team-Saison benötigt.
-              </p>
-            )}
-          </div>
-        </section>
       </DetailPagePattern>
     </PageShell>
   );
