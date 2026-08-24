@@ -7,8 +7,10 @@ import TeamCockpitHeaderBar from "@/components/admin/teams/TeamCockpitHeaderBar"
 import TeamCockpitOverview from "@/components/admin/teams/TeamCockpitOverview";
 import TeamTrainingSchedule from "@/components/admin/teams/TeamTrainingSchedule";
 import TeamAdministrationSection from "@/components/admin/teams/TeamAdministrationSection";
+import TeamAttendanceSection from "@/components/admin/teams/TeamAttendanceSection";
 import type { TeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import type { TeamTrainingScheduleEntry } from "@/lib/teams/team-training-schedule";
+import type { TeamAttendanceOverview } from "@/lib/attendance/types";
 import { SectionCard } from "@/components/ui/page";
 
 type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
@@ -125,6 +127,7 @@ type Props = {
   initialTeam: Team;
   cockpitMetrics: TeamCockpitMetrics;
   trainingSchedule: TeamTrainingScheduleEntry[];
+  attendanceOverview: TeamAttendanceOverview | null;
   canManage: boolean;
   canDelete: boolean;
   availableOrgUnits: OrgUnitOption[];
@@ -136,6 +139,7 @@ export default function TeamCockpitShell({
   initialTeam,
   cockpitMetrics,
   trainingSchedule,
+  attendanceOverview,
   canManage,
   canDelete,
   availableOrgUnits,
@@ -201,6 +205,16 @@ export default function TeamCockpitShell({
 
         <TeamTrainingSchedule entries={trainingSchedule} />
       </div>
+
+      {/* TEAM-COCKPIT-02B: canonical attendance overview for the current season. */}
+      {attendanceOverview ? (
+        <TeamAttendanceSection
+          teamId={team.id}
+          teamSeasonId={attendanceOverview.teamSeasonId}
+          initialOverview={attendanceOverview}
+          canManage={canManage}
+        />
+      ) : null}
 
       {/* TEAM-COCKPIT-02: future sport-data slot (matches, results, standings). */}
       <div data-testid="team-cockpit-sport-slot" className="hidden" aria-hidden="true" />

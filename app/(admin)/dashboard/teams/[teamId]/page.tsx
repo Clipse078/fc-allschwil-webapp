@@ -9,6 +9,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { buildTeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import { getTeamTrainingSchedule } from "@/lib/teams/team-training-schedule";
+import { getTeamAttendanceOverview } from "@/lib/attendance/queries";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
@@ -75,7 +76,7 @@ export default async function TeamDetailPage({ params }: Props) {
   const teamOrgUnit = team.currentSeasonOrgUnit ?? team.orgUnit ?? null;
   const teamOrgUnitId = teamOrgUnit?.id ?? null;
 
-  const [teamScopedAssignments, teamEligibleUsers, teamRolesForResponsibilities, trainingSchedule] =
+  const [teamScopedAssignments, teamEligibleUsers, teamRolesForResponsibilities, trainingSchedule, attendanceOverview] =
     await Promise.all([
       teamOrgUnitId
         ? getScopedAssignmentsForOrgUnit(tenantId, teamOrgUnitId)
@@ -96,6 +97,9 @@ export default async function TeamDetailPage({ params }: Props) {
       team.currentTeamSeasonId
         ? getTeamTrainingSchedule(tenantId, team.currentTeamSeasonId)
         : Promise.resolve([]),
+      team.currentTeamSeasonId
+        ? getTeamAttendanceOverview(tenantId, team.currentTeamSeasonId)
+        : Promise.resolve(null),
     ]);
 
   const categoryLabel = CATEGORY_LABELS[team.category] ?? team.category;
@@ -149,6 +153,7 @@ export default async function TeamDetailPage({ params }: Props) {
             initialTeam={team}
             cockpitMetrics={cockpitMetrics}
             trainingSchedule={trainingSchedule}
+            attendanceOverview={attendanceOverview}
             canManage={canManage}
             canDelete={canDelete}
             availableOrgUnits={availableOrgUnits.map((ou) => ({

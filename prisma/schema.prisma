@@ -333,6 +333,24 @@ enum MeetingParticipantStatus {
   EXCUSED
 }
 
+// TEAM-COCKPIT-02B — canonical attendance event kind (discriminated reference).
+enum AttendanceEventKind {
+  TRAINING
+  MATCH
+  TOURNAMENT
+}
+
+// TEAM-COCKPIT-02B — canonical per-event attendance status.
+// OPEN is the default until explicitly recorded. Attendance is never inferred
+// from event occurrence alone.
+enum AttendanceStatus {
+  OPEN
+  PRESENT
+  ABSENT
+  EXCUSED
+  INJURED
+}
+
 enum InitiativeStatus {
   PLANNED
   IN_PROGRESS
@@ -692,6 +710,8 @@ model Tenant {
   personEmergencyContacts         PersonEmergencyContact[]         @relation("TenantPersonEmergencyContacts")
   // REG-WAIT-01: canonical waiting list entries for this tenant
   waitingListEntries              WaitingListEntry[]               @relation("TenantWaitingListEntries")
+  // TEAM-COCKPIT-02B: canonical per-event attendance records
+  attendanceRecords               AttendanceRecord[]               @relation("TenantAttendanceRecords")
   // COMM-01A: tenant-scoped communication/collaboration foundation
   communicationThreads            CommunicationThread[]
   communicationMessages           CommunicationMessage[]
@@ -766,6 +786,9 @@ model User {
   responsibleWaitingListEntries WaitingListEntry[] @relation("WaitingListEntryResponsibleUser")
   addedWaitingListEntries       WaitingListEntry[] @relation("WaitingListEntryAddedByUser")
   resolvedWaitingListEntries    WaitingListEntry[] @relation("WaitingListEntryResolvedByUser")
+  // TEAM-COCKPIT-02B: attendance audit back-relations
+  recordedAttendanceRecords     AttendanceRecord[] @relation("AttendanceRecordedByUser")
+  updatedAttendanceRecords      AttendanceRecord[] @relation("AttendanceUpdatedByUser")
 
   // COMM-01A: communication foundation back-relations
   createdCommunicationThreads  CommunicationThread[]  @relation("CommunicationThreadCreatedBy")
@@ -1383,6 +1406,8 @@ model Person {
   emergencyContacts               PersonEmergencyContact[] @relation("PersonEmergencyContacts")
   // REG-WAIT-01: waiting list entries linked to this Person
   waitingListEntries              WaitingListEntry[]       @relation("WaitingListEntryPerson")
+  // TEAM-COCKPIT-02B: canonical attendance history for this Person
+  attendanceRecords               AttendanceRecord[]       @relation("PersonAttendanceRecords")
 
   @@index([lastName, firstName])
   @@index([email])
@@ -1667,6 +1692,8 @@ model TeamSeason {
   developmentAssessments DevelopmentAssessment[] @relation("TeamSeasonDevelopmentAssessments")
   // REG-WAIT-01: waiting list entries scoped to this TeamSeason
   waitingListEntries     WaitingListEntry[]      @relation("WaitingListEntryTeamSeason")
+  // TEAM-COCKPIT-02B: roster-context attendance records for this TeamSeason
+  attendanceRecords      AttendanceRecord[]      @relation("TeamSeasonAttendanceRecords")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -1849,6 +1876,8 @@ model Event {
   // type — never populated or read outside the TournamentCenter domain.
   tournamentParticipants        TournamentParticipant[]
   tournamentResourceAllocations TournamentResourceAllocation[]
+  // TEAM-COCKPIT-02B: per-player attendance for match/tournament events
+  attendanceRecords             AttendanceRecord[]             @relation("EventAttendanceRecords")
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -4593,6 +4622,8 @@ model TrainingSession {
   /// Removing every override row for a group reverts that group back to
   /// the TrainingSeries default. See lib/training/session-allocation-service.ts.
   sessionAllocations TrainingSessionAllocation[]
+  // TEAM-COCKPIT-02B: per-player attendance for this training occurrence
+  attendanceRecords  AttendanceRecord[]          @relation("TrainingSessionAttendanceRecords")
 
   /// Canonical rule: one generated session per series per date. Never duplicated.
   @@unique([trainingSeriesId, date])
@@ -5417,4 +5448,61 @@ model PersonEmergencyContact {
   @@index([tenantId])
   @@index([personId])
   @@index([personId, priority])
+}
+
+// ---------------------------------------------------------------------------
+// TEAM-COCKPIT-02B — AttendanceRecord
+//
+// Canonical, reusable per-person-per-event attendance record.
+// One unified model for Training, Match, and Tournament — no separate
+// TrainingAttendance / MatchAttendance / TournamentAttendance tables.
+//
+// Event reference strategy (mirrors WeekplannerItem):
+//   TRAINING   → trainingSessionId (canonical TrainingSession occurrence)
+//   MATCH      → eventId (Event.type = MATCH)
+//   TOURNAMENT → eventId (Event.type = TOURNAMENT)
+//
+// Invariants:
+//   - tenantId is required and always from trusted session context.
+//   - teamSeasonId provides roster/filter context for Team Cockpit views.
+//   - Attendance is explicit data — never inferred from event occurrence.
+//   - No automatic backfill of historical events.
+//   - OPEN is the default until a trainer/coordinator records a status.
+// ---------------------------------------------------------------------------
+model AttendanceRecord {
+  id                String              @id @default(cuid())
+  tenantId          String
+  personId          String
+  teamSeasonId      String
+  eventKind         AttendanceEventKind
+  /// Set when eventKind = TRAINING. Null for MATCH/TOURNAMENT.
+  trainingSessionId String?
+  /// Set when eventKind = MATCH | TOURNAMENT. Null for TRAINING.
+  eventId           String?
+  status            AttendanceStatus    @default(OPEN)
+  /// Optional reason or note (e.g. excuse, injury detail).
+  note              String?
+  recordedByUserId  String?
+  updatedByUserId   String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant          Tenant           @relation("TenantAttendanceRecords", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person          Person           @relation("PersonAttendanceRecords", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason      TeamSeason       @relation("TeamSeasonAttendanceRecords", fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSession TrainingSession? @relation("TrainingSessionAttendanceRecords", fields: [trainingSessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event           Event?           @relation("EventAttendanceRecords", fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  recordedByUser  User?            @relation("AttendanceRecordedByUser", fields: [recordedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedByUser   User?            @relation("AttendanceUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([personId, trainingSessionId])
+  @@unique([personId, eventId])
+  @@index([tenantId])
+  @@index([tenantId, teamSeasonId])
+  @@index([tenantId, personId])
+  @@index([teamSeasonId, personId])
+  @@index([teamSeasonId, eventKind])
+  @@index([trainingSessionId])
+  @@index([eventId])
+  @@index([tenantId, status])
 }

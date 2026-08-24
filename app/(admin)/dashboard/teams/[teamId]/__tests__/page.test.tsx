@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   getScopedAssignmentsForOrgUnit: vi.fn(),
   getEligibleTenantMembers: vi.fn(),
   getTeamTrainingSchedule: vi.fn(),
+  getTeamAttendanceOverview: vi.fn(),
   roleFindMany: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
@@ -32,6 +33,9 @@ vi.mock("@/lib/teams/queries", () => ({
 }));
 vi.mock("@/lib/teams/team-training-schedule", () => ({
   getTeamTrainingSchedule: mocks.getTeamTrainingSchedule,
+}));
+vi.mock("@/lib/attendance/queries", () => ({
+  getTeamAttendanceOverview: mocks.getTeamAttendanceOverview,
 }));
 vi.mock("@/lib/org/queries", () => ({
   getOrgUnits: mocks.getOrgUnits,
@@ -179,6 +183,10 @@ beforeEach(() => {
   mocks.getScopedAssignmentsForOrgUnit.mockResolvedValue([]);
   mocks.getEligibleTenantMembers.mockResolvedValue([]);
   mocks.getTeamTrainingSchedule.mockResolvedValue([]);
+  mocks.getTeamAttendanceOverview.mockResolvedValue({
+    teamSeasonId: "ts-1",
+    players: [],
+  });
   mocks.roleFindMany.mockResolvedValue([]);
 });
 
@@ -194,6 +202,7 @@ describe("TEAM-COCKPIT-01D — Team detail page", () => {
     await renderPage();
 
     expect(mocks.getTeamTrainingSchedule).toHaveBeenCalledWith(TENANT_ID, "ts-1");
+    expect(mocks.getTeamAttendanceOverview).toHaveBeenCalledWith(TENANT_ID, "ts-1");
   });
 
   it("keeps responsibilities available as a distinct section", async () => {
@@ -237,5 +246,6 @@ describe("TEAM-COCKPIT-01D — Team detail page", () => {
       screen.getByText(/Keine Saison im aktuellen Geschäftsjahr/),
     ).toBeInTheDocument();
     expect(mocks.getTeamTrainingSchedule).not.toHaveBeenCalled();
+    expect(mocks.getTeamAttendanceOverview).not.toHaveBeenCalled();
   });
 });
