@@ -43,6 +43,8 @@ import {
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
+import { getInfoboardBySlug } from "@/lib/infoboard/queries";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 
 // ── Tenant select ─────────────────────────────────────────────────────────────
 
@@ -141,12 +143,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     // ── Source loader ──────────────────────────────────────────────────────
     const db = createPrismaDb();
     const loader = createCanonicalInfoboardSourceLoader(db);
+    const board = await getInfoboardBySlug("screen-1", tenant.id);
+    const boardConfig = board ? buildBoardConfig(board) : null;
 
     // ── Build live payload ─────────────────────────────────────────────────
     const payload = await buildScreen1LivePayload({
       tenant,
       now,
       loader,
+      boardConfig,
       tournamentPresentationDatabase: {
         tournamentParticipant: {
           findMany: (args) =>
