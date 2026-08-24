@@ -175,6 +175,12 @@ export async function updateInfoboard(
         anlageplanJson: input.anlageplanJson,
       }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
+      ...(input.screen1TrainingShowLogos !== undefined && {
+        screen1TrainingShowLogos: input.screen1TrainingShowLogos,
+      }),
+      ...(input.screen1TrainingLogoSize !== undefined && {
+        screen1TrainingLogoSize: input.screen1TrainingLogoSize,
+      }),
       ...(input.screen1MatchShowLogos !== undefined && {
         screen1MatchShowLogos: input.screen1MatchShowLogos,
       }),

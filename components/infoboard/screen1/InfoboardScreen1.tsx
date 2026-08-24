@@ -60,6 +60,7 @@ import { admitDisplayItemsByCapacity } from "@/lib/publishing/infoboard/screen1-
 import {
   DEFAULT_SCREEN1_LOGO_PRESENTATION,
   MATCH_LOGO_SIZE_CSS,
+  TRAINING_LOGO_SIZE_CSS,
   TOURNAMENT_LOGO_SIZE_CSS,
   type Screen1LogoPresentationConfig,
 } from "@/lib/infoboard/screen1-logo-settings";
@@ -110,7 +111,7 @@ export type InfoboardScreen1Props = {
     readonly showDate?: boolean;
     readonly showWeather?: boolean;
   };
-  /** Per-board Match/Tournament logo presentation settings. */
+  /** Per-board Training/Match/Tournament logo presentation settings. */
   logoPresentation?: Screen1LogoPresentationConfig;
 };
 
@@ -847,6 +848,9 @@ type TrainingGroupCardProps = {
   demand: number;
   /** Club name for prefix stripping from team display names. */
   clubName: string;
+  /** Existing tenant club logo used for Training team identity. */
+  clubLogoSrc: string | null;
+  showLogos: boolean;
 };
 
 /**
@@ -869,6 +873,8 @@ function TrainingGroupCard({
   timeZone,
   demand,
   clubName,
+  clubLogoSrc,
+  showLogos,
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
@@ -947,19 +953,32 @@ function TrainingGroupCard({
                 data-testid="training-group-row"
               >
                 <span className={styles.trainingGroupTeamName}>
-                  {stripClubPrefix(
-                    it.event.teamDisplayName ?? it.event.displayTitle,
-                    clubName,
+                  {showLogos && clubLogoSrc !== null && (
+                    // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
+                    <img
+                      src={clubLogoSrc}
+                      alt=""
+                      aria-hidden="true"
+                      className={styles.trainingClubLogo}
+                      data-testid="training-team-logo"
+                      data-event-id={it.event.id}
+                    />
                   )}
+                  <span className={styles.trainingGroupTeamText}>
+                    {stripClubPrefix(
+                      it.event.teamDisplayName ?? it.event.displayTitle,
+                      clubName,
+                    )}
 
-                  {rowEndTime !== null && (
-                    <span
-                      className={styles.trainingGroupRowEndTime}
-                      aria-label="Bis"
-                    >
-                      {" "}bis {rowEndTime}
-                    </span>
-                  )}
+                    {rowEndTime !== null && (
+                      <span
+                        className={styles.trainingGroupRowEndTime}
+                        aria-label="Bis"
+                      >
+                        {" "}bis {rowEndTime}
+                      </span>
+                    )}
+                  </span>
                 </span>
               </div>
             );
@@ -1319,6 +1338,8 @@ export function InfoboardScreen1({
                 timeZone={timeZone}
                 demand={demand}
                 clubName={clubNameUpper}
+                clubLogoSrc={clubLogoSrc}
+                showLogos={logoPresentation.trainingShowLogos}
               />
             );
           }
@@ -1349,6 +1370,8 @@ export function InfoboardScreen1({
       data-theme={themeAttr}
       style={
         {
+          "--ib-training-logo-size":
+            TRAINING_LOGO_SIZE_CSS[logoPresentation.trainingLogoSize],
           "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[logoPresentation.matchLogoSize],
           "--ib-tournament-logo-size":
             TOURNAMENT_LOGO_SIZE_CSS[logoPresentation.tournamentLogoSize],

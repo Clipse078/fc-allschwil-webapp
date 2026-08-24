@@ -5143,7 +5143,11 @@ model Infoboard {
   /// Display sequence within this tenant's Infoboard list (ascending).
   sortOrder Int @default(0)
 
-  // ── Screen 1 presentation controls (INFOBOARD-SCREEN1-URGENT-07C) ─────────
+  // ── Screen 1 presentation controls (INFOBOARD-SCREEN1-URGENT-07C/07E) ─────
+  /// Show club logos on Training cards. Independent from Match/Tournament.
+  screen1TrainingShowLogos   Boolean @default(true)
+  /// Training logo size preset: SMALL | MEDIUM | LARGE | XLARGE
+  screen1TrainingLogoSize    String  @default("MEDIUM")
   /// Show club logos on Match cards. Default true preserves existing behaviour.
   screen1MatchShowLogos     Boolean @default(true)
   /// Match logo size preset: SMALL | MEDIUM | LARGE | XLARGE

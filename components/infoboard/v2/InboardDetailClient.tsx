@@ -42,6 +42,7 @@ import {
   type InfoboardLogoSize,
 } from "@/lib/infoboard/screen1-logo-settings";
 import type { AnlageplanResourceOption } from "@/lib/infoboard/anlageplan-types";
+import { SwitchThumb } from "@/components/ui/SwitchToggle";
 import { InboardDesignerClient } from "./designer/InboardDesignerClient";
 import { AnlageplanDesignerClient } from "./designer/anlageplan/AnlageplanDesignerClient";
 
@@ -80,6 +81,12 @@ export function InboardDetailClient({
   const [displayTheme, setDisplayTheme] = useState<string | null>(board.displayTheme);
   const [anzeigeNameValue, setAnzeigeNameValue] = useState(board.name);
   const [anzeigeTemplatetype, setAnzeigeTemplatetype] = useState(board.templateType);
+  const [trainingShowLogos, setTrainingShowLogos] = useState(
+    board.screen1TrainingShowLogos ?? true,
+  );
+  const [trainingLogoSize, setTrainingLogoSize] = useState<InfoboardLogoSize>(
+    resolveInfoboardLogoSize(board.screen1TrainingLogoSize),
+  );
   const [matchShowLogos, setMatchShowLogos] = useState(
     board.screen1MatchShowLogos ?? true,
   );
@@ -169,6 +176,8 @@ export function InboardDetailClient({
           displayTheme,
           templateType: anzeigeTemplatetype,
           name: anzeigeNameValue.trim() || board.name,
+          screen1TrainingShowLogos: trainingShowLogos,
+          screen1TrainingLogoSize: trainingLogoSize,
           screen1MatchShowLogos: matchShowLogos,
           screen1MatchLogoSize: matchLogoSize,
           screen1TournamentShowLogos: tournamentShowLogos,
@@ -500,34 +509,40 @@ export function InboardDetailClient({
                   Kopfzeile, Hinweisleiste und Widget-Layout werden im Designer konfiguriert.
                 </p>
 
-                <div className="border-t border-[var(--border)] pt-4 space-y-4">
+                <div className="border-t border-[var(--border)] pt-4 space-y-3">
                   <p className="text-[0.75rem] font-semibold text-[var(--foreground)]">
-                    Match
+                    Training
                   </p>
-                  <label className="flex items-center gap-2 text-[0.78rem] text-[var(--foreground)]">
-                    <input
-                      type="checkbox"
-                      checked={matchShowLogos}
-                      onChange={(e) => {
-                        setMatchShowLogos(e.target.checked);
+                  <div className="flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="training-show-logos"
+                      className="text-[0.78rem] text-[var(--foreground)]"
+                    >
+                      Clublogos anzeigen
+                    </label>
+                    <SwitchThumb
+                      id="training-show-logos"
+                      checked={trainingShowLogos}
+                      onChange={(checked) => {
+                        setTrainingShowLogos(checked);
                         setAnzeigeSaved(false);
                       }}
-                      data-testid="match-show-logos"
+                      aria-label="Training Clublogos anzeigen"
                     />
-                    Clublogos anzeigen
-                  </label>
+                  </div>
                   <div>
                     <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
                       Logogrösse
                     </label>
                     <select
-                      value={matchLogoSize}
+                      value={trainingLogoSize}
                       onChange={(e) => {
-                        setMatchLogoSize(e.target.value as InfoboardLogoSize);
+                        setTrainingLogoSize(e.target.value as InfoboardLogoSize);
                         setAnzeigeSaved(false);
                       }}
-                      data-testid="match-logo-size"
-                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                      disabled={!trainingShowLogos}
+                      data-testid="training-logo-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {INFOBOARD_LOGO_SIZES.map((size) => (
                         <option key={size} value={size}>
@@ -538,22 +553,71 @@ export function InboardDetailClient({
                   </div>
                 </div>
 
-                <div className="border-t border-[var(--border)] pt-4 space-y-4">
+                <div className="border-t border-[var(--border)] pt-4 space-y-3">
+                  <p className="text-[0.75rem] font-semibold text-[var(--foreground)]">
+                    Match
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="match-show-logos"
+                      className="text-[0.78rem] text-[var(--foreground)]"
+                    >
+                      Clublogos anzeigen
+                    </label>
+                    <SwitchThumb
+                      id="match-show-logos"
+                      checked={matchShowLogos}
+                      onChange={(checked) => {
+                        setMatchShowLogos(checked);
+                        setAnzeigeSaved(false);
+                      }}
+                      aria-label="Match Clublogos anzeigen"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Logogrösse
+                    </label>
+                    <select
+                      value={matchLogoSize}
+                      onChange={(e) => {
+                        setMatchLogoSize(e.target.value as InfoboardLogoSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      disabled={!matchShowLogos}
+                      data-testid="match-logo-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {INFOBOARD_LOGO_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {LOGO_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-[var(--border)] pt-4 space-y-3">
                   <p className="text-[0.75rem] font-semibold text-[var(--foreground)]">
                     Turnier
                   </p>
-                  <label className="flex items-center gap-2 text-[0.78rem] text-[var(--foreground)]">
-                    <input
-                      type="checkbox"
+                  <div className="flex items-center justify-between gap-3">
+                    <label
+                      htmlFor="tournament-show-logos"
+                      className="text-[0.78rem] text-[var(--foreground)]"
+                    >
+                      Clublogos anzeigen
+                    </label>
+                    <SwitchThumb
+                      id="tournament-show-logos"
                       checked={tournamentShowLogos}
-                      onChange={(e) => {
-                        setTournamentShowLogos(e.target.checked);
+                      onChange={(checked) => {
+                        setTournamentShowLogos(checked);
                         setAnzeigeSaved(false);
                       }}
-                      data-testid="tournament-show-logos"
+                      aria-label="Turnier Clublogos anzeigen"
                     />
-                    Clublogos anzeigen
-                  </label>
+                  </div>
                   <div>
                     <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
                       Logogrösse
@@ -564,8 +628,9 @@ export function InboardDetailClient({
                         setTournamentLogoSize(e.target.value as InfoboardLogoSize);
                         setAnzeigeSaved(false);
                       }}
+                      disabled={!tournamentShowLogos}
                       data-testid="tournament-logo-size"
-                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {INFOBOARD_LOGO_SIZES.map((size) => (
                         <option key={size} value={size}>

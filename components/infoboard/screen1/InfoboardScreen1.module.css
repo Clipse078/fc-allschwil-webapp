@@ -87,6 +87,7 @@
   --ib-fs-event-opponent:   clamp(1.1rem, 1.5vw, 2rem);
   --ib-fs-vs-label:         clamp(0.65rem, 0.82vw, 1rem);
   --ib-fs-match-role:       clamp(0.62rem, 0.75vw, 0.88rem);
+  --ib-training-logo-size:  clamp(1.75rem, 2.8vh, 2.625rem);
   --ib-match-logo-size:     clamp(2rem, 2.35vw, 2.375rem);
   --ib-tournament-logo-size: clamp(2.25rem, 2.8vw, 3.4375rem);
   --ib-tournament-logo-size-large: clamp(2.75rem, 3.4vw, 3.4375rem);
@@ -1257,6 +1258,21 @@
   align-items: baseline;
   gap: var(--ib-sp-2);
   min-width: 0;
+}
+
+.trainingClubLogo {
+  width: var(--ib-training-logo-size);
+  height: var(--ib-training-logo-size);
+  flex: 0 0 var(--ib-training-logo-size);
+  object-fit: contain;
+  align-self: center;
+}
+
+.trainingGroupTeamText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trainingGroupRowEndTime {

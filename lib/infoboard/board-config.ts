@@ -45,6 +45,9 @@ export function buildBoardConfig(board: InboardRow): InfoboardBoardConfig {
     headerShowDate: board.headerShowDate,
     headerShowWeather: board.headerShowWeather,
     logoPresentation: {
+      trainingShowLogos:
+        board.screen1TrainingShowLogos ?? DEFAULT_SCREEN1_LOGO_PRESENTATION.trainingShowLogos,
+      trainingLogoSize: resolveInfoboardLogoSize(board.screen1TrainingLogoSize),
       matchShowLogos: board.screen1MatchShowLogos ?? DEFAULT_SCREEN1_LOGO_PRESENTATION.matchShowLogos,
       matchLogoSize: resolveInfoboardLogoSize(board.screen1MatchLogoSize),
       tournamentShowLogos:

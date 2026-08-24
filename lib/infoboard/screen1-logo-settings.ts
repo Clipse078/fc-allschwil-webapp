@@ -1,7 +1,7 @@
 /**
  * lib/infoboard/screen1-logo-settings.ts
  *
- * Screen 1 Match/Tournament logo presentation presets.
+ * Screen 1 Training/Match/Tournament logo presentation presets.
  * Stable enum model — no arbitrary pixel sizing exposed to administrators.
  */
 
@@ -31,6 +31,17 @@ export const MATCH_LOGO_SIZE_CSS: Record<InfoboardLogoSize, string> = {
 };
 
 /**
+ * Training logo CSS clamp values per preset.
+ * MEDIUM preserves the former Screen 1 team-logo baseline (28–42px).
+ */
+export const TRAINING_LOGO_SIZE_CSS: Record<InfoboardLogoSize, string> = {
+  SMALL: "clamp(1.375rem, 2.2vh, 2.125rem)",
+  MEDIUM: "clamp(1.75rem, 2.8vh, 2.625rem)",
+  LARGE: "clamp(2.125rem, 3.4vh, 3.125rem)",
+  XLARGE: "clamp(2.5rem, 4vh, 3.625rem)",
+};
+
+/**
  * Tournament logo CSS clamp values per preset.
  * MEDIUM reproduces the accepted baseline (--ib-tournament-logo-size).
  */
@@ -42,6 +53,8 @@ export const TOURNAMENT_LOGO_SIZE_CSS: Record<InfoboardLogoSize, string> = {
 };
 
 export type Screen1LogoPresentationConfig = {
+  readonly trainingShowLogos: boolean;
+  readonly trainingLogoSize: InfoboardLogoSize;
   readonly matchShowLogos: boolean;
   readonly matchLogoSize: InfoboardLogoSize;
   readonly tournamentShowLogos: boolean;
@@ -49,6 +62,8 @@ export type Screen1LogoPresentationConfig = {
 };
 
 export const DEFAULT_SCREEN1_LOGO_PRESENTATION: Screen1LogoPresentationConfig = {
+  trainingShowLogos: true,
+  trainingLogoSize: DEFAULT_INFOBOARD_LOGO_SIZE,
   matchShowLogos: true,
   matchLogoSize: DEFAULT_INFOBOARD_LOGO_SIZE,
   tournamentShowLogos: true,

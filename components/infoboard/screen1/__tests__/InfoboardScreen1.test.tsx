@@ -2228,9 +2228,7 @@ describe("Match logo placement — INFOBOARD-LOGO-02", () => {
     expect(matchAlloc.querySelector("img")).toBeNull();
   });
 
-  it("no logo appears in training group card even with branding (V2: all trainings use TrainingGroupCard)", () => {
-    // INFOBOARD-V2: Solo trainings now render through TrainingGroupCard (training-group testid),
-    // not through the old TrainingDestination (training-allocation testid).
+  it("renders the tenant logo in a training group card by default", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR2", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -2241,9 +2239,8 @@ describe("Match logo placement — INFOBOARD-LOGO-02", () => {
         branding={{ clubLogoSrc: "/logo.png" }}
       />,
     );
-    // TrainingGroupCard uses data-testid="training-group"
     const trainingGroup = screen.getByTestId("training-group");
-    expect(trainingGroup.querySelector("img")).toBeNull();
+    expect(trainingGroup.querySelector("[data-testid='training-team-logo']")).toBeTruthy();
   });
 });
 

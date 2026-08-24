@@ -108,7 +108,7 @@ export type InfoboardBoardConfig = {
   readonly headerShowTime?: boolean;
   readonly headerShowDate?: boolean;
   readonly headerShowWeather?: boolean;
-  /** Screen 1 Match/Tournament logo presentation (per-board). */
+  /** Screen 1 Training/Match/Tournament logo presentation (per-board). */
   readonly logoPresentation?: Screen1LogoPresentationConfig;
 };
 

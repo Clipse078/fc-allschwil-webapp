@@ -240,6 +240,19 @@ export async function PATCH(
     input.anlageplanBackgroundUrl = body.anlageplanBackgroundUrl as string | null;
   }
 
+  if ("screen1TrainingShowLogos" in body) {
+    input.screen1TrainingShowLogos = Boolean(body.screen1TrainingShowLogos);
+  }
+  if ("screen1TrainingLogoSize" in body) {
+    const size = body.screen1TrainingLogoSize;
+    if (typeof size !== "string" || !INFOBOARD_LOGO_SIZES.includes(size as typeof INFOBOARD_LOGO_SIZES[number])) {
+      return NextResponse.json(
+        { error: `screen1TrainingLogoSize muss einer von: ${INFOBOARD_LOGO_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1TrainingLogoSize = size;
+  }
   if ("screen1MatchShowLogos" in body) {
     input.screen1MatchShowLogos = Boolean(body.screen1MatchShowLogos);
   }

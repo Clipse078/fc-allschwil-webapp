@@ -120,6 +120,20 @@ describe("Match single-line team name (07C)", () => {
 });
 
 describe("Logo presentation settings (07C)", () => {
+  it("renders match logos when enabled", () => {
+    const feed: InfoboardScreen1Feed = {
+      ...BASE_FEED,
+      isEmpty: false,
+      emptyStateReason: null,
+      current: [makeMatchEvent("m1", "current", "2026-08-24T18:00:00.000Z")],
+    };
+
+    render(<InfoboardScreen1 feed={feed} />);
+
+    expect(screen.getByTestId("home-team-logo")).toBeInTheDocument();
+    expect(screen.getByTestId("away-team-logo")).toBeInTheDocument();
+  });
+
   it("hides match logos when disabled", () => {
     const feed: InfoboardScreen1Feed = {
       ...BASE_FEED,
@@ -199,6 +213,7 @@ describe("Logo presentation settings (07C)", () => {
           },
         ]}
         logoPresentation={{
+          ...DEFAULT_SCREEN1_LOGO_PRESENTATION,
           matchShowLogos: false,
           matchLogoSize: "SMALL",
           tournamentShowLogos: true,
@@ -212,6 +227,50 @@ describe("Logo presentation settings (07C)", () => {
       TOURNAMENT_LOGO_SIZE_CSS.XLARGE,
     );
     expect(screen.getByTestId("tournament-participant-logo-p1")).toBeInTheDocument();
+  });
+
+  it("hides tournament logos when disabled", () => {
+    const feed: InfoboardScreen1Feed = {
+      ...BASE_FEED,
+      isEmpty: false,
+      emptyStateReason: null,
+      current: [
+        {
+          ...makeMatchEvent("t1", "current", "2026-08-24T18:00:00.000Z"),
+          type: "TOURNAMENT",
+          matchPresentation: null,
+          displayTitle: "Mini-Turnier",
+        },
+      ],
+    };
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        eventPresentation={[
+          {
+            eventId: "t1",
+            participantAllocations: [
+              {
+                id: "p1",
+                teamDisplayName: "Team A",
+                dressingRoomLabel: "1",
+                clubLogoUrl: "/a.png",
+              },
+            ],
+          },
+        ]}
+        logoPresentation={{
+          ...DEFAULT_SCREEN1_LOGO_PRESENTATION,
+          tournamentShowLogos: false,
+        }}
+      />,
+    );
+
+    expect(screen.queryByTestId("tournament-participant-logo-p1")).toBeNull();
+    expect(
+      screen.queryByTestId("tournament-participant-logo-p1-placeholder"),
+    ).toBeNull();
   });
 });
 
@@ -324,6 +383,8 @@ describe("Board config persistence defaults (07C)", () => {
 
     const config = buildBoardConfig(board);
     expect(config.logoPresentation).toEqual({
+      trainingShowLogos: true,
+      trainingLogoSize: "MEDIUM",
       matchShowLogos: true,
       matchLogoSize: "MEDIUM",
       tournamentShowLogos: true,
