@@ -119,12 +119,27 @@ const PROTOTYPE_CAPACITY = 12;
 export const CARD_DEMAND_TRAINING_BASE = 1.0;
 /** Added demand per training row — drives proportional height growth. */
 export const CARD_DEMAND_TRAINING_ROW = 0.55;
-/** Fixed demand for a match card (structurally consistent content). */
-export const CARD_DEMAND_MATCH = 1.5;
+/**
+ * Content-safe baseline demand for a simple Match card.
+ * Reflects the full vertical presentation stack (type label, home/away
+ * identity with logos, VS., time, Kabine, Platz) — not logo presence alone.
+ */
+export const CARD_DEMAND_MATCH = 2.2;
+/** Added demand per team sub-name line (e.g. "E1") in match identity. */
+export const CARD_DEMAND_MATCH_SUB_TEAM = 0.22;
+/** Added demand when an end time is shown in the TIME zone. */
+export const CARD_DEMAND_MATCH_END_TIME = 0.12;
 /** Base demand for a tournament card. */
 export const CARD_DEMAND_TOURNAMENT_BASE = 1.5;
-/** Added demand per known participant allocation row in a tournament. */
+/**
+ * Added demand per centre participant display row for small tournaments
+ * (< 3 participants, logo strip only — no KABINE allocation matrix).
+ */
+export const CARD_DEMAND_TOURNAMENT_DISPLAY_ROW = 0.25;
+/** Added demand per KABINE allocation row (≥ 3 participants). */
 export const CARD_DEMAND_TOURNAMENT_PARTICIPANT = 0.3;
+/** Centre participant grid columns — matches tournamentParticipants CSS. */
+export const TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS = 2;
 /**
  * Maximum total demand per rendered page.
  * When the visible set exceeds this threshold the display list is split
@@ -141,9 +156,77 @@ export function computeTrainingGroupDemand(rowCount: number): number {
 }
 
 /**
- * Demand for a non-training event card.
- * For TOURNAMENT, pass the number of resolved participant allocation rows.
- * For MATCH and other types, participantCount is ignored.
+ * Centre participant display rows for tournament identity presentation.
+ * Reflects the two-column grid used when participant names are shown.
+ * Exported for regression testing.
+ */
+export function computeTournamentParticipantDisplayRows(
+  participantCount: number,
+): number {
+  if (participantCount <= 0) return 0;
+  return Math.ceil(participantCount / TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS);
+}
+
+function countMatchSubTeamLines(
+  presentation: InfoboardScreen1Event["matchPresentation"],
+): number {
+  if (presentation === null) return 0;
+  let count = 0;
+  if (presentation.home.teamSubDisplayName?.trim()) count++;
+  if (presentation.away?.teamSubDisplayName?.trim()) count++;
+  return count;
+}
+
+/**
+ * Semantic demand for a MATCH card based on presentational vertical content.
+ * Logo presence alone does not increase demand.
+ * Exported for regression testing.
+ */
+export function computeMatchDemand(event: InfoboardScreen1Event): number {
+  let demand = CARD_DEMAND_MATCH;
+  demand += countMatchSubTeamLines(event.matchPresentation) * CARD_DEMAND_MATCH_SUB_TEAM;
+  if (event.endAt !== null && event.endAt !== event.startAt) {
+    demand += CARD_DEMAND_MATCH_END_TIME;
+  }
+  return demand;
+}
+
+/**
+ * Content-safe minimum demand for a MATCH card — the floor used before
+ * proportional viewport distribution. Equals computeMatchDemand() because
+ * the baseline already encodes the full safe presentation stack.
+ * Exported for regression testing.
+ */
+export function computeMatchContentSafeMinimum(
+  event: InfoboardScreen1Event,
+): number {
+  return computeMatchDemand(event);
+}
+
+/**
+ * Semantic demand for a TOURNAMENT card.
+ * Small tournaments (< 3 participants) use centre display-row demand only.
+ * Larger tournaments use KABINE allocation-row demand to avoid double-counting
+ * the same participant information shown in both zones.
+ * Exported for regression testing.
+ */
+export function computeTournamentDemand(
+  participantAllocations: readonly InfoboardTeamAllocationPresentation[] | undefined,
+): number {
+  const count = participantAllocations?.length ?? 0;
+  if (count === 0) return CARD_DEMAND_TOURNAMENT_BASE;
+  if (count < 3) {
+    return (
+      CARD_DEMAND_TOURNAMENT_BASE
+      + computeTournamentParticipantDisplayRows(count) * CARD_DEMAND_TOURNAMENT_DISPLAY_ROW
+    );
+  }
+  return CARD_DEMAND_TOURNAMENT_BASE + count * CARD_DEMAND_TOURNAMENT_PARTICIPANT;
+}
+
+/**
+ * Demand for a non-training event card (legacy test helper).
+ * Prefer computeMatchDemand / computeTournamentDemand for semantic inputs.
  * Exported for regression testing.
  */
 export function computeEventDemand(
@@ -151,6 +234,15 @@ export function computeEventDemand(
   participantCount: number = 0,
 ): number {
   if (type === "TOURNAMENT") {
+    if (participantCount === 0) return CARD_DEMAND_TOURNAMENT_BASE;
+    if (participantCount < 3) {
+      const synthetic = Array.from({ length: participantCount }, (_, i) => ({
+        id: `p${i}`,
+        teamDisplayName: `Team ${i}`,
+        dressingRoomLabel: null,
+      }));
+      return computeTournamentDemand(synthetic);
+    }
     return CARD_DEMAND_TOURNAMENT_BASE + participantCount * CARD_DEMAND_TOURNAMENT_PARTICIPANT;
   }
   return CARD_DEMAND_MATCH;
@@ -184,8 +276,8 @@ export function densityTier(totalDemand: number): "normal" | "dense" | "ultra" {
  * cannot be clipped.
  *
  * The threshold (4.0) is placed above the maximum demand any single
- * low-content card can produce (~1.55 for a 1-row training, 1.5 for
- * a match) so solo cards and 2-card sparse pages use the bounded mode.
+ * low-content card can produce (~1.55 for a 1-row training, ~2.2 for
+ * a simple match) so solo cards and low-demand sparse pages use bounded mode.
  * A 1-training-group with 6 rows produces demand ≥ 4.3 and therefore
  * correctly uses FILL mode.
  *
@@ -1138,11 +1230,15 @@ export function InfoboardScreen1({
     if (item.kind === "training-group") {
       return computeTrainingGroupDemand(item.items.length);
     }
-    const ext = findEventExtension(item.item.event.id, eventPresentation);
-    const rawAllocCount = ext?.participantAllocations?.length ?? 0;
-    // Only count participants when there are enough for the allocation block
-    const allocCount = rawAllocCount >= 3 ? rawAllocCount : 0;
-    return computeEventDemand(item.item.event.type, allocCount);
+    const event = item.item.event;
+    if (event.type === "MATCH") {
+      return computeMatchDemand(event);
+    }
+    if (event.type === "TOURNAMENT") {
+      const ext = findEventExtension(event.id, eventPresentation);
+      return computeTournamentDemand(ext?.participantAllocations);
+    }
+    return computeEventDemand(event.type);
   });
 
   // Split into pages based on demand. Normal days: single page (no rotation).
@@ -1166,6 +1262,7 @@ export function InfoboardScreen1({
         data-count={pageItems.length}
         data-density={pageDensity}
         data-layout-mode={pageLayoutMode}
+        style={{ "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX } as CSSProperties}
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];

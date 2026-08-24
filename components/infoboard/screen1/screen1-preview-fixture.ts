@@ -1279,3 +1279,181 @@ export const PREVIEW_EVENT_TYPE_REGRESSION_EXTENSIONS: readonly InfoboardEventPr
     ...extension,
     eventId: "evt-reg-tournament",
   }));
+
+// ── INFOBOARD-LAYOUT-01 acceptance fixtures ─────────────────────────────────
+
+/**
+ * Case A — one simple Match: club identity + opponent + pitch + rooms,
+ * no sub-team lines, no end-time line.
+ */
+export const PREVIEW_FIXTURE_SIMPLE_MATCH: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-layout-simple-match",
+      type: "MATCH",
+      displayTitle: "FC Allschwil – FC Binningen",
+      teamDisplayName: "FC Allschwil",
+      opponentDisplayName: "FC Binningen",
+      opponentLogoUrl: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: "/images/logos/fc-allschwil.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcBinningen,
+        },
+      },
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine A",
+        awayDressingRoomLabel: "Kabine B",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+/**
+ * Case B — one richer Match: sub-team lines on both sides + end time.
+ */
+export const PREVIEW_FIXTURE_RICHER_MATCH: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-layout-richer-match",
+      type: "MATCH",
+      displayTitle: "FC Allschwil E1 – FC Binningen E1",
+      teamDisplayName: "FC Allschwil E1",
+      opponentDisplayName: "FC Binningen E1",
+      opponentLogoUrl: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: "/images/logos/fc-allschwil.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcBinningen,
+        },
+      },
+      organizerDisplayName: null,
+      competitionLabel: "Meisterschaft",
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: "2026-09-12T16:45:00.000Z",
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "Stadion",
+        homeDressingRoomLabel: "Kabine E1",
+        awayDressingRoomLabel: "Kabine E2",
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+/**
+ * Case C — one small Tournament (2 participants, logo strip only).
+ */
+export const PREVIEW_FIXTURE_SMALL_TOURNAMENT: InfoboardScreen1Feed = {
+  generatedAt: "2026-09-12T15:35:00.000Z",
+  tenant: PREVIEW_TENANT,
+  displayDate: "2026-09-12",
+  isStale: false,
+  wochenplanVariantBadge: null,
+  current: [
+    {
+      id: "evt-layout-small-tournament",
+      type: "TOURNAMENT",
+      displayTitle: "Mini-Cup E-Junioren",
+      teamDisplayName: "FC Allschwil",
+      opponentDisplayName: null,
+      opponentLogoUrl: null,
+      matchPresentation: null,
+      organizerDisplayName: "FC Allschwil",
+      competitionLabel: "Mini-Cup",
+      startAt: "2026-09-12T15:00:00.000Z",
+      endAt: null,
+      meetingTime: null,
+      status: "LIVE",
+      resultLabel: null,
+      intermediateResultLabel: null,
+      temporalBucket: "current",
+      seasonKey: "2026-27",
+      allocation: {
+        pitchLabel: "KR1",
+        homeDressingRoomLabel: null,
+        awayDressingRoomLabel: null,
+        refereeDressingRoomLabel: null,
+      },
+    },
+  ],
+  next: [],
+  later: [],
+  isEmpty: false,
+  emptyStateReason: null,
+};
+
+export const PREVIEW_SMALL_TOURNAMENT_EXTENSIONS: readonly InfoboardEventPresentationExtension[] = [
+  {
+    eventId: "evt-layout-small-tournament",
+    participantAllocations: [
+      {
+        id: "st-1",
+        teamDisplayName: "FC Allschwil E1",
+        dressingRoomLabel: null,
+        clubLogoUrl: "/images/logos/fc-allschwil.png",
+      },
+      {
+        id: "st-2",
+        teamDisplayName: "FC Binningen E1",
+        dressingRoomLabel: null,
+        clubLogoUrl: PREVIEW_OPPONENT_LOGOS.fcBinningen,
+      },
+    ],
+  },
+];
+
+/**
+ * Case E — Training + Match on the same board.
+ */
+export const PREVIEW_FIXTURE_TRAINING_PLUS_MATCH: InfoboardScreen1Feed = {
+  ...PREVIEW_FIXTURE_2EVENTS,
+};

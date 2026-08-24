@@ -332,6 +332,14 @@
   margin: 0;
   padding: 0;
   min-height: 0;
+  /* Content-safe demand unit: one demand point = 1/PAGE_MAX of the content viewport.
+     Cards receive min-height = demand × unit before flex-grow distributes surplus. */
+  --ib-content-viewport: calc(
+    100dvh - var(--ib-header-height) - var(--ib-footer-height) - 2 * var(--ib-sp-3)
+  );
+  --ib-demand-unit-height: calc(
+    var(--ib-content-viewport) / var(--ib-page-demand-max, 12)
+  );
 }
 
 /* ─── Event card ─────────────────────────────────────────────────────────── */
@@ -348,11 +356,13 @@
      semantic content demand (set via --ib-card-demand CSS custom property).
      Denser cards (e.g. 6-row training groups) receive proportionally more
      of the available viewport height than compact cards (1-row training,
-     match). Falls back to flex: 1 when no demand is set. */
+     match). Falls back to flex: 1 when no demand is set.
+     Content-safe first: min-height from demand units prevents flex-shrink
+     from clipping rendered content; surplus height is distributed via flex-grow. */
   flex-grow: var(--ib-card-demand, 1);
-  flex-shrink: 1;
+  flex-shrink: 0;
   flex-basis: 0;
-  min-height: 0;
+  min-height: calc(var(--ib-card-demand, 1) * var(--ib-demand-unit-height, 0px));
   overflow: hidden;
 }
 
@@ -1138,8 +1148,8 @@
  *   max-height: calc(var(--ib-card-demand, 1) * 25vh)
  *
  * This cap is demand-proportional so:
- *   - 1 MATCH (demand 1.5): max ≈ 405px at 1080p (≈43% of content area) ✓
- *   - 2 MATCH (demand 1.5 each): each ≈ 405px, background visible below ✓
+ *   - 1 simple MATCH (demand 2.2): max ≈ 594px at 1080p (≈55vh) ✓
+ *   - 2 simple MATCH (demand 2.2 each): each ≈ 594px, fill mode engages ✓
  *   - 1 TRAINING 1-row (demand 1.55): max ≈ 419px — comfortable ✓
  *
  * As demand approaches the fill threshold (4.0), max-height approaches
