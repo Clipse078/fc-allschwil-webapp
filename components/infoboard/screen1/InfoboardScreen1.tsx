@@ -119,12 +119,16 @@ const PROTOTYPE_CAPACITY = 12;
 export const CARD_DEMAND_TRAINING_BASE = 1.0;
 /** Added demand per training row — drives proportional height growth. */
 export const CARD_DEMAND_TRAINING_ROW = 0.55;
-/** Compact baseline demand for a simple match card. */
-export const CARD_DEMAND_MATCH = 1.5;
+/**
+ * Content-safe baseline demand for a simple Match card.
+ * Reflects the full vertical presentation stack (type label, home/away
+ * identity with logos, VS., time, Kabine, Platz) — not logo presence alone.
+ */
+export const CARD_DEMAND_MATCH = 2.2;
 /** Added demand per team sub-name line (e.g. "E1") in match identity. */
-export const CARD_DEMAND_MATCH_SUB_TEAM = 0.12;
+export const CARD_DEMAND_MATCH_SUB_TEAM = 0.22;
 /** Added demand when an end time is shown in the TIME zone. */
-export const CARD_DEMAND_MATCH_END_TIME = 0.08;
+export const CARD_DEMAND_MATCH_END_TIME = 0.12;
 /** Base demand for a tournament card. */
 export const CARD_DEMAND_TOURNAMENT_BASE = 1.5;
 /**
@@ -185,6 +189,18 @@ export function computeMatchDemand(event: InfoboardScreen1Event): number {
     demand += CARD_DEMAND_MATCH_END_TIME;
   }
   return demand;
+}
+
+/**
+ * Content-safe minimum demand for a MATCH card — the floor used before
+ * proportional viewport distribution. Equals computeMatchDemand() because
+ * the baseline already encodes the full safe presentation stack.
+ * Exported for regression testing.
+ */
+export function computeMatchContentSafeMinimum(
+  event: InfoboardScreen1Event,
+): number {
+  return computeMatchDemand(event);
 }
 
 /**
@@ -260,8 +276,8 @@ export function densityTier(totalDemand: number): "normal" | "dense" | "ultra" {
  * cannot be clipped.
  *
  * The threshold (4.0) is placed above the maximum demand any single
- * low-content card can produce (~1.55 for a 1-row training, 1.5 for
- * a match) so solo cards and 2-card sparse pages use the bounded mode.
+ * low-content card can produce (~1.55 for a 1-row training, ~2.2 for
+ * a simple match) so solo cards and low-demand sparse pages use bounded mode.
  * A 1-training-group with 6 rows produces demand ≥ 4.3 and therefore
  * correctly uses FILL mode.
  *
@@ -1246,6 +1262,7 @@ export function InfoboardScreen1({
         data-count={pageItems.length}
         data-density={pageDensity}
         data-layout-mode={pageLayoutMode}
+        style={{ "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX } as CSSProperties}
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];

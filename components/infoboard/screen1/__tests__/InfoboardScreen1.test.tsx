@@ -20,6 +20,7 @@ import {
   computeTrainingGroupDemand,
   computeEventDemand,
   computeMatchDemand,
+  computeMatchContentSafeMinimum,
   computeTournamentDemand,
   computeTournamentParticipantDisplayRows,
   densityTier,
@@ -2984,6 +2985,126 @@ describe("Content-demand — computeMatchDemand", () => {
       computeMatchDemand(withoutEnd) + CARD_DEMAND_MATCH_END_TIME,
     );
   });
+
+  it("richer match demand exceeds simple match by a meaningful bounded margin", () => {
+    const simple = makeEvent({
+      type: "MATCH",
+      endAt: null,
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: null,
+          clubLogoUrl: null,
+        },
+      },
+    });
+    const richer = makeEvent({
+      type: "MATCH",
+      startAt: "2026-09-12T08:00:00.000Z",
+      endAt: "2026-09-12T09:30:00.000Z",
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: null,
+        },
+      },
+    });
+    const simpleDemand = computeMatchDemand(simple);
+    const richerDemand = computeMatchDemand(richer);
+    expect(richerDemand).toBeGreaterThan(simpleDemand);
+    expect(richerDemand - simpleDemand).toBeGreaterThanOrEqual(0.4);
+    expect(richerDemand - simpleDemand).toBeLessThanOrEqual(1.0);
+  });
+});
+
+describe("Content-demand — computeMatchContentSafeMinimum", () => {
+  it("content-safe minimum equals semantic match demand", () => {
+    const event = makeEvent({
+      type: "MATCH",
+      endAt: "2026-09-12T09:30:00.000Z",
+      matchPresentation: {
+        home: {
+          clubDisplayName: "FC ALLSCHWIL",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: "/logo.png",
+        },
+        away: {
+          clubDisplayName: "FC BINNINGEN",
+          teamSubDisplayName: "E1",
+          clubLogoUrl: "/logo2.png",
+        },
+      },
+    });
+    expect(computeMatchContentSafeMinimum(event)).toBeCloseTo(computeMatchDemand(event));
+  });
+
+  it("mixed preview match cards cannot fall below their content-safe minimum", () => {
+    const currentMatch = PREVIEW_FIXTURE.current[0];
+    const laterMatch = PREVIEW_FIXTURE.later[1];
+    expect(computeMatchContentSafeMinimum(currentMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
+    expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
+  });
+
+  it("mixed preview page total demand stays within CARD_DEMAND_PAGE_MAX", () => {
+    const matchCurrent = computeMatchDemand(PREVIEW_FIXTURE.current[0]);
+    const trainingNext = computeTrainingGroupDemand(1);
+    const tournamentLater = computeTournamentDemand(
+      PREVIEW_TARGET_TOURNAMENT_EXTENSIONS[0]?.participantAllocations,
+    );
+    const matchLater = computeMatchDemand(PREVIEW_FIXTURE.later[1]);
+    const trainingLater = computeTrainingGroupDemand(1);
+    const total =
+      matchCurrent + trainingNext + tournamentLater + matchLater + trainingLater;
+    expect(total).toBeLessThanOrEqual(CARD_DEMAND_PAGE_MAX);
+    expect(total).toBeGreaterThan(10);
+  });
+
+  it("insufficient page capacity paginates instead of compressing below safe minimum", () => {
+    const items = Array.from({ length: 7 }, (_, i) => ({
+      kind: "event" as const,
+      item: {
+        event: makeEvent({
+          id: `m${i}`,
+          type: "MATCH" as const,
+          startAt: `2026-09-12T${String(8 + i).padStart(2, "0")}:00:00.000Z`,
+        }),
+        temporal: "later" as const,
+      },
+    }));
+    const demands = items.map((item) => computeMatchContentSafeMinimum(item.item.event));
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    expect(pages.length).toBeGreaterThan(1);
+    for (const page of pages) {
+      const pageDemand = page.reduce(
+        (sum, item) => sum + computeMatchContentSafeMinimum(item.item.event),
+        0,
+      );
+      expect(pageDemand).toBeLessThanOrEqual(CARD_DEMAND_PAGE_MAX + 0.01);
+    }
+  });
+
+  it("event-list exposes page demand max custom property for content-safe CSS", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE}
+        currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
+        eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
+      />,
+    );
+    const list = screen.getByTestId("event-list");
+    expect(list.style.getPropertyValue("--ib-page-demand-max")).toBe(String(CARD_DEMAND_PAGE_MAX));
+  });
 });
 
 describe("Content-demand — computeTournamentDemand", () => {
@@ -3098,7 +3219,7 @@ describe("Content-demand — layout mode and pagination", () => {
     ]);
     const total = trainingDemand + matchDemand + tournamentDemand;
     expect(layoutModeTier(total)).toBe("fill");
-    expect(total).toBeCloseTo(4.3 + 1.5 + 2.7, 1);
+    expect(total).toBeCloseTo(4.3 + CARD_DEMAND_MATCH + 2.7, 1);
   });
 
   it("pagination still respects CARD_DEMAND_PAGE_MAX", () => {
@@ -3439,9 +3560,8 @@ describe("Content-demand — layout contract (MATCH / TOURNAMENT unchanged)", ()
 
 describe("Sparse layout mode — layoutModeTier", () => {
   it("demand below threshold → sparse", () => {
-    expect(layoutModeTier(1.5)).toBe("sparse");   // 1 MATCH
+    expect(layoutModeTier(CARD_DEMAND_MATCH)).toBe("sparse");   // 1 simple MATCH
     expect(layoutModeTier(1.55)).toBe("sparse");  // 1-row training
-    expect(layoutModeTier(3.0)).toBe("sparse");   // 2 MATCH
     expect(layoutModeTier(3.9)).toBe("sparse");   // just below threshold
   });
 
@@ -3478,7 +3598,7 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
     expect(list.getAttribute("data-layout-mode")).toBe("sparse");
   });
 
-  it("two MATCH cards → data-layout-mode='sparse'", () => {
+  it("two simple MATCH cards → data-layout-mode='fill' (content-safe demand exceeds threshold)", () => {
     const feed = makeFeed({
       current: [
         makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T09:00:00.000Z", teamDisplayName: "Home1", opponentDisplayName: "Away1" }),
@@ -3488,7 +3608,7 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
     });
     render(<InfoboardScreen1 feed={feed} />);
     const list = screen.getByTestId("event-list");
-    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+    expect(list.getAttribute("data-layout-mode")).toBe("fill");
   });
 
   it("one 6-row training group → data-layout-mode='fill' (high demand)", () => {
