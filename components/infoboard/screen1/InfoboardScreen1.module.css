@@ -581,6 +581,7 @@
 }
 
 .eventTeamMain {
+  --ib-match-team-name-base: var(--ib-fs-event-team);
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-event-team);
   font-weight: 700;
@@ -594,6 +595,7 @@
 }
 
 .eventTeamOpponent {
+  --ib-match-team-name-base: var(--ib-fs-event-opponent);
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
   font-size: var(--ib-fs-event-opponent);
   font-weight: 600;
@@ -604,6 +606,36 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/*
+ * Match display names remain one semantic label on one line. Length-based
+ * presentation tiers cap only names that need less width; short names retain
+ * the existing event-count/density size. At 1920px the medium and minimum
+ * tiers resolve to 41.28px and 34.56px respectively, leaving room for an
+ * XLARGE 56px crest in the Match content column.
+ */
+.eventCard[data-type="MATCH"] [data-match-team-label] {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.eventCard[data-type="MATCH"] [data-match-name-size="medium"] {
+  font-size: min(
+    var(--ib-match-team-name-base),
+    clamp(1.65rem, 2.15vw, 2.75rem)
+  );
+}
+
+.eventCard[data-type="MATCH"] [data-match-name-size="minimum"] {
+  font-size: min(
+    var(--ib-match-team-name-base),
+    clamp(1.4rem, 1.8vw, 2.25rem)
+  );
 }
 
 .vsLabel {

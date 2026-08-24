@@ -514,6 +514,23 @@ function stripClubPrefix(teamName: string, clubName: string): string {
   return teamName;
 }
 
+export type MatchTeamNameSize = "normal" | "medium" | "minimum";
+
+/**
+ * Deterministic Match-only typography tier.
+ *
+ * The configured display name remains one label and one line. Short names keep
+ * the density architecture's normal size; longer labels receive progressively
+ * smaller caps so they can coexist with the reserved Match logo slot without
+ * runtime DOM measurement.
+ */
+export function matchTeamNameSize(label: string): MatchTeamNameSize {
+  const normalizedLength = label.trim().replace(/\s+/g, " ").length;
+  if (normalizedLength <= 18) return "normal";
+  if (normalizedLength <= 25) return "medium";
+  return "minimum";
+}
+
 /** Event-family accent key for the card left stripe. */
 function stripeKey(type: PublishingEventType): string {
   if (type === "MATCH") return "red";
@@ -599,7 +616,13 @@ function MatchSideIdentity({
         showLogos={showLogos}
       />
       <div className={styles.matchTeamText}>
-        <span className={primaryClassName}>{side.clubDisplayName}</span>
+        <span
+          className={primaryClassName}
+          data-match-team-label
+          data-match-name-size={matchTeamNameSize(side.clubDisplayName)}
+        >
+          {side.clubDisplayName}
+        </span>
       </div>
     </div>
   );
@@ -1153,14 +1176,22 @@ function EventCard({
             ) : (
               <>
                 <div className={styles.matchTeamRow} data-testid="match-home-team-row">
-                  <span className={styles.eventTeamMain}>
+                  <span
+                    className={styles.eventTeamMain}
+                    data-match-team-label
+                    data-match-name-size={matchTeamNameSize(event.teamDisplayName ?? "")}
+                  >
                     {event.teamDisplayName}
                   </span>
                 </div>
                 <span className={styles.vsLabel} aria-hidden="true">vs.</span>
                 {event.opponentDisplayName !== null && (
                   <div className={styles.matchTeamRow} data-testid="match-away-team-row">
-                    <span className={styles.eventTeamOpponent}>
+                    <span
+                      className={styles.eventTeamOpponent}
+                      data-match-team-label
+                      data-match-name-size={matchTeamNameSize(event.opponentDisplayName)}
+                    >
                       {event.opponentDisplayName}
                     </span>
                   </div>
