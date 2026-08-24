@@ -146,13 +146,16 @@ describe("Per-board logo setting independence (07E)", () => {
       updatedAt: new Date(),
     } as InboardRow;
 
-    expect(buildBoardConfig(board).logoPresentation).toEqual({
+    expect(buildBoardConfig(board).presentation).toEqual({
       trainingShowLogos: false,
       trainingLogoSize: "SMALL",
       matchShowLogos: true,
       matchLogoSize: "LARGE",
       tournamentShowLogos: true,
       tournamentLogoSize: "XLARGE",
+      trainingFontSize: "LARGE",
+      matchFontSize: "MEDIUM",
+      tournamentFontSize: "LARGE",
     });
   });
 });

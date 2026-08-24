@@ -47,6 +47,12 @@ export type InboardRow = {
   screen1TournamentShowLogos?: boolean;
   /** Screen 1 Tournament logo size preset. */
   screen1TournamentLogoSize?: string;
+  /** Screen 1 Training team-name font size preset. */
+  screen1TrainingFontSize?: string;
+  /** Screen 1 Match team-name font size preset. */
+  screen1MatchFontSize?: string;
+  /** Screen 1 Tournament title font size preset. */
+  screen1TournamentFontSize?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -115,6 +121,9 @@ export type UpdateInfoboardInput = {
   screen1MatchLogoSize?: string;
   screen1TournamentShowLogos?: boolean;
   screen1TournamentLogoSize?: string;
+  screen1TrainingFontSize?: string;
+  screen1MatchFontSize?: string;
+  screen1TournamentFontSize?: string;
 };
 
 /**

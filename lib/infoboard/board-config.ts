@@ -8,7 +8,11 @@
 import type { InboardRow } from "./types";
 import type { InfoboardBoardConfig } from "@/lib/publishing/infoboard/screen1-live-service";
 import {
-  DEFAULT_SCREEN1_LOGO_PRESENTATION,
+  DEFAULT_MATCH_FONT_SIZE,
+  DEFAULT_TOURNAMENT_FONT_SIZE,
+  DEFAULT_TRAINING_FONT_SIZE,
+  DEFAULT_SCREEN1_PRESENTATION,
+  resolveInfoboardFontSize,
   resolveInfoboardLogoSize,
 } from "./screen1-logo-settings";
 
@@ -44,15 +48,27 @@ export function buildBoardConfig(board: InboardRow): InfoboardBoardConfig {
     headerShowTime: board.headerShowTime,
     headerShowDate: board.headerShowDate,
     headerShowWeather: board.headerShowWeather,
-    logoPresentation: {
+    presentation: {
       trainingShowLogos:
-        board.screen1TrainingShowLogos ?? DEFAULT_SCREEN1_LOGO_PRESENTATION.trainingShowLogos,
+        board.screen1TrainingShowLogos ?? DEFAULT_SCREEN1_PRESENTATION.trainingShowLogos,
       trainingLogoSize: resolveInfoboardLogoSize(board.screen1TrainingLogoSize),
-      matchShowLogos: board.screen1MatchShowLogos ?? DEFAULT_SCREEN1_LOGO_PRESENTATION.matchShowLogos,
+      matchShowLogos: board.screen1MatchShowLogos ?? DEFAULT_SCREEN1_PRESENTATION.matchShowLogos,
       matchLogoSize: resolveInfoboardLogoSize(board.screen1MatchLogoSize),
       tournamentShowLogos:
-        board.screen1TournamentShowLogos ?? DEFAULT_SCREEN1_LOGO_PRESENTATION.tournamentShowLogos,
+        board.screen1TournamentShowLogos ?? DEFAULT_SCREEN1_PRESENTATION.tournamentShowLogos,
       tournamentLogoSize: resolveInfoboardLogoSize(board.screen1TournamentLogoSize),
+      trainingFontSize: resolveInfoboardFontSize(
+        board.screen1TrainingFontSize,
+        DEFAULT_TRAINING_FONT_SIZE,
+      ),
+      matchFontSize: resolveInfoboardFontSize(
+        board.screen1MatchFontSize,
+        DEFAULT_MATCH_FONT_SIZE,
+      ),
+      tournamentFontSize: resolveInfoboardFontSize(
+        board.screen1TournamentFontSize,
+        DEFAULT_TOURNAMENT_FONT_SIZE,
+      ),
     },
   };
 }

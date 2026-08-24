@@ -1,4 +1,4 @@
-/**
+﻿/**
  * @vitest-environment jsdom
  */
 
@@ -10,7 +10,7 @@
  *
  * CSS modules are mocked automatically by vitest (each property returns its
  * own name as a string). Tests rely on text content, data attributes, and
- * ARIA semantics — not on computed browser fonts.
+ * ARIA semantics â€” not on computed browser fonts.
  */
 
 import { render, screen, within } from "@testing-library/react";
@@ -62,7 +62,7 @@ import type {
   InfoboardEventPresentationExtension,
 } from "@/components/infoboard/screen1/screen1-presentation-types";
 
-// ── Fixture helpers ───────────────────────────────────────────────────────────
+// â”€â”€ Fixture helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function makeFeed(
   overrides: Partial<InfoboardScreen1Feed> = {},
@@ -125,11 +125,11 @@ function makeEventPresentation(
   return [{ eventId, participantAllocations: allocations }];
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — club logo ────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” club logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — club logo", () => {
+describe("Header â€” club logo", () => {
   it("renders club logo when clubLogoSrc is provided", () => {
     render(
       <InfoboardScreen1
@@ -165,11 +165,11 @@ describe("Header — club logo", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — club name ────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” club name â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — club name", () => {
+describe("Header â€” club name", () => {
   it("renders the tenant name", () => {
     render(
       <InfoboardScreen1
@@ -190,11 +190,11 @@ describe("Header — club name", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — SportClubEvo branding NOT in header ──────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” SportClubEvo branding NOT in header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — no SportClubEvo logo in header", () => {
+describe("Header â€” no SportClubEvo logo in header", () => {
   it("renders header-time-zone and header-date-zone", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     expect(screen.getByTestId("header-time-zone")).toBeTruthy();
@@ -233,11 +233,11 @@ describe("Header — no SportClubEvo logo in header", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — current time ─────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” current time â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — current time", () => {
+describe("Header â€” current time", () => {
   it("renders current time in center when currentTimeIso is provided", () => {
     render(
       <InfoboardScreen1
@@ -246,12 +246,12 @@ describe("Header — current time", () => {
       />,
     );
     const center = screen.getByTestId("header-time-zone");
-    // 08:30Z → 10:30 Europe/Zurich (UTC+2 in summer)
+    // 08:30Z â†’ 10:30 Europe/Zurich (UTC+2 in summer)
     expect(center.textContent).toContain("10:30");
   });
 
   it("uses tenant timezone for current time formatting", () => {
-    // 09:00Z → 11:00 Europe/Zurich (UTC+2)
+    // 09:00Z â†’ 11:00 Europe/Zurich (UTC+2)
     render(
       <InfoboardScreen1
         feed={makeFeed({ tenant: { id: "t", key: "k", name: "Test", timezone: "Europe/Zurich" } })}
@@ -276,11 +276,11 @@ describe("Header — current time", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — date ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” date â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — date", () => {
+describe("Header â€” date", () => {
   it("renders a date derived from feed.displayDate when no currentTimeIso", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     const header = screen.getByTestId("kiosk-shell-header");
@@ -323,11 +323,11 @@ describe("Header — date", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Header — Alexa-safe right zone ────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Header â€” Alexa-safe right zone â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header — Alexa-safe right zone", () => {
+describe("Header â€” Alexa-safe right zone", () => {
   it("right Alexa-safe zone exists", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     const safeZone = screen.getByTestId("alexa-safe-zone");
@@ -368,9 +368,9 @@ describe("Header — Alexa-safe right zone", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Board title ───────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Board title â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Board title", () => {
   it("no implicit subtitle when no headerConfig provided (no fallback text)", () => {
@@ -400,11 +400,11 @@ describe("Board title", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Event list — flat model (no section containers) ───────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Event list â€” flat model (no section containers) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Event list — flat model", () => {
+describe("Event list â€” flat model", () => {
   it("renders event-list container", () => {
     render(
       <InfoboardScreen1
@@ -452,23 +452,23 @@ describe("Event list — flat model", () => {
     expect(headings).toHaveLength(0);
   });
 
-  it("no ALS NÄCHSTES section heading rendered", () => {
+  it("no ALS NÃ„CHSTES section heading rendered", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({ next: [makeEvent()], isEmpty: false })}
       />,
     );
-    const headings = screen.queryAllByRole("heading", { name: "ALS NÄCHSTES" });
+    const headings = screen.queryAllByRole("heading", { name: "ALS NÃ„CHSTES" });
     expect(headings).toHaveLength(0);
   });
 
-  it("no SPÄTER HEUTE section heading rendered", () => {
+  it("no SPÃ„TER HEUTE section heading rendered", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({ later: [makeEvent()], isEmpty: false })}
       />,
     );
-    const headings = screen.queryAllByRole("heading", { name: "SPÄTER HEUTE" });
+    const headings = screen.queryAllByRole("heading", { name: "SPÃ„TER HEUTE" });
     expect(headings).toHaveLength(0);
   });
 
@@ -500,11 +500,11 @@ describe("Event list — flat model", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Temporal status labels ────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Temporal status labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Temporal status — JETZT label", () => {
+describe("Temporal status â€” JETZT label", () => {
   it("current event row shows JETZT inline status label", () => {
     const feed = makeFeed({ current: [makeEvent({ id: "c1" })], isEmpty: false });
     render(<InfoboardScreen1 feed={feed} />);
@@ -526,8 +526,8 @@ describe("Temporal status — JETZT label", () => {
   });
 });
 
-describe("Temporal status — next label (no countdown)", () => {
-  it("next event always shows ALS NÄCHSTES (never countdown) when currentTimeIso provided", () => {
+describe("Temporal status â€” next label (no countdown)", () => {
+  it("next event always shows ALS NÃ„CHSTES (never countdown) when currentTimeIso provided", () => {
     const feed = makeFeed({
       next: [makeEvent({ id: "n1", startAt: "2026-09-12T16:00:00.000Z" })],
       isEmpty: false,
@@ -539,17 +539,17 @@ describe("Temporal status — next label (no countdown)", () => {
       />,
     );
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toBe("ALS NÄCHSTES");
+    expect(label.textContent).toBe("ALS NÃ„CHSTES");
   });
 
-  it("next event shows ALS NÄCHSTES when currentTimeIso is not provided", () => {
+  it("next event shows ALS NÃ„CHSTES when currentTimeIso is not provided", () => {
     const feed = makeFeed({
       next: [makeEvent({ id: "n1" })],
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toBe("ALS NÄCHSTES");
+    expect(label.textContent).toBe("ALS NÃ„CHSTES");
   });
 
   it("next label has next status data attribute", () => {
@@ -601,7 +601,7 @@ describe("No countdown text", () => {
   });
 });
 
-describe("Temporal status — later rows unlabeled", () => {
+describe("Temporal status â€” later rows unlabeled", () => {
   it("later event row has no status label", () => {
     const feed = makeFeed({ later: [makeEvent({ id: "l1" })], isEmpty: false });
     render(<InfoboardScreen1 feed={feed} />);
@@ -610,9 +610,9 @@ describe("Temporal status — later rows unlabeled", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Training rows ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Training rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Training row", () => {
   it("renders team name", () => {
@@ -729,9 +729,9 @@ describe("Training row", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Match rows ────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Match rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Match row", () => {
   it("renders home team name", () => {
@@ -818,7 +818,7 @@ describe("Match row", () => {
     render(<InfoboardScreen1 feed={feed} />);
     const matchAlloc = screen.getByTestId("match-allocation");
     const text = matchAlloc.textContent ?? "";
-    // "Kabine HOME" → stripped to "HOME"; "Kabine AWAY" → stripped to "AWAY"
+    // "Kabine HOME" â†’ stripped to "HOME"; "Kabine AWAY" â†’ stripped to "AWAY"
     const homeIdx = text.indexOf("HOME");
     const awayIdx = text.indexOf("AWAY");
     expect(homeIdx).not.toBe(-1);
@@ -857,7 +857,7 @@ describe("Match row", () => {
     const row = screen.getByTestId("event-row");
     expect(row.textContent).not.toContain("SCHIRI");
     expect(row.textContent).not.toContain("Kabine C");
-    // Room values are stripped of the "Kabine " prefix — verify home/away rooms are present
+    // Room values are stripped of the "Kabine " prefix â€” verify home/away rooms are present
     const matchAlloc = screen.getByTestId("match-allocation");
     expect(matchAlloc.textContent).toContain("E1");
     expect(matchAlloc.textContent).toContain("E2");
@@ -946,9 +946,9 @@ describe("Match row", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Tournament rows — 4-team allocation ───────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Tournament rows â€” 4-team allocation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("4-team tournament allocation", () => {
   it("renders event row once", () => {
@@ -997,7 +997,7 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans
     expect(within(block).getByText("A")).toBeTruthy();
     expect(within(block).getByText("B")).toBeTruthy();
     expect(within(block).getByText("C")).toBeTruthy();
@@ -1033,7 +1033,7 @@ describe("4-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    // Block contains team names and room values — header row not required in new card design
+    // Block contains team names and room values â€” header row not required in new card design
     expect(block.textContent).toContain("FC Allschwil E1");
     // Room value "A" (stripped from "Kabine A") is in a standalone span within the block
     expect(within(block).getByText("A")).toBeTruthy();
@@ -1067,7 +1067,7 @@ describe("4-team tournament allocation", () => {
         eventPresentation={PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS}
       />,
     );
-    // Team names appear in kabinen allocation block only — not beside logos.
+    // Team names appear in kabinen allocation block only â€” not beside logos.
     expect(screen.getAllByText("FC Allschwil E1").length).toBeGreaterThan(0);
     expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
@@ -1099,7 +1099,7 @@ describe("4-team tournament allocation", () => {
   });
 });
 
-describe("Tournament logo strip alignment — INFOBOARD-LOGO-08A", () => {
+describe("Tournament logo strip alignment â€” INFOBOARD-LOGO-08A", () => {
   function renderTournamentWithLogoCount(count: number) {
     const allocations = PREVIEW_TOURNAMENT_4TEAM_EXTENSIONS[0].participantAllocations
       .slice(0, count)
@@ -1147,9 +1147,9 @@ describe("Tournament logo strip alignment — INFOBOARD-LOGO-08A", () => {
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Tournament rows — 6-team allocation ───────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Tournament rows â€” 6-team allocation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("6-team tournament allocation", () => {
   it("renders all six team names", () => {
@@ -1176,7 +1176,7 @@ describe("6-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans
     expect(within(block).getByText("A")).toBeTruthy();
     expect(within(block).getByText("B")).toBeTruthy();
     expect(within(block).getByText("C")).toBeTruthy();
@@ -1185,7 +1185,7 @@ describe("6-team tournament allocation", () => {
     expect(within(block).getByText("F")).toBeTruthy();
   });
 
-  it("no allocation row is omitted — all 6 teams visible", () => {
+  it("no allocation row is omitted â€” all 6 teams visible", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_6TEAM}
@@ -1241,9 +1241,9 @@ describe("6-team tournament allocation", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Target 5-team tournament (Sommer-Cup Junioren E) ─────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Target 5-team tournament (Sommer-Cup Junioren E) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Target 5-team tournament allocation", () => {
   it("renders all five team names in participant block", () => {
@@ -1254,7 +1254,7 @@ describe("Target 5-team tournament allocation", () => {
         eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
       />,
     );
-    // Use the participant block to scope the query — "FC Binningen E1" also
+    // Use the participant block to scope the query â€” "FC Binningen E1" also
     // appears in the match row's allocation section (away team name).
     const block = screen.getByTestId("participant-allocation-block");
     expect(block.textContent).toContain("FC Binningen E1");
@@ -1273,7 +1273,7 @@ describe("Target 5-team tournament allocation", () => {
       />,
     );
     const block = screen.getByTestId("participant-allocation-block");
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans
     expect(within(block).getByText("01")).toBeTruthy();
     expect(within(block).getByText("02")).toBeTruthy();
     expect(within(block).getByText("03")).toBeTruthy();
@@ -1282,11 +1282,11 @@ describe("Target 5-team tournament allocation", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Many simultaneous events — flat list visibility ───────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Many simultaneous events â€” flat list visibility â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("High-density — 6 simultaneous trainings (flat list)", () => {
+describe("High-density â€” 6 simultaneous trainings (flat list)", () => {
   it("all 6 teams remain individually visible (club prefix stripped in V2)", () => {
     // INFOBOARD-V2: "FC Allschwil" prefix is stripped since header establishes club identity.
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
@@ -1310,7 +1310,7 @@ describe("High-density — 6 simultaneous trainings (flat list)", () => {
 
   it("all 6 dressing rooms remain visible", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans
     expect(screen.getByText("A")).toBeTruthy();
     expect(screen.getByText("B")).toBeTruthy();
     expect(screen.getByText("C")).toBeTruthy();
@@ -1319,14 +1319,14 @@ describe("High-density — 6 simultaneous trainings (flat list)", () => {
     expect(screen.getByText("F")).toBeTruthy();
   });
 
-  it("renders 1 aggregated group card (6 simultaneous trainings → 1 card)", () => {
+  it("renders 1 aggregated group card (6 simultaneous trainings â†’ 1 card)", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
     const rows = screen.getAllByTestId("event-row");
     expect(rows).toHaveLength(1);
   });
 });
 
-describe("High-density — 4 simultaneous events visibility", () => {
+describe("High-density â€” 4 simultaneous events visibility", () => {
   const FOUR_TEAM_FEED: InfoboardScreen1Feed = {
     generatedAt: "2026-09-12T08:30:00.000Z",
     tenant: { id: "t", key: "k", name: "Test", timezone: "Europe/Zurich" },
@@ -1363,7 +1363,7 @@ describe("High-density — 4 simultaneous events visibility", () => {
 
   it("all 4 dressing rooms remain visible", () => {
     render(<InfoboardScreen1 feed={FOUR_TEAM_FEED} />);
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans
     expect(screen.getByText("A")).toBeTruthy();
     expect(screen.getByText("B")).toBeTruthy();
     expect(screen.getByText("C")).toBeTruthy();
@@ -1371,11 +1371,11 @@ describe("High-density — 4 simultaneous events visibility", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Announcement bar / footer ─────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Announcement bar / footer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Announcement bar — enabled", () => {
+describe("Announcement bar â€” enabled", () => {
   it("renders when enabled is true and text is non-blank", () => {
     const ann: InfoboardAnnouncementPresentation = {
       enabled: true,
@@ -1390,12 +1390,12 @@ describe("Announcement bar — enabled", () => {
   it("renders the announcement text", () => {
     const ann: InfoboardAnnouncementPresentation = {
       enabled: true,
-      text: "TEST ANKÜNDIGUNG HIER",
+      text: "TEST ANKÃœNDIGUNG HIER",
       backgroundColor: null,
       textColor: null,
     };
     render(<InfoboardScreen1 feed={makeFeed()} announcement={ann} />);
-    expect(screen.getByText("TEST ANKÜNDIGUNG HIER")).toBeTruthy();
+    expect(screen.getByText("TEST ANKÃœNDIGUNG HIER")).toBeTruthy();
   });
 
   it("text appears only once (not duplicated)", () => {
@@ -1446,7 +1446,7 @@ describe("Announcement bar — enabled", () => {
   });
 });
 
-describe("Announcement bar — disabled", () => {
+describe("Announcement bar â€” disabled", () => {
   it("hidden when enabled is false", () => {
     const ann: InfoboardAnnouncementPresentation = {
       enabled: false,
@@ -1497,7 +1497,7 @@ describe("Announcement bar — disabled", () => {
   });
 });
 
-describe("Announcement bar — no hardcoded slogan", () => {
+describe("Announcement bar â€” no hardcoded slogan", () => {
   it("component does not hardcode any club slogan when no announcement is provided", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     expect(screen.queryByText(/FAIRNESS/i)).toBeNull();
@@ -1518,7 +1518,7 @@ describe("Announcement bar — no hardcoded slogan", () => {
   });
 });
 
-describe("Announcement bar — color fallbacks", () => {
+describe("Announcement bar â€” color fallbacks", () => {
   it("renders without inline styles when both colors are null (uses CSS defaults)", () => {
     const ann: InfoboardAnnouncementPresentation = {
       enabled: true,
@@ -1534,20 +1534,20 @@ describe("Announcement bar — color fallbacks", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Footer — product branding ─────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Footer â€” product branding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Footer — product branding", () => {
+describe("Footer â€” product branding", () => {
   it("renders product-branding element in footer", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     expect(screen.getByTestId("product-branding")).toBeTruthy();
   });
 
-  it("renders POWERED BY text in footer", () => {
+  it("renders SportClubEvo logo in footer", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     const branding = screen.getByTestId("product-branding");
-    expect(branding.textContent).toContain("POWERED BY");
+    expect(branding.querySelector('img[alt="SportClubEvo"]')).toHaveAttribute("src", "/images/branding/sportclubevo_logo_alt.png");
   });
 
   it("renders product logo image when productLogoSrc is provided", () => {
@@ -1598,17 +1598,17 @@ describe("Footer — product branding", () => {
     const root = screen.getByTestId("infoboard-screen1-root");
     const text = root.textContent ?? "";
     const headerIdx = text.indexOf("Test Club"); // club name in header
-    const brandingIdx = text.indexOf("POWERED BY");
-    // POWERED BY must appear after the club name (footer is below header)
+    const brandingIdx = screen.getByTestId("product-branding").querySelector('img[alt="SportClubEvo"]') ? text.length : -1;
+    // Product branding must appear after the club name (footer is below header)
     expect(brandingIdx).toBeGreaterThan(headerIdx);
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Referee removal regression ────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Referee removal regression â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Referee removal — no SCHIRI anywhere", () => {
+describe("Referee removal â€” no SCHIRI anywhere", () => {
   it("SCHIRI does not appear for match in current", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "MATCH", teamDisplayName: "FC Test", opponentDisplayName: "FC Other", allocation: { pitchLabel: "Stadion", homeDressingRoomLabel: "K1", awayDressingRoomLabel: "K2", refereeDressingRoomLabel: "K-SCHIRI" } })],
@@ -1636,15 +1636,15 @@ describe("Referee removal — no SCHIRI anywhere", () => {
     });
     render(<InfoboardScreen1 feed={feed} />);
     expect(screen.queryByText("Kabine C")).toBeNull();
-    // Room values are stripped of "Kabine " prefix — verify home/away rooms visible
+    // Room values are stripped of "Kabine " prefix â€” verify home/away rooms visible
     expect(screen.getByText("E1")).toBeTruthy();
     expect(screen.getByText("E2")).toBeTruthy();
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Event-type labels ─────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Event-type labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Event-type labels", () => {
   it("renders TRAINING label for TRAINING events", () => {
@@ -1693,9 +1693,9 @@ describe("Event-type labels", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Empty states ──────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Empty states â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Empty states", () => {
   it("renders empty-state-full when feed is empty", () => {
@@ -1718,9 +1718,9 @@ describe("Empty states", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Purity ────────────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Purity â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Purity", () => {
   it("does not mutate the feed input", () => {
@@ -1796,11 +1796,11 @@ describe("Purity", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04A: Dark theme ────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-04A: Dark theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Dark theme — INFOBOARD-04A", () => {
+describe("Dark theme â€” INFOBOARD-04A", () => {
   it("root element has data-theme='dark' attribute by default", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     const root = screen.getByTestId("infoboard-screen1-root");
@@ -1836,11 +1836,11 @@ describe("Dark theme — INFOBOARD-04A", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-INTEGRATION-01B: Light theme ───────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-INTEGRATION-01B: Light theme â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
+describe("Light theme â€” INFOBOARD-INTEGRATION-01B", () => {
   it("root element has data-theme='light' attribute when theme='LIGHT'", () => {
     render(<InfoboardScreen1 feed={makeFeed()} theme="LIGHT" />);
     const root = screen.getByTestId("infoboard-screen1-root");
@@ -1902,7 +1902,7 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
     );
     const lightText = lightContainer.textContent;
 
-    // Same underlying content — only the data-theme attribute (and CSS) differs.
+    // Same underlying content â€” only the data-theme attribute (and CSS) differs.
     expect(darkText).toBe(lightText);
   });
 
@@ -1938,9 +1938,9 @@ describe("Light theme — INFOBOARD-INTEGRATION-01B", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04A: Unassigned warnings (amber) ───────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-04A: Unassigned warnings (amber) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Unassigned pitch warning", () => {
   it("shows NICHT ZUGETEILT when pitch is null (training uses TrainingGroupCard in V2)", () => {
@@ -1990,9 +1990,9 @@ describe("Unassigned dressing-room warning (training)", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04A: No interaction affordances ────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-04A: No interaction affordances â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("No interaction affordances", () => {
   it("no clickable arrow or chevron button in event rows", () => {
@@ -2010,9 +2010,9 @@ describe("No interaction affordances", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Missing / null data safety ────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Missing / null data safety â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Missing and optional data safety", () => {
   it("no null string rendered for training with null organizer", () => {
@@ -2076,11 +2076,11 @@ describe("Missing and optional data safety", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-04B: Card-based layout requirements ────────────────────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-04B: Card-based layout requirements â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Card-based layout — no table-row appearance", () => {
+describe("Card-based layout â€” no table-row appearance", () => {
   it("event-list is a <ul> element (not <table>)", () => {
     render(
       <InfoboardScreen1
@@ -2126,7 +2126,7 @@ describe("Card-based layout — no table-row appearance", () => {
   });
 });
 
-describe("Match logo placement — INFOBOARD-LOGO-02", () => {
+describe("Match logo placement â€” INFOBOARD-LOGO-02", () => {
   it("home team row shows club logo when matchPresentation provides one", () => {
     const feed = makeFeed({
       current: [makeEvent({
@@ -2245,7 +2245,7 @@ describe("Match logo placement — INFOBOARD-LOGO-02", () => {
 });
 
 describe("Adaptive event count marker", () => {
-  it("1 event → data-count=1 on event list", () => {
+  it("1 event â†’ data-count=1 on event list", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({ current: [makeEvent()], isEmpty: false })}
@@ -2254,7 +2254,7 @@ describe("Adaptive event count marker", () => {
     expect(screen.getByTestId("event-list").getAttribute("data-count")).toBe("1");
   });
 
-  it("3 events → data-count=3 on event list", () => {
+  it("3 events â†’ data-count=3 on event list", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({
@@ -2295,7 +2295,7 @@ describe("No interaction affordances (INFOBOARD-04B)", () => {
   });
 });
 
-describe("Alexa safe zone — INFOBOARD-04B", () => {
+describe("Alexa safe zone â€” INFOBOARD-04B", () => {
   it("alexa-safe-zone is empty in full preview", () => {
     render(
       <InfoboardScreen1
@@ -2309,11 +2309,11 @@ describe("Alexa safe zone — INFOBOARD-04B", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── Training group card — aggregation (spec-required focused tests) ───────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Training group card â€” aggregation (spec-required focused tests) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Training aggregation — same-start-time trainings collapse into one card", () => {
+describe("Training aggregation â€” same-start-time trainings collapse into one card", () => {
   it("two trainings at the same startAt produce one event-row card, not two", () => {
     const feed = makeFeed({
       current: [
@@ -2343,19 +2343,19 @@ describe("Training aggregation — same-start-time trainings collapse into one c
     expect(rows).toHaveLength(1);
   });
 
-  it("PREVIEW_FIXTURE_TRAINING_GROUPS: 3 start-times → 3 rendered cards (group A + match + group B)", () => {
+  it("PREVIEW_FIXTURE_TRAINING_GROUPS: 3 start-times â†’ 3 rendered cards (group A + match + group B)", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
     const rows = screen.getAllByTestId("event-row");
     expect(rows).toHaveLength(3);
   });
 });
 
-describe("Training aggregation — team, pitch, and kabine remain individually visible", () => {
+describe("Training aggregation â€” team, pitch, and kabine remain individually visible", () => {
   it("team names are visible inside the group card with club prefix stripped (V2)", () => {
     // INFOBOARD-V2: The club name (tenant.name = "FC Allschwil") is stripped from the
     // start of team display names since the header already establishes club identity.
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
-    // Stripped: "FC Allschwil D7 D1" → "D7 D1"
+    // Stripped: "FC Allschwil D7 D1" â†’ "D7 D1"
     expect(screen.getByText("D7 D1")).toBeTruthy();
     expect(screen.getByText("D7 D2")).toBeTruthy();
     expect(screen.getByText("Junioren E1")).toBeTruthy();
@@ -2375,7 +2375,7 @@ describe("Training aggregation — team, pitch, and kabine remain individually v
 
   it("all kabine values are visible inside group rows", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_TRAINING_GROUPS} />);
-    // Room values are stripped of "Kabine " prefix — rendered as standalone spans in the KABINE zone
+    // Room values are stripped of "Kabine " prefix â€” rendered as standalone spans in the KABINE zone
     // event-rows[0] is the first training group (D7 D1, D7 D2, Junioren E1)
     // with rooms "3" (stripped from "Kabine 3") and "4" (stripped from "Kabine 4")
     const rows = screen.getAllByTestId("event-row");
@@ -2397,7 +2397,7 @@ describe("Training aggregation — team, pitch, and kabine remain individually v
   });
 });
 
-describe("Training aggregation — different start times stay as separate cards", () => {
+describe("Training aggregation â€” different start times stay as separate cards", () => {
   it("two trainings with different startAt values produce two separate event-row cards", () => {
     const feed = makeFeed({
       current: [
@@ -2426,7 +2426,7 @@ describe("Training aggregation — different start times stay as separate cards"
   });
 });
 
-describe("Training aggregation — non-training activities are not merged", () => {
+describe("Training aggregation â€” non-training activities are not merged", () => {
   it("a MATCH at the same startAt as trainings is NOT merged into the training group", () => {
     const feed = makeFeed({
       current: [
@@ -2437,7 +2437,7 @@ describe("Training aggregation — non-training activities are not merged", () =
       isEmpty: false,
     });
     render(<InfoboardScreen1 feed={feed} />);
-    // Match renders as individual EventCard, trainings as one group → 2 cards
+    // Match renders as individual EventCard, trainings as one group â†’ 2 cards
     const rows = screen.getAllByTestId("event-row");
     expect(rows).toHaveLength(2);
     // Match identity still visible
@@ -2468,7 +2468,7 @@ describe("Training aggregation — non-training activities are not merged", () =
   });
 });
 
-describe("Training aggregation — missing allocation warning remains visible", () => {
+describe("Training aggregation â€” missing allocation warning remains visible", () => {
   it("a team with null pitch inside a group shows the unassigned pitch warning", () => {
     const feed = makeFeed({
       current: [
@@ -2501,11 +2501,11 @@ describe("Training aggregation — missing allocation warning remains visible", 
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-FINAL: Physical-TV density + alignment regression ───────────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-FINAL: Physical-TV density + alignment regression â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Physical-TV fit — dense layout renders all required events", () => {
+describe("Physical-TV fit â€” dense layout renders all required events", () => {
   it("full 5-event preview fixture renders exactly 5 cards (no clipping)", () => {
     render(
       <InfoboardScreen1
@@ -2554,7 +2554,7 @@ describe("Physical-TV fit — dense layout renders all required events", () => {
   });
 });
 
-describe("Physical-TV alignment — MATCH info fields preserved", () => {
+describe("Physical-TV alignment â€” MATCH info fields preserved", () => {
   const MATCH_FEED = makeFeed({
     current: [
       makeEvent({
@@ -2602,7 +2602,7 @@ describe("Physical-TV alignment — MATCH info fields preserved", () => {
 
   it("MATCH card preserves dressing room values", () => {
     render(<InfoboardScreen1 feed={MATCH_FEED} />);
-    // formatDressingRoomLabel strips the "Kabine " prefix — values render as "E1", "E2"
+    // formatDressingRoomLabel strips the "Kabine " prefix â€” values render as "E1", "E2"
     const root = screen.getByTestId("infoboard-screen1-root");
     const matchAlloc = root.querySelector('[data-testid="match-allocation"]');
     expect(matchAlloc).not.toBeNull();
@@ -2622,7 +2622,7 @@ describe("Physical-TV alignment — MATCH info fields preserved", () => {
   });
 });
 
-describe("Physical-TV alignment — TOURNAMENT info fields preserved", () => {
+describe("Physical-TV alignment â€” TOURNAMENT info fields preserved", () => {
   it("TOURNAMENT card has data-type=TOURNAMENT", () => {
     render(
       <InfoboardScreen1
@@ -2675,7 +2675,7 @@ describe("Physical-TV alignment — TOURNAMENT info fields preserved", () => {
   });
 });
 
-describe("Physical-TV alignment — internal grid structure for Meisterschaft/Turnier, Kabine, Platz", () => {
+describe("Physical-TV alignment â€” internal grid structure for Meisterschaft/Turnier, Kabine, Platz", () => {
   it("MATCH event zones use grid layout (alignment structure present)", () => {
     render(
       <InfoboardScreen1
@@ -2753,7 +2753,7 @@ describe("Physical-TV alignment — internal grid structure for Meisterschaft/Tu
   });
 });
 
-describe("Header/Footer regression — kiosk shell unchanged", () => {
+describe("Header/Footer regression â€” kiosk shell unchanged", () => {
   it("InfoboardScreen1 still renders kiosk-shell-header", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
     expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();
@@ -2773,12 +2773,12 @@ describe("Header/Footer regression — kiosk shell unchanged", () => {
     expect(screen.getByTestId("kiosk-shell-header").textContent).toContain("FC Musterklub");
   });
 
-  it("InfoboardScreen1 footer still contains POWERED BY", () => {
+  it("InfoboardScreen1 footer contains SportClubEvo branding", () => {
     render(<InfoboardScreen1 feed={makeFeed()} />);
-    expect(screen.getByTestId("product-branding").textContent).toContain("POWERED BY");
+    expect(screen.getByTestId("product-branding").querySelector('img[alt="SportClubEvo"]')).toHaveAttribute("src", "/images/branding/sportclubevo_logo_alt.png");
   });
 
-  it("Header/Footer — kiosk shell headers/footers not changed by demand engine", () => {
+  it("Header/Footer â€” kiosk shell headers/footers not changed by demand engine", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} currentTimeIso={PREVIEW_CURRENT_TIME_ISO} />);
     // Header and footer still present, unchanged
     expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();
@@ -2811,14 +2811,14 @@ describe("Header/Footer regression — kiosk shell unchanged", () => {
   });
 });
 
-// ── Content-demand layout engine — unit tests ─────────────────────────────────
+// â”€â”€ Content-demand layout engine â€” unit tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Content-demand — computeTrainingGroupDemand", () => {
-  it("1-row training demand = base + 1×row", () => {
+describe("Content-demand â€” computeTrainingGroupDemand", () => {
+  it("1-row training demand = base + 1Ã—row", () => {
     expect(computeTrainingGroupDemand(1)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 1 * CARD_DEMAND_TRAINING_ROW);
   });
 
-  it("2-row training demand = base + 2×row", () => {
+  it("2-row training demand = base + 2Ã—row", () => {
     expect(computeTrainingGroupDemand(2)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 2 * CARD_DEMAND_TRAINING_ROW);
   });
 
@@ -2850,7 +2850,7 @@ describe("Content-demand — computeTrainingGroupDemand", () => {
   });
 });
 
-describe("Content-demand — computeEventDemand", () => {
+describe("Content-demand â€” computeEventDemand", () => {
   it("match demand equals CARD_DEMAND_MATCH constant", () => {
     expect(computeEventDemand("MATCH")).toBeCloseTo(CARD_DEMAND_MATCH);
   });
@@ -2877,7 +2877,7 @@ describe("Content-demand — computeEventDemand", () => {
   });
 });
 
-describe("Content-demand — computeMatchDemand", () => {
+describe("Content-demand â€” computeMatchDemand", () => {
   it("simple match without sub-team lines gets baseline demand", () => {
     const event = makeEvent({
       type: "MATCH",
@@ -3025,7 +3025,7 @@ describe("Content-demand — computeMatchDemand", () => {
   });
 });
 
-describe("Content-demand — computeMatchContentSafeMinimum", () => {
+describe("Content-demand â€” computeMatchContentSafeMinimum", () => {
   it("content-safe minimum equals semantic match demand", () => {
     const event = makeEvent({
       type: "MATCH",
@@ -3104,7 +3104,7 @@ describe("Content-demand — computeMatchContentSafeMinimum", () => {
   });
 });
 
-describe("Content-demand — computeTournamentDemand", () => {
+describe("Content-demand â€” computeTournamentDemand", () => {
   it("small tournament with no participants gets base demand", () => {
     expect(computeTournamentDemand(undefined)).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE);
     expect(computeTournamentDemand([])).toBeCloseTo(CARD_DEMAND_TOURNAMENT_BASE);
@@ -3156,7 +3156,7 @@ describe("Content-demand — computeTournamentDemand", () => {
   });
 });
 
-describe("Content-demand — training regression (unchanged)", () => {
+describe("Content-demand â€” training regression (unchanged)", () => {
   it("1-row training demand unchanged", () => {
     expect(computeTrainingGroupDemand(1)).toBeCloseTo(
       CARD_DEMAND_TRAINING_BASE + CARD_DEMAND_TRAINING_ROW,
@@ -3170,7 +3170,7 @@ describe("Content-demand — training regression (unchanged)", () => {
   });
 });
 
-describe("Content-demand — layout mode and pagination", () => {
+describe("Content-demand â€” layout mode and pagination", () => {
   it("sparse simple match stays sparse", () => {
     const event = makeEvent({ type: "MATCH", endAt: null });
     expect(layoutModeTier(computeMatchDemand(event))).toBe("sparse");
@@ -3244,24 +3244,24 @@ describe("Content-demand — layout mode and pagination", () => {
   });
 });
 
-describe("Content-demand — densityTier", () => {
-  it("low total demand → normal tier", () => {
+describe("Content-demand â€” densityTier", () => {
+  it("low total demand â†’ normal tier", () => {
     expect(densityTier(4)).toBe("normal");
     expect(densityTier(8)).toBe("normal");
   });
 
-  it("moderate total demand → dense tier", () => {
+  it("moderate total demand â†’ dense tier", () => {
     expect(densityTier(8.1)).toBe("dense");
     expect(densityTier(11)).toBe("dense");
   });
 
-  it("high total demand → ultra tier", () => {
+  it("high total demand â†’ ultra tier", () => {
     expect(densityTier(11.1)).toBe("ultra");
     expect(densityTier(15)).toBe("ultra");
   });
 });
 
-describe("Content-demand — paginateDisplayList", () => {
+describe("Content-demand â€” paginateDisplayList", () => {
   function makeTrainingItem(rowCount: number): DisplayItem {
     const items: FlatEvent[] = Array.from({ length: rowCount }, (_, i) => ({
       event: {
@@ -3294,11 +3294,11 @@ describe("Content-demand — paginateDisplayList", () => {
     return { kind: "training-group", items, temporal: "current" };
   }
 
-  it("empty list → empty result", () => {
+  it("empty list â†’ empty result", () => {
     expect(paginateDisplayList([], [])).toHaveLength(0);
   });
 
-  it("single item fitting on one page → 1 page", () => {
+  it("single item fitting on one page â†’ 1 page", () => {
     const item = makeTrainingItem(1);
     const demand = [computeTrainingGroupDemand(1)];
     const pages = paginateDisplayList([item], demand, CARD_DEMAND_PAGE_MAX);
@@ -3306,7 +3306,7 @@ describe("Content-demand — paginateDisplayList", () => {
     expect(pages[0]).toHaveLength(1);
   });
 
-  it("items within page limit → 1 page", () => {
+  it("items within page limit â†’ 1 page", () => {
     const items = [
       makeTrainingItem(3),
       makeTrainingItem(2),
@@ -3320,8 +3320,8 @@ describe("Content-demand — paginateDisplayList", () => {
     expect(pages[0]).toHaveLength(2);
   });
 
-  it("high-demand set exceeds page limit → 2 pages", () => {
-    // 3 × 6-row = 3 × 4.30 = 12.90 > PAGE_MAX(12)
+  it("high-demand set exceeds page limit â†’ 2 pages", () => {
+    // 3 Ã— 6-row = 3 Ã— 4.30 = 12.90 > PAGE_MAX(12)
     const items = [
       makeTrainingItem(6),
       makeTrainingItem(6),
@@ -3348,7 +3348,7 @@ describe("Content-demand — paginateDisplayList", () => {
   });
 });
 
-describe("Content-demand — rendered data-card-demand attributes", () => {
+describe("Content-demand â€” rendered data-card-demand attributes", () => {
   it("training-group card has data-card-demand attribute", () => {
     const feed = makeFeed({
       current: [
@@ -3415,7 +3415,7 @@ describe("Content-demand — rendered data-card-demand attributes", () => {
   });
 
   it("cards in mixed list are not all assigned identical demand", () => {
-    // Dense training + match → different demands
+    // Dense training + match â†’ different demands
     const feed = makeFeed({
       current: [
         makeEvent({ id: "t1", startAt: "2026-09-12T08:00:00.000Z", teamDisplayName: "T1" }),
@@ -3453,13 +3453,13 @@ describe("Content-demand — rendered data-card-demand attributes", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
     const row = screen.getByTestId("event-row");
     const demand = parseFloat(row.getAttribute("data-card-demand") ?? "0");
-    // 6-row training: demand = 1.0 + 6×0.55 = 4.30
+    // 6-row training: demand = 1.0 + 6Ã—0.55 = 4.30
     expect(demand).toBeCloseTo(computeTrainingGroupDemand(6), 1);
     expect(demand).toBeGreaterThan(3);
   });
 });
 
-describe("Content-demand — layout contract (MATCH / TOURNAMENT unchanged)", () => {
+describe("Content-demand â€” layout contract (MATCH / TOURNAMENT unchanged)", () => {
   it("MATCH content remains visible under demand model", () => {
     const feed = makeFeed({
       current: [
@@ -3545,24 +3545,24 @@ describe("Content-demand — layout contract (MATCH / TOURNAMENT unchanged)", ()
 });
 
 
-// ── Sparse layout mode regression tests ───────────────────────────────────────
+// â”€â”€ Sparse layout mode regression tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 //
-// INFOBOARD-FINAL-C ADDENDUM — prevents unconstrained full-page card growth on
-// sparse days (1–2 low-demand cards).
+// INFOBOARD-FINAL-C ADDENDUM â€” prevents unconstrained full-page card growth on
+// sparse days (1â€“2 low-demand cards).
 //
 // These tests verify semantic layout mode via the data-layout-mode attribute
 // and CSS custom-property contracts. Pixel heights are not tested because CSS
 // is not applied in jsdom; what matters is that the correct mode and demand
 // values are propagated so the CSS max-height rule engages at runtime.
 
-describe("Sparse layout mode — layoutModeTier", () => {
-  it("demand below threshold → sparse", () => {
+describe("Sparse layout mode â€” layoutModeTier", () => {
+  it("demand below threshold â†’ sparse", () => {
     expect(layoutModeTier(CARD_DEMAND_MATCH)).toBe("sparse");   // 1 simple MATCH
     expect(layoutModeTier(1.55)).toBe("sparse");  // 1-row training
     expect(layoutModeTier(3.9)).toBe("sparse");   // just below threshold
   });
 
-  it("demand at/above threshold → fill", () => {
+  it("demand at/above threshold â†’ fill", () => {
     expect(layoutModeTier(LAYOUT_MODE_SPARSE_THRESHOLD)).toBe("fill");   // exactly at threshold
     expect(layoutModeTier(4.3)).toBe("fill");    // 1 training-group 6 rows
     expect(layoutModeTier(5.0)).toBe("fill");
@@ -3574,8 +3574,8 @@ describe("Sparse layout mode — layoutModeTier", () => {
   });
 });
 
-describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
-  it("one MATCH card → data-layout-mode='sparse'", () => {
+describe("Sparse layout mode â€” event-list data-layout-mode attribute", () => {
+  it("one MATCH card â†’ data-layout-mode='sparse'", () => {
     const feed = makeFeed({
       current: [makeEvent({ id: "m1", type: "MATCH", teamDisplayName: "Home", opponentDisplayName: "Away" })],
       isEmpty: false,
@@ -3585,7 +3585,7 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
     expect(list.getAttribute("data-layout-mode")).toBe("sparse");
   });
 
-  it("one 1-row training card → data-layout-mode='sparse'", () => {
+  it("one 1-row training card â†’ data-layout-mode='sparse'", () => {
     const feed = makeFeed({
       current: [makeEvent({ id: "t1", teamDisplayName: "Solo Training" })],
       isEmpty: false,
@@ -3595,7 +3595,7 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
     expect(list.getAttribute("data-layout-mode")).toBe("sparse");
   });
 
-  it("two simple MATCH cards → data-layout-mode='fill' (content-safe demand exceeds threshold)", () => {
+  it("two simple MATCH cards â†’ data-layout-mode='fill' (content-safe demand exceeds threshold)", () => {
     const feed = makeFeed({
       current: [
         makeEvent({ id: "m1", type: "MATCH", startAt: "2026-09-12T09:00:00.000Z", teamDisplayName: "Home1", opponentDisplayName: "Away1" }),
@@ -3608,13 +3608,13 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
     expect(list.getAttribute("data-layout-mode")).toBe("fill");
   });
 
-  it("one 6-row training group → data-layout-mode='fill' (high demand)", () => {
+  it("one 6-row training group â†’ data-layout-mode='fill' (high demand)", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
     const list = screen.getByTestId("event-list");
     expect(list.getAttribute("data-layout-mode")).toBe("fill");
   });
 
-  it("dense preview fixture → data-layout-mode='fill'", () => {
+  it("dense preview fixture â†’ data-layout-mode='fill'", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE}
@@ -3626,7 +3626,7 @@ describe("Sparse layout mode — event-list data-layout-mode attribute", () => {
   });
 });
 
-describe("Sparse layout mode — demand proportionality preserved", () => {
+describe("Sparse layout mode â€” demand proportionality preserved", () => {
   it("1-row training demand < 6-row training demand", () => {
     const d1Row = computeTrainingGroupDemand(1);
     const d6Row = computeTrainingGroupDemand(6);
@@ -3685,9 +3685,9 @@ describe("Sparse layout mode — demand proportionality preserved", () => {
   });
 });
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ── INFOBOARD-FINAL-C — Screen 1 vertical alignment acceptance tests ──────────
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ INFOBOARD-FINAL-C â€” Screen 1 vertical alignment acceptance tests â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("INFOBOARD-FINAL-C: Match/Tournament shared vertical content-band", () => {
   function makeMatchCard(params: { home?: string; away?: string; competition?: string } = {}) {
@@ -3749,7 +3749,7 @@ describe("INFOBOARD-FINAL-C: Match/Tournament shared vertical content-band", () 
     expect(within(card).getAllByText("PLATZ").length).toBeGreaterThan(0);
   });
 
-  it("Training card renders with data-type=TRAINING (reference — behavior unchanged)", () => {
+  it("Training card renders with data-type=TRAINING (reference â€” behavior unchanged)", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed({
@@ -3922,7 +3922,7 @@ describe("INFOBOARD-FINAL-C: Screen 1 long text / overflow protection", () => {
   });
 });
 
-// ── FC Allschwil physical-TV regression (24 Aug 2026) ─────────────────────────
+// â”€â”€ FC Allschwil physical-TV regression (24 Aug 2026) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const FCA_TIMEZONE = "Europe/Zurich";
 const FCA_NOW_1843 = "2026-08-24T16:43:00.000Z";
@@ -3950,8 +3950,8 @@ function makeFcaTraining(
   });
 }
 
-describe("FC Allschwil regression — Fixture A expired event", () => {
-  it("17:00–18:30 Junioren F2 is NOT rendered at 18:43", () => {
+describe("FC Allschwil regression â€” Fixture A expired event", () => {
+  it("17:00â€“18:30 Junioren F2 is NOT rendered at 18:43", () => {
     const feed = makeFeed({
       tenant: {
         id: "tenant-fca",
@@ -3976,7 +3976,7 @@ describe("FC Allschwil regression — Fixture A expired event", () => {
   });
 });
 
-describe("FC Allschwil regression — Fixture B dense 17:15–18:45 group", () => {
+describe("FC Allschwil regression â€” Fixture B dense 17:15â€“18:45 group", () => {
   const groupStart = "2026-08-24T15:15:00.000Z";
   const groupEnd = "2026-08-24T16:45:00.000Z";
 
@@ -4012,7 +4012,7 @@ describe("FC Allschwil regression — Fixture B dense 17:15–18:45 group", () =
   });
 });
 
-describe("FC Allschwil regression — Fixture C dense 18:45–20:15 group", () => {
+describe("FC Allschwil regression â€” Fixture C dense 18:45â€“20:15 group", () => {
   const groupStart = "2026-08-24T16:45:00.000Z";
   const groupEnd = "2026-08-24T18:15:00.000Z";
 
@@ -4043,7 +4043,7 @@ describe("FC Allschwil regression — Fixture C dense 18:45–20:15 group", () =
   });
 });
 
-describe("FC Allschwil regression — Fixture D boundary visibility", () => {
+describe("FC Allschwil regression â€” Fixture D boundary visibility", () => {
   const training = makeFcaTraining(
     "fca-boundary",
     "Junioren F2",
@@ -4079,13 +4079,13 @@ describe("FC Allschwil regression — Fixture D boundary visibility", () => {
   });
 });
 
-describe("trainingGroupDensityTier — sparse groups unchanged", () => {
-  it("1–3 rows use normal density", () => {
+describe("trainingGroupDensityTier â€” sparse groups unchanged", () => {
+  it("1â€“3 rows use normal density", () => {
     expect(trainingGroupDensityTier(1)).toBe("normal");
     expect(trainingGroupDensityTier(3)).toBe("normal");
   });
 
-  it("4–5 rows use compact density", () => {
+  it("4â€“5 rows use compact density", () => {
     expect(trainingGroupDensityTier(4)).toBe("compact");
     expect(trainingGroupDensityTier(5)).toBe("compact");
   });
@@ -4094,3 +4094,5 @@ describe("trainingGroupDensityTier — sparse groups unchanged", () => {
     expect(trainingGroupDensityTier(6)).toBe("dense");
   });
 });
+
+

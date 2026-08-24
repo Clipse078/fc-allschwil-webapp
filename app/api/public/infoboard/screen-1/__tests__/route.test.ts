@@ -25,6 +25,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   tenantFindFirst: vi.fn(),
   buildScreen1LivePayload: vi.fn(),
+  getInfoboardBySlug: vi.fn(),
+  buildBoardConfig: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -50,6 +52,14 @@ vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
     buildScreen1LivePayload: mocks.buildScreen1LivePayload,
   };
 });
+
+vi.mock("@/lib/infoboard/queries", () => ({
+  getInfoboardBySlug: mocks.getInfoboardBySlug,
+}));
+
+vi.mock("@/lib/infoboard/board-config", () => ({
+  buildBoardConfig: mocks.buildBoardConfig,
+}));
 
 import { GET } from "../route";
 
@@ -108,6 +118,7 @@ describe("GET /api/public/infoboard/screen-1", () => {
     vi.clearAllMocks();
     mocks.tenantFindFirst.mockResolvedValue(ACTIVE_TENANT);
     mocks.buildScreen1LivePayload.mockResolvedValue(MOCK_PAYLOAD);
+    mocks.getInfoboardBySlug.mockResolvedValue(null);
   });
 
   describe("successful response", () => {
@@ -147,6 +158,30 @@ describe("GET /api/public/infoboard/screen-1", () => {
       const response = await GET(makeRequest());
       const body = await response.json();
       expect(body.feed.tenant.name).toBe("FC Allschwil");
+    });
+
+    it("passes the tenant-scoped screen-1 board presentation to the live service", async () => {
+      const board = { id: "board-1", tenantId: "tenant-fca" };
+      const boardConfig = {
+        presentation: {
+          trainingFontSize: "LARGE",
+          matchFontSize: "SMALL",
+          tournamentFontSize: "XLARGE",
+        },
+      };
+      mocks.getInfoboardBySlug.mockResolvedValue(board);
+      mocks.buildBoardConfig.mockReturnValue(boardConfig);
+
+      await GET(makeRequest());
+
+      expect(mocks.getInfoboardBySlug).toHaveBeenCalledWith(
+        "screen-1",
+        "tenant-fca",
+      );
+      expect(mocks.buildBoardConfig).toHaveBeenCalledWith(board);
+      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
+        expect.objectContaining({ boardConfig }),
+      );
     });
   });
 

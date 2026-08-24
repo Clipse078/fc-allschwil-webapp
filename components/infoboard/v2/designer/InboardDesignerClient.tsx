@@ -70,6 +70,7 @@ import {
   type AnnouncementWidgetSettings,
 } from "@/lib/infoboard/widget-types";
 import type { InboardRow } from "@/lib/infoboard/types";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -566,6 +567,7 @@ export function InboardDesignerClient({
             theme={board.displayTheme as "DARK" | "LIGHT" | null}
             headerConfig={previewHeaderConfig}
             announcement={previewAnnouncement}
+            presentation={buildBoardConfig(board).presentation}
             onWidgetSelect={setSelectedWidget}
             onLayoutChange={handleCanvasLayoutChange}
             className="border border-[var(--border)] shadow-sm"

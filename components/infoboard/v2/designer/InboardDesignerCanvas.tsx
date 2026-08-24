@@ -42,6 +42,7 @@ import {
   type InboardLayout,
 } from "@/lib/infoboard/widget-types";
 import type { InfoboardDisplayTheme } from "@/lib/publishing/infoboard/display-theme";
+import type { Screen1PresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -93,6 +94,7 @@ export type InboardDesignerCanvasProps = {
     bgColor: string | null;
     textColor: string | null;
   } | null;
+  presentation?: Screen1PresentationConfig;
   /** Called when user clicks/selects a widget on the canvas */
   onWidgetSelect: (type: WidgetType) => void;
   /** Called when a valid move/resize is committed */
@@ -143,6 +145,7 @@ export function InboardDesignerCanvas({
   theme,
   headerConfig,
   announcement,
+  presentation,
   onWidgetSelect,
   onLayoutChange,
   className = "",
@@ -412,6 +415,7 @@ export function InboardDesignerCanvas({
         theme={theme}
         headerConfig={headerConfig}
         announcement={announcement}
+        presentation={presentation}
         className="absolute inset-0 w-full h-full rounded-none"
       />
 

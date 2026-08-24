@@ -214,26 +214,29 @@ describe("buildScreen1LivePayload", () => {
     });
   });
 
-  describe("per-board logo presentation", () => {
+  describe("per-board Screen 1 presentation", () => {
     it("passes independent Training, Match, and Tournament settings to Screen 1", async () => {
       const loader = makeEmptyLoader();
-      const logoPresentation = {
+      const presentation = {
         trainingShowLogos: false,
         trainingLogoSize: "SMALL" as const,
         matchShowLogos: true,
         matchLogoSize: "LARGE" as const,
         tournamentShowLogos: true,
         tournamentLogoSize: "XLARGE" as const,
+        trainingFontSize: "LARGE" as const,
+        matchFontSize: "SMALL" as const,
+        tournamentFontSize: "XLARGE" as const,
       };
 
       const payload = await buildScreen1LivePayload({
         tenant: TENANT_FCA,
         now: NOW,
         loader,
-        boardConfig: { logoPresentation },
+        boardConfig: { presentation },
       });
 
-      expect(payload.logoPresentation).toEqual(logoPresentation);
+      expect(payload.presentation).toEqual(presentation);
     });
   });
 

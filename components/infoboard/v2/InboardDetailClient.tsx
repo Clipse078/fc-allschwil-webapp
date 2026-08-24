@@ -36,9 +36,16 @@ import {
 import type { InboardRow } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
 import {
+  DEFAULT_MATCH_FONT_SIZE,
+  DEFAULT_TOURNAMENT_FONT_SIZE,
+  DEFAULT_TRAINING_FONT_SIZE,
+  FONT_SIZE_LABELS,
+  INFOBOARD_FONT_SIZES,
   INFOBOARD_LOGO_SIZES,
   LOGO_SIZE_LABELS,
+  resolveInfoboardFontSize,
   resolveInfoboardLogoSize,
+  type InfoboardFontSize,
   type InfoboardLogoSize,
 } from "@/lib/infoboard/screen1-logo-settings";
 import type { AnlageplanResourceOption } from "@/lib/infoboard/anlageplan-types";
@@ -87,17 +94,29 @@ export function InboardDetailClient({
   const [trainingLogoSize, setTrainingLogoSize] = useState<InfoboardLogoSize>(
     resolveInfoboardLogoSize(board.screen1TrainingLogoSize),
   );
+  const [trainingFontSize, setTrainingFontSize] = useState<InfoboardFontSize>(
+    resolveInfoboardFontSize(board.screen1TrainingFontSize, DEFAULT_TRAINING_FONT_SIZE),
+  );
   const [matchShowLogos, setMatchShowLogos] = useState(
     board.screen1MatchShowLogos ?? true,
   );
   const [matchLogoSize, setMatchLogoSize] = useState<InfoboardLogoSize>(
     resolveInfoboardLogoSize(board.screen1MatchLogoSize),
   );
+  const [matchFontSize, setMatchFontSize] = useState<InfoboardFontSize>(
+    resolveInfoboardFontSize(board.screen1MatchFontSize, DEFAULT_MATCH_FONT_SIZE),
+  );
   const [tournamentShowLogos, setTournamentShowLogos] = useState(
     board.screen1TournamentShowLogos ?? true,
   );
   const [tournamentLogoSize, setTournamentLogoSize] = useState<InfoboardLogoSize>(
     resolveInfoboardLogoSize(board.screen1TournamentLogoSize),
+  );
+  const [tournamentFontSize, setTournamentFontSize] = useState<InfoboardFontSize>(
+    resolveInfoboardFontSize(
+      board.screen1TournamentFontSize,
+      DEFAULT_TOURNAMENT_FONT_SIZE,
+    ),
   );
   const [anzeigesaving, setAnzeigeSaving] = useState(false);
   const [anzeigesaved, setAnzeigeSaved] = useState(false);
@@ -178,10 +197,13 @@ export function InboardDetailClient({
           name: anzeigeNameValue.trim() || board.name,
           screen1TrainingShowLogos: trainingShowLogos,
           screen1TrainingLogoSize: trainingLogoSize,
+          screen1TrainingFontSize: trainingFontSize,
           screen1MatchShowLogos: matchShowLogos,
           screen1MatchLogoSize: matchLogoSize,
+          screen1MatchFontSize: matchFontSize,
           screen1TournamentShowLogos: tournamentShowLogos,
           screen1TournamentLogoSize: tournamentLogoSize,
+          screen1TournamentFontSize: tournamentFontSize,
         }),
       });
       if (!res.ok) {
@@ -551,6 +573,26 @@ export function InboardDetailClient({
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Schriftgrösse
+                    </label>
+                    <select
+                      value={trainingFontSize}
+                      onChange={(e) => {
+                        setTrainingFontSize(e.target.value as InfoboardFontSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="training-font-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    >
+                      {INFOBOARD_FONT_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {FONT_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="border-t border-[var(--border)] pt-4 space-y-3">
@@ -595,6 +637,26 @@ export function InboardDetailClient({
                       ))}
                     </select>
                   </div>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Schriftgrösse
+                    </label>
+                    <select
+                      value={matchFontSize}
+                      onChange={(e) => {
+                        setMatchFontSize(e.target.value as InfoboardFontSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="match-font-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    >
+                      {INFOBOARD_FONT_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {FONT_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="border-t border-[var(--border)] pt-4 space-y-3">
@@ -635,6 +697,26 @@ export function InboardDetailClient({
                       {INFOBOARD_LOGO_SIZES.map((size) => (
                         <option key={size} value={size}>
                           {LOGO_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Schriftgrösse
+                    </label>
+                    <select
+                      value={tournamentFontSize}
+                      onChange={(e) => {
+                        setTournamentFontSize(e.target.value as InfoboardFontSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="tournament-font-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    >
+                      {INFOBOARD_FONT_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {FONT_SIZE_LABELS[size]}
                         </option>
                       ))}
                     </select>

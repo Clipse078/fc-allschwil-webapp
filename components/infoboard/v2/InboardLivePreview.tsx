@@ -26,6 +26,7 @@ import {
 } from "@/components/infoboard/screen1/screen1-preview-fixture";
 import type { InfoboardAnnouncementPresentation } from "@/components/infoboard/screen1/screen1-presentation-types";
 import type { InfoboardDisplayTheme } from "@/lib/publishing/infoboard/display-theme";
+import type { Screen1PresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
 
 export type InboardLivePreviewProps = {
   theme?: InfoboardDisplayTheme | null;
@@ -41,6 +42,7 @@ export type InboardLivePreviewProps = {
     bgColor: string | null;
     textColor: string | null;
   } | null;
+  presentation?: Screen1PresentationConfig;
   /** Optional CSS class applied to the outer wrapper */
   className?: string;
 };
@@ -51,6 +53,7 @@ export function InboardLivePreview({
   theme,
   headerConfig,
   announcement,
+  presentation,
   className = "",
 }: InboardLivePreviewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -111,6 +114,7 @@ export function InboardLivePreview({
           eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
           currentTimeIso={PREVIEW_CURRENT_TIME_ISO}
           theme={resolvedTheme}
+          presentation={presentation}
           headerConfig={{
             subtitleEnabled: headerConfig?.subtitleEnabled,
             subtitleText: headerConfig?.subtitleText,

@@ -21,7 +21,10 @@ import {
   deleteInfoboard,
 } from "@/lib/infoboard/queries";
 import type { UpdateInfoboardInput, InfoboardStatusValue } from "@/lib/infoboard/types";
-import { INFOBOARD_LOGO_SIZES } from "@/lib/infoboard/screen1-logo-settings";
+import {
+  INFOBOARD_FONT_SIZES,
+  INFOBOARD_LOGO_SIZES,
+} from "@/lib/infoboard/screen1-logo-settings";
 import {
   parseAnlageplanJson,
   isResourceZone,
@@ -278,6 +281,45 @@ export async function PATCH(
       );
     }
     input.screen1TournamentLogoSize = size;
+  }
+  if ("screen1TrainingFontSize" in body) {
+    const size = body.screen1TrainingFontSize;
+    if (
+      typeof size !== "string" ||
+      !INFOBOARD_FONT_SIZES.includes(size as (typeof INFOBOARD_FONT_SIZES)[number])
+    ) {
+      return NextResponse.json(
+        { error: `screen1TrainingFontSize muss einer von: ${INFOBOARD_FONT_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1TrainingFontSize = size;
+  }
+  if ("screen1MatchFontSize" in body) {
+    const size = body.screen1MatchFontSize;
+    if (
+      typeof size !== "string" ||
+      !INFOBOARD_FONT_SIZES.includes(size as (typeof INFOBOARD_FONT_SIZES)[number])
+    ) {
+      return NextResponse.json(
+        { error: `screen1MatchFontSize muss einer von: ${INFOBOARD_FONT_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1MatchFontSize = size;
+  }
+  if ("screen1TournamentFontSize" in body) {
+    const size = body.screen1TournamentFontSize;
+    if (
+      typeof size !== "string" ||
+      !INFOBOARD_FONT_SIZES.includes(size as (typeof INFOBOARD_FONT_SIZES)[number])
+    ) {
+      return NextResponse.json(
+        { error: `screen1TournamentFontSize muss einer von: ${INFOBOARD_FONT_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1TournamentFontSize = size;
   }
 
   // Validate: announcement requires text when enabled
