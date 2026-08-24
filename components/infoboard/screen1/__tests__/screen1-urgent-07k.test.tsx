@@ -5,6 +5,7 @@
 /** @vitest-environment jsdom */
 
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
@@ -24,7 +25,10 @@ import type {
 import { InfoboardScreen1 } from "../InfoboardScreen1";
 
 const CSS = readFileSync(
-  new URL("../InfoboardScreen1.module.css", import.meta.url),
+  resolve(
+    process.cwd(),
+    "components/infoboard/screen1/InfoboardScreen1.module.css",
+  ),
   "utf8",
 );
 
