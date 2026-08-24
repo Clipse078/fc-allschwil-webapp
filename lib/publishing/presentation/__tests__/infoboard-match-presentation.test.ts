@@ -23,6 +23,7 @@ function makeIdentity(
       teamShortName: null,
       teamAlternativeName: "Junioren C2",
       teamInfoboardDisplayName: null,
+      teamInfoboardMatchDisplayName: null,
       fallbackDisplayName: "FC Allschwil Junioren C2",
     },
     away: {
@@ -33,6 +34,7 @@ function makeIdentity(
       teamShortName: "C Gelb",
       teamAlternativeName: null,
       teamInfoboardDisplayName: null,
+      teamInfoboardMatchDisplayName: null,
       fallbackDisplayName: "FC Therwil C Gelb",
     },
     ...overrides,
@@ -54,6 +56,19 @@ describe("resolveInfoboardClubDisplayName", () => {
 });
 
 describe("resolveInfoboardTeamSubDisplayName", () => {
+  it("uses infoboardMatchDisplayName before generic infoboardDisplayName", () => {
+    expect(
+      resolveInfoboardTeamSubDisplayName({
+        clubDisplayName: "FC Allschwil",
+        teamName: "FC Allschwil Junioren E1",
+        teamShortName: "E1",
+        teamAlternativeName: "Junioren E1",
+        teamInfoboardDisplayName: "FCA E1",
+        teamInfoboardMatchDisplayName: "FC Allschwil E1",
+      }),
+    ).toBe("FC Allschwil E1");
+  });
+
   it("uses infoboardDisplayName first", () => {
     expect(
       resolveInfoboardTeamSubDisplayName({
@@ -101,6 +116,38 @@ describe("resolveInfoboardTeamSubDisplayName", () => {
 });
 
 describe("resolveInfoboardMatchPresentation", () => {
+  it("12 — own-team Match pipeline uses infoboardMatchDisplayName", () => {
+    const result = resolveInfoboardMatchPresentation(
+      makeIdentity({
+        home: {
+          isOwnTeam: true,
+          clubName: null,
+          clubLogoUrl: null,
+          teamName: "FC Allschwil Junioren E1",
+          teamShortName: "E1",
+          teamAlternativeName: "Junioren E1",
+          teamInfoboardDisplayName: "FCA E1",
+          teamInfoboardMatchDisplayName: "FC Allschwil E1",
+          fallbackDisplayName: "FC Allschwil Junioren E1",
+        },
+      }),
+      "https://cdn.example.com/tenant.png",
+      "FC Allschwil",
+    );
+
+    expect(result?.home.teamSubDisplayName).toBe("FC Allschwil E1");
+  });
+
+  it("13 — external opponent remains unchanged", () => {
+    const result = resolveInfoboardMatchPresentation(
+      makeIdentity(),
+      "https://cdn.example.com/tenant.png",
+      "FC Allschwil",
+    );
+
+    expect(result?.away?.teamSubDisplayName).toBe("C Gelb");
+  });
+
   it("resolves tenant logo for own-team side and external logo for opponent", () => {
     const result = resolveInfoboardMatchPresentation(
       makeIdentity(),
@@ -131,6 +178,7 @@ describe("resolveInfoboardMatchPresentation", () => {
           teamShortName: "C Gelb",
           teamAlternativeName: null,
           teamInfoboardDisplayName: null,
+          teamInfoboardMatchDisplayName: null,
           fallbackDisplayName: "FC Therwil C Gelb",
         },
       }),

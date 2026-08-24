@@ -1487,6 +1487,18 @@ model Team {
   /// Infoboard Screen 1 without changing canonical Team naming elsewhere.
   /// Never written by provider sync.
   infoboardDisplayName String?
+  /// INFOBOARD-TEAMNAME-04A — optional Infoboard Training card display override.
+  /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
+  /// naming when unset. Never written by provider sync.
+  infoboardTrainingDisplayName String?
+  /// INFOBOARD-TEAMNAME-04A — optional Infoboard Match card display override.
+  /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
+  /// naming when unset. Never written by provider sync.
+  infoboardMatchDisplayName String?
+  /// INFOBOARD-TEAMNAME-04A — optional Infoboard Tournament card display override.
+  /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
+  /// naming when unset. Never written by provider sync.
+  infoboardTournamentDisplayName String?
   // slug is unique per tenant (tenant-scoped) since TEAM-CORE-02.
   // Legacy global @unique dropped; replaced by @@unique([tenantId, slug]) below.
   // Queries must always scope by tenantId when resolving by slug.

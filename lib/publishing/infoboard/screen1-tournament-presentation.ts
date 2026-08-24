@@ -31,6 +31,9 @@ type TournamentParticipantRow = {
     readonly shortName: string | null;
     readonly alternativeName: string | null;
     readonly infoboardDisplayName: string | null;
+    readonly infoboardTrainingDisplayName: string | null;
+    readonly infoboardMatchDisplayName: string | null;
+    readonly infoboardTournamentDisplayName: string | null;
   } | null;
   readonly externalClub: {
     readonly name: string;
@@ -72,6 +75,9 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
       shortName: true,
       alternativeName: true,
       infoboardDisplayName: true,
+      infoboardTrainingDisplayName: true,
+      infoboardMatchDisplayName: true,
+      infoboardTournamentDisplayName: true,
     },
   },
   externalClub: {
@@ -114,12 +120,16 @@ function resolveParticipantDisplayName(row: TournamentParticipantRow): string {
   if (configured) return configured;
   if (row.team) {
     return (
-      resolveInfoboardTeamDisplayName({
-        infoboardDisplayName: row.team.infoboardDisplayName,
-        alternativeName: row.team.alternativeName,
-        shortName: row.team.shortName,
-        name: row.team.name,
-      }) ?? row.team.name
+      resolveInfoboardTeamDisplayName(
+        {
+          infoboardTournamentDisplayName: row.team.infoboardTournamentDisplayName,
+          infoboardDisplayName: row.team.infoboardDisplayName,
+          alternativeName: row.team.alternativeName,
+          shortName: row.team.shortName,
+          name: row.team.name,
+        },
+        "TOURNAMENT",
+      ) ?? row.team.name
     );
   }
   if (row.externalClub) return row.externalClub.name;

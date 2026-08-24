@@ -137,6 +137,9 @@ const EXISTING_TEAM = {
   shortName: null,
   alternativeName: null,
   infoboardDisplayName: null,
+  infoboardTrainingDisplayName: null,
+  infoboardMatchDisplayName: null,
+  infoboardTournamentDisplayName: null,
   slug: "junioren-b2",
   category: "JUNIOREN",
   genderGroup: null,
@@ -349,6 +352,31 @@ describe("PATCH /api/teams/[teamId] — TEAM-IDENTITY-01 naming fields", () => {
     expect(updateArgs.data.shortName).toBe("E4");
     expect(updateArgs.data.alternativeName).toBe("Junioren E4");
     expect(updateArgs.data.infoboardDisplayName).toBe("JUNIOREN E4");
+  });
+
+  it("12 — card-specific infoboard display names can be set and trimmed", async () => {
+    mocks.teamUpdate.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      infoboardTrainingDisplayName: "Junioren E1",
+      infoboardMatchDisplayName: "FC Allschwil E1",
+      infoboardTournamentDisplayName: "FCA E1",
+      teamSeasons: [],
+    });
+
+    await PATCH(
+      makeRequest({
+        ...BASE_BODY,
+        infoboardTrainingDisplayName: "  Junioren E1  ",
+        infoboardMatchDisplayName: " FC Allschwil E1 ",
+        infoboardTournamentDisplayName: " FCA E1 ",
+      }),
+      makeContext(),
+    );
+
+    const updateArgs = mocks.teamUpdate.mock.calls[0][0];
+    expect(updateArgs.data.infoboardTrainingDisplayName).toBe("Junioren E1");
+    expect(updateArgs.data.infoboardMatchDisplayName).toBe("FC Allschwil E1");
+    expect(updateArgs.data.infoboardTournamentDisplayName).toBe("FCA E1");
   });
 
   it("11 — rejects infoboardDisplayName longer than 120 characters", async () => {

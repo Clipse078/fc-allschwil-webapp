@@ -39,6 +39,9 @@ type Team = {
   shortName: string | null;
   alternativeName: string | null;
   infoboardDisplayName: string | null;
+  infoboardTrainingDisplayName: string | null;
+  infoboardMatchDisplayName: string | null;
+  infoboardTournamentDisplayName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -156,12 +159,36 @@ export default function TeamSettingsCard({
   const competitionLabel =
     form.competition?.shortName ?? form.competition?.name ?? null;
 
-  const effectiveInfoboardDisplayName = resolveInfoboardTeamDisplayName({
-    infoboardDisplayName: form.infoboardDisplayName,
-    alternativeName: form.alternativeName,
-    shortName: form.shortName,
-    name: form.name,
-  });
+  const effectiveTrainingDisplayName = resolveInfoboardTeamDisplayName(
+    {
+      infoboardTrainingDisplayName: form.infoboardTrainingDisplayName,
+      infoboardDisplayName: form.infoboardDisplayName,
+      alternativeName: form.alternativeName,
+      shortName: form.shortName,
+      name: form.name,
+    },
+    "TRAINING",
+  );
+  const effectiveMatchDisplayName = resolveInfoboardTeamDisplayName(
+    {
+      infoboardMatchDisplayName: form.infoboardMatchDisplayName,
+      infoboardDisplayName: form.infoboardDisplayName,
+      alternativeName: form.alternativeName,
+      shortName: form.shortName,
+      name: form.name,
+    },
+    "MATCH",
+  );
+  const effectiveTournamentDisplayName = resolveInfoboardTeamDisplayName(
+    {
+      infoboardTournamentDisplayName: form.infoboardTournamentDisplayName,
+      infoboardDisplayName: form.infoboardDisplayName,
+      alternativeName: form.alternativeName,
+      shortName: form.shortName,
+      name: form.name,
+    },
+    "TOURNAMENT",
+  );
 
   const isCompetitionTeamSeason = currentParticipationType === "COMPETITION";
 
@@ -274,6 +301,9 @@ export default function TeamSettingsCard({
           shortName: form.shortName,
           alternativeName: form.alternativeName,
           infoboardDisplayName: form.infoboardDisplayName,
+          infoboardTrainingDisplayName: form.infoboardTrainingDisplayName,
+          infoboardMatchDisplayName: form.infoboardMatchDisplayName,
+          infoboardTournamentDisplayName: form.infoboardTournamentDisplayName,
           category: form.category,
           genderGroup: form.genderGroup,
           // TEAMCENTER-UX-01B (F): Teamstufe (ageGroup) is no longer editable
@@ -380,9 +410,14 @@ export default function TeamSettingsCard({
               placeholder="z. B. Junioren B2"
             />
           </label>
+        </FormSection>
 
+        <FormSection
+          title="Infoboard-Anzeigenamen"
+          description="Optionale Namen für die Anzeige auf dem Infoboard. Der allgemeine Anzeigename gilt als Fallback für Training, Match und Turnier, sofern kein spezifischer Name gesetzt ist."
+        >
           <label className="block space-y-1.5 md:col-span-2">
-            <span className={labelClass}>Infoboard-Anzeigename</span>
+            <span className={labelClass}>Allgemein</span>
             <input
               type="text"
               value={form.infoboardDisplayName ?? ""}
@@ -392,16 +427,71 @@ export default function TeamSettingsCard({
                 updateField("infoboardDisplayName", event.target.value || null)
               }
               className={fieldClass}
-              placeholder="z. B. JUNIOREN E4"
+              placeholder="z. B. FCA E1"
             />
             <p className="text-xs text-[var(--text-2)]">
-              Optionaler Name für die Anzeige auf dem Infoboard. Wenn leer,
-              verwendet SCE automatisch den alternativen Anzeigenamen, Kurznamen
-              oder Teamnamen.
+              Allgemeiner Infoboard-Fallback. Wenn leer, verwendet SCE
+              automatisch den alternativen Anzeigenamen, Kurznamen oder
+              Teamnamen.
             </p>
-            {effectiveInfoboardDisplayName ? (
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Training</span>
+            <input
+              type="text"
+              value={form.infoboardTrainingDisplayName ?? ""}
+              disabled={!canManage}
+              maxLength={120}
+              onChange={(event) =>
+                updateField("infoboardTrainingDisplayName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. Junioren E1"
+            />
+            {effectiveTrainingDisplayName ? (
               <p className="text-xs font-medium text-[var(--foreground)]">
-                Effektive Infoboard-Anzeige: {effectiveInfoboardDisplayName}
+                Effektive Training-Anzeige: {effectiveTrainingDisplayName}
+              </p>
+            ) : null}
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Match</span>
+            <input
+              type="text"
+              value={form.infoboardMatchDisplayName ?? ""}
+              disabled={!canManage}
+              maxLength={120}
+              onChange={(event) =>
+                updateField("infoboardMatchDisplayName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. FC Allschwil E1"
+            />
+            {effectiveMatchDisplayName ? (
+              <p className="text-xs font-medium text-[var(--foreground)]">
+                Effektive Match-Anzeige: {effectiveMatchDisplayName}
+              </p>
+            ) : null}
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className={labelClass}>Turnier</span>
+            <input
+              type="text"
+              value={form.infoboardTournamentDisplayName ?? ""}
+              disabled={!canManage}
+              maxLength={120}
+              onChange={(event) =>
+                updateField("infoboardTournamentDisplayName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. FCA E1"
+            />
+            {effectiveTournamentDisplayName ? (
+              <p className="text-xs font-medium text-[var(--foreground)]">
+                Effektive Turnier-Anzeige: {effectiveTournamentDisplayName}
               </p>
             ) : null}
           </label>

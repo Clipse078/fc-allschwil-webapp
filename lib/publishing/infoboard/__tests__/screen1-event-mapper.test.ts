@@ -173,6 +173,20 @@ describe("mapScreen1Event — team display name (INFOBOARD tenant-managed priori
     expect(result.teamDisplayName).toBe("FC Allschwil U17");
   });
 
+  it("uses infoboardTrainingDisplayName for TRAINING cards", () => {
+    const result = mapScreen1Event(makeInput({
+      type: "TRAINING",
+      team: {
+        infoboardTrainingDisplayName: "Junioren E1",
+        infoboardDisplayName: "FCA E1",
+        alternativeName: "E1",
+        shortName: "E1",
+        name: "FC Allschwil Junioren E1",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("Junioren E1");
+  });
+
   it("uses infoboardDisplayName when present", () => {
     const result = mapScreen1Event(makeInput({
       team: {
@@ -658,6 +672,7 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
             teamShortName: null,
             teamAlternativeName: "Junioren C2",
             teamInfoboardDisplayName: null,
+            teamInfoboardMatchDisplayName: null,
             fallbackDisplayName: "FC Allschwil Junioren C2",
           },
           away: {
@@ -668,6 +683,7 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
             teamShortName: "C Gelb",
             teamAlternativeName: null,
             teamInfoboardDisplayName: null,
+            teamInfoboardMatchDisplayName: null,
             fallbackDisplayName: "FC Therwil C Gelb",
           },
         },

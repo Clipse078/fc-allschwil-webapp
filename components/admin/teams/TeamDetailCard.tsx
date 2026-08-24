@@ -78,6 +78,9 @@ type Team = {
   shortName: string | null;
   alternativeName: string | null;
   infoboardDisplayName: string | null;
+  infoboardTrainingDisplayName: string | null;
+  infoboardMatchDisplayName: string | null;
+  infoboardTournamentDisplayName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -131,6 +134,9 @@ export default function TeamDetailCard({
     shortName: string | null;
     alternativeName: string | null;
     infoboardDisplayName: string | null;
+    infoboardTrainingDisplayName: string | null;
+    infoboardMatchDisplayName: string | null;
+    infoboardTournamentDisplayName: string | null;
     slug: string;
     category: string;
     genderGroup: string | null;
@@ -158,6 +164,9 @@ export default function TeamDetailCard({
           shortName: team.shortName,
           alternativeName: team.alternativeName,
           infoboardDisplayName: team.infoboardDisplayName,
+          infoboardTrainingDisplayName: team.infoboardTrainingDisplayName,
+          infoboardMatchDisplayName: team.infoboardMatchDisplayName,
+          infoboardTournamentDisplayName: team.infoboardTournamentDisplayName,
           slug: team.slug,
           category: team.category,
           genderGroup: team.genderGroup,

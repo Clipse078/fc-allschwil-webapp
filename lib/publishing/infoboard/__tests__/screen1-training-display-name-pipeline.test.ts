@@ -76,6 +76,9 @@ function trainingPolicyRow(
         shortName: "Junioren E1",
         alternativeName: "E1",
         infoboardDisplayName: "JUNIOREN E1 TEST",
+        infoboardTrainingDisplayName: null,
+        infoboardMatchDisplayName: null,
+        infoboardTournamentDisplayName: null,
       },
     },
     ...overrides,
@@ -104,14 +107,73 @@ beforeEach(() => {
 });
 
 describe("INFOBOARD-TEAMNAME-03A — real Screen 1 Training display-name pipeline", () => {
-  it("select clause requests Team.infoboardDisplayName for training policy lookup", () => {
+  it("select clause requests card-specific Team display names for training policy lookup", () => {
     expect(CANONICAL_TRAINING_SESSION_POLICY_SELECT.teamSeason.select.team.select).toMatchObject({
       infoboardDisplayName: true,
+      infoboardTrainingDisplayName: true,
+      infoboardMatchDisplayName: true,
+      infoboardTournamentDisplayName: true,
     });
   });
 
-  it("maps persisted infoboardDisplayName through the canonical loader (not alternativeName)", async () => {
-    const database = makeDatabase();
+  it("11 — real Training Screen 1 pipeline prefers infoboardTrainingDisplayName", async () => {
+    const database = makeDatabase([
+      trainingPolicyRow({
+        teamSeason: {
+          season: { key: "2026-2027" },
+          team: {
+            name: "FC Allschwil Junioren E1",
+            shortName: "Junioren E1",
+            alternativeName: "E1",
+            infoboardDisplayName: "JUNIOREN E1 TEST",
+            infoboardTrainingDisplayName: "Junioren E1 Training",
+            infoboardMatchDisplayName: null,
+            infoboardTournamentDisplayName: null,
+          },
+        },
+      }),
+    ]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+    const now = new Date("2026-08-24T14:00:00.000Z");
+
+    const feed = await buildInfoboardScreen1Feed(loader, {
+      tenant: {
+        id: TENANT_ID,
+        key: "fc-allschwil",
+        name: "FC Allschwil",
+        timezone: TZ_ZURICH,
+      },
+      timeZone: TZ_ZURICH,
+      now,
+      dateFrom: new Date("2026-08-24T00:00:00.000Z"),
+      dateTo: new Date("2026-08-24T00:00:00.000Z"),
+    });
+
+    const trainingCard = [...feed.current, ...feed.next, ...feed.later].find(
+      (event) => event.type === "TRAINING",
+    );
+
+    expect(trainingCard?.teamDisplayName).toBe("Junioren E1 Training");
+    expect(trainingCard?.teamDisplayName).not.toBe("JUNIOREN E1 TEST");
+  });
+
+  it("maps persisted infoboardTrainingDisplayName through the canonical loader", async () => {
+    const database = makeDatabase([
+      trainingPolicyRow({
+        teamSeason: {
+          season: { key: "2026-2027" },
+          team: {
+            name: "FC Allschwil Junioren E1",
+            shortName: "Junioren E1",
+            alternativeName: "E1",
+            infoboardDisplayName: "JUNIOREN E1 TEST",
+            infoboardTrainingDisplayName: "Junioren E1 Training",
+            infoboardMatchDisplayName: null,
+            infoboardTournamentDisplayName: null,
+          },
+        },
+      }),
+    ]);
     const loader = createCanonicalInfoboardSourceLoader(database);
 
     const [sourceEvent] = await loader({
@@ -120,6 +182,7 @@ describe("INFOBOARD-TEAMNAME-03A — real Screen 1 Training display-name pipelin
       dateTo: new Date("2026-08-24T00:00:00.000Z"),
     });
 
+    expect(sourceEvent.team?.infoboardTrainingDisplayName).toBe("Junioren E1 Training");
     expect(sourceEvent.team?.infoboardDisplayName).toBe("JUNIOREN E1 TEST");
     expect(sourceEvent.team?.alternativeName).toBe("E1");
   });
@@ -163,6 +226,9 @@ describe("INFOBOARD-TEAMNAME-03A — real Screen 1 Training display-name pipelin
             shortName: "Junioren E1",
             alternativeName: "E1",
             infoboardDisplayName: null,
+            infoboardTrainingDisplayName: null,
+            infoboardMatchDisplayName: null,
+            infoboardTournamentDisplayName: null,
           },
         },
       }),

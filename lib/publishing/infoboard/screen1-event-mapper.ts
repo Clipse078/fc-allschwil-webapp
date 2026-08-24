@@ -31,10 +31,13 @@ import type {
 } from "../event-types";
 import type { PublicationPolicyEvent } from "../policy/publication-policy";
 import {
-  resolveTeamDisplayName,
   resolveOpponentDisplayName,
   resolveCompetitionDisplay,
 } from "../presentation/display-name-resolver";
+import {
+  resolveInfoboardTeamDisplayName,
+  type InfoboardTeamDisplayNameContext,
+} from "../presentation/infoboard-team-display-name";
 import {
   resolvePitchDisplay,
   resolveDressingRoomDisplay,
@@ -98,6 +101,12 @@ export type Screen1SourceEvent = {
     readonly alternativeName?: string | null;
     /** Team.infoboardDisplayName — Infoboard Screen 1 override (INFOBOARD-TEAMNAME-01). */
     readonly infoboardDisplayName?: string | null;
+    /** Team.infoboardTrainingDisplayName — Training card override (INFOBOARD-TEAMNAME-04A). */
+    readonly infoboardTrainingDisplayName?: string | null;
+    /** Team.infoboardMatchDisplayName — Match card override (INFOBOARD-TEAMNAME-04A). */
+    readonly infoboardMatchDisplayName?: string | null;
+    /** Team.infoboardTournamentDisplayName — Tournament card override (INFOBOARD-TEAMNAME-04A). */
+    readonly infoboardTournamentDisplayName?: string | null;
   } | null;
 
   /** Explicit source-level team name fallback (e.g. from event import). */
@@ -230,6 +239,21 @@ export type MapScreen1EventInput = {
 
 // ── mapScreen1Event ───────────────────────────────────────────────────────────
 
+function infoboardContextForEventType(
+  type: PublishingEventType,
+): InfoboardTeamDisplayNameContext | undefined {
+  switch (type) {
+    case "TRAINING":
+      return "TRAINING";
+    case "MATCH":
+      return "MATCH";
+    case "TOURNAMENT":
+      return "TOURNAMENT";
+    default:
+      return undefined;
+  }
+}
+
 /**
  * Maps a single Screen 1 source event to an InfoboardScreen1Event DTO.
  *
@@ -242,16 +266,18 @@ export function mapScreen1Event(
   const { event, temporalBucket, tenantClubName, tenantLogoUrl } = input;
 
   // ── Team display name ───────────────────────────────────────────────────
-  const teamDisplayName = resolveTeamDisplayName(
+  const teamDisplayName = resolveInfoboardTeamDisplayName(
     {
-      name: event.team?.name,
-      displayName: event.team?.displayName,
-      shortName: event.team?.shortName,
-      alternativeName: event.team?.alternativeName,
+      infoboardTrainingDisplayName: event.team?.infoboardTrainingDisplayName,
+      infoboardMatchDisplayName: event.team?.infoboardMatchDisplayName,
+      infoboardTournamentDisplayName: event.team?.infoboardTournamentDisplayName,
       infoboardDisplayName: event.team?.infoboardDisplayName,
+      alternativeName: event.team?.alternativeName,
+      shortName: event.team?.shortName,
+      name: event.team?.name,
       fallbackName: event.teamFallbackName,
     },
-    "INFOBOARD",
+    infoboardContextForEventType(event.type),
   );
 
   // ── Opponent display name ───────────────────────────────────────────────
