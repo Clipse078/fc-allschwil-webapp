@@ -2,10 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Plus } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
-import AdminListItem from "@/components/admin/shared/AdminListItem";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { PeoplePicker, type PersonPickerResult } from "@/components/shared/PeoplePicker";
+import { Button } from "@/components/ui/Button";
 import {
   getAllowedBirthYearsForSeason,
   getCanonicalSeasonLabel,
@@ -32,10 +34,10 @@ type SquadMember = {
   };
 };
 
-
 type Props = {
   teamId: string;
   canManage: boolean;
+  sectionId?: string;
   teamSeason: {
     id: string;
     displayName: string;
@@ -63,12 +65,16 @@ const STATUS_OPTIONS = [
   { value: "ARCHIVED", label: "Archiviert" },
 ];
 
+const fieldClass =
+  "w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30";
+const labelClass = "block text-xs font-medium text-[var(--text-2)] mb-1.5";
+
 function getPersonName(person: {
   firstName: string;
   lastName: string;
   displayName: string | null;
 }) {
-  return person.displayName || person.firstName + " " + person.lastName;
+  return person.displayName || `${person.firstName} ${person.lastName}`;
 }
 
 function getBirthYear(dateOfBirth?: string | null) {
@@ -77,7 +83,6 @@ function getBirthYear(dateOfBirth?: string | null) {
   }
 
   const date = new Date(dateOfBirth);
-
   if (Number.isNaN(date.getTime())) {
     return null;
   }
@@ -91,7 +96,6 @@ function formatBirthDate(dateOfBirth?: string | null) {
   }
 
   const date = new Date(dateOfBirth);
-
   if (Number.isNaN(date.getTime())) {
     return null;
   }
@@ -102,24 +106,21 @@ function formatBirthDate(dateOfBirth?: string | null) {
 export default function TeamSquadManagementCard({
   teamId,
   canManage,
+  sectionId,
   teamSeason,
 }: Props) {
   const router = useRouter();
+  const playerCount = teamSeason.playerSquadMembers.length;
 
   const saisonLabel = useMemo(() => {
-    return (
-      getCanonicalSeasonLabel(teamSeason.season.startDate) ??
-      teamSeason.season.name
-    );
+    return getCanonicalSeasonLabel(teamSeason.season.startDate) ?? teamSeason.season.name;
   }, [teamSeason.season.startDate, teamSeason.season.name]);
 
   const allowedBirthYears = useMemo(() => {
-    return getAllowedBirthYearsForSeason(
-      teamSeason.teamAgeGroup,
-      teamSeason.season.startDate
-    );
+    return getAllowedBirthYearsForSeason(teamSeason.teamAgeGroup, teamSeason.season.startDate);
   }, [teamSeason.teamAgeGroup, teamSeason.season.startDate]);
 
+  const [showAddForm, setShowAddForm] = useState(false);
   const [selectedPerson, setSelectedPerson] = useState<PersonPickerResult | null>(null);
   const [assignStatus, setAssignStatus] = useState("ACTIVE");
   const [shirtNumber, setShirtNumber] = useState("");
@@ -136,21 +137,29 @@ export default function TeamSquadManagementCard({
 
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
   const [removeError, setRemoveError] = useState<string | null>(null);
-  const [removeMessage, setRemoveMessage] = useState<string | null>(null);
 
   const existingSquadPersonIds = useMemo(
-    () => teamSeason.playerSquadMembers.map((m) => m.person.id),
-    [teamSeason.playerSquadMembers]
+    () => teamSeason.playerSquadMembers.map((member) => member.person.id),
+    [teamSeason.playerSquadMembers],
   );
 
-  async function handleAssign() {
-    if (!canManage) {
-      return;
-    }
+  function resetAddForm() {
+    setShowAddForm(false);
+    setSelectedPerson(null);
+    setShirtNumber("");
+    setPositionLabel("");
+    setIsCaptain(false);
+    setIsViceCaptain(false);
+    setIsWebsiteVisible(true);
+    setSortOrder("0");
+    setRemarks("");
+    setAssignError(null);
+    setAssignMessage(null);
+  }
 
-    if (!selectedPerson) {
+  async function handleAssign() {
+    if (!canManage || !selectedPerson) {
       setAssignError("Bitte zuerst eine Person auswählen.");
-      setAssignMessage(null);
       return;
     }
 
@@ -158,16 +167,13 @@ export default function TeamSquadManagementCard({
     setAssignError(null);
     setAssignMessage(null);
     setRemoveError(null);
-    setRemoveMessage(null);
 
     try {
       const response = await fetch(
-        "/api/teams/" + teamId + "/team-seasons/" + teamSeason.id + "/squad-members",
+        `/api/teams/${teamId}/team-seasons/${teamSeason.id}/squad-members`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             personId: selectedPerson.id,
             status: assignStatus,
@@ -179,33 +185,22 @@ export default function TeamSquadManagementCard({
             sortOrder: sortOrder.trim(),
             remarks,
           }),
-        }
+        },
       );
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.error ?? "Spieler konnte dem Team-Saison-Kader nicht hinzugefügt werden."
+          data?.error ?? "Spieler konnte dem Team-Saison-Kader nicht hinzugefügt werden.",
         );
       }
 
-      setAssignMessage(
-        data?.message ?? "Spieler erfolgreich dem Team-Saison-Kader hinzugefügt."
-      );
-      setSelectedPerson(null);
-      setShirtNumber("");
-      setPositionLabel("");
-      setIsCaptain(false);
-      setIsViceCaptain(false);
-      setIsWebsiteVisible(true);
-      setSortOrder("0");
-      setRemarks("");
+      setAssignMessage(data?.message ?? "Spieler erfolgreich hinzugefügt.");
+      resetAddForm();
       router.refresh();
     } catch (err) {
-      setAssignError(
-        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
-      );
+      setAssignError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     } finally {
       setAssignLoading(false);
     }
@@ -217,9 +212,7 @@ export default function TeamSquadManagementCard({
     }
 
     const confirmed = window.confirm(
-      'Spieler "' +
-        getPersonName(member.person) +
-        '" wirklich aus diesem Team-Saison-Kader entfernen?'
+      `Spieler "${getPersonName(member.person)}" wirklich aus diesem Kader entfernen?`,
     );
 
     if (!confirmed) {
@@ -228,134 +221,116 @@ export default function TeamSquadManagementCard({
 
     setRemovingMemberId(member.id);
     setRemoveError(null);
-    setRemoveMessage(null);
-    setAssignError(null);
-    setAssignMessage(null);
 
     try {
       const response = await fetch(
-        "/api/teams/" +
-          teamId +
-          "/team-seasons/" +
-          teamSeason.id +
-          "/squad-members/" +
-          member.id,
-        {
-          method: "DELETE",
-        }
+        `/api/teams/${teamId}/team-seasons/${teamSeason.id}/squad-members/${member.id}`,
+        { method: "DELETE" },
       );
 
       const data = await response.json().catch(() => null);
 
       if (!response.ok) {
         throw new Error(
-          data?.error ?? "Spieler konnte nicht aus dem Team-Saison-Kader entfernt werden."
+          data?.error ?? "Spieler konnte nicht aus dem Team-Saison-Kader entfernt werden.",
         );
       }
 
-      setRemoveMessage(
-        data?.message ?? "Spieler erfolgreich aus dem Team-Saison-Kader entfernt."
-      );
       router.refresh();
     } catch (err) {
-      setRemoveError(
-        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
-      );
+      setRemoveError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
     } finally {
       setRemovingMemberId(null);
     }
   }
 
   return (
-    <div className="fca-section-card p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <section
+      id={sectionId}
+      className={
+        sectionId
+          ? "scroll-mt-20 target:ring-2 target:ring-inset target:ring-[var(--sce-primary)]"
+          : undefined
+      }
+      data-testid="team-squad-section"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="fca-eyebrow">Spielerkader</p>
-          <h4 className="fca-subheading mt-2">{saisonLabel}</h4>
-          <p className="fca-body-muted mt-3">
-            Suche, Zuordnung und Verwaltung der Spieler dieser Team-Saison.
+          <h3 className="text-base font-semibold text-[var(--foreground)]">Kader</h3>
+          <p className="mt-0.5 text-sm text-[var(--muted)]">
+            {playerCount} Spieler · {saisonLabel}
           </p>
         </div>
 
-        <span className="fca-pill">
-          Kader Website: {teamSeason.squadWebsiteVisible ? "An" : "Aus"}
-        </span>
+        {canManage ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            iconLeft={<Plus className="h-3.5 w-3.5" />}
+            onClick={() => setShowAddForm((current) => !current)}
+            data-testid="team-squad-add-button"
+          >
+            Spieler
+          </Button>
+        ) : null}
       </div>
 
-      <div className="fca-section-card mt-5 px-4 py-4">
-        <div className="fca-label">Erlaubte Jahrgänge für diese Team-Saison</div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {allowedBirthYears.length === 0 ? (
-            <span className="fca-body-muted">
-              Keine automatische Jahrgangslogik verfügbar.
+      {allowedBirthYears.length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {allowedBirthYears.map((year) => (
+            <span
+              key={year}
+              className="rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 py-0.5 text-xs text-[var(--text-2)]"
+            >
+              {year}
             </span>
-          ) : (
-            allowedBirthYears.map((year) => (
-              <span key={year} className="fca-pill-year">
-                {year}
-              </span>
-            ))
-          )}
+          ))}
         </div>
-      </div>
+      ) : null}
 
-      {!canManage ? (
-        <div className="fca-status-box fca-status-box-warn mt-5">
-          Diese Kaderübersicht ist aktuell nur lesbar.
-        </div>
-      ) : (
-        <div className="fca-section-card mt-5 p-5">
+      {showAddForm && canManage ? (
+        <div className="mt-4 space-y-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
           <div>
-            <h5 className="fca-eyebrow">Spieler zuweisen</h5>
-            <p className="fca-body-muted mt-2">
-              Neue Personen werden nur im People-Modul angelegt.
+            <p className="text-sm font-medium text-[var(--foreground)]">Spieler hinzufügen</p>
+            <p className="mt-1 text-xs text-[var(--muted)]">
+              Neue Personen werden im People-Modul angelegt.
             </p>
           </div>
 
-          <div className="mt-4">
-            <label className="fca-label mb-2 block">Spieler suchen</label>
-            <PeoplePicker
-              mode="player"
-              teamSeasonId={teamSeason.id}
-              excludeIds={existingSquadPersonIds}
-              selected={selectedPerson}
-              onSelect={setSelectedPerson}
-              onClearSelected={() => setSelectedPerson(null)}
-              placeholder="Aktiven Spieler suchen nach Name, E-Mail…"
-            />
-          </div>
+          <PeoplePicker
+            mode="player"
+            teamSeasonId={teamSeason.id}
+            excludeIds={existingSquadPersonIds}
+            selected={selectedPerson}
+            onSelect={setSelectedPerson}
+            onClearSelected={() => setSelectedPerson(null)}
+            placeholder="Spieler suchen nach Name, E-Mail…"
+          />
 
           {selectedPerson ? (
-            <div className="mt-4 grid gap-4">
-              <div className="fca-card p-4">
-                <div className="flex items-center gap-4">
-                  <AdminAvatar name={getPersonName(selectedPerson)} size="md" />
-                  <div>
-                    <div className="font-semibold text-slate-900">
-                      {getPersonName(selectedPerson)}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      {[selectedPerson.email, selectedPerson.phone]
-                        .filter(Boolean)
-                        .join(" • ") || "Keine Kontaktdaten"}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Geburtsdatum: {formatBirthDate(selectedPerson.dateOfBirth) ?? "nicht gesetzt"}
-                    </div>
-                    <div className="mt-1 text-sm text-slate-500">
-                      Geburtsjahr: {getBirthYear(selectedPerson.dateOfBirth) ?? "-"}
-                    </div>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] px-3 py-3">
+                <AdminAvatar name={getPersonName(selectedPerson)} size="md" />
+                <div>
+                  <p className="text-sm font-semibold text-[var(--foreground)]">
+                    {getPersonName(selectedPerson)}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    Geburtsdatum: {formatBirthDate(selectedPerson.dateOfBirth) ?? "nicht gesetzt"}
+                    {getBirthYear(selectedPerson.dateOfBirth)
+                      ? ` · ${getBirthYear(selectedPerson.dateOfBirth)}`
+                      : ""}
+                  </p>
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="block space-y-2">
-                  <span className="fca-label">Status</span>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <label className="block">
+                  <span className={labelClass}>Status</span>
                   <select
                     value={assignStatus}
                     onChange={(event) => setAssignStatus(event.target.value)}
-                    className="fca-select"
+                    className={fieldClass}
                   >
                     {STATUS_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
@@ -365,165 +340,173 @@ export default function TeamSquadManagementCard({
                   </select>
                 </label>
 
-                <label className="block space-y-2">
-                  <span className="fca-label">Rückennummer</span>
+                <label className="block">
+                  <span className={labelClass}>Rückennummer</span>
                   <input
                     type="number"
                     value={shirtNumber}
                     onChange={(event) => setShirtNumber(event.target.value)}
-                    className="fca-input"
+                    className={fieldClass}
                   />
                 </label>
 
-                <label className="block space-y-2">
-                  <span className="fca-label">Position</span>
+                <label className="block">
+                  <span className={labelClass}>Position</span>
                   <input
                     type="text"
                     value={positionLabel}
                     onChange={(event) => setPositionLabel(event.target.value)}
-                    className="fca-input"
+                    className={fieldClass}
                   />
                 </label>
 
-                <label className="block space-y-2">
-                  <span className="fca-label">Sortierung</span>
+                <label className="block">
+                  <span className={labelClass}>Sortierung</span>
                   <input
                     type="number"
                     value={sortOrder}
                     onChange={(event) => setSortOrder(event.target.value)}
-                    className="fca-input"
+                    className={fieldClass}
                   />
                 </label>
               </div>
 
-              <label className="block space-y-2">
-                <span className="fca-label">Bemerkungen</span>
+              <label className="block">
+                <span className={labelClass}>Bemerkungen</span>
                 <input
                   type="text"
                   value={remarks}
                   onChange={(event) => setRemarks(event.target.value)}
-                  className="fca-input"
+                  className={fieldClass}
                 />
               </label>
 
-              <div className="grid gap-4 md:grid-cols-3">
-                <Toggle label="Captain" value={isCaptain} onChange={setIsCaptain} />
-                <Toggle label="Vice-Captain" value={isViceCaptain} onChange={setIsViceCaptain} />
-                <Toggle label="Website sichtbar" value={isWebsiteVisible} onChange={setIsWebsiteVisible} />
+              <div className="flex flex-wrap gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={isCaptain} onChange={(e) => setIsCaptain(e.target.checked)} />
+                  Captain
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isViceCaptain}
+                    onChange={(e) => setIsViceCaptain(e.target.checked)}
+                  />
+                  Vice-Captain
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={isWebsiteVisible}
+                    onChange={(e) => setIsWebsiteVisible(e.target.checked)}
+                  />
+                  Website sichtbar
+                </label>
               </div>
 
               {assignError ? (
-                <div className="fca-status-box fca-status-box-error">
-                  {assignError}
-                </div>
+                <p className="text-sm font-medium text-[var(--sce-danger)]">{assignError}</p>
               ) : null}
-
               {assignMessage ? (
-                <div className="fca-status-box fca-status-box-success">
-                  {assignMessage}
-                </div>
+                <p className="text-sm font-medium text-emerald-600">{assignMessage}</p>
               ) : null}
 
-              <div className="flex justify-end">
-                <button
-                  type="button"
+              <div className="flex justify-end gap-2">
+                <Button variant="secondary" size="sm" onClick={resetAddForm}>
+                  Abbrechen
+                </Button>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  loading={assignLoading}
+                  disabled={!selectedPerson}
                   onClick={handleAssign}
-                  disabled={assignLoading || !selectedPerson}
-                  className="fca-button-primary"
                 >
-                  {assignLoading ? "Hinzufügen..." : "Spieler hinzufügen"}
-                </button>
+                  Spieler hinzufügen
+                </Button>
               </div>
             </div>
           ) : null}
         </div>
-      )}
+      ) : null}
 
       {removeError ? (
-        <div className="fca-status-box fca-status-box-error mt-4">
-          {removeError}
-        </div>
+        <p className="mt-3 text-sm font-medium text-[var(--sce-danger)]">{removeError}</p>
       ) : null}
 
-      {removeMessage ? (
-        <div className="fca-status-box fca-status-box-success mt-4">
-          {removeMessage}
-        </div>
-      ) : null}
-
-      {teamSeason.playerSquadMembers.length === 0 ? (
-        <div className="fca-status-box fca-status-box-muted mt-5">
-          Noch keine Spieler im Kader dieser Team-Saison.
+      {playerCount === 0 ? (
+        <div className="mt-4" data-testid="team-squad-empty">
+          <p className="text-sm text-[var(--muted)]">Noch keine Spieler im Kader.</p>
+          {canManage && !showAddForm ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="mt-3"
+              iconLeft={<Plus className="h-3.5 w-3.5" />}
+              onClick={() => setShowAddForm(true)}
+            >
+              Spieler hinzufügen
+            </Button>
+          ) : null}
         </div>
       ) : (
-        <div className="mt-5 space-y-3">
+        <div className="mt-4 divide-y divide-[var(--border)]" data-testid="team-squad-list">
           {teamSeason.playerSquadMembers.map((member) => (
-            <AdminListItem
+            <div
               key={member.id}
-              avatar={
-                <AdminAvatar
-                  name={getPersonName(member.person)}
-                  size="md"
-                />
-              }
-              title={getPersonName(member.person)}
-              subtitle={[
-                getBirthYear(member.person.dateOfBirth)?.toString() ?? null,
-                member.positionLabel ?? null,
-                member.shirtNumber ? "Nr. " + member.shirtNumber : null,
-              ]
-                .filter(Boolean)
-                .join(" • ") || "Keine Zusatzdaten"}
-              meta={
-                <>
-                  <AdminStatusPill label={member.status} tone={member.status === "ACTIVE" ? "success" : "muted"} />
-                  <span className="fca-pill">
-                    Website: {member.isWebsiteVisible ? "Ja" : "Nein"}
-                  </span>
-                  {member.isCaptain ? <span className="fca-pill">Captain</span> : null}
-                  {member.isViceCaptain ? <span className="fca-pill">Vice-Captain</span> : null}
-                </>
-              }
-              actions={
-                canManage ? (
-                  <button
-                    type="button"
-                    onClick={() => handleRemove(member)}
-                    disabled={removingMemberId === member.id}
-                    className="fca-button-primary"
+              className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <AdminAvatar name={getPersonName(member.person)} size="md" />
+                <div className="min-w-0">
+                  <Link
+                    href={`/dashboard/persons/${member.person.id}`}
+                    className="truncate text-sm font-semibold text-[var(--foreground)] hover:text-[var(--blue)]"
                   >
-                    {removingMemberId === member.id ? "Entfernen..." : "Entfernen"}
-                  </button>
-                ) : (
-                  <span className="text-xs text-slate-400">Nur lesen</span>
-                )
-              }
-            />
+                    {getPersonName(member.person)}
+                  </Link>
+                  <p className="truncate text-xs text-[var(--muted)]">
+                    {[
+                      getBirthYear(member.person.dateOfBirth)?.toString() ?? null,
+                      member.positionLabel ?? null,
+                      member.shirtNumber ? `Nr. ${member.shirtNumber}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || "Keine Zusatzdaten"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <AdminStatusPill
+                  label={member.status}
+                  tone={member.status === "ACTIVE" ? "success" : "muted"}
+                />
+                {member.isCaptain ? (
+                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-2)]">
+                    Captain
+                  </span>
+                ) : null}
+                {member.isViceCaptain ? (
+                  <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-2)]">
+                    Vice-Captain
+                  </span>
+                ) : null}
+                {canManage ? (
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    loading={removingMemberId === member.id}
+                    onClick={() => handleRemove(member)}
+                  >
+                    Entfernen
+                  </Button>
+                ) : null}
+              </div>
+            </div>
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function Toggle({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="fca-toggle-row">
-      <span className="fca-label">{label}</span>
-      <input
-        type="checkbox"
-        checked={value}
-        onChange={(event) => onChange(event.target.checked)}
-        className="fca-toggle-checkbox"
-      />
-    </div>
+    </section>
   );
 }

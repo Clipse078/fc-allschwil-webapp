@@ -67,6 +67,8 @@ type ScopedResponsibilitiesCardProps = {
   eligibleUsers: EligibleUser[];
   showScopeModeSelector?: boolean;
   canManage: boolean;
+  title?: string;
+  description?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -394,6 +396,8 @@ export default function ScopedResponsibilitiesCard({
   eligibleUsers,
   showScopeModeSelector = false,
   canManage,
+  title = "Personen & Zuständigkeiten",
+  description,
 }: ScopedResponsibilitiesCardProps) {
   const router = useRouter();
   const [addPanelOpen, setAddPanelOpen] = useState(false);
@@ -438,9 +442,7 @@ export default function ScopedResponsibilitiesCard({
       <div className="sce-detail-section-header">
         <div className="flex items-center gap-2">
           <Shield className="h-4 w-4 text-[var(--muted)]" />
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-            Personen &amp; Zuständigkeiten
-          </p>
+          <p className="text-sm font-semibold text-[var(--foreground)]">{title}</p>
           {initialAssignments.length > 0 ? (
             <span className="sce-count-badge">{initialAssignments.length}</span>
           ) : null}
@@ -468,7 +470,10 @@ export default function ScopedResponsibilitiesCard({
 
       {/* Scope context badge */}
       <div className="border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-2.5">
-        <p className="text-[11px] text-[var(--muted)]">
+        <p className="text-sm text-[var(--muted)]">
+          {description ?? "Organisatorische und administrative Zuständigkeiten — getrennt vom sportlichen Kader."}
+        </p>
+        <p className="mt-1 text-xs text-[var(--muted)]">
           Bereich:{" "}
           <span className="font-semibold text-[var(--foreground)]">{orgUnitName}</span>
         </p>

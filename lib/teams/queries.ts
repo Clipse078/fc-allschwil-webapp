@@ -236,6 +236,8 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           participationType: true,
           websiteVisible: true,
           infoboardVisible: true,
+          squadWebsiteVisible: true,
+          trainerTeamWebsiteVisible: true,
           season: {
             select: {
               id: true,
@@ -275,6 +277,61 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
                   name: true,
                   key: true,
                   type: true,
+                },
+              },
+            },
+          },
+          playerSquadMembers: {
+            orderBy: [
+              { sortOrder: "asc" },
+              { shirtNumber: "asc" },
+              { person: { lastName: "asc" } },
+              { person: { firstName: "asc" } },
+            ],
+            select: {
+              id: true,
+              status: true,
+              shirtNumber: true,
+              positionLabel: true,
+              isCaptain: true,
+              isViceCaptain: true,
+              isWebsiteVisible: true,
+              sortOrder: true,
+              remarks: true,
+              person: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  displayName: true,
+                  email: true,
+                  phone: true,
+                  dateOfBirth: true,
+                },
+              },
+            },
+          },
+          trainerTeamMembers: {
+            orderBy: [
+              { sortOrder: "asc" },
+              { person: { lastName: "asc" } },
+              { person: { firstName: "asc" } },
+            ],
+            select: {
+              id: true,
+              status: true,
+              roleLabel: true,
+              isWebsiteVisible: true,
+              sortOrder: true,
+              remarks: true,
+              person: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  displayName: true,
+                  email: true,
+                  phone: true,
                 },
               },
             },
@@ -374,6 +431,14 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
         startDate: entry.season.startDate.toISOString(),
         endDate: entry.season.endDate.toISOString(),
       },
+      playerSquadMembers: (entry.playerSquadMembers ?? []).map((member) => ({
+        ...member,
+        person: {
+          ...member.person,
+          dateOfBirth: member.person.dateOfBirth?.toISOString() ?? null,
+        },
+      })),
+      trainerTeamMembers: entry.trainerTeamMembers ?? [],
     })),
   };
 }

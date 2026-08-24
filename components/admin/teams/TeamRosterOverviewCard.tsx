@@ -1,78 +1,22 @@
 ﻿import TeamSquadManagementCard from "@/components/admin/teams/TeamSquadManagementCard";
 import TeamTrainerManagementCard from "@/components/admin/teams/TeamTrainerManagementCard";
-import AdminSurfaceCard from "@/components/admin/shared/AdminSurfaceCard";
-
-type SquadMember = {
-  id: string;
-  status: string;
-  shirtNumber: number | null;
-  positionLabel: string | null;
-  isCaptain: boolean;
-  isViceCaptain: boolean;
-  isWebsiteVisible: boolean;
-  sortOrder: number;
-  remarks: string | null;
-  person: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    displayName: string | null;
-    email: string | null;
-    phone: string | null;
-    dateOfBirth?: string | null;
-  };
-};
-
-type TrainerMember = {
-  id: string;
-  status: string;
-  roleLabel: string | null;
-  isWebsiteVisible: boolean;
-  sortOrder: number;
-  remarks: string | null;
-  person: {
-    id: string;
-    firstName: string;
-    lastName: string;
-    displayName: string | null;
-    email: string | null;
-    phone: string | null;
-  };
-};
-
-type TeamSeasonItem = {
-  id: string;
-  displayName: string;
-  shortName: string | null;
-  status: string;
-  websiteVisible: boolean;
-  infoboardVisible: boolean;
-  squadWebsiteVisible?: boolean;
-  trainerTeamWebsiteVisible?: boolean;
-  season: {
-    id: string;
-    key: string;
-    name: string;
-    startDate: string;
-    endDate: string;
-    isActive: boolean;
-  };
-  playerSquadMembers?: SquadMember[];
-  trainerTeamMembers?: TrainerMember[];
-};
+import {
+  TeamHistoricalSeasonRosters,
+  type TeamRosterSeasonEntry,
+} from "@/components/admin/teams/TeamRosterSeasonSection";
 
 type Props = {
   teamId: string;
   teamAgeGroup: string | null;
   canManage: boolean;
-  teamSeasons: TeamSeasonItem[];
+  teamSeasons: TeamRosterSeasonEntry[];
+  currentTeamSeasonId: string | null;
 };
 
-function sortTeamSeasonsDesc(entries: TeamSeasonItem[]) {
+function sortTeamSeasonsDesc(entries: TeamRosterSeasonEntry[]) {
   return [...entries].sort((a, b) => {
     const aTime = new Date(a.season.startDate).getTime();
     const bTime = new Date(b.season.startDate).getTime();
-
     return bTime - aTime;
   });
 }
@@ -82,81 +26,65 @@ export default function TeamRosterOverviewCard({
   teamAgeGroup,
   canManage,
   teamSeasons,
+  currentTeamSeasonId,
 }: Props) {
   const sortedSeasons = sortTeamSeasonsDesc(teamSeasons);
+  const currentSeason = currentTeamSeasonId
+    ? sortedSeasons.find((entry) => entry.id === currentTeamSeasonId) ?? null
+    : null;
+  const historicalSeasons = currentSeason
+    ? sortedSeasons.filter((entry) => entry.id !== currentSeason.id)
+    : sortedSeasons;
 
   return (
-    <AdminSurfaceCard className="p-6">
-      <div>
-        <p className="fca-eyebrow">Roster Management</p>
-        <h3 className="fca-heading mt-2">Spielerkader und Trainerteam</h3>
-        <p className="fca-body-muted mt-3 max-w-3xl">
-          Saisonbasierte Grundlage für Kaderverwaltung mit getrennten Bereichen
-          für Spieler und Trainer – im selben FCA Premium UX Stil wie die Website.
-        </p>
-      </div>
+    <div className="space-y-6" data-testid="team-roster-overview">
+      {currentSeason ? (
+        <div className="grid gap-8 xl:grid-cols-2">
+          <TeamSquadManagementCard
+            teamId={teamId}
+            canManage={canManage}
+            sectionId="spielerkader"
+            teamSeason={{
+              id: currentSeason.id,
+              displayName: currentSeason.displayName,
+              shortName: currentSeason.shortName,
+              status: currentSeason.status,
+              squadWebsiteVisible: currentSeason.squadWebsiteVisible ?? true,
+              season: currentSeason.season,
+              teamAgeGroup,
+              playerSquadMembers: currentSeason.playerSquadMembers ?? [],
+            }}
+          />
 
-      {sortedSeasons.length === 0 ? (
-        <div className="fca-status-box fca-status-box-muted mt-5">
-          Noch keine Team-Saisons vorhanden. Für die spätere Kader- und
-          Trainerteam-Verwaltung wird mindestens eine Team-Saison benötigt.
+          <TeamTrainerManagementCard
+            teamId={teamId}
+            canManage={canManage}
+            sectionId="trainerteam"
+            teamSeason={{
+              id: currentSeason.id,
+              displayName: currentSeason.displayName,
+              trainerTeamWebsiteVisible: currentSeason.trainerTeamWebsiteVisible ?? true,
+              season: currentSeason.season,
+              trainerTeamMembers: currentSeason.trainerTeamMembers ?? [],
+            }}
+          />
         </div>
       ) : (
-        <div className="mt-6 grid gap-6">
-          {sortedSeasons.map((entry) => (
-            <div key={entry.id} className="fca-section-card p-6">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div>
-                  <p className="fca-eyebrow">Saison</p>
-                  <h4 className="fca-subheading mt-2">{entry.season.name}</h4>
-                  <p className="fca-body-muted mt-3">{entry.displayName}</p>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <span className="fca-pill">
-                    Kader Website: {entry.squadWebsiteVisible ? "An" : "Aus"}
-                  </span>
-                  <span className="fca-pill">
-                    Trainer Website: {entry.trainerTeamWebsiteVisible ? "An" : "Aus"}
-                  </span>
-                  <span className="fca-pill">
-                    Status: {entry.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-6">
-                <TeamSquadManagementCard
-                  teamId={teamId}
-                  canManage={canManage}
-                  teamSeason={{
-                    id: entry.id,
-                    displayName: entry.displayName,
-                    shortName: entry.shortName,
-                    status: entry.status,
-                    squadWebsiteVisible: entry.squadWebsiteVisible ?? true,
-                    season: entry.season,
-                    teamAgeGroup,
-                    playerSquadMembers: entry.playerSquadMembers ?? [],
-                  }}
-                />
-
-                <TeamTrainerManagementCard
-                  teamId={teamId}
-                  canManage={canManage}
-                  teamSeason={{
-                    id: entry.id,
-                    displayName: entry.displayName,
-                    trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible ?? true,
-                    season: entry.season,
-                    trainerTeamMembers: entry.trainerTeamMembers ?? [],
-                  }}
-                />
-              </div>
-            </div>
-          ))}
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-5 text-sm text-[var(--muted)]">
+          {teamSeasons.length > 0
+            ? "Für die aktuelle Geschäftsjahr-Saison ist kein Kader hinterlegt. Historische Saisons sind unten verfügbar."
+            : "Noch keine Team-Saison vorhanden. Für Kader und Trainerteam wird mindestens eine Team-Saison benötigt."}
         </div>
       )}
-    </AdminSurfaceCard>
+
+      {historicalSeasons.length > 0 ? (
+        <TeamHistoricalSeasonRosters
+          teamId={teamId}
+          teamAgeGroup={teamAgeGroup}
+          canManage={canManage}
+          seasons={historicalSeasons}
+        />
+      ) : null}
+    </div>
   );
 }

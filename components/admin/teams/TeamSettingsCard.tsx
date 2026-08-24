@@ -79,6 +79,7 @@ type Props = {
   currentSeasonOrgUnit: OrgUnitOption | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
+  onCancelEdit?: () => void;
 };
 
 const CATEGORY_OPTIONS = [
@@ -133,6 +134,7 @@ export default function TeamSettingsCard({
   currentSeasonOrgUnit,
   canManage,
   onSaved,
+  onCancelEdit,
 }: Props) {
   const router = useRouter();
   const [form, setForm] = useState<Team>(team);
@@ -342,11 +344,50 @@ export default function TeamSettingsCard({
     }
   }
 
+  const isDirty =
+    form.name !== team.name ||
+    form.shortName !== team.shortName ||
+    form.alternativeName !== team.alternativeName ||
+    form.infoboardDisplayName !== team.infoboardDisplayName ||
+    form.infoboardTrainingDisplayName !== team.infoboardTrainingDisplayName ||
+    form.infoboardMatchDisplayName !== team.infoboardMatchDisplayName ||
+    form.infoboardTournamentDisplayName !== team.infoboardTournamentDisplayName ||
+    form.category !== team.category ||
+    form.genderGroup !== team.genderGroup ||
+    form.sortOrder !== team.sortOrder;
+
   return (
     <SectionCard
       title="Team-Einstellungen"
       description={`Slug: ${form.slug}`}
     >
+      {canManage ? (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-3">
+          <p className="text-sm text-[var(--text-2)]">
+            {isDirty ? "Änderungen noch nicht gespeichert." : "Teamdaten bearbeiten."}
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {onCancelEdit ? (
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                className="rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+              >
+                Abbrechen
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={submitting || !isDirty}
+              className="fca-button-primary"
+            >
+              {submitting ? "Speichern..." : "Team speichern"}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       {!canManage ? (
         <div className="fca-status-box fca-status-box-warn mb-5">
           Diese Teamdaten sind aktuell nur lesbar. Bearbeitung ist nur mit
@@ -650,21 +691,6 @@ export default function TeamSettingsCard({
           </div>
         </FormSection>
 
-        <FormSection title="Sichtbarkeit">
-          <Toggle
-            label="Website sichtbar"
-            value={form.websiteVisible}
-            disabled={!canManage}
-            onChange={(value) => updateField("websiteVisible", value)}
-          />
-
-          <Toggle
-            label="Infoboard sichtbar"
-            value={form.infoboardVisible}
-            disabled={!canManage}
-            onChange={(value) => updateField("infoboardVisible", value)}
-          />
-        </FormSection>
       </div>
 
       {/* TEAM-IDENTITY-01: provider identity is read-only and clearly separate
@@ -703,7 +729,7 @@ export default function TeamSettingsCard({
           <button
             type="button"
             onClick={handleSave}
-            disabled={submitting}
+            disabled={submitting || !isDirty}
             className="fca-button-primary"
           >
             {submitting ? "Speichern..." : "Team speichern"}
@@ -711,47 +737,5 @@ export default function TeamSettingsCard({
         </div>
       ) : null}
     </SectionCard>
-  );
-}
-
-/**
- * Compact ON/OFF toggle switch (TEAMCENTER-UX-01B, letter G).
- *
- * Replaces the previous raw checkbox presentation with a proper switch
- * control. Same underlying boolean field + onChange contract — no new
- * publication architecture.
- */
-function Toggle({
-  label,
-  value,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  value: boolean;
-  disabled: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border)] bg-white px-3.5 py-2.5">
-      <span className="text-sm font-medium text-[var(--foreground)]">{label}</span>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={value}
-        aria-label={label}
-        disabled={disabled}
-        onClick={() => onChange(!value)}
-        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--blue)]/30 disabled:cursor-not-allowed disabled:opacity-50 ${
-          value ? "bg-emerald-500" : "bg-[var(--border-strong)]"
-        }`}
-      >
-        <span
-          className={`inline-block h-4.5 w-4.5 transform rounded-full bg-white shadow transition-transform ${
-            value ? "translate-x-[22px]" : "translate-x-[3px]"
-          }`}
-        />
-      </button>
-    </div>
   );
 }
