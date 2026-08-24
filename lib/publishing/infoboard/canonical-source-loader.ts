@@ -295,6 +295,7 @@ export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
           name: true,
           shortName: true,
           alternativeName: true,
+          infoboardDisplayName: true,
         },
       },
     },
