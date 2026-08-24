@@ -15,6 +15,7 @@
  */
 
 import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
+import { resolveInfoboardTeamDisplayName } from "./infoboard-team-display-name";
 import type {
   InfoboardMatchPresentation,
   InfoboardMatchSidePresentation,
@@ -37,6 +38,7 @@ export type InfoboardMatchSideIdentity = {
   readonly teamName: string | null;
   readonly teamShortName: string | null;
   readonly teamAlternativeName: string | null;
+  readonly teamInfoboardDisplayName: string | null;
   /** Legacy combined display name when canonical club/team split is unavailable. */
   readonly fallbackDisplayName: string | null;
 };
@@ -67,21 +69,24 @@ export function resolveInfoboardClubDisplayName(
  * Resolves the secondary team-specific line for one match side.
  *
  * Priority (tenant Team naming architecture):
- *   1. alternativeName
- *   2. shortName
- *   3. name — only when it does not merely repeat the club line
+ *   1. infoboardDisplayName
+ *   2. alternativeName
+ *   3. shortName
+ *   4. name — only when it does not merely repeat the club line
  */
 export function resolveInfoboardTeamSubDisplayName(input: {
   readonly clubDisplayName: string;
   readonly teamName: string | null | undefined;
   readonly teamShortName: string | null | undefined;
   readonly teamAlternativeName: string | null | undefined;
+  readonly teamInfoboardDisplayName?: string | null | undefined;
 }): string | null {
-  const alternative = meaningful(input.teamAlternativeName);
-  if (alternative) return alternative;
-
-  const short = meaningful(input.teamShortName);
-  if (short) return short;
+  const configured = resolveInfoboardTeamDisplayName({
+    infoboardDisplayName: input.teamInfoboardDisplayName,
+    alternativeName: input.teamAlternativeName,
+    shortName: input.teamShortName,
+  });
+  if (configured) return configured;
 
   const name = meaningful(input.teamName);
   if (!name) return null;
@@ -116,6 +121,7 @@ function resolveSidePresentation(
     teamName: identity.teamName,
     teamShortName: identity.teamShortName,
     teamAlternativeName: identity.teamAlternativeName,
+    teamInfoboardDisplayName: identity.teamInfoboardDisplayName,
   });
 
   const clubLogoUrl = resolveClubIdentityLogoUrl(

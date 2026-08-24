@@ -136,6 +136,7 @@ const EXISTING_TEAM = {
   name: "FC Allschwil Junioren B2",
   shortName: null,
   alternativeName: null,
+  infoboardDisplayName: null,
   slug: "junioren-b2",
   category: "JUNIOREN",
   genderGroup: null,
@@ -281,6 +282,83 @@ describe("PATCH /api/teams/[teamId] — TEAM-IDENTITY-01 naming fields", () => {
         }),
       }),
     );
+  });
+
+  it("8 — infoboardDisplayName can be set and trimmed", async () => {
+    mocks.teamUpdate.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      infoboardDisplayName: "JUNIOREN E4",
+      teamSeasons: [],
+    });
+
+    await PATCH(
+      makeRequest({ ...BASE_BODY, infoboardDisplayName: "  JUNIOREN E4  " }),
+      makeContext(),
+    );
+
+    const updateArgs = mocks.teamUpdate.mock.calls[0][0];
+    expect(updateArgs.data.infoboardDisplayName).toBe("JUNIOREN E4");
+  });
+
+  it("9 — blank infoboardDisplayName is normalized to null", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      infoboardDisplayName: "JUNIOREN E4",
+    });
+    mocks.teamUpdate.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      infoboardDisplayName: null,
+      teamSeasons: [],
+    });
+
+    await PATCH(makeRequest({ ...BASE_BODY, infoboardDisplayName: "   " }), makeContext());
+
+    const updateArgs = mocks.teamUpdate.mock.calls[0][0];
+    expect(updateArgs.data.infoboardDisplayName).toBeNull();
+  });
+
+  it("10 — canonical Team fields remain unchanged when only infoboardDisplayName is updated", async () => {
+    mocks.teamFindUnique.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      name: "E4",
+      shortName: "E4",
+      alternativeName: "Junioren E4",
+    });
+    mocks.teamUpdate.mockResolvedValueOnce({
+      ...EXISTING_TEAM,
+      name: "E4",
+      shortName: "E4",
+      alternativeName: "Junioren E4",
+      infoboardDisplayName: "JUNIOREN E4",
+      teamSeasons: [],
+    });
+
+    await PATCH(
+      makeRequest({
+        ...BASE_BODY,
+        name: "E4",
+        shortName: "E4",
+        alternativeName: "Junioren E4",
+        infoboardDisplayName: "JUNIOREN E4",
+      }),
+      makeContext(),
+    );
+
+    const updateArgs = mocks.teamUpdate.mock.calls[0][0];
+    expect(updateArgs.data.name).toBe("E4");
+    expect(updateArgs.data.shortName).toBe("E4");
+    expect(updateArgs.data.alternativeName).toBe("Junioren E4");
+    expect(updateArgs.data.infoboardDisplayName).toBe("JUNIOREN E4");
+  });
+
+  it("11 — rejects infoboardDisplayName longer than 120 characters", async () => {
+    const response = await PATCH(
+      makeRequest({ ...BASE_BODY, infoboardDisplayName: "X".repeat(121) }),
+      makeContext(),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.teamUpdate).not.toHaveBeenCalled();
   });
 
   it("never sends a request that touches provider-owned TeamExternalMapping fields", async () => {

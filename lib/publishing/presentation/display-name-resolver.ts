@@ -25,7 +25,7 @@
  *     - No `categoryLabel` on the Event model. Only `competitionLabel` exists.
  */
 
-import { resolveCompactTeamName } from "@/lib/teams/team-naming";
+import { resolveInfoboardTeamDisplayName } from "./infoboard-team-display-name";
 
 // ── Presentation channel ───────────────────────────────────────────────────────
 
@@ -74,6 +74,7 @@ function firstMeaningful(
  *   - `name`            → Team.name (tenant-managed canonical long name)
  *   - `shortName`       → Team.shortName (tenant-managed compact name)
  *   - `alternativeName` → Team.alternativeName (tenant-managed alternative)
+ *   - `infoboardDisplayName` → Team.infoboardDisplayName (Infoboard override)
  *   - `displayName`     → TeamSeason.displayName (season-scoped; WEBSITE only)
  *   - `fallbackName`    → explicit source-event fallback (e.g. raw team title from
  *                         event import); not a schema field.
@@ -88,6 +89,7 @@ export type TeamDisplayNameInput = {
   readonly displayName?: string | null;
   readonly shortName?: string | null;
   readonly alternativeName?: string | null;
+  readonly infoboardDisplayName?: string | null;
   readonly fallbackName?: string | null;
 };
 
@@ -95,11 +97,12 @@ export type TeamDisplayNameInput = {
  * Resolves the best team display name for the given presentation channel.
  *
  * INFOBOARD — tenant-managed Team identity (INFOBOARD-TEAMNAME-01):
- *   Reuses resolveCompactTeamName() from lib/teams/team-naming.ts:
- *   1. Team.shortName
- *   2. Team.name
- *   3. Team.alternativeName
- *   4. fallbackName (explicit source-event fallback)
+ *   Reuses resolveInfoboardTeamDisplayName() from infoboard-team-display-name.ts:
+ *   1. Team.infoboardDisplayName
+ *   2. Team.alternativeName
+ *   3. Team.shortName
+ *   4. Team.name
+ *   5. fallbackName (explicit source-event fallback)
  *
  *   TeamSeason.displayName / TeamSeason.shortName are intentionally excluded —
  *   seasonal overrides must not substitute for tenant-managed Team fields.
@@ -121,13 +124,13 @@ export function resolveTeamDisplayName(
   channel: PresentationChannel,
 ): string | null {
   if (channel === "INFOBOARD") {
-    const tenantManaged = resolveCompactTeamName({
-      teamName: input.name,
-      teamShortName: input.shortName,
-      teamAlternativeName: input.alternativeName,
+    return resolveInfoboardTeamDisplayName({
+      infoboardDisplayName: input.infoboardDisplayName,
+      alternativeName: input.alternativeName,
+      shortName: input.shortName,
+      name: input.name,
+      fallbackName: input.fallbackName,
     });
-    if (tenantManaged !== null) return tenantManaged;
-    return meaningful(input.fallbackName) ?? null;
   }
 
   return firstMeaningful([

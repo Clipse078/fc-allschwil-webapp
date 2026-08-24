@@ -96,6 +96,8 @@ export type Screen1SourceEvent = {
     readonly shortName?: string | null;
     /** Team.alternativeName — canonical alternative name (INFOBOARD-LOGO-02). */
     readonly alternativeName?: string | null;
+    /** Team.infoboardDisplayName — Infoboard Screen 1 override (INFOBOARD-TEAMNAME-01). */
+    readonly infoboardDisplayName?: string | null;
   } | null;
 
   /** Explicit source-level team name fallback (e.g. from event import). */
@@ -246,6 +248,7 @@ export function mapScreen1Event(
       displayName: event.team?.displayName,
       shortName: event.team?.shortName,
       alternativeName: event.team?.alternativeName,
+      infoboardDisplayName: event.team?.infoboardDisplayName,
       fallbackName: event.teamFallbackName,
     },
     "INFOBOARD",

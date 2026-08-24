@@ -18,6 +18,8 @@ type Context = {
   params: Promise<{ teamId: string }>;
 };
 
+const INFOBOARD_DISPLAY_NAME_MAX_LENGTH = 120;
+
 const ALLOWED_CATEGORIES = [
   "KINDERFUSSBALL",
   "JUNIOREN",
@@ -114,6 +116,14 @@ export async function PATCH(request: NextRequest, context: Context) {
         : alternativeNameRaw === null || alternativeNameRaw === ""
           ? null
           : String(alternativeNameRaw).trim() || null;
+
+    const infoboardDisplayNameRaw = body.infoboardDisplayName;
+    const infoboardDisplayName: string | null | undefined =
+      infoboardDisplayNameRaw === undefined
+        ? undefined
+        : infoboardDisplayNameRaw === null || infoboardDisplayNameRaw === ""
+          ? null
+          : String(infoboardDisplayNameRaw).trim() || null;
     const genderGroup =
       body.genderGroup === null || body.genderGroup === undefined
         ? null
@@ -151,6 +161,19 @@ export async function PATCH(request: NextRequest, context: Context) {
       return NextResponse.json(
         { error: "Sortierung muss eine Zahl sein." },
         { status: 400 }
+      );
+    }
+
+    if (
+      infoboardDisplayName !== undefined &&
+      infoboardDisplayName !== null &&
+      infoboardDisplayName.length > INFOBOARD_DISPLAY_NAME_MAX_LENGTH
+    ) {
+      return NextResponse.json(
+        {
+          error: `Infoboard-Anzeigename darf maximal ${INFOBOARD_DISPLAY_NAME_MAX_LENGTH} Zeichen lang sein.`,
+        },
+        { status: 400 },
       );
     }
 
@@ -194,6 +217,7 @@ export async function PATCH(request: NextRequest, context: Context) {
         ...(orgUnitId !== undefined ? { orgUnitId } : {}),
         ...(shortName !== undefined ? { shortName } : {}),
         ...(alternativeName !== undefined ? { alternativeName } : {}),
+        ...(infoboardDisplayName !== undefined ? { infoboardDisplayName } : {}),
       },
       include: {
         teamSeasons: {
@@ -224,6 +248,7 @@ export async function PATCH(request: NextRequest, context: Context) {
         name: updated.name,
         shortName: updated.shortName,
         alternativeName: updated.alternativeName,
+        infoboardDisplayName: updated.infoboardDisplayName,
         slug: updated.slug,
         category: updated.category,
         genderGroup: updated.genderGroup,

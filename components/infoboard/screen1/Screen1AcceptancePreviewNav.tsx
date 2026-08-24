@@ -7,7 +7,8 @@ type Screen1AcceptancePreviewNavProps = {
     | "richer-match"
     | "small-tournament"
     | "tournament"
-    | "dense";
+    | "dense"
+    | "teamname";
 };
 
 const SCENARIOS = [
@@ -17,6 +18,7 @@ const SCENARIOS = [
   { key: "tournament", href: "/infoboard/screen-1/preview/tournament", label: "D 4-Team" },
   { key: "mixed", href: "/infoboard/screen-1/preview", label: "F Mixed" },
   { key: "dense", href: "/infoboard/screen-1/preview/dense", label: "G Dense" },
+  { key: "teamname", href: "/infoboard/screen-1/preview/teamname", label: "H Teamname" },
 ] as const;
 
 /**

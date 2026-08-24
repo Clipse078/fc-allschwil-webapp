@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { SectionCard } from "@/components/ui/page";
+import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 
 type OrgUnitOption = {
   id: string;
@@ -37,6 +38,7 @@ type Team = {
   // Optional. Never written by provider sync.
   shortName: string | null;
   alternativeName: string | null;
+  infoboardDisplayName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -154,6 +156,13 @@ export default function TeamSettingsCard({
   const competitionLabel =
     form.competition?.shortName ?? form.competition?.name ?? null;
 
+  const effectiveInfoboardDisplayName = resolveInfoboardTeamDisplayName({
+    infoboardDisplayName: form.infoboardDisplayName,
+    alternativeName: form.alternativeName,
+    shortName: form.shortName,
+    name: form.name,
+  });
+
   const isCompetitionTeamSeason = currentParticipationType === "COMPETITION";
 
   async function handleCompetitionChange(nextCompetitionId: string) {
@@ -264,6 +273,7 @@ export default function TeamSettingsCard({
           name: form.name,
           shortName: form.shortName,
           alternativeName: form.alternativeName,
+          infoboardDisplayName: form.infoboardDisplayName,
           category: form.category,
           genderGroup: form.genderGroup,
           // TEAMCENTER-UX-01B (F): Teamstufe (ageGroup) is no longer editable
@@ -369,6 +379,31 @@ export default function TeamSettingsCard({
               className={fieldClass}
               placeholder="z. B. Junioren B2"
             />
+          </label>
+
+          <label className="block space-y-1.5 md:col-span-2">
+            <span className={labelClass}>Infoboard-Anzeigename</span>
+            <input
+              type="text"
+              value={form.infoboardDisplayName ?? ""}
+              disabled={!canManage}
+              maxLength={120}
+              onChange={(event) =>
+                updateField("infoboardDisplayName", event.target.value || null)
+              }
+              className={fieldClass}
+              placeholder="z. B. JUNIOREN E4"
+            />
+            <p className="text-xs text-[var(--text-2)]">
+              Optionaler Name für die Anzeige auf dem Infoboard. Wenn leer,
+              verwendet SCE automatisch den alternativen Anzeigenamen, Kurznamen
+              oder Teamnamen.
+            </p>
+            {effectiveInfoboardDisplayName ? (
+              <p className="text-xs font-medium text-[var(--foreground)]">
+                Effektive Infoboard-Anzeige: {effectiveInfoboardDisplayName}
+              </p>
+            ) : null}
           </label>
         </FormSection>
 

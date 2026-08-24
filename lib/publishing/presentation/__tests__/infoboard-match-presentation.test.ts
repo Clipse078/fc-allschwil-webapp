@@ -22,6 +22,7 @@ function makeIdentity(
       teamName: "FC Allschwil Junioren C2",
       teamShortName: null,
       teamAlternativeName: "Junioren C2",
+      teamInfoboardDisplayName: null,
       fallbackDisplayName: "FC Allschwil Junioren C2",
     },
     away: {
@@ -31,6 +32,7 @@ function makeIdentity(
       teamName: "FC Therwil C Gelb",
       teamShortName: "C Gelb",
       teamAlternativeName: null,
+      teamInfoboardDisplayName: null,
       fallbackDisplayName: "FC Therwil C Gelb",
     },
     ...overrides,
@@ -52,7 +54,19 @@ describe("resolveInfoboardClubDisplayName", () => {
 });
 
 describe("resolveInfoboardTeamSubDisplayName", () => {
-  it("uses alternativeName first", () => {
+  it("uses infoboardDisplayName first", () => {
+    expect(
+      resolveInfoboardTeamSubDisplayName({
+        clubDisplayName: "FC Allschwil",
+        teamName: "E4",
+        teamShortName: "E4",
+        teamAlternativeName: "Junioren E4",
+        teamInfoboardDisplayName: "JUNIOREN E4",
+      }),
+    ).toBe("JUNIOREN E4");
+  });
+
+  it("uses alternativeName when infoboardDisplayName is absent", () => {
     expect(
       resolveInfoboardTeamSubDisplayName({
         clubDisplayName: "FC Allschwil",
@@ -116,6 +130,7 @@ describe("resolveInfoboardMatchPresentation", () => {
           teamName: "C Gelb",
           teamShortName: "C Gelb",
           teamAlternativeName: null,
+          teamInfoboardDisplayName: null,
           fallbackDisplayName: "FC Therwil C Gelb",
         },
       }),

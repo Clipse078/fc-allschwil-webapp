@@ -589,16 +589,36 @@ describe("buildInfoboardScreen1Feed — mapping integration", () => {
     });
   }
 
-  it("resolves team infoboard name from tenant-managed Team.shortName first", async () => {
+  it("resolves explicit infoboardDisplayName before other Team fields", async () => {
     const event = makeFutureEvent({
-      team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "U17" },
+      team: {
+        infoboardDisplayName: "JUNIOREN E4",
+        alternativeName: "Junioren E4",
+        name: "E4",
+        displayName: "Season E4",
+        shortName: "E4",
+      },
     });
     const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput({ now }));
     const mapped = feed.next.find((e) => e.id === event.id);
-    expect(mapped?.teamDisplayName).toBe("U17");
+    expect(mapped?.teamDisplayName).toBe("JUNIOREN E4");
   });
 
-  it("prefers Team.name over TeamSeason.displayName on infoboard (INFOBOARD-TEAMNAME-01)", async () => {
+  it("prefers alternativeName over shortName on infoboard", async () => {
+    const event = makeFutureEvent({
+      team: {
+        name: "F2",
+        displayName: "Season F2",
+        shortName: "F2",
+        alternativeName: "Junioren F2",
+      },
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput({ now }));
+    const mapped = feed.next.find((e) => e.id === event.id);
+    expect(mapped?.teamDisplayName).toBe("Junioren F2");
+  });
+
+  it("falls back to Team.name when higher priorities are absent", async () => {
     const event = makeFutureEvent({
       team: {
         name: "FC Allschwil Junioren B2",

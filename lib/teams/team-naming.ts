@@ -5,7 +5,7 @@
  *
  * Defines ONE reusable naming-fallback contract for tenant-facing Team
  * naming (Teams admin UI: overview list, Team detail/edit). Publishing
- * INFOBOARD team display names reuse resolveCompactTeamName() via
+ * INFOBOARD team display names use resolveInfoboardTeamDisplayName() via
  * display-name-resolver.ts (INFOBOARD-TEAMNAME-01). WEBSITE channel naming
  * still resolves TeamSeason.displayName/shortName in display-name-resolver.ts.
  *

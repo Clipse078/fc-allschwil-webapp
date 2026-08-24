@@ -132,17 +132,20 @@ export type CanonicalEventPolicyRow = {
     readonly name: string;
     readonly shortName: string | null;
     readonly alternativeName: string | null;
+    readonly infoboardDisplayName: string | null;
   } | null;
   readonly matchExternalMapping?: {
     readonly homeTeam: {
       readonly name: string;
       readonly shortName: string | null;
       readonly alternativeName: string | null;
+      readonly infoboardDisplayName: string | null;
     } | null;
     readonly awayTeam: {
       readonly name: string;
       readonly shortName: string | null;
       readonly alternativeName: string | null;
+      readonly infoboardDisplayName: string | null;
     } | null;
     readonly homeExternalTeam: {
       readonly name: string;
@@ -179,6 +182,7 @@ export type CanonicalTrainingSessionPolicyRow = {
       readonly name: string;
       readonly shortName: string | null;
       readonly alternativeName: string | null;
+      readonly infoboardDisplayName: string | null;
     };
   };
 };
@@ -225,6 +229,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
       name: true,
       shortName: true,
       alternativeName: true,
+      infoboardDisplayName: true,
     },
   },
   matchExternalMapping: {
@@ -234,6 +239,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
           name: true,
           shortName: true,
           alternativeName: true,
+          infoboardDisplayName: true,
         },
       },
       awayTeam: {
@@ -241,6 +247,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
           name: true,
           shortName: true,
           alternativeName: true,
+          infoboardDisplayName: true,
         },
       },
       homeExternalTeam: {
@@ -472,6 +479,7 @@ function buildExternalSideIdentity(
       teamName: null,
       teamShortName: null,
       teamAlternativeName: null,
+      teamInfoboardDisplayName: null,
       fallbackDisplayName,
     };
   }
@@ -486,6 +494,7 @@ function buildExternalSideIdentity(
     teamName: externalTeam.name,
     teamShortName: externalTeam.shortName,
     teamAlternativeName: externalTeam.alternativeName,
+    teamInfoboardDisplayName: null,
     fallbackDisplayName,
   };
 }
@@ -496,6 +505,7 @@ function buildOwnTeamSideIdentity(
         readonly name: string;
         readonly shortName: string | null;
         readonly alternativeName: string | null;
+        readonly infoboardDisplayName: string | null;
       }
     | null
     | undefined,
@@ -508,6 +518,7 @@ function buildOwnTeamSideIdentity(
     teamName: team?.name ?? null,
     teamShortName: team?.shortName ?? null,
     teamAlternativeName: team?.alternativeName ?? null,
+    teamInfoboardDisplayName: team?.infoboardDisplayName ?? null,
     fallbackDisplayName,
   };
 }
@@ -589,6 +600,7 @@ function mapTrainingItem(
           name: canonicalTeam.name,
           shortName: canonicalTeam.shortName,
           alternativeName: canonicalTeam.alternativeName,
+          infoboardDisplayName: canonicalTeam.infoboardDisplayName,
         }
       : { name: item.teamNames[0] ?? null },
     opponent: null,
@@ -638,6 +650,7 @@ function mapMatchItem(
           name: eventTeam.name,
           shortName: eventTeam.shortName,
           alternativeName: eventTeam.alternativeName,
+          infoboardDisplayName: eventTeam.infoboardDisplayName,
         }
       : { name: item.teamNames[0] ?? null },
     opponent: null,

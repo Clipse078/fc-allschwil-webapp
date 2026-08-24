@@ -9,6 +9,7 @@
  */
 
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 import type { InfoboardEventPresentationExtension } from "@/components/infoboard/screen1/screen1-presentation-types";
 
 type DressingRoomAllocationRow = {
@@ -29,6 +30,7 @@ type TournamentParticipantRow = {
     readonly name: string;
     readonly shortName: string | null;
     readonly alternativeName: string | null;
+    readonly infoboardDisplayName: string | null;
   } | null;
   readonly externalClub: {
     readonly name: string;
@@ -69,6 +71,7 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
       name: true,
       shortName: true,
       alternativeName: true,
+      infoboardDisplayName: true,
     },
   },
   externalClub: {
@@ -109,7 +112,16 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
 function resolveParticipantDisplayName(row: TournamentParticipantRow): string {
   const configured = row.displayName?.trim();
   if (configured) return configured;
-  if (row.team) return row.team.name;
+  if (row.team) {
+    return (
+      resolveInfoboardTeamDisplayName({
+        infoboardDisplayName: row.team.infoboardDisplayName,
+        alternativeName: row.team.alternativeName,
+        shortName: row.team.shortName,
+        name: row.team.name,
+      }) ?? row.team.name
+    );
+  }
   if (row.externalClub) return row.externalClub.name;
   if (row.externalTeam) return row.externalTeam.name;
   return row.manualLabel?.trim() ?? "";

@@ -103,14 +103,44 @@ describe("shared string normalization", () => {
 // ── Team — INFOBOARD ──────────────────────────────────────────────────────────
 
 describe("resolveTeamDisplayName — INFOBOARD", () => {
-  it("returns Team.shortName when available (priority 1)", () => {
+  it("returns infoboardDisplayName when available (priority 1)", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          infoboardDisplayName: "JUNIOREN E4",
+          alternativeName: "Junioren E4",
+          shortName: "E4",
+          displayName: "Season Override",
+          name: "E4",
+          fallbackName: "Fallback",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("JUNIOREN E4");
+  });
+
+  it("falls through to alternativeName when infoboardDisplayName is blank", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          infoboardDisplayName: "  ",
+          alternativeName: "Junioren F2",
+          shortName: "F2",
+          name: "F2",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("Junioren F2");
+  });
+
+  it("falls through to shortName when infoboardDisplayName and alternativeName are blank", () => {
     expect(
       resolveTeamDisplayName(
         {
           shortName: "U12a",
           displayName: "U12a Junioren",
           name: "FC Allschwil",
-          alternativeName: "Junioren U12a",
+          alternativeName: null,
           fallbackName: "Fallback",
         },
         "INFOBOARD",
@@ -118,7 +148,7 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     ).toBe("U12a");
   });
 
-  it("falls through to Team.name when shortName is blank", () => {
+  it("falls through to Team.name when higher priorities are blank", () => {
     expect(
       resolveTeamDisplayName(
         {
@@ -131,7 +161,7 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     ).toBe("FC Allschwil");
   });
 
-  it("prefers Team.name over TeamSeason.displayName (tenant-managed, INFOBOARD-TEAMNAME-01)", () => {
+  it("does not use TeamSeason.displayName on INFOBOARD", () => {
     expect(
       resolveTeamDisplayName(
         {
@@ -185,10 +215,10 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     expect(resolveTeamDisplayName({}, "INFOBOARD")).toBeNull();
   });
 
-  it("trims shortName on INFOBOARD", () => {
+  it("trims infoboardDisplayName on INFOBOARD", () => {
     expect(
-      resolveTeamDisplayName({ shortName: "  U12a  " }, "INFOBOARD"),
-    ).toBe("U12a");
+      resolveTeamDisplayName({ infoboardDisplayName: "  JUNIOREN E1  " }, "INFOBOARD"),
+    ).toBe("JUNIOREN E1");
   });
 });
 

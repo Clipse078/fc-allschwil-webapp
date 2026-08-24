@@ -40,6 +40,7 @@ export async function getTeamsListData(tenantId: string, selectedSeasonKey?: str
       // Never written by provider sync — see lib/teams/team-naming.ts.
       shortName: true,
       alternativeName: true,
+      infoboardDisplayName: true,
       slug: true,
       category: true,
       genderGroup: true,
@@ -121,6 +122,7 @@ export async function getTeamsListData(tenantId: string, selectedSeasonKey?: str
       name: team.name,
       shortName: team.shortName,
       alternativeName: team.alternativeName,
+      infoboardDisplayName: team.infoboardDisplayName,
       slug: team.slug,
       category: team.category,
       genderGroup: team.genderGroup,
@@ -179,6 +181,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
       // Never written by provider sync — see lib/teams/team-naming.ts.
       shortName: true,
       alternativeName: true,
+      infoboardDisplayName: true,
       slug: true,
       category: true,
       genderGroup: true,
@@ -309,6 +312,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     name: team.name,
     shortName: team.shortName,
     alternativeName: team.alternativeName,
+    infoboardDisplayName: team.infoboardDisplayName,
     slug: team.slug,
     category: team.category,
     genderGroup: team.genderGroup,

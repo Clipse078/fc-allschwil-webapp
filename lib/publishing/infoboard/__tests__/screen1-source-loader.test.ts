@@ -295,7 +295,7 @@ describe("createScreen1SourceLoader", () => {
   describe("Team tenant-managed naming (INFOBOARD-TEAMNAME-01)", () => {
     it("maps Team.name when no teamSeasons exist", async () => {
       const row = makeDbEvent({
-        team: { name: "1. Mannschaft", shortName: null, alternativeName: null, teamSeasons: [] },
+        team: { name: "1. Mannschaft", shortName: null, alternativeName: null, infoboardDisplayName: null, teamSeasons: [] },
       });
       const db = makeDb([row]);
       const loader = createScreen1SourceLoader(db);
@@ -315,6 +315,7 @@ describe("createScreen1SourceLoader", () => {
           name: "1. Mannschaft",
           shortName: "1M",
           alternativeName: "Erste Mannschaft",
+          infoboardDisplayName: null,
           teamSeasons: [
             { seasonId: SEASON_ID, displayName: "1. Mannschaft 2025/26", shortName: "1M-season" },
           ],
@@ -336,6 +337,7 @@ describe("createScreen1SourceLoader", () => {
           name: "1. Mannschaft",
           shortName: null,
           alternativeName: null,
+          infoboardDisplayName: null,
           teamSeasons: [
             { seasonId: SEASON_ID, displayName: "1. Mannschaft 2025/26", shortName: "1M" },
           ],
@@ -349,6 +351,25 @@ describe("createScreen1SourceLoader", () => {
       expect(event.team?.displayName).toBe("1. Mannschaft 2025/26");
     });
 
+    it("maps Team.infoboardDisplayName from Team model", async () => {
+      const row = makeDbEvent({
+        seasonId: SEASON_ID,
+        team: {
+          name: "E4",
+          shortName: "E4",
+          alternativeName: "Junioren E4",
+          infoboardDisplayName: "JUNIOREN E4",
+          teamSeasons: [],
+        },
+      });
+      const db = makeDb([row]);
+      const loader = createScreen1SourceLoader(db);
+
+      const [event] = await loader({ tenantId: TENANT_ID });
+
+      expect(event.team?.infoboardDisplayName).toBe("JUNIOREN E4");
+    });
+
     it("does not use wrong-season TeamSeason for displayName", async () => {
       const row = makeDbEvent({
         seasonId: SEASON_ID,
@@ -356,6 +377,7 @@ describe("createScreen1SourceLoader", () => {
           name: "1. Mannschaft",
           shortName: null,
           alternativeName: null,
+          infoboardDisplayName: null,
           teamSeasons: [
             { seasonId: "different-season-id", displayName: "Old Season Name", shortName: "OLD" },
           ],
@@ -378,6 +400,7 @@ describe("createScreen1SourceLoader", () => {
           name: "1. Mannschaft",
           shortName: "1M",
           alternativeName: null,
+          infoboardDisplayName: null,
           teamSeasons: [
             { seasonId: "old-season", displayName: "1M 2024/25", shortName: "1M-old" },
             { seasonId: SEASON_ID, displayName: "1M 2025/26", shortName: "1M-new" },

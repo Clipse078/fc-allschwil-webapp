@@ -40,6 +40,7 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
               name: "FC Binningen E1",
               shortName: null,
               alternativeName: null,
+              infoboardDisplayName: "JUNIOREN E1",
             },
             externalClub: null,
             externalTeam: null,
@@ -66,7 +67,7 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
     expect(extensions[0]?.participantAllocations).toEqual([
       {
         id: "p2",
-        teamDisplayName: "FC Binningen E1",
+        teamDisplayName: "JUNIOREN E1",
         dressingRoomLabel: "DR-A",
         clubLogoUrl: "https://cdn.example.com/tenant.png",
       },
@@ -91,6 +92,42 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
     await expect(
       loadScreen1TournamentPresentationExtensions(database, "tenant-a", [], null),
     ).resolves.toEqual([]);
+  });
+
+  it("keeps explicit participant displayName above Team.infoboardDisplayName", async () => {
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => [
+          {
+            id: "p-override",
+            eventId: "evt-t3",
+            displayName: "Custom Label",
+            manualLabel: null,
+            displayOrder: 0,
+            team: {
+              name: "E4",
+              shortName: "E4",
+              alternativeName: "Junioren E4",
+              infoboardDisplayName: "JUNIOREN E4",
+            },
+            externalClub: null,
+            externalTeam: null,
+            dressingRoomAllocations: [],
+          },
+        ],
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t3"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations?.[0]?.teamDisplayName).toBe(
+      "Custom Label",
+    );
   });
 
   it("allows manual participants without logos", async () => {

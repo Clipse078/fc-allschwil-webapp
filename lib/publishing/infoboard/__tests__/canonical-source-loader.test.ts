@@ -160,6 +160,7 @@ function trainingPolicyRow(
         name: "E2",
         shortName: null,
         alternativeName: null,
+        infoboardDisplayName: null,
       },
     },
     ...overrides,
