@@ -292,10 +292,10 @@ describe("createScreen1SourceLoader", () => {
     });
   });
 
-  describe("Team and TeamSeason name mapping", () => {
+  describe("Team tenant-managed naming (INFOBOARD-TEAMNAME-01)", () => {
     it("maps Team.name when no teamSeasons exist", async () => {
       const row = makeDbEvent({
-        team: { name: "1. Mannschaft", teamSeasons: [] },
+        team: { name: "1. Mannschaft", shortName: null, alternativeName: null, teamSeasons: [] },
       });
       const db = makeDb([row]);
       const loader = createScreen1SourceLoader(db);
@@ -303,15 +303,39 @@ describe("createScreen1SourceLoader", () => {
       const [event] = await loader({ tenantId: TENANT_ID });
 
       expect(event.team?.name).toBe("1. Mannschaft");
-      expect(event.team?.displayName).toBeNull();
       expect(event.team?.shortName).toBeNull();
+      expect(event.team?.alternativeName).toBeNull();
+      expect(event.team?.displayName).toBeNull();
     });
 
-    it("maps matching TeamSeason displayName", async () => {
+    it("maps Team.shortName and Team.alternativeName from Team model", async () => {
       const row = makeDbEvent({
         seasonId: SEASON_ID,
         team: {
           name: "1. Mannschaft",
+          shortName: "1M",
+          alternativeName: "Erste Mannschaft",
+          teamSeasons: [
+            { seasonId: SEASON_ID, displayName: "1. Mannschaft 2025/26", shortName: "1M-season" },
+          ],
+        },
+      });
+      const db = makeDb([row]);
+      const loader = createScreen1SourceLoader(db);
+
+      const [event] = await loader({ tenantId: TENANT_ID });
+
+      expect(event.team?.shortName).toBe("1M");
+      expect(event.team?.alternativeName).toBe("Erste Mannschaft");
+    });
+
+    it("still maps matching TeamSeason displayName for WEBSITE channel reuse", async () => {
+      const row = makeDbEvent({
+        seasonId: SEASON_ID,
+        team: {
+          name: "1. Mannschaft",
+          shortName: null,
+          alternativeName: null,
           teamSeasons: [
             { seasonId: SEASON_ID, displayName: "1. Mannschaft 2025/26", shortName: "1M" },
           ],
@@ -325,29 +349,13 @@ describe("createScreen1SourceLoader", () => {
       expect(event.team?.displayName).toBe("1. Mannschaft 2025/26");
     });
 
-    it("maps matching TeamSeason shortName", async () => {
+    it("does not use wrong-season TeamSeason for displayName", async () => {
       const row = makeDbEvent({
         seasonId: SEASON_ID,
         team: {
           name: "1. Mannschaft",
-          teamSeasons: [
-            { seasonId: SEASON_ID, displayName: "1. Mannschaft 2025/26", shortName: "1M" },
-          ],
-        },
-      });
-      const db = makeDb([row]);
-      const loader = createScreen1SourceLoader(db);
-
-      const [event] = await loader({ tenantId: TENANT_ID });
-
-      expect(event.team?.shortName).toBe("1M");
-    });
-
-    it("does not use wrong-season TeamSeason", async () => {
-      const row = makeDbEvent({
-        seasonId: SEASON_ID,
-        team: {
-          name: "1. Mannschaft",
+          shortName: null,
+          alternativeName: null,
           teamSeasons: [
             { seasonId: "different-season-id", displayName: "Old Season Name", shortName: "OLD" },
           ],
@@ -358,17 +366,18 @@ describe("createScreen1SourceLoader", () => {
 
       const [event] = await loader({ tenantId: TENANT_ID });
 
-      // Team.name is fallback; wrong-season TeamSeason names must not appear
       expect(event.team?.name).toBe("1. Mannschaft");
       expect(event.team?.displayName).toBeNull();
       expect(event.team?.shortName).toBeNull();
     });
 
-    it("uses matching TeamSeason when multiple seasons present", async () => {
+    it("uses matching TeamSeason displayName when multiple seasons present", async () => {
       const row = makeDbEvent({
         seasonId: SEASON_ID,
         team: {
           name: "1. Mannschaft",
+          shortName: "1M",
+          alternativeName: null,
           teamSeasons: [
             { seasonId: "old-season", displayName: "1M 2024/25", shortName: "1M-old" },
             { seasonId: SEASON_ID, displayName: "1M 2025/26", shortName: "1M-new" },
@@ -381,7 +390,7 @@ describe("createScreen1SourceLoader", () => {
       const [event] = await loader({ tenantId: TENANT_ID });
 
       expect(event.team?.displayName).toBe("1M 2025/26");
-      expect(event.team?.shortName).toBe("1M-new");
+      expect(event.team?.shortName).toBe("1M");
     });
 
     it("returns null team when event has no team", async () => {

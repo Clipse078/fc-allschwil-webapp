@@ -589,13 +589,26 @@ describe("buildInfoboardScreen1Feed — mapping integration", () => {
     });
   }
 
-  it("resolves team infoboard name (shortName first)", async () => {
+  it("resolves team infoboard name from tenant-managed Team.shortName first", async () => {
     const event = makeFutureEvent({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "U17" },
     });
     const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput({ now }));
     const mapped = feed.next.find((e) => e.id === event.id);
     expect(mapped?.teamDisplayName).toBe("U17");
+  });
+
+  it("prefers Team.name over TeamSeason.displayName on infoboard (INFOBOARD-TEAMNAME-01)", async () => {
+    const event = makeFutureEvent({
+      team: {
+        name: "FC Allschwil Junioren B2",
+        displayName: "Junioren B2",
+        shortName: null,
+      },
+    });
+    const feed = await buildInfoboardScreen1Feed(makeLoader([event]), makeInput({ now }));
+    const mapped = feed.next.find((e) => e.id === event.id);
+    expect(mapped?.teamDisplayName).toBe("FC Allschwil Junioren B2");
   });
 
   it("resolves opponent infoboard name (infoboardName first)", async () => {

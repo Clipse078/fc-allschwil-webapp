@@ -173,7 +173,14 @@ export type CanonicalEventPolicyRow = {
 export type CanonicalTrainingSessionPolicyRow = {
   readonly id: string;
   readonly status: string;
-  readonly teamSeason: { readonly season: { readonly key: string } };
+  readonly teamSeason: {
+    readonly season: { readonly key: string };
+    readonly team: {
+      readonly name: string;
+      readonly shortName: string | null;
+      readonly alternativeName: string | null;
+    };
+  };
 };
 
 /**
@@ -273,7 +280,18 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
 export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
   id: true,
   status: true,
-  teamSeason: { select: { season: { select: { key: true } } } },
+  teamSeason: {
+    select: {
+      season: { select: { key: true } },
+      team: {
+        select: {
+          name: true,
+          shortName: true,
+          alternativeName: true,
+        },
+      },
+    },
+  },
 } as const;
 
 // ── Calendar-day enumeration (Europe/Zurich, pure date-only math) ─────────
@@ -547,6 +565,7 @@ function mapTrainingItem(
   item: WeekplannerTrainingItem,
   policy: CanonicalTrainingSessionPolicyRow | undefined,
 ): Screen1SourceEvent {
+  const canonicalTeam = policy?.teamSeason.team;
   return {
     tenantId: item.tenantId,
     type: "TRAINING",
@@ -565,7 +584,13 @@ function mapTrainingItem(
     id: item.id,
     title: item.title,
     seasonKey: policy?.teamSeason.season.key ?? "",
-    team: { name: item.teamNames[0] ?? null },
+    team: canonicalTeam
+      ? {
+          name: canonicalTeam.name,
+          shortName: canonicalTeam.shortName,
+          alternativeName: canonicalTeam.alternativeName,
+        }
+      : { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: null,
     organizerName: null,

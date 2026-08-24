@@ -17,12 +17,15 @@
  *
  * Inventory notes — missing proposed fields (absent from real schema):
  *   Team:
- *     - No `shortName` on the Team model itself (exists on TeamSeason only).
  *     - No `officialName`, `websiteName`, or `infoboardName` on Team or TeamSeason.
- *     - TeamSeason has `displayName` (required) and `shortName` (optional).
+ *     - TeamSeason has `displayName` (required) and `shortName` (optional) —
+ *       used by the WEBSITE channel only; INFOBOARD uses tenant-managed Team
+ *       fields (INFOBOARD-TEAMNAME-01).
  *   Event:
  *     - No `categoryLabel` on the Event model. Only `competitionLabel` exists.
  */
+
+import { resolveCompactTeamName } from "@/lib/teams/team-naming";
 
 // ── Presentation channel ───────────────────────────────────────────────────────
 
@@ -68,11 +71,12 @@ function firstMeaningful(
  * Structural input for team display-name resolution.
  *
  * Verified schema fields only — fields absent from the real schema are omitted:
- *   - `name`        → Team.name (primary team name, always present)
- *   - `displayName` → TeamSeason.displayName (season-scoped display name)
- *   - `shortName`   → TeamSeason.shortName (season-scoped abbreviated name)
- *   - `fallbackName`→ explicit source-event fallback (e.g. raw team title from
- *                     event import); not a schema field.
+ *   - `name`            → Team.name (tenant-managed canonical long name)
+ *   - `shortName`       → Team.shortName (tenant-managed compact name)
+ *   - `alternativeName` → Team.alternativeName (tenant-managed alternative)
+ *   - `displayName`     → TeamSeason.displayName (season-scoped; WEBSITE only)
+ *   - `fallbackName`    → explicit source-event fallback (e.g. raw team title from
+ *                         event import); not a schema field.
  *
  * Missing proposed fields (not invented):
  *   - `infoboardName` — does not exist on Team or TeamSeason.
@@ -83,17 +87,22 @@ export type TeamDisplayNameInput = {
   readonly name?: string | null;
   readonly displayName?: string | null;
   readonly shortName?: string | null;
+  readonly alternativeName?: string | null;
   readonly fallbackName?: string | null;
 };
 
 /**
  * Resolves the best team display name for the given presentation channel.
  *
- * INFOBOARD — space-constrained displays prefer shorter names:
- *   1. shortName   (TeamSeason.shortName — abbreviated, space-efficient)
- *   2. displayName (TeamSeason.displayName — season-scoped full name)
- *   3. name        (Team.name — primary identifier)
+ * INFOBOARD — tenant-managed Team identity (INFOBOARD-TEAMNAME-01):
+ *   Reuses resolveCompactTeamName() from lib/teams/team-naming.ts:
+ *   1. Team.shortName
+ *   2. Team.name
+ *   3. Team.alternativeName
  *   4. fallbackName (explicit source-event fallback)
+ *
+ *   TeamSeason.displayName / TeamSeason.shortName are intentionally excluded —
+ *   seasonal overrides must not substitute for tenant-managed Team fields.
  *
  * WEBSITE — richer displays prefer the full season context name:
  *   1. displayName (TeamSeason.displayName — season-scoped full name)
@@ -112,12 +121,13 @@ export function resolveTeamDisplayName(
   channel: PresentationChannel,
 ): string | null {
   if (channel === "INFOBOARD") {
-    return firstMeaningful([
-      input.shortName,
-      input.displayName,
-      input.name,
-      input.fallbackName,
-    ]);
+    const tenantManaged = resolveCompactTeamName({
+      teamName: input.name,
+      teamShortName: input.shortName,
+      teamAlternativeName: input.alternativeName,
+    });
+    if (tenantManaged !== null) return tenantManaged;
+    return meaningful(input.fallbackName) ?? null;
   }
 
   return firstMeaningful([

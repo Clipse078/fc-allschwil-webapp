@@ -158,29 +158,41 @@ describe("mapScreen1Event — organizer", () => {
 
 // ── Team display name ─────────────────────────────────────────────────────────
 
-describe("mapScreen1Event — team display name (INFOBOARD priority)", () => {
-  it("uses shortName when present (highest infoboard priority)", () => {
+describe("mapScreen1Event — team display name (INFOBOARD tenant-managed priority)", () => {
+  it("uses Team.shortName when present (highest infoboard priority)", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "U17" },
     }));
     expect(result.teamDisplayName).toBe("U17");
   });
 
-  it("falls through blank shortName to displayName", () => {
+  it("falls through blank Team.shortName to Team.name", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "  " },
     }));
-    expect(result.teamDisplayName).toBe("FCA U17");
+    expect(result.teamDisplayName).toBe("FC Allschwil U17");
   });
 
-  it("uses displayName fallback when shortName absent", () => {
+  it("prefers Team.name over TeamSeason.displayName when shortName absent", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: null },
     }));
-    expect(result.teamDisplayName).toBe("FCA U17");
+    expect(result.teamDisplayName).toBe("FC Allschwil U17");
   });
 
-  it("uses Team.name fallback when displayName absent", () => {
+  it("uses Team.alternativeName when name and shortName absent", () => {
+    const result = mapScreen1Event(makeInput({
+      team: {
+        name: null,
+        displayName: "FCA U17",
+        shortName: null,
+        alternativeName: "Junioren U17",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("Junioren U17");
+  });
+
+  it("uses Team.name fallback when only name is present", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: null, shortName: null },
     }));

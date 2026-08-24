@@ -245,6 +245,7 @@ export function mapScreen1Event(
       name: event.team?.name,
       displayName: event.team?.displayName,
       shortName: event.team?.shortName,
+      alternativeName: event.team?.alternativeName,
       fallbackName: event.teamFallbackName,
     },
     "INFOBOARD",

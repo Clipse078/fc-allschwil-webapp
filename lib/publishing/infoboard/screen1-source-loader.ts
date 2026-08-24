@@ -56,6 +56,8 @@ export type Screen1TeamSeasonRow = {
  */
 export type Screen1TeamRow = {
   readonly name: string;
+  readonly shortName: string | null;
+  readonly alternativeName: string | null;
   readonly teamSeasons: readonly Screen1TeamSeasonRow[];
 };
 
@@ -166,6 +168,8 @@ const EVENT_SELECT = {
   team: {
     select: {
       name: true,
+      shortName: true,
+      alternativeName: true,
       teamSeasons: {
         select: {
           seasonId: true,
@@ -210,17 +214,19 @@ function mapRowToSourceEvent(
   row: Screen1DbEventRow,
   resourceNameMap: ReadonlyMap<string, string>,
 ): Screen1SourceEvent {
-  // ── Team + TeamSeason resolution ─────────────────────────────────────────
-  // Filter teamSeasons by event.seasonId to get the season-scoped display name.
-  // If no matching TeamSeason exists, team.name is the fallback.
+  // ── Team naming (INFOBOARD-TEAMNAME-01) ──────────────────────────────────
+  // Infoboard uses tenant-managed Team.name / shortName / alternativeName.
+  // TeamSeason display overrides are retained on the row for WEBSITE callers
+  // that reuse Screen1SourceEvent.team.displayName via the WEBSITE channel.
   const matchingTeamSeason =
     row.team?.teamSeasons.find((ts) => ts.seasonId === row.seasonId) ?? null;
 
   const team = row.team
     ? {
         name: row.team.name,
+        shortName: row.team.shortName,
+        alternativeName: row.team.alternativeName,
         displayName: matchingTeamSeason?.displayName ?? null,
-        shortName: matchingTeamSeason?.shortName ?? null,
       }
     : null;
 

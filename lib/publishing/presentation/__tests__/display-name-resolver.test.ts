@@ -103,13 +103,14 @@ describe("shared string normalization", () => {
 // ── Team — INFOBOARD ──────────────────────────────────────────────────────────
 
 describe("resolveTeamDisplayName — INFOBOARD", () => {
-  it("returns shortName when available (priority 1)", () => {
+  it("returns Team.shortName when available (priority 1)", () => {
     expect(
       resolveTeamDisplayName(
         {
           shortName: "U12a",
           displayName: "U12a Junioren",
           name: "FC Allschwil",
+          alternativeName: "Junioren U12a",
           fallbackName: "Fallback",
         },
         "INFOBOARD",
@@ -117,7 +118,7 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     ).toBe("U12a");
   });
 
-  it("falls through to displayName when shortName is blank", () => {
+  it("falls through to Team.name when shortName is blank", () => {
     expect(
       resolveTeamDisplayName(
         {
@@ -127,20 +128,34 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
         },
         "INFOBOARD",
       ),
-    ).toBe("U12a Junioren");
+    ).toBe("FC Allschwil");
   });
 
-  it("falls through to name when shortName and displayName are blank", () => {
+  it("prefers Team.name over TeamSeason.displayName (tenant-managed, INFOBOARD-TEAMNAME-01)", () => {
     expect(
       resolveTeamDisplayName(
         {
           shortName: null,
-          displayName: "",
-          name: "FC Allschwil",
+          displayName: "Junioren B2",
+          name: "FC Allschwil Junioren B2",
         },
         "INFOBOARD",
       ),
-    ).toBe("FC Allschwil");
+    ).toBe("FC Allschwil Junioren B2");
+  });
+
+  it("falls through to Team.alternativeName when shortName and name are blank", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          shortName: null,
+          displayName: "Season Override",
+          name: null,
+          alternativeName: "Junioren B2",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("Junioren B2");
   });
 
   it("uses fallbackName as last resort", () => {

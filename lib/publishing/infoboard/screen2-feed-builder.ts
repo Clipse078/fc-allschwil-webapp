@@ -174,6 +174,7 @@ function resolveHomePartyDisplayName(event: Screen1SourceEvent): string | null {
       name: event.team?.name,
       displayName: event.team?.displayName,
       shortName: event.team?.shortName,
+      alternativeName: event.team?.alternativeName,
       fallbackName: event.teamFallbackName,
     },
     "INFOBOARD",

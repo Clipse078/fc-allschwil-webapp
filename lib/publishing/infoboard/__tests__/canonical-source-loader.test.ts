@@ -154,7 +154,14 @@ function trainingPolicyRow(
   return {
     id: "session-1",
     status: "SCHEDULED",
-    teamSeason: { season: { key: "2026-2027" } },
+    teamSeason: {
+      season: { key: "2026-2027" },
+      team: {
+        name: "E2",
+        shortName: null,
+        alternativeName: null,
+      },
+    },
     ...overrides,
   };
 }

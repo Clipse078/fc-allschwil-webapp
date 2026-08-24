@@ -89,7 +89,10 @@ function trainingSessionRow(overrides: Record<string, unknown> = {}) {
     // Additional fields read ONLY by the canonical Infoboard policy lookup
     // (never by lib/training/session-generation-service.ts) — see
     // canonical-source-loader.ts's CanonicalTrainingSessionPolicyRow.
-    teamSeason: { season: { key: "2026-2027" } },
+    teamSeason: {
+      season: { key: "2026-2027" },
+      team: { name: "E2", shortName: null, alternativeName: null },
+    },
     ...overrides,
   };
 }
