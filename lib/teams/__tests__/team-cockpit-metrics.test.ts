@@ -133,10 +133,9 @@ describe("TEAM-COCKPIT-01 — buildTeamCockpitMetrics", () => {
     expect(metrics.playerCount).toBe(2);
     expect(metrics.trainerCount).toBe(1);
     expect(metrics.seasonName).toBe("Saison 2025/26");
+    expect(metrics.seasonLabel).toBe("Saison 2025/26");
     expect(metrics.competitionLabel).toBe("2L");
     expect(metrics.orgUnitName).toBe("Junioren");
-    expect(metrics.websiteVisible).toBe(true);
-    expect(metrics.infoboardVisible).toBe(false);
     expect(metrics.healthState).toBe("neutral");
   });
 
@@ -150,5 +149,21 @@ describe("TEAM-COCKPIT-01 — buildTeamCockpitMetrics", () => {
     expect(metrics.playerCount).toBe(0);
     expect(metrics.trainerCount).toBe(0);
     expect(metrics.seasonName).toBeNull();
+    expect(metrics.seasonLabel).toBe("Keine Saison");
+  });
+
+  it("distinguishes historical seasons from missing current-season assignment", () => {
+    const metrics = buildTeamCockpitMetrics({
+      team: makeTeamDetail({
+        currentTeamSeasonId: null,
+        teamSeasons: makeTeamDetail().teamSeasons,
+      }),
+      categoryLabels: CATEGORY_LABELS,
+      participationTypeLabels: PARTICIPATION_LABELS,
+    });
+
+    expect(metrics.seasonLabel).toBe("Keine Saison im aktuellen Geschäftsjahr");
+    expect(metrics.hasHistoricalSeasons).toBe(true);
+    expect(metrics.playerCount).toBe(0);
   });
 });

@@ -69,7 +69,6 @@ type Props = {
   canManage: boolean;
   entry: TeamRosterSeasonEntry;
   anchorTargets?: boolean;
-  compact?: boolean;
 };
 
 export default function TeamRosterSeasonSection({
@@ -78,59 +77,44 @@ export default function TeamRosterSeasonSection({
   canManage,
   entry,
   anchorTargets = false,
-  compact = false,
 }: Props) {
   return (
-    <div className={compact ? "space-y-4" : "space-y-5"}>
-      {!compact ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
-              {entry.season.name}
-            </p>
-            <p className="mt-1 text-sm text-[var(--text-2)]">{entry.displayName}</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <span className="fca-pill">
-              Kader Website: {entry.squadWebsiteVisible ? "An" : "Aus"}
-            </span>
-            <span className="fca-pill">
-              Trainer Website: {entry.trainerTeamWebsiteVisible ? "An" : "Aus"}
-            </span>
-          </div>
-        </div>
-      ) : null}
+    <div className="space-y-6">
+      <div className="border-b border-[var(--border)] pb-3">
+        <p className="text-sm font-semibold text-[var(--foreground)]">{entry.season.name}</p>
+        <p className="mt-0.5 text-sm text-[var(--muted)]">{entry.displayName}</p>
+      </div>
 
-      <TeamSquadManagementCard
-        teamId={teamId}
-        canManage={canManage}
-        sectionId={anchorTargets ? "spielerkader" : undefined}
-        compact={compact}
-        teamSeason={{
-          id: entry.id,
-          displayName: entry.displayName,
-          shortName: entry.shortName,
-          status: entry.status,
-          squadWebsiteVisible: entry.squadWebsiteVisible ?? true,
-          season: entry.season,
-          teamAgeGroup,
-          playerSquadMembers: entry.playerSquadMembers ?? [],
-        }}
-      />
+      <div className="grid gap-8 xl:grid-cols-2">
+        <TeamSquadManagementCard
+          teamId={teamId}
+          canManage={canManage}
+          sectionId={anchorTargets ? "spielerkader" : undefined}
+          teamSeason={{
+            id: entry.id,
+            displayName: entry.displayName,
+            shortName: entry.shortName,
+            status: entry.status,
+            squadWebsiteVisible: entry.squadWebsiteVisible ?? true,
+            season: entry.season,
+            teamAgeGroup,
+            playerSquadMembers: entry.playerSquadMembers ?? [],
+          }}
+        />
 
-      <TeamTrainerManagementCard
-        teamId={teamId}
-        canManage={canManage}
-        sectionId={anchorTargets ? "trainerteam" : undefined}
-        compact={compact}
-        teamSeason={{
-          id: entry.id,
-          displayName: entry.displayName,
-          trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible ?? true,
-          season: entry.season,
-          trainerTeamMembers: entry.trainerTeamMembers ?? [],
-        }}
-      />
+        <TeamTrainerManagementCard
+          teamId={teamId}
+          canManage={canManage}
+          sectionId={anchorTargets ? "trainerteam" : undefined}
+          teamSeason={{
+            id: entry.id,
+            displayName: entry.displayName,
+            trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible ?? true,
+            season: entry.season,
+            trainerTeamMembers: entry.trainerTeamMembers ?? [],
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -163,7 +147,7 @@ export function TeamHistoricalSeasonRosters({
       <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-[var(--foreground)] marker:content-none [&::-webkit-details-marker]:hidden">
         Weitere Saisons ({seasons.length})
       </summary>
-      <div className="space-y-6 border-t border-[var(--border)] px-4 py-4">
+      <div className="space-y-8 border-t border-[var(--border)] px-4 py-4">
         {seasons.map((entry) => (
           <TeamRosterSeasonSection
             key={entry.id}

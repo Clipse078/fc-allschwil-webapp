@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   getActiveTenant: vi.fn(),
   getScopedAssignmentsForOrgUnit: vi.fn(),
   getEligibleTenantMembers: vi.fn(),
+  getTeamTrainingSchedule: vi.fn(),
   roleFindMany: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
@@ -28,6 +29,9 @@ vi.mock("@/lib/permissions/has-permission", () => ({
 }));
 vi.mock("@/lib/teams/queries", () => ({
   getTeamDetailData: mocks.getTeamDetailData,
+}));
+vi.mock("@/lib/teams/team-training-schedule", () => ({
+  getTeamTrainingSchedule: mocks.getTeamTrainingSchedule,
 }));
 vi.mock("@/lib/org/queries", () => ({
   getOrgUnits: mocks.getOrgUnits,
@@ -57,18 +61,12 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
 }));
-vi.mock("@/components/admin/teams/TeamDetailCard", () => ({
-  default: () => <div data-testid="team-detail-card">TeamDetailCard</div>,
-}));
-vi.mock("@/components/admin/teams/TeamLifecycleCard", () => ({
-  default: () => <div data-testid="team-lifecycle-card">TeamLifecycleCard</div>,
-}));
-vi.mock("@/components/admin/teams/TeamSeasonDeleteButton", () => ({
-  default: () => null,
+vi.mock("@/components/admin/teams/TeamCockpitShell", () => ({
+  default: () => <div data-testid="team-cockpit-shell">TeamCockpitShell</div>,
 }));
 vi.mock("@/components/admin/shared/ScopedResponsibilitiesCard", () => ({
-  default: () => (
-    <div data-testid="scoped-responsibilities-card">ScopedResponsibilitiesCard</div>
+  default: (props: { title?: string }) => (
+    <div data-testid="scoped-responsibilities-card">{props.title}</div>
   ),
 }));
 
@@ -180,27 +178,28 @@ beforeEach(() => {
   mocks.getEligibleCompetitions.mockResolvedValue([]);
   mocks.getScopedAssignmentsForOrgUnit.mockResolvedValue([]);
   mocks.getEligibleTenantMembers.mockResolvedValue([]);
+  mocks.getTeamTrainingSchedule.mockResolvedValue([]);
   mocks.roleFindMany.mockResolvedValue([]);
 });
 
-describe("TEAM-COCKPIT-01 — Team detail page", () => {
-  it("renders consolidated cockpit overview with team identity and roster counts", async () => {
+describe("TEAM-COCKPIT-01D — Team detail page", () => {
+  it("renders premium cockpit shell with team identity", async () => {
     await renderPage();
 
     expect(screen.getByRole("heading", { name: "FC Test" })).toBeInTheDocument();
-    const overview = screen.getByTestId("team-cockpit-overview");
-    expect(overview).toBeInTheDocument();
-    expect(screen.getByText("Spieler")).toBeInTheDocument();
-    expect(screen.getByText("Trainer & Staff")).toBeInTheDocument();
-    expect(overview).toHaveTextContent("1");
-    expect(overview).toHaveTextContent("Saison 2025/26");
-    expect(screen.getByTestId("team-detail-card")).toBeInTheDocument();
+    expect(screen.getByTestId("team-cockpit-shell")).toBeInTheDocument();
+  });
+
+  it("loads training schedule for the canonical current team season", async () => {
+    await renderPage();
+
+    expect(mocks.getTeamTrainingSchedule).toHaveBeenCalledWith(TENANT_ID, "ts-1");
   });
 
   it("keeps responsibilities available as a distinct section", async () => {
     await renderPage();
 
-    expect(screen.getByTestId("scoped-responsibilities-card")).toBeInTheDocument();
+    expect(screen.getByTestId("scoped-responsibilities-card")).toHaveTextContent("Zuständigkeiten");
   });
 
   it("does not render legacy duplicate Spielerkader/Trainerteam stub sections", async () => {
@@ -209,7 +208,7 @@ describe("TEAM-COCKPIT-01 — Team detail page", () => {
     expect(screen.queryByLabelText("Spielerkader")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Trainerteam")).not.toBeInTheDocument();
     expect(
-      screen.queryByText(/Kader-Zuordnungen werden hier hinterlegt/)
+      screen.queryByText(/Kader-Zuordnungen werden hier hinterlegt/),
     ).not.toBeInTheDocument();
   });
 
@@ -223,5 +222,20 @@ describe("TEAM-COCKPIT-01 — Team detail page", () => {
     mocks.getTeamDetailData.mockResolvedValue(null);
 
     await expect(renderPage()).rejects.toThrow("NOT_FOUND");
+  });
+
+  it("shows consistent season messaging when no canonical current season exists", async () => {
+    mocks.getTeamDetailData.mockResolvedValue({
+      ...TEAM_FIXTURE,
+      currentTeamSeasonId: null,
+      teamSeasons: TEAM_FIXTURE.teamSeasons,
+    });
+
+    await renderPage();
+
+    expect(
+      screen.getByText(/Keine Saison im aktuellen Geschäftsjahr/),
+    ).toBeInTheDocument();
+    expect(mocks.getTeamTrainingSchedule).not.toHaveBeenCalled();
   });
 });
