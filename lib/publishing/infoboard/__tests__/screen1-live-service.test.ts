@@ -214,6 +214,29 @@ describe("buildScreen1LivePayload", () => {
     });
   });
 
+  describe("per-board logo presentation", () => {
+    it("passes independent Training, Match, and Tournament settings to Screen 1", async () => {
+      const loader = makeEmptyLoader();
+      const logoPresentation = {
+        trainingShowLogos: false,
+        trainingLogoSize: "SMALL" as const,
+        matchShowLogos: true,
+        matchLogoSize: "LARGE" as const,
+        tournamentShowLogos: true,
+        tournamentLogoSize: "XLARGE" as const,
+      };
+
+      const payload = await buildScreen1LivePayload({
+        tenant: TENANT_FCA,
+        now: NOW,
+        loader,
+        boardConfig: { logoPresentation },
+      });
+
+      expect(payload.logoPresentation).toEqual(logoPresentation);
+    });
+  });
+
   describe("branding", () => {
     it("productLogoSrc is the SportClubEvo logo path", async () => {
       const loader = makeEmptyLoader();
