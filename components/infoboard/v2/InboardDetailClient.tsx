@@ -35,6 +35,12 @@ import {
 } from "lucide-react";
 import type { InboardRow } from "@/lib/infoboard/types";
 import { STATUS_META, TEMPLATE_LABELS, infoboardKioskUrl } from "@/lib/infoboard/types";
+import {
+  INFOBOARD_LOGO_SIZES,
+  LOGO_SIZE_LABELS,
+  resolveInfoboardLogoSize,
+  type InfoboardLogoSize,
+} from "@/lib/infoboard/screen1-logo-settings";
 import type { AnlageplanResourceOption } from "@/lib/infoboard/anlageplan-types";
 import { InboardDesignerClient } from "./designer/InboardDesignerClient";
 import { AnlageplanDesignerClient } from "./designer/anlageplan/AnlageplanDesignerClient";
@@ -74,6 +80,18 @@ export function InboardDetailClient({
   const [displayTheme, setDisplayTheme] = useState<string | null>(board.displayTheme);
   const [anzeigeNameValue, setAnzeigeNameValue] = useState(board.name);
   const [anzeigeTemplatetype, setAnzeigeTemplatetype] = useState(board.templateType);
+  const [matchShowLogos, setMatchShowLogos] = useState(
+    board.screen1MatchShowLogos ?? true,
+  );
+  const [matchLogoSize, setMatchLogoSize] = useState<InfoboardLogoSize>(
+    resolveInfoboardLogoSize(board.screen1MatchLogoSize),
+  );
+  const [tournamentShowLogos, setTournamentShowLogos] = useState(
+    board.screen1TournamentShowLogos ?? true,
+  );
+  const [tournamentLogoSize, setTournamentLogoSize] = useState<InfoboardLogoSize>(
+    resolveInfoboardLogoSize(board.screen1TournamentLogoSize),
+  );
   const [anzeigesaving, setAnzeigeSaving] = useState(false);
   const [anzeigesaved, setAnzeigeSaved] = useState(false);
   const [anzeigeError, setAnzeigeError] = useState<string | null>(null);
@@ -151,6 +169,10 @@ export function InboardDetailClient({
           displayTheme,
           templateType: anzeigeTemplatetype,
           name: anzeigeNameValue.trim() || board.name,
+          screen1MatchShowLogos: matchShowLogos,
+          screen1MatchLogoSize: matchLogoSize,
+          screen1TournamentShowLogos: tournamentShowLogos,
+          screen1TournamentLogoSize: tournamentLogoSize,
         }),
       });
       if (!res.ok) {
@@ -477,6 +499,82 @@ export function InboardDetailClient({
                 <p className="text-[0.72rem] text-[var(--muted)]">
                   Kopfzeile, Hinweisleiste und Widget-Layout werden im Designer konfiguriert.
                 </p>
+
+                <div className="border-t border-[var(--border)] pt-4 space-y-4">
+                  <p className="text-[0.75rem] font-semibold text-[var(--foreground)]">
+                    Match
+                  </p>
+                  <label className="flex items-center gap-2 text-[0.78rem] text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      checked={matchShowLogos}
+                      onChange={(e) => {
+                        setMatchShowLogos(e.target.checked);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="match-show-logos"
+                    />
+                    Clublogos anzeigen
+                  </label>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Logogrösse
+                    </label>
+                    <select
+                      value={matchLogoSize}
+                      onChange={(e) => {
+                        setMatchLogoSize(e.target.value as InfoboardLogoSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="match-logo-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    >
+                      {INFOBOARD_LOGO_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {LOGO_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="border-t border-[var(--border)] pt-4 space-y-4">
+                  <p className="text-[0.75rem] font-semibold text-[var(--foreground)]">
+                    Turnier
+                  </p>
+                  <label className="flex items-center gap-2 text-[0.78rem] text-[var(--foreground)]">
+                    <input
+                      type="checkbox"
+                      checked={tournamentShowLogos}
+                      onChange={(e) => {
+                        setTournamentShowLogos(e.target.checked);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="tournament-show-logos"
+                    />
+                    Clublogos anzeigen
+                  </label>
+                  <div>
+                    <label className="block text-[0.75rem] font-medium text-[var(--foreground)] mb-1.5">
+                      Logogrösse
+                    </label>
+                    <select
+                      value={tournamentLogoSize}
+                      onChange={(e) => {
+                        setTournamentLogoSize(e.target.value as InfoboardLogoSize);
+                        setAnzeigeSaved(false);
+                      }}
+                      data-testid="tournament-logo-size"
+                      className="w-full rounded-[var(--radius-lg)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--foreground)]"
+                    >
+                      {INFOBOARD_LOGO_SIZES.map((size) => (
+                        <option key={size} value={size}>
+                          {LOGO_SIZE_LABELS[size]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
 
                 <div className="flex items-center gap-3 pt-1">
                   <button

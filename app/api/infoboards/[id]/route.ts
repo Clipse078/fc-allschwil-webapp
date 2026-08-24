@@ -21,6 +21,7 @@ import {
   deleteInfoboard,
 } from "@/lib/infoboard/queries";
 import type { UpdateInfoboardInput, InfoboardStatusValue } from "@/lib/infoboard/types";
+import { INFOBOARD_LOGO_SIZES } from "@/lib/infoboard/screen1-logo-settings";
 import {
   parseAnlageplanJson,
   isResourceZone,
@@ -237,6 +238,33 @@ export async function PATCH(
       );
     }
     input.anlageplanBackgroundUrl = body.anlageplanBackgroundUrl as string | null;
+  }
+
+  if ("screen1MatchShowLogos" in body) {
+    input.screen1MatchShowLogos = Boolean(body.screen1MatchShowLogos);
+  }
+  if ("screen1MatchLogoSize" in body) {
+    const size = body.screen1MatchLogoSize;
+    if (typeof size !== "string" || !INFOBOARD_LOGO_SIZES.includes(size as typeof INFOBOARD_LOGO_SIZES[number])) {
+      return NextResponse.json(
+        { error: `screen1MatchLogoSize muss einer von: ${INFOBOARD_LOGO_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1MatchLogoSize = size;
+  }
+  if ("screen1TournamentShowLogos" in body) {
+    input.screen1TournamentShowLogos = Boolean(body.screen1TournamentShowLogos);
+  }
+  if ("screen1TournamentLogoSize" in body) {
+    const size = body.screen1TournamentLogoSize;
+    if (typeof size !== "string" || !INFOBOARD_LOGO_SIZES.includes(size as typeof INFOBOARD_LOGO_SIZES[number])) {
+      return NextResponse.json(
+        { error: `screen1TournamentLogoSize muss einer von: ${INFOBOARD_LOGO_SIZES.join(", ")}` },
+        { status: 422 },
+      );
+    }
+    input.screen1TournamentLogoSize = size;
   }
 
   // Validate: announcement requires text when enabled

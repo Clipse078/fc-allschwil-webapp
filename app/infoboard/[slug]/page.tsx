@@ -197,6 +197,7 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
       eventPresentation={payload.eventPresentation}
       theme={payload.theme}
       headerConfig={payload.headerConfig ?? undefined}
+      logoPresentation={payload.logoPresentation ?? undefined}
     />
   );
 }

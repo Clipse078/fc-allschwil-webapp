@@ -896,7 +896,7 @@ describe("Match row", () => {
     expect(homeTeamRow.textContent).toContain("FC Test");
   });
 
-  it("renders structured club + team presentation with logos when matchPresentation is present", () => {
+  it("renders single-line match team presentation with logos when matchPresentation is present", () => {
     const feed = makeFeed({
       current: [makeEvent({
         type: "MATCH",
@@ -904,13 +904,13 @@ describe("Match row", () => {
         opponentDisplayName: "FC Therwil C Gelb",
         matchPresentation: {
           home: {
-            clubDisplayName: "FC ALLSCHWIL",
-            teamSubDisplayName: "Junioren C2",
+            clubDisplayName: "FC Allschwil Junioren C2",
+            teamSubDisplayName: null,
             clubLogoUrl: "/tenant-logo.png",
           },
           away: {
-            clubDisplayName: "FC THERWIL",
-            teamSubDisplayName: "C Gelb",
+            clubDisplayName: "FC Therwil C Gelb",
+            teamSubDisplayName: null,
             clubLogoUrl: "https://cdn.example.com/therwil.png",
           },
         },
@@ -922,10 +922,10 @@ describe("Match row", () => {
 
     const homeRow = screen.getByTestId("match-home-team-row");
     const awayRow = screen.getByTestId("match-away-team-row");
-    expect(homeRow.textContent).toContain("FC ALLSCHWIL");
-    expect(homeRow.textContent).toContain("Junioren C2");
-    expect(awayRow.textContent).toContain("FC THERWIL");
-    expect(awayRow.textContent).toContain("C Gelb");
+    expect(homeRow.textContent).toContain("FC Allschwil Junioren C2");
+    expect(awayRow.textContent).toContain("FC Therwil C Gelb");
+    expect(homeRow.querySelectorAll('[class*="matchTeamSubName"]').length).toBe(0);
+    expect(awayRow.querySelectorAll('[class*="matchTeamSubName"]').length).toBe(0);
     expect(screen.getByTestId("home-team-logo")).toBeTruthy();
     expect(screen.getByTestId("away-team-logo")).toBeTruthy();
   });
@@ -2901,7 +2901,7 @@ describe("Content-demand — computeMatchDemand", () => {
     expect(computeMatchDemand(event)).toBeCloseTo(CARD_DEMAND_MATCH);
   });
 
-  it("richer match with sub-team lines gets greater demand", () => {
+  it("richer match with end time gets greater demand than match without end time", () => {
     const simple = makeEvent({
       type: "MATCH",
       endAt: null,
@@ -2920,23 +2920,23 @@ describe("Content-demand — computeMatchDemand", () => {
     });
     const richer = makeEvent({
       type: "MATCH",
-      endAt: null,
+      endAt: "2026-09-12T09:30:00.000Z",
       matchPresentation: {
         home: {
-          clubDisplayName: "FC ALLSCHWIL",
-          teamSubDisplayName: "E1",
+          clubDisplayName: "FC ALLSCHWIL E1",
+          teamSubDisplayName: null,
           clubLogoUrl: null,
         },
         away: {
-          clubDisplayName: "FC BINNINGEN",
-          teamSubDisplayName: "E1",
+          clubDisplayName: "FC BINNINGEN E1",
+          teamSubDisplayName: null,
           clubLogoUrl: null,
         },
       },
     });
     expect(computeMatchDemand(richer)).toBeGreaterThan(computeMatchDemand(simple));
     expect(computeMatchDemand(richer)).toBeCloseTo(
-      CARD_DEMAND_MATCH + 2 * CARD_DEMAND_MATCH_SUB_TEAM,
+      CARD_DEMAND_MATCH + CARD_DEMAND_MATCH_END_TIME,
     );
   });
 
@@ -3024,8 +3024,7 @@ describe("Content-demand — computeMatchDemand", () => {
     const simpleDemand = computeMatchDemand(simple);
     const richerDemand = computeMatchDemand(richer);
     expect(richerDemand).toBeGreaterThan(simpleDemand);
-    expect(richerDemand - simpleDemand).toBeGreaterThanOrEqual(0.4);
-    expect(richerDemand - simpleDemand).toBeLessThanOrEqual(1.0);
+    expect(richerDemand - simpleDemand).toBeCloseTo(CARD_DEMAND_MATCH_END_TIME);
   });
 });
 
@@ -3054,7 +3053,7 @@ describe("Content-demand — computeMatchContentSafeMinimum", () => {
     const currentMatch = PREVIEW_FIXTURE.current[0];
     const laterMatch = PREVIEW_FIXTURE.later[1];
     expect(computeMatchContentSafeMinimum(currentMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
-    expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
+    expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThanOrEqual(CARD_DEMAND_MATCH);
   });
 
   it("mixed preview page total demand stays within CARD_DEMAND_PAGE_MAX", () => {

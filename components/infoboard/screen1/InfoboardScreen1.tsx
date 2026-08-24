@@ -56,6 +56,13 @@ import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter
 import { InfoboardPageRotator } from "./InfoboardPageRotator";
 import { useKioskClock } from "@/components/infoboard/kiosk-clock";
 import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-feed-expiry";
+import { admitDisplayItemsByCapacity } from "@/lib/publishing/infoboard/screen1-capacity-admission";
+import {
+  DEFAULT_SCREEN1_LOGO_PRESENTATION,
+  MATCH_LOGO_SIZE_CSS,
+  TOURNAMENT_LOGO_SIZE_CSS,
+  type Screen1LogoPresentationConfig,
+} from "@/lib/infoboard/screen1-logo-settings";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -103,6 +110,8 @@ export type InfoboardScreen1Props = {
     readonly showDate?: boolean;
     readonly showWeather?: boolean;
   };
+  /** Per-board Match/Tournament logo presentation settings. */
+  logoPresentation?: Screen1LogoPresentationConfig;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -187,24 +196,8 @@ export function computeTournamentParticipantDisplayRows(
   return Math.ceil(participantCount / TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS);
 }
 
-function countMatchSubTeamLines(
-  presentation: InfoboardScreen1Event["matchPresentation"],
-): number {
-  if (presentation?.home == null) return 0;
-  let count = 0;
-  if (presentation.home.teamSubDisplayName?.trim()) count++;
-  if (presentation.away?.teamSubDisplayName?.trim()) count++;
-  return count;
-}
-
-/**
- * Semantic demand for a MATCH card based on presentational vertical content.
- * Logo presence alone does not increase demand.
- * Exported for regression testing.
- */
 export function computeMatchDemand(event: InfoboardScreen1Event): number {
   let demand = CARD_DEMAND_MATCH;
-  demand += countMatchSubTeamLines(event.matchPresentation) * CARD_DEMAND_MATCH_SUB_TEAM;
   if (event.endAt !== null && event.endAt !== event.startAt) {
     demand += CARD_DEMAND_MATCH_END_TIME;
   }
@@ -494,6 +487,10 @@ function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
   return result;
 }
 
+function displayItemTemporal(item: DisplayItem): TemporalBucket {
+  return item.kind === "training-group" ? item.temporal : item.item.temporal;
+}
+
 /**
  * Strips a club name prefix from a team display name for Infoboard rendering.
  *
@@ -528,19 +525,23 @@ type MatchClubLogoProps = {
   clubName: string;
   testId?: string;
   presentation?: "match" | "tournament";
+  showLogos?: boolean;
 };
 
 /**
  * Reserved-size club crest slot for MATCH / TOURNAMENT presentation.
- * Renders the configured logo when available; otherwise an empty slot so
- * layout does not jump and no broken-image icon is shown.
+ * When showLogos is false the slot is omitted entirely (space reclaimed).
+ * When enabled but no URL: empty placeholder preserves layout stability.
  */
 function MatchClubLogo({
   logoUrl,
   clubName,
   testId,
   presentation = "match",
-}: MatchClubLogoProps): ReactElement {
+  showLogos = true,
+}: MatchClubLogoProps): ReactElement | null {
+  if (!showLogos) return null;
+
   const logoClassName =
     presentation === "tournament"
       ? logoUrl
@@ -578,7 +579,7 @@ type MatchSideIdentityProps = {
   rowTestId: string;
   logoTestId: string;
   primaryClassName: string;
-  secondaryClassName: string;
+  showLogos?: boolean;
 };
 
 function MatchSideIdentity({
@@ -586,7 +587,7 @@ function MatchSideIdentity({
   rowTestId,
   logoTestId,
   primaryClassName,
-  secondaryClassName,
+  showLogos = true,
 }: MatchSideIdentityProps): ReactElement {
   return (
     <div className={styles.matchTeamRow} data-testid={rowTestId}>
@@ -594,12 +595,10 @@ function MatchSideIdentity({
         logoUrl={side.clubLogoUrl}
         clubName={side.clubDisplayName}
         testId={logoTestId}
+        showLogos={showLogos}
       />
       <div className={styles.matchTeamText}>
         <span className={primaryClassName}>{side.clubDisplayName}</span>
-        {side.teamSubDisplayName !== null && (
-          <span className={secondaryClassName}>{side.teamSubDisplayName}</span>
-        )}
       </div>
     </div>
   );
@@ -1043,6 +1042,7 @@ type EventCardProps = {
   participantAllocations: readonly InfoboardTeamAllocationPresentation[] | undefined;
   /** Content-demand value driving flex-grow on this card. */
   demand: number;
+  logoPresentation?: Screen1LogoPresentationConfig;
 };
 
 function EventCard({
@@ -1050,6 +1050,7 @@ function EventCard({
   timeZone,
   participantAllocations,
   demand,
+  logoPresentation = DEFAULT_SCREEN1_LOGO_PRESENTATION,
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
@@ -1117,7 +1118,7 @@ function EventCard({
                   rowTestId="match-home-team-row"
                   logoTestId="home-team-logo"
                   primaryClassName={styles.eventTeamMain}
-                  secondaryClassName={styles.matchTeamSubName}
+                  showLogos={logoPresentation.matchShowLogos}
                 />
                 <span className={styles.vsLabel} aria-hidden="true">vs.</span>
                 {event.matchPresentation.away !== null && (
@@ -1126,7 +1127,7 @@ function EventCard({
                     rowTestId="match-away-team-row"
                     logoTestId="away-team-logo"
                     primaryClassName={styles.eventTeamOpponent}
-                    secondaryClassName={styles.matchTeamSubNameOpponent}
+                    showLogos={logoPresentation.matchShowLogos}
                   />
                 )}
               </>
@@ -1164,6 +1165,7 @@ function EventCard({
                     clubName={participant.teamDisplayName}
                     testId={`tournament-participant-logo-${participant.id}`}
                     presentation="tournament"
+                    showLogos={logoPresentation.tournamentShowLogos}
                   />
                 ))}
               </div>
@@ -1213,7 +1215,9 @@ export function InfoboardScreen1({
   weather,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
   headerConfig,
+  logoPresentation: logoPresentationProp,
 }: InfoboardScreen1Props): ReactElement {
+  const logoPresentation = logoPresentationProp ?? DEFAULT_SCREEN1_LOGO_PRESENTATION;
   const { tenant } = feed;
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
@@ -1236,7 +1240,31 @@ export function InfoboardScreen1({
   const clubNameUpper = tenant.name.toUpperCase();
 
   const flatList = buildFlatList(visibleFeed);
-  const displayList = buildDisplayList(flatList);
+  const rawDisplayList = buildDisplayList(flatList);
+
+  // Pre-compute demands for capacity admission (tournament extensions resolved once).
+  const rawItemDemands: number[] = rawDisplayList.map((item) => {
+    if (item.kind === "training-group") {
+      return computeTrainingGroupDemand(item.items.length);
+    }
+    const event = item.item.event;
+    if (event.type === "MATCH") {
+      return computeMatchDemand(event);
+    }
+    if (event.type === "TOURNAMENT") {
+      const ext = findEventExtension(event.id, eventPresentation);
+      return computeTournamentDemand(ext?.participantAllocations);
+    }
+    return computeEventDemand(event.type);
+  });
+
+  const displayList = admitDisplayItemsByCapacity(
+    rawDisplayList,
+    rawItemDemands,
+    displayItemTemporal,
+    CARD_DEMAND_PAGE_MAX,
+  );
+
   const totalCards = displayList.length;
 
   const overflowCount =
@@ -1252,22 +1280,10 @@ export function InfoboardScreen1({
   const staticDateLine =
     currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
 
-  // ── Content-demand pre-computation ───────────────────────────────────────
-  // Compute per-item demands before pagination. Tournament participant counts
-  // require the extension lookup, so we resolve them here once.
+  // ── Content-demand pre-computation for pagination ────────────────────────
   const itemDemands: number[] = visibleDisplayList.map((item) => {
-    if (item.kind === "training-group") {
-      return computeTrainingGroupDemand(item.items.length);
-    }
-    const event = item.item.event;
-    if (event.type === "MATCH") {
-      return computeMatchDemand(event);
-    }
-    if (event.type === "TOURNAMENT") {
-      const ext = findEventExtension(event.id, eventPresentation);
-      return computeTournamentDemand(ext?.participantAllocations);
-    }
-    return computeEventDemand(event.type);
+    const rawIndex = rawDisplayList.indexOf(item);
+    return rawIndex >= 0 ? rawItemDemands[rawIndex] ?? 1.0 : 1.0;
   });
 
   // Split into pages based on demand. Normal days: single page (no rotation).
@@ -1318,6 +1334,7 @@ export function InfoboardScreen1({
               timeZone={timeZone}
               participantAllocations={participantAllocations}
               demand={demand}
+              logoPresentation={logoPresentation}
             />
           );
         })}
@@ -1330,6 +1347,13 @@ export function InfoboardScreen1({
       className={styles.root}
       data-testid="infoboard-screen1-root"
       data-theme={themeAttr}
+      style={
+        {
+          "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[logoPresentation.matchLogoSize],
+          "--ib-tournament-logo-size":
+            TOURNAMENT_LOGO_SIZE_CSS[logoPresentation.tournamentLogoSize],
+        } as CSSProperties
+      }
     >
       {/* ── Shared kiosk header (INFOBOARD-MAP-02) ──────────────────────── */}
       <KioskShellHeader
