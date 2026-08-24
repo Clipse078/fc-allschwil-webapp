@@ -48,6 +48,7 @@ import type {
 import type { PublicationEventLoader } from "../policy/event-selection";
 import { selectEventsForPublication } from "../policy/event-selection";
 import {
+  getEffectiveEndAt,
   partitionByTemporalGroup,
   toLocalDateKey,
 } from "../time/temporal-grouping";
@@ -212,6 +213,7 @@ export async function buildInfoboardScreen1Feed(
         if (alreadyShown.has(e.id)) return false;
         // Only future events (not completed)
         if (e.startAt <= input.now) return false;
+        if (getEffectiveEndAt(e).getTime() <= input.now.getTime()) return false;
         // Only today
         return toLocalDateKey(e.startAt, input.timeZone) === displayDate;
       })

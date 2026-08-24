@@ -1353,6 +1353,70 @@
   margin: 0;
   padding: 0;
 }
+
+/* ─── Grouped-training row density (per-card, 4+ rows) ─────────────────────
+ *
+ * Page-level data-density tightens all cards on busy pages. Per-group density
+ * targets multi-row training blocks only so sparse 1–3 row groups stay unchanged.
+ *
+ * Root cause fix: minmax(0, 1fr) allowed the value grid to shrink below its
+ * intrinsic row height; combined with overflow:hidden on .eventCard this clipped
+ * the final team entries on 1080p TVs.
+ */
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupZone,
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupZone {
+  grid-template-rows: auto auto;
+  row-gap: clamp(2px, 0.35vh, 5px);
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(20px, 2.4vh, 30px), auto);
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupAlignedRow {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTeamName {
+  font-size: clamp(1.15rem, 1.55vw, 2.2rem);
+  line-height: 1.05;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupPitchValue {
+  font-size: clamp(1rem, 1.35vw, 1.75rem);
+  line-height: 1.05;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupRoomValue {
+  font-size: clamp(0.9rem, 1.15vw, 1.55rem);
+  line-height: 1.05;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupRows {
+  grid-auto-rows: minmax(clamp(18px, 2.1vh, 28px), auto);
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupAlignedRow {
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTeamName {
+  font-size: clamp(1.05rem, 1.4vw, 2rem);
+  line-height: 1.02;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupPitchValue {
+  font-size: clamp(0.95rem, 1.25vw, 1.6rem);
+  line-height: 1.02;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupRoomValue {
+  font-size: clamp(0.85rem, 1.05vw, 1.45rem);
+  line-height: 1.02;
+}
+
 /* INFOBOARD-TV-UX-04 — MATCH/TOURNAMENT vertical centering
  *
  * Match and Tournament zones vertically center their [label + content]

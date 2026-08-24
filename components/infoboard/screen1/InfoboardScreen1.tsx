@@ -1,3 +1,4 @@
+"use client";
 /**
  * components/infoboard/screen1/InfoboardScreen1.tsx
  *
@@ -18,8 +19,9 @@
  *   - SportClubEvo branding in footer, not in header.
  *
  * Invariants:
- *   - Pure presentational server component — no "use client", no effects,
- *     no timers, no fetch, no browser storage, no URL parameter logic.
+ *   - Presentational component — no fetch, DB, URL parameters, or browser storage.
+ *   - Live expiry filtering uses the kiosk clock so events disappear at end time
+ *     without requiring a full page reload on long-running TV sessions.
  *   - No Prisma imports, no DB access.
  *   - Tenant timezone is always taken explicitly from feed.tenant.timezone.
  *   - No new Date() without an argument; no server-local or browser-local TZ.
@@ -32,7 +34,7 @@
  *   - No countdown text (IN X MIN.); temporal labels are JETZT or ALS NÄCHSTES.
  */
 
-import type { ReactElement, CSSProperties } from "react";
+import { useMemo, type ReactElement, type CSSProperties } from "react";
 import type {
   InfoboardScreen1Feed,
   InfoboardScreen1Event,
@@ -52,6 +54,8 @@ import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { InfoboardPageRotator } from "./InfoboardPageRotator";
+import { useKioskClock } from "@/components/infoboard/kiosk-clock";
+import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-feed-expiry";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -152,7 +156,23 @@ export const CARD_DEMAND_PAGE_MAX = 12.0;
  * Exported for regression testing.
  */
 export function computeTrainingGroupDemand(rowCount: number): number {
-  return CARD_DEMAND_TRAINING_BASE + Math.max(1, rowCount) * CARD_DEMAND_TRAINING_ROW;
+  const rows = Math.max(1, rowCount);
+  const rowWeight = rows >= 4 ? 0.62 : CARD_DEMAND_TRAINING_ROW;
+  return CARD_DEMAND_TRAINING_BASE + rows * rowWeight;
+}
+
+/**
+ * Per-card density for grouped training rows.
+ * Sparse groups (1–3 rows) keep normal typography; 4+ rows tighten spacing.
+ *
+ * Exported for regression testing.
+ */
+export function trainingGroupDensityTier(
+  rowCount: number,
+): "normal" | "compact" | "dense" {
+  if (rowCount >= 6) return "dense";
+  if (rowCount >= 4) return "compact";
+  return "normal";
 }
 
 /**
@@ -170,7 +190,7 @@ export function computeTournamentParticipantDisplayRows(
 function countMatchSubTeamLines(
   presentation: InfoboardScreen1Event["matchPresentation"],
 ): number {
-  if (presentation === null) return 0;
+  if (presentation?.home == null) return 0;
   let count = 0;
   if (presentation.home.teamSubDisplayName?.trim()) count++;
   if (presentation.away?.teamSubDisplayName?.trim()) count++;
@@ -857,6 +877,7 @@ function TrainingGroupCard({
   const startTime = formatTime(startAt, timeZone);
   const label = statusLabel(temporal);
   const stripe = stripeKey("TRAINING");
+  const groupDensity = trainingGroupDensityTier(items.length);
 
   // Shared end time is displayed once in the TIME zone when all grouped
   // trainings end together. Differing end times remain visible per team row.
@@ -873,6 +894,7 @@ function TrainingGroupCard({
       data-temporal={temporal}
       data-stripe={stripe}
       data-training-count={items.length}
+      data-group-density={groupDensity}
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
@@ -1196,6 +1218,13 @@ export function InfoboardScreen1({
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
 
+  const clockSeed = currentTimeIso ?? feed.generatedAt;
+  const liveTimeIso = useKioskClock(clockSeed);
+  const visibleFeed = useMemo(() => {
+    if (currentTimeIso == null) return feed;
+    return filterExpiredScreen1Feed(feed, new Date(liveTimeIso));
+  }, [feed, liveTimeIso, currentTimeIso]);
+
   // Header visibility settings (per-board config or defaults)
   const showTime = headerConfig?.showTime !== false;
   const showDate = headerConfig?.showDate !== false;
@@ -1206,7 +1235,7 @@ export function InfoboardScreen1({
   // Club name for prefix stripping (presentation-only)
   const clubNameUpper = tenant.name.toUpperCase();
 
-  const flatList = buildFlatList(feed);
+  const flatList = buildFlatList(visibleFeed);
   const displayList = buildDisplayList(flatList);
   const totalCards = displayList.length;
 
@@ -1318,10 +1347,10 @@ export function InfoboardScreen1({
 
       {/* ── Main: event list (demand-paginated, rotated when multi-page) ── */}
       <main className={styles.main}>
-        {feed.isEmpty ? (
+        {visibleFeed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">
             <p className={styles.emptyFullMessage}>
-              {feed.emptyStateReason === "DAY_COMPLETED"
+              {visibleFeed.emptyStateReason === "DAY_COMPLETED"
                 ? "Heute keine weiteren Trainings, Heimspiele oder Turniere."
                 : "Heute sind keine Trainings, Heimspiele oder Turniere geplant."}
             </p>
