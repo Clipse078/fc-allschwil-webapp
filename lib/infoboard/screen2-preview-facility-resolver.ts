@@ -120,13 +120,13 @@ export function resolveScreen2PreviewFacilities(
     }),
     hauptfeldHalfA: resolveSlot(pitches, {
       description: "Hauptfeld Feld A",
-      primaryCodes: ["HAUPTFELD_A"],
+      primaryCodes: ["HAUPTFELD A", "HAUPTFELD_A"],
       legacyCodes: ["STADION_A"],
       resourceType: "HALF_PITCH",
     }),
     hauptfeldHalfB: resolveSlot(pitches, {
       description: "Hauptfeld Feld B",
-      primaryCodes: ["HAUPTFELD_B"],
+      primaryCodes: ["HAUPTFELD B", "HAUPTFELD_B"],
       legacyCodes: ["STADION_B"],
       resourceType: "HALF_PITCH",
     }),
