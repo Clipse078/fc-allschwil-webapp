@@ -128,22 +128,10 @@ export type CanonicalEventPolicyRow = {
   // INFOBOARD-C1: nullable after ADMIN-DELETE-SEASON-01-C1 (Event.seasonId uses
   // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
   readonly season: { readonly key: string } | null;
-  readonly team?: {
-    readonly name: string;
-    readonly shortName: string | null;
-    readonly alternativeName: string | null;
-  } | null;
+  readonly team?: CanonicalInfoboardTeamDisplayNameRow | null;
   readonly matchExternalMapping?: {
-    readonly homeTeam: {
-      readonly name: string;
-      readonly shortName: string | null;
-      readonly alternativeName: string | null;
-    } | null;
-    readonly awayTeam: {
-      readonly name: string;
-      readonly shortName: string | null;
-      readonly alternativeName: string | null;
-    } | null;
+    readonly homeTeam: CanonicalInfoboardTeamDisplayNameRow | null;
+    readonly awayTeam: CanonicalInfoboardTeamDisplayNameRow | null;
     readonly homeExternalTeam: {
       readonly name: string;
       readonly shortName: string | null;
@@ -173,7 +161,10 @@ export type CanonicalEventPolicyRow = {
 export type CanonicalTrainingSessionPolicyRow = {
   readonly id: string;
   readonly status: string;
-  readonly teamSeason: { readonly season: { readonly key: string } };
+  readonly teamSeason: {
+    readonly season: { readonly key: string };
+    readonly team: CanonicalInfoboardTeamDisplayNameRow;
+  };
 };
 
 /**
@@ -200,6 +191,26 @@ export type CanonicalInfoboardPolicyDatabase = {
 
 // ── Select clauses (kept inside this module; never mutated) ───────────────
 
+export const CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT = {
+  name: true,
+  shortName: true,
+  alternativeName: true,
+  infoboardDisplayName: true,
+  infoboardTrainingDisplayName: true,
+  infoboardMatchDisplayName: true,
+  infoboardTournamentDisplayName: true,
+} as const;
+
+export type CanonicalInfoboardTeamDisplayNameRow = {
+  readonly name: string;
+  readonly shortName: string | null;
+  readonly alternativeName: string | null;
+  readonly infoboardDisplayName: string | null;
+  readonly infoboardTrainingDisplayName: string | null;
+  readonly infoboardMatchDisplayName: string | null;
+  readonly infoboardTournamentDisplayName: string | null;
+};
+
 export const CANONICAL_EVENT_POLICY_SELECT = {
   id: true,
   status: true,
@@ -214,27 +225,15 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
   intermediateResultLabel: true,
   season: { select: { key: true } },
   team: {
-    select: {
-      name: true,
-      shortName: true,
-      alternativeName: true,
-    },
+    select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,
   },
   matchExternalMapping: {
     select: {
       homeTeam: {
-        select: {
-          name: true,
-          shortName: true,
-          alternativeName: true,
-        },
+        select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,
       },
       awayTeam: {
-        select: {
-          name: true,
-          shortName: true,
-          alternativeName: true,
-        },
+        select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,
       },
       homeExternalTeam: {
         select: {
@@ -273,7 +272,14 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
 export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
   id: true,
   status: true,
-  teamSeason: { select: { season: { select: { key: true } } } },
+  teamSeason: {
+    select: {
+      season: { select: { key: true } },
+      team: {
+        select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,
+      },
+    },
+  },
 } as const;
 
 // ── Calendar-day enumeration (Europe/Zurich, pure date-only math) ─────────
@@ -454,6 +460,8 @@ function buildExternalSideIdentity(
       teamName: null,
       teamShortName: null,
       teamAlternativeName: null,
+      teamInfoboardDisplayName: null,
+      teamInfoboardMatchDisplayName: null,
       fallbackDisplayName,
     };
   }
@@ -468,19 +476,28 @@ function buildExternalSideIdentity(
     teamName: externalTeam.name,
     teamShortName: externalTeam.shortName,
     teamAlternativeName: externalTeam.alternativeName,
+    teamInfoboardDisplayName: null,
+    teamInfoboardMatchDisplayName: null,
     fallbackDisplayName,
   };
 }
 
+function mapInfoboardTeamDisplayFields(
+  team: CanonicalInfoboardTeamDisplayNameRow,
+): Screen1SourceEvent["team"] {
+  return {
+    name: team.name,
+    shortName: team.shortName,
+    alternativeName: team.alternativeName,
+    infoboardDisplayName: team.infoboardDisplayName,
+    infoboardTrainingDisplayName: team.infoboardTrainingDisplayName,
+    infoboardMatchDisplayName: team.infoboardMatchDisplayName,
+    infoboardTournamentDisplayName: team.infoboardTournamentDisplayName,
+  };
+}
+
 function buildOwnTeamSideIdentity(
-  team:
-    | {
-        readonly name: string;
-        readonly shortName: string | null;
-        readonly alternativeName: string | null;
-      }
-    | null
-    | undefined,
+  team: CanonicalInfoboardTeamDisplayNameRow | null | undefined,
   fallbackDisplayName: string | null,
 ): InfoboardMatchIdentity["home"] {
   return {
@@ -490,6 +507,8 @@ function buildOwnTeamSideIdentity(
     teamName: team?.name ?? null,
     teamShortName: team?.shortName ?? null,
     teamAlternativeName: team?.alternativeName ?? null,
+    teamInfoboardDisplayName: team?.infoboardDisplayName ?? null,
+    teamInfoboardMatchDisplayName: team?.infoboardMatchDisplayName ?? null,
     fallbackDisplayName,
   };
 }
@@ -547,6 +566,7 @@ function mapTrainingItem(
   item: WeekplannerTrainingItem,
   policy: CanonicalTrainingSessionPolicyRow | undefined,
 ): Screen1SourceEvent {
+  const canonicalTeam = policy?.teamSeason.team;
   return {
     tenantId: item.tenantId,
     type: "TRAINING",
@@ -565,7 +585,9 @@ function mapTrainingItem(
     id: item.id,
     title: item.title,
     seasonKey: policy?.teamSeason.season.key ?? "",
-    team: { name: item.teamNames[0] ?? null },
+    team: canonicalTeam
+      ? mapInfoboardTeamDisplayFields(canonicalTeam)
+      : { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: null,
     organizerName: null,
@@ -609,11 +631,7 @@ function mapMatchItem(
     title: item.title,
     seasonKey: policy?.season?.key ?? "",
     team: eventTeam
-      ? {
-          name: eventTeam.name,
-          shortName: eventTeam.shortName,
-          alternativeName: eventTeam.alternativeName,
-        }
+      ? mapInfoboardTeamDisplayFields(eventTeam)
       : { name: item.teamNames[0] ?? null },
     opponent: null,
     opponentFallbackName: item.opponentName,

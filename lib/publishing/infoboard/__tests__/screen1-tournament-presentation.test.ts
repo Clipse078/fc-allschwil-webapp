@@ -2,7 +2,7 @@
  * lib/publishing/infoboard/__tests__/screen1-tournament-presentation.test.ts
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { loadScreen1TournamentPresentationExtensions } from "../screen1-tournament-presentation";
 
 describe("loadScreen1TournamentPresentationExtensions", () => {
@@ -40,6 +40,10 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
               name: "FC Binningen E1",
               shortName: null,
               alternativeName: null,
+              infoboardDisplayName: "JUNIOREN E1",
+              infoboardTrainingDisplayName: null,
+              infoboardMatchDisplayName: null,
+              infoboardTournamentDisplayName: "FCA E1 Tournament",
             },
             externalClub: null,
             externalTeam: null,
@@ -66,7 +70,7 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
     expect(extensions[0]?.participantAllocations).toEqual([
       {
         id: "p2",
-        teamDisplayName: "FC Binningen E1",
+        teamDisplayName: "FCA E1 Tournament",
         dressingRoomLabel: "DR-A",
         clubLogoUrl: "https://cdn.example.com/tenant.png",
       },
@@ -91,6 +95,100 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
     await expect(
       loadScreen1TournamentPresentationExtensions(database, "tenant-a", [], null),
     ).resolves.toEqual([]);
+  });
+
+  it("keeps explicit participant displayName above Team.infoboardDisplayName", async () => {
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => [
+          {
+            id: "p-override",
+            eventId: "evt-t3",
+            displayName: "Custom Label",
+            manualLabel: null,
+            displayOrder: 0,
+            team: {
+              name: "E4",
+              shortName: "E4",
+              alternativeName: "Junioren E4",
+              infoboardDisplayName: "JUNIOREN E4",
+              infoboardTrainingDisplayName: null,
+              infoboardMatchDisplayName: null,
+              infoboardTournamentDisplayName: null,
+            },
+            externalClub: null,
+            externalTeam: null,
+            dressingRoomAllocations: [],
+          },
+        ],
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t3"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations?.[0]?.teamDisplayName).toBe(
+      "Custom Label",
+    );
+  });
+
+  it("15 — external/unlinked Tournament participant remains unchanged", async () => {
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => [
+          {
+            id: "p-external",
+            eventId: "evt-t4",
+            displayName: null,
+            manualLabel: null,
+            displayOrder: 0,
+            team: null,
+            externalClub: {
+              name: "FC Binningen",
+              shortName: null,
+              logoUrl: "https://cdn.example.com/binningen.png",
+            },
+            externalTeam: null,
+            dressingRoomAllocations: [],
+          },
+        ],
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t4"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations?.[0]?.teamDisplayName).toBe(
+      "FC Binningen",
+    );
+  });
+
+  it("16 — scopes tournament participant lookup by tenantId", async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const database = {
+      tournamentParticipant: { findMany },
+    };
+
+    await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t1"],
+      null,
+    );
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ tenantId: "tenant-a" }),
+      }),
+    );
   });
 
   it("allows manual participants without logos", async () => {

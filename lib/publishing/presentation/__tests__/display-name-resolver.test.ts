@@ -103,13 +103,44 @@ describe("shared string normalization", () => {
 // ── Team — INFOBOARD ──────────────────────────────────────────────────────────
 
 describe("resolveTeamDisplayName — INFOBOARD", () => {
-  it("returns shortName when available (priority 1)", () => {
+  it("returns infoboardDisplayName when available (priority 1)", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          infoboardDisplayName: "JUNIOREN E4",
+          alternativeName: "Junioren E4",
+          shortName: "E4",
+          displayName: "Season Override",
+          name: "E4",
+          fallbackName: "Fallback",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("JUNIOREN E4");
+  });
+
+  it("falls through to alternativeName when infoboardDisplayName is blank", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          infoboardDisplayName: "  ",
+          alternativeName: "Junioren F2",
+          shortName: "F2",
+          name: "F2",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("Junioren F2");
+  });
+
+  it("falls through to shortName when infoboardDisplayName and alternativeName are blank", () => {
     expect(
       resolveTeamDisplayName(
         {
           shortName: "U12a",
           displayName: "U12a Junioren",
           name: "FC Allschwil",
+          alternativeName: null,
           fallbackName: "Fallback",
         },
         "INFOBOARD",
@@ -117,7 +148,7 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     ).toBe("U12a");
   });
 
-  it("falls through to displayName when shortName is blank", () => {
+  it("falls through to Team.name when higher priorities are blank", () => {
     expect(
       resolveTeamDisplayName(
         {
@@ -127,20 +158,34 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
         },
         "INFOBOARD",
       ),
-    ).toBe("U12a Junioren");
+    ).toBe("FC Allschwil");
   });
 
-  it("falls through to name when shortName and displayName are blank", () => {
+  it("does not use TeamSeason.displayName on INFOBOARD", () => {
     expect(
       resolveTeamDisplayName(
         {
           shortName: null,
-          displayName: "",
-          name: "FC Allschwil",
+          displayName: "Junioren B2",
+          name: "FC Allschwil Junioren B2",
         },
         "INFOBOARD",
       ),
-    ).toBe("FC Allschwil");
+    ).toBe("FC Allschwil Junioren B2");
+  });
+
+  it("falls through to Team.alternativeName when shortName and name are blank", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          shortName: null,
+          displayName: "Season Override",
+          name: null,
+          alternativeName: "Junioren B2",
+        },
+        "INFOBOARD",
+      ),
+    ).toBe("Junioren B2");
   });
 
   it("uses fallbackName as last resort", () => {
@@ -170,10 +215,10 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
     expect(resolveTeamDisplayName({}, "INFOBOARD")).toBeNull();
   });
 
-  it("trims shortName on INFOBOARD", () => {
+  it("trims infoboardDisplayName on INFOBOARD", () => {
     expect(
-      resolveTeamDisplayName({ shortName: "  U12a  " }, "INFOBOARD"),
-    ).toBe("U12a");
+      resolveTeamDisplayName({ infoboardDisplayName: "  JUNIOREN E1  " }, "INFOBOARD"),
+    ).toBe("JUNIOREN E1");
   });
 });
 

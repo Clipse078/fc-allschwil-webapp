@@ -18,6 +18,30 @@ type Context = {
   params: Promise<{ teamId: string }>;
 };
 
+const INFOBOARD_DISPLAY_NAME_MAX_LENGTH = 120;
+
+function parseOptionalNullableStringField(
+  raw: unknown,
+): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null || raw === "") return null;
+  return String(raw).trim() || null;
+}
+
+function validateInfoboardDisplayNameLength(
+  value: string | null | undefined,
+  label: string,
+): string | null {
+  if (
+    value !== undefined &&
+    value !== null &&
+    value.length > INFOBOARD_DISPLAY_NAME_MAX_LENGTH
+  ) {
+    return `${label} darf maximal ${INFOBOARD_DISPLAY_NAME_MAX_LENGTH} Zeichen lang sein.`;
+  }
+  return null;
+}
+
 const ALLOWED_CATEGORIES = [
   "KINDERFUSSBALL",
   "JUNIOREN",
@@ -114,6 +138,19 @@ export async function PATCH(request: NextRequest, context: Context) {
         : alternativeNameRaw === null || alternativeNameRaw === ""
           ? null
           : String(alternativeNameRaw).trim() || null;
+
+    const infoboardDisplayName = parseOptionalNullableStringField(
+      body.infoboardDisplayName,
+    );
+    const infoboardTrainingDisplayName = parseOptionalNullableStringField(
+      body.infoboardTrainingDisplayName,
+    );
+    const infoboardMatchDisplayName = parseOptionalNullableStringField(
+      body.infoboardMatchDisplayName,
+    );
+    const infoboardTournamentDisplayName = parseOptionalNullableStringField(
+      body.infoboardTournamentDisplayName,
+    );
     const genderGroup =
       body.genderGroup === null || body.genderGroup === undefined
         ? null
@@ -152,6 +189,28 @@ export async function PATCH(request: NextRequest, context: Context) {
         { error: "Sortierung muss eine Zahl sein." },
         { status: 400 }
       );
+    }
+
+    const infoboardLengthError =
+      validateInfoboardDisplayNameLength(
+        infoboardDisplayName,
+        "Infoboard-Anzeigename",
+      ) ??
+      validateInfoboardDisplayNameLength(
+        infoboardTrainingDisplayName,
+        "Infoboard-Training-Anzeigename",
+      ) ??
+      validateInfoboardDisplayNameLength(
+        infoboardMatchDisplayName,
+        "Infoboard-Match-Anzeigename",
+      ) ??
+      validateInfoboardDisplayNameLength(
+        infoboardTournamentDisplayName,
+        "Infoboard-Turnier-Anzeigename",
+      );
+
+    if (infoboardLengthError) {
+      return NextResponse.json({ error: infoboardLengthError }, { status: 400 });
     }
 
     // Validate orgUnitId against active tenant if explicitly set to a non-null value.
@@ -194,6 +253,16 @@ export async function PATCH(request: NextRequest, context: Context) {
         ...(orgUnitId !== undefined ? { orgUnitId } : {}),
         ...(shortName !== undefined ? { shortName } : {}),
         ...(alternativeName !== undefined ? { alternativeName } : {}),
+        ...(infoboardDisplayName !== undefined ? { infoboardDisplayName } : {}),
+        ...(infoboardTrainingDisplayName !== undefined
+          ? { infoboardTrainingDisplayName }
+          : {}),
+        ...(infoboardMatchDisplayName !== undefined
+          ? { infoboardMatchDisplayName }
+          : {}),
+        ...(infoboardTournamentDisplayName !== undefined
+          ? { infoboardTournamentDisplayName }
+          : {}),
       },
       include: {
         teamSeasons: {
@@ -224,6 +293,10 @@ export async function PATCH(request: NextRequest, context: Context) {
         name: updated.name,
         shortName: updated.shortName,
         alternativeName: updated.alternativeName,
+        infoboardDisplayName: updated.infoboardDisplayName,
+        infoboardTrainingDisplayName: updated.infoboardTrainingDisplayName,
+        infoboardMatchDisplayName: updated.infoboardMatchDisplayName,
+        infoboardTournamentDisplayName: updated.infoboardTournamentDisplayName,
         slug: updated.slug,
         category: updated.category,
         genderGroup: updated.genderGroup,

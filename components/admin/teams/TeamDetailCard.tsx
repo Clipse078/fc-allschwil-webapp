@@ -77,6 +77,10 @@ type Team = {
   // TEAM-IDENTITY-01: tenant-owned SHORT NAME / ALTERNATIVE NAME.
   shortName: string | null;
   alternativeName: string | null;
+  infoboardDisplayName: string | null;
+  infoboardTrainingDisplayName: string | null;
+  infoboardMatchDisplayName: string | null;
+  infoboardTournamentDisplayName: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -129,6 +133,10 @@ export default function TeamDetailCard({
     name: string;
     shortName: string | null;
     alternativeName: string | null;
+    infoboardDisplayName: string | null;
+    infoboardTrainingDisplayName: string | null;
+    infoboardMatchDisplayName: string | null;
+    infoboardTournamentDisplayName: string | null;
     slug: string;
     category: string;
     genderGroup: string | null;
@@ -155,6 +163,10 @@ export default function TeamDetailCard({
           name: team.name,
           shortName: team.shortName,
           alternativeName: team.alternativeName,
+          infoboardDisplayName: team.infoboardDisplayName,
+          infoboardTrainingDisplayName: team.infoboardTrainingDisplayName,
+          infoboardMatchDisplayName: team.infoboardMatchDisplayName,
+          infoboardTournamentDisplayName: team.infoboardTournamentDisplayName,
           slug: team.slug,
           category: team.category,
           genderGroup: team.genderGroup,

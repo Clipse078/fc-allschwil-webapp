@@ -4,10 +4,10 @@
  * TEAM-IDENTITY-01 — canonical Team naming contract.
  *
  * Defines ONE reusable naming-fallback contract for tenant-facing Team
- * naming (Teams admin UI: overview list, Team detail/edit). This is
- * intentionally separate from `lib/publishing/presentation/display-name-resolver.ts`,
- * which resolves TeamSeason.displayName/shortName for the (frozen)
- * Infoboard/Website publishing pipelines and must not be modified here.
+ * naming (Teams admin UI: overview list, Team detail/edit). Publishing
+ * INFOBOARD team display names use resolveInfoboardTeamDisplayName() via
+ * display-name-resolver.ts (INFOBOARD-TEAMNAME-01). WEBSITE channel naming
+ * still resolves TeamSeason.displayName/shortName in display-name-resolver.ts.
  *
  * Mandatory model (tenant-owned, never overwritten by provider sync):
  *   - Team.name             — LONG NAME  (e.g. "FC Allschwil Junioren B2")

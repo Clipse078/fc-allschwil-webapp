@@ -83,13 +83,16 @@ function trainingSessionRow(overrides: Record<string, unknown> = {}) {
       title: "E2 Training",
       teamSeason: {
         displayName: "FC Allschwil E2",
-        team: { name: "E2", shortName: null, alternativeName: null },
+        team: { name: "E2", shortName: null, alternativeName: null, infoboardDisplayName: null },
       },
     },
     // Additional fields read ONLY by the canonical Infoboard policy lookup
     // (never by lib/training/session-generation-service.ts) — see
     // canonical-source-loader.ts's CanonicalTrainingSessionPolicyRow.
-    teamSeason: { season: { key: "2026-2027" } },
+    teamSeason: {
+      season: { key: "2026-2027" },
+      team: { name: "E2", shortName: null, alternativeName: null },
+    },
     ...overrides,
   };
 }

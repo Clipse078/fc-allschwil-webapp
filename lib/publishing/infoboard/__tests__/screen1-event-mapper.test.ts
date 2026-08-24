@@ -158,29 +158,80 @@ describe("mapScreen1Event — organizer", () => {
 
 // ── Team display name ─────────────────────────────────────────────────────────
 
-describe("mapScreen1Event — team display name (INFOBOARD priority)", () => {
-  it("uses shortName when present (highest infoboard priority)", () => {
+describe("mapScreen1Event — team display name (INFOBOARD tenant-managed priority)", () => {
+  it("uses Team.shortName when present (highest infoboard priority)", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "U17" },
     }));
     expect(result.teamDisplayName).toBe("U17");
   });
 
-  it("falls through blank shortName to displayName", () => {
+  it("falls through blank Team.shortName to Team.name", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: "  " },
     }));
-    expect(result.teamDisplayName).toBe("FCA U17");
+    expect(result.teamDisplayName).toBe("FC Allschwil U17");
   });
 
-  it("uses displayName fallback when shortName absent", () => {
+  it("uses infoboardTrainingDisplayName for TRAINING cards", () => {
+    const result = mapScreen1Event(makeInput({
+      type: "TRAINING",
+      team: {
+        infoboardTrainingDisplayName: "Junioren E1",
+        infoboardDisplayName: "FCA E1",
+        alternativeName: "E1",
+        shortName: "E1",
+        name: "FC Allschwil Junioren E1",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("Junioren E1");
+  });
+
+  it("uses infoboardDisplayName when present", () => {
+    const result = mapScreen1Event(makeInput({
+      team: {
+        infoboardDisplayName: "JUNIOREN E1",
+        alternativeName: "Junioren E1",
+        shortName: "E1",
+        name: "E1",
+        displayName: "Season E1",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("JUNIOREN E1");
+  });
+
+  it("prefers alternativeName over shortName when infoboardDisplayName absent", () => {
+    const result = mapScreen1Event(makeInput({
+      team: {
+        name: "F2",
+        displayName: "Season F2",
+        shortName: "F2",
+        alternativeName: "Junioren F2",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("Junioren F2");
+  });
+
+  it("prefers Team.name over TeamSeason.displayName when higher priorities absent", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: "FCA U17", shortName: null },
     }));
-    expect(result.teamDisplayName).toBe("FCA U17");
+    expect(result.teamDisplayName).toBe("FC Allschwil U17");
   });
 
-  it("uses Team.name fallback when displayName absent", () => {
+  it("uses Team.alternativeName when name and shortName absent", () => {
+    const result = mapScreen1Event(makeInput({
+      team: {
+        name: null,
+        displayName: "FCA U17",
+        shortName: null,
+        alternativeName: "Junioren U17",
+      },
+    }));
+    expect(result.teamDisplayName).toBe("Junioren U17");
+  });
+
+  it("uses Team.name fallback when only name is present", () => {
     const result = mapScreen1Event(makeInput({
       team: { name: "FC Allschwil U17", displayName: null, shortName: null },
     }));
@@ -620,6 +671,8 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
             teamName: "FC Allschwil Junioren C2",
             teamShortName: null,
             teamAlternativeName: "Junioren C2",
+            teamInfoboardDisplayName: null,
+            teamInfoboardMatchDisplayName: null,
             fallbackDisplayName: "FC Allschwil Junioren C2",
           },
           away: {
@@ -629,6 +682,8 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
             teamName: "FC Therwil C Gelb",
             teamShortName: "C Gelb",
             teamAlternativeName: null,
+            teamInfoboardDisplayName: null,
+            teamInfoboardMatchDisplayName: null,
             fallbackDisplayName: "FC Therwil C Gelb",
           },
         },
