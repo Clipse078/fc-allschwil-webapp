@@ -382,13 +382,16 @@ describe("Board config persistence defaults (07C)", () => {
     } as InboardRow;
 
     const config = buildBoardConfig(board);
-    expect(config.logoPresentation).toEqual({
+    expect(config.presentation).toEqual({
       trainingShowLogos: true,
       trainingLogoSize: "MEDIUM",
       matchShowLogos: true,
       matchLogoSize: "MEDIUM",
       tournamentShowLogos: true,
       tournamentLogoSize: "MEDIUM",
+      trainingFontSize: "LARGE",
+      matchFontSize: "MEDIUM",
+      tournamentFontSize: "LARGE",
     });
   });
 });

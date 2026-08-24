@@ -193,6 +193,15 @@ export async function updateInfoboard(
       ...(input.screen1TournamentLogoSize !== undefined && {
         screen1TournamentLogoSize: input.screen1TournamentLogoSize,
       }),
+      ...(input.screen1TrainingFontSize !== undefined && {
+        screen1TrainingFontSize: input.screen1TrainingFontSize,
+      }),
+      ...(input.screen1MatchFontSize !== undefined && {
+        screen1MatchFontSize: input.screen1MatchFontSize,
+      }),
+      ...(input.screen1TournamentFontSize !== undefined && {
+        screen1TournamentFontSize: input.screen1TournamentFontSize,
+      }),
     },
   }) as unknown as Promise<InboardRow>;
 }

@@ -91,6 +91,12 @@
   --ib-match-logo-size:     clamp(2rem, 2.35vw, 2.375rem);
   --ib-tournament-logo-size: clamp(2.25rem, 2.8vw, 3.4375rem);
   --ib-tournament-logo-size-large: clamp(2.75rem, 3.4vw, 3.4375rem);
+  --ib-training-font-size:  clamp(2rem, 3vw, 4rem);
+  --ib-training-font-size-compact: clamp(1.15rem, 1.55vw, 2.2rem);
+  --ib-training-font-size-dense: clamp(1.05rem, 1.4vw, 2rem);
+  --ib-match-font-size:     clamp(1.65rem, 2.15vw, 2.75rem);
+  --ib-match-opponent-font-size: clamp(0.935rem, 1.25vw, 1.65rem);
+  --ib-tournament-font-size: clamp(1.15rem, 1.55vw, 2.6rem);
   --ib-fs-dest-label:       clamp(0.6rem, 0.78vw, 0.92rem);
   --ib-fs-dest-pitch:       clamp(1.5rem, 2.1vw, 2.8rem);
   --ib-fs-dest-room:        clamp(1rem, 1.4vw, 1.9rem);
@@ -535,7 +541,7 @@
 
 .tournamentTitle {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(1.15rem, 1.55vw, var(--ib-fs-event-team));
+  font-size: min(var(--ib-tournament-font-size), var(--ib-fs-event-team));
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -606,6 +612,22 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.eventCard[data-type="MATCH"] .eventTeamMain {
+  --ib-match-team-name-base: min(
+    var(--ib-match-font-size),
+    var(--ib-fs-event-team)
+  );
+  font-size: var(--ib-match-team-name-base);
+}
+
+.eventCard[data-type="MATCH"] .eventTeamOpponent {
+  --ib-match-team-name-base: min(
+    var(--ib-match-opponent-font-size),
+    var(--ib-fs-event-opponent)
+  );
+  font-size: var(--ib-match-team-name-base);
 }
 
 /*
@@ -1277,7 +1299,7 @@
 
 .trainingGroupTeamName {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-event-team);
+  font-size: min(var(--ib-training-font-size), var(--ib-fs-event-team));
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -1427,7 +1449,7 @@
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTeamName {
-  font-size: clamp(1.15rem, 1.55vw, 2.2rem);
+  font-size: var(--ib-training-font-size-compact);
   line-height: 1.05;
 }
 
@@ -1451,7 +1473,7 @@
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTeamName {
-  font-size: clamp(1.05rem, 1.4vw, 2rem);
+  font-size: var(--ib-training-font-size-dense);
   line-height: 1.02;
 }
 

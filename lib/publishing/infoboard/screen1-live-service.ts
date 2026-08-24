@@ -49,7 +49,7 @@ import {
   loadScreen1TournamentPresentationExtensions,
   type Screen1TournamentPresentationDatabase,
 } from "./screen1-tournament-presentation";
-import type { Screen1LogoPresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
+import type { Screen1PresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -108,8 +108,8 @@ export type InfoboardBoardConfig = {
   readonly headerShowTime?: boolean;
   readonly headerShowDate?: boolean;
   readonly headerShowWeather?: boolean;
-  /** Screen 1 Training/Match/Tournament logo presentation (per-board). */
-  readonly logoPresentation?: Screen1LogoPresentationConfig;
+  /** Screen 1 Training/Match/Tournament presentation (per-board). */
+  readonly presentation?: Screen1PresentationConfig;
 };
 
 /**
@@ -149,8 +149,8 @@ export type InfoboardScreen1LivePayload = {
     readonly showDate: boolean;
     readonly showWeather: boolean;
   } | null;
-  /** Per-board Screen 1 logo presentation settings. */
-  readonly logoPresentation: Screen1LogoPresentationConfig | null;
+  /** Per-board Screen 1 presentation settings. */
+  readonly presentation: Screen1PresentationConfig | null;
 };
 
 // ── Branding resolver ─────────────────────────────────────────────────────────
@@ -286,6 +286,6 @@ export async function buildScreen1LivePayload(params: {
     currentTimeIso: now.toISOString(),
     theme,
     headerConfig,
-    logoPresentation: boardConfig?.logoPresentation ?? null,
+    presentation: boardConfig?.presentation ?? null,
   };
 }

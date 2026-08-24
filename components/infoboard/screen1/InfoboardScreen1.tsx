@@ -58,11 +58,14 @@ import { useKioskClock } from "@/components/infoboard/kiosk-clock";
 import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-feed-expiry";
 import { admitDisplayItemsByCapacity } from "@/lib/publishing/infoboard/screen1-capacity-admission";
 import {
-  DEFAULT_SCREEN1_LOGO_PRESENTATION,
+  DEFAULT_SCREEN1_PRESENTATION,
+  MATCH_FONT_SIZE_CSS,
   MATCH_LOGO_SIZE_CSS,
+  TRAINING_FONT_SIZE_CSS,
   TRAINING_LOGO_SIZE_CSS,
+  TOURNAMENT_FONT_SIZE_CSS,
   TOURNAMENT_LOGO_SIZE_CSS,
-  type Screen1LogoPresentationConfig,
+  type Screen1PresentationConfig,
 } from "@/lib/infoboard/screen1-logo-settings";
 import styles from "./InfoboardScreen1.module.css";
 
@@ -111,8 +114,10 @@ export type InfoboardScreen1Props = {
     readonly showDate?: boolean;
     readonly showWeather?: boolean;
   };
-  /** Per-board Training/Match/Tournament logo presentation settings. */
-  logoPresentation?: Screen1LogoPresentationConfig;
+  /** Per-board Training/Match/Tournament presentation settings. */
+  presentation?: Screen1PresentationConfig;
+  /** @deprecated Compatibility for callers predating generalized presentation. */
+  logoPresentation?: Screen1PresentationConfig;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1084,7 +1089,7 @@ type EventCardProps = {
   participantAllocations: readonly InfoboardTeamAllocationPresentation[] | undefined;
   /** Content-demand value driving flex-grow on this card. */
   demand: number;
-  logoPresentation?: Screen1LogoPresentationConfig;
+  presentation?: Screen1PresentationConfig;
 };
 
 function EventCard({
@@ -1092,7 +1097,7 @@ function EventCard({
   timeZone,
   participantAllocations,
   demand,
-  logoPresentation = DEFAULT_SCREEN1_LOGO_PRESENTATION,
+  presentation = DEFAULT_SCREEN1_PRESENTATION,
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
@@ -1160,7 +1165,7 @@ function EventCard({
                   rowTestId="match-home-team-row"
                   logoTestId="home-team-logo"
                   primaryClassName={styles.eventTeamMain}
-                  showLogos={logoPresentation.matchShowLogos}
+                  showLogos={presentation.matchShowLogos}
                 />
                 <span className={styles.vsLabel} aria-hidden="true">vs.</span>
                 {event.matchPresentation.away !== null && (
@@ -1169,7 +1174,7 @@ function EventCard({
                     rowTestId="match-away-team-row"
                     logoTestId="away-team-logo"
                     primaryClassName={styles.eventTeamOpponent}
-                    showLogos={logoPresentation.matchShowLogos}
+                    showLogos={presentation.matchShowLogos}
                   />
                 )}
               </>
@@ -1215,7 +1220,7 @@ function EventCard({
                     clubName={participant.teamDisplayName}
                     testId={`tournament-participant-logo-${participant.id}`}
                     presentation="tournament"
-                    showLogos={logoPresentation.tournamentShowLogos}
+                    showLogos={presentation.tournamentShowLogos}
                   />
                 ))}
               </div>
@@ -1265,9 +1270,11 @@ export function InfoboardScreen1({
   weather,
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
   headerConfig,
-  logoPresentation: logoPresentationProp,
+  presentation: presentationProp,
+  logoPresentation: legacyLogoPresentation,
 }: InfoboardScreen1Props): ReactElement {
-  const logoPresentation = logoPresentationProp ?? DEFAULT_SCREEN1_LOGO_PRESENTATION;
+  const presentation =
+    presentationProp ?? legacyLogoPresentation ?? DEFAULT_SCREEN1_PRESENTATION;
   const { tenant } = feed;
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
@@ -1370,7 +1377,7 @@ export function InfoboardScreen1({
                 demand={demand}
                 clubName={clubNameUpper}
                 clubLogoSrc={clubLogoSrc}
-                showLogos={logoPresentation.trainingShowLogos}
+                showLogos={presentation.trainingShowLogos}
               />
             );
           }
@@ -1386,7 +1393,7 @@ export function InfoboardScreen1({
               timeZone={timeZone}
               participantAllocations={participantAllocations}
               demand={demand}
-              logoPresentation={logoPresentation}
+              presentation={presentation}
             />
           );
         })}
@@ -1402,10 +1409,22 @@ export function InfoboardScreen1({
       style={
         {
           "--ib-training-logo-size":
-            TRAINING_LOGO_SIZE_CSS[logoPresentation.trainingLogoSize],
-          "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[logoPresentation.matchLogoSize],
+            TRAINING_LOGO_SIZE_CSS[presentation.trainingLogoSize],
+          "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[presentation.matchLogoSize],
           "--ib-tournament-logo-size":
-            TOURNAMENT_LOGO_SIZE_CSS[logoPresentation.tournamentLogoSize],
+            TOURNAMENT_LOGO_SIZE_CSS[presentation.tournamentLogoSize],
+          "--ib-training-font-size":
+            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].normal,
+          "--ib-training-font-size-compact":
+            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].compact,
+          "--ib-training-font-size-dense":
+            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].dense,
+          "--ib-match-font-size":
+            MATCH_FONT_SIZE_CSS[presentation.matchFontSize].primary,
+          "--ib-match-opponent-font-size":
+            MATCH_FONT_SIZE_CSS[presentation.matchFontSize].opponent,
+          "--ib-tournament-font-size":
+            TOURNAMENT_FONT_SIZE_CSS[presentation.tournamentFontSize],
         } as CSSProperties
       }
     >

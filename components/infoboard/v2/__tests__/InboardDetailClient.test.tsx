@@ -91,6 +91,9 @@ const BOARD = {
   screen1MatchLogoSize: "LARGE",
   screen1TournamentShowLogos: true,
   screen1TournamentLogoSize: "XLARGE",
+  screen1TrainingFontSize: "LARGE",
+  screen1MatchFontSize: "MEDIUM",
+  screen1TournamentFontSize: "XLARGE",
   createdAt: new Date("2026-08-01"),
   updatedAt: new Date("2026-08-01"),
 };
@@ -244,5 +247,30 @@ describe("InboardDetailClient — Screen 1 logo toggles", () => {
     expect(match).toHaveAttribute("aria-checked", "false");
     expect(screen.getByTestId("match-logo-size")).toBeDisabled();
     expect(tournament).toHaveAttribute("aria-checked", "true");
+  });
+});
+
+describe("InboardDetailClient — Screen 1 font-size controls", () => {
+  it("shows independent German preset selects for all three card types", async () => {
+    await renderDetailClient();
+    fireEvent.click(screen.getByTestId("tab-anzeige"));
+
+    const training = screen.getByTestId("training-font-size") as HTMLSelectElement;
+    const match = screen.getByTestId("match-font-size") as HTMLSelectElement;
+    const tournament = screen.getByTestId(
+      "tournament-font-size",
+    ) as HTMLSelectElement;
+
+    expect(training.value).toBe("LARGE");
+    expect(match.value).toBe("MEDIUM");
+    expect(tournament.value).toBe("XLARGE");
+    expect(
+      Array.from(match.options, (option) => option.textContent),
+    ).toEqual(["Klein", "Mittel", "Gross", "Extra gross"]);
+
+    fireEvent.change(match, { target: { value: "SMALL" } });
+    expect(match.value).toBe("SMALL");
+    expect(training.value).toBe("LARGE");
+    expect(tournament.value).toBe("XLARGE");
   });
 });

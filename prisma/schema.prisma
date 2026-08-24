@@ -1466,35 +1466,35 @@ model PersonDocument {
 }
 
 model Team {
-  id               String       @id @default(cuid())
+  id                             String       @id @default(cuid())
   // ── TEAM-IDENTITY-01: canonical tenant-owned naming ───────────────────────
   // Team.name is the canonical LONG NAME (e.g. "FC Allschwil Junioren B2").
   // Kept as `name` for backward compatibility — NOT renamed to `longName`.
   // Tenant-managed: set on Team creation (including first SFV import) and
   // then owned exclusively by the tenant. Provider sync never overwrites it
   // on subsequent syncs (see lib/integrations/sfv/sync/team-mapper.ts).
-  name             String
+  name                           String
   /// SHORT NAME (e.g. "B2") — tenant-owned, optional. Used for compact
   /// contexts. Never written by provider sync. Distinct from
   /// TeamSeason.shortName, which is a seasonal presentation override.
-  shortName        String?
+  shortName                      String?
   /// ALTERNATIVE NAME (e.g. "Junioren B2") — tenant-owned, optional.
   /// Used as a naming fallback before providerTeamName. Never written by
   /// provider sync. Never auto-derived from string parsing of other names.
-  alternativeName  String?
+  alternativeName                String?
   /// INFOBOARD-TEAMNAME-01 — optional Infoboard Screen 1 display override.
   /// Presentation-only: when set, wins over alternativeName/shortName/name on
   /// Infoboard Screen 1 without changing canonical Team naming elsewhere.
   /// Never written by provider sync.
-  infoboardDisplayName String?
+  infoboardDisplayName           String?
   /// INFOBOARD-TEAMNAME-04A — optional Infoboard Training card display override.
   /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
   /// naming when unset. Never written by provider sync.
-  infoboardTrainingDisplayName String?
+  infoboardTrainingDisplayName   String?
   /// INFOBOARD-TEAMNAME-04A — optional Infoboard Match card display override.
   /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
   /// naming when unset. Never written by provider sync.
-  infoboardMatchDisplayName String?
+  infoboardMatchDisplayName      String?
   /// INFOBOARD-TEAMNAME-04A — optional Infoboard Tournament card display override.
   /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
   /// naming when unset. Never written by provider sync.
@@ -1502,25 +1502,25 @@ model Team {
   // slug is unique per tenant (tenant-scoped) since TEAM-CORE-02.
   // Legacy global @unique dropped; replaced by @@unique([tenantId, slug]) below.
   // Queries must always scope by tenantId when resolving by slug.
-  slug             String
+  slug                           String
   // @deprecated TeamCategory — legacy compatibility field retained for existing APIs,
   //   website fallbacks, and admin UI. New business logic must use TeamSeasonOrgUnit.
   //   Do not add new rules based on TeamCategory. Removal planned for TEAM-CORE-03+.
-  category         TeamCategory
-  genderGroup      String?
-  ageGroup         String?
-  sortOrder        Int          @default(0)
-  isActive         Boolean      @default(true)
+  category                       TeamCategory
+  genderGroup                    String?
+  ageGroup                       String?
+  sortOrder                      Int          @default(0)
+  isActive                       Boolean      @default(true)
   // websiteVisible / infoboardVisible — transitional fallback fields.
   // Canonical seasonal visibility lives on TeamSeason. These fields are read
   // when a TeamSeason record is absent or as legacy fallback.
   // Removal planned once all reads use the getEffectiveTeamSeasonVisibility() helper.
-  websiteVisible   Boolean      @default(true)
-  infoboardVisible Boolean      @default(true)
+  websiteVisible                 Boolean      @default(true)
+  infoboardVisible               Boolean      @default(true)
   // @deprecated orgUnitId — legacy single OrgUnit link. Retained for backward
   //   compatibility. New canonical relationship is TeamSeasonOrgUnit (many-to-many).
   //   Do not use for new business logic. Removal planned after full migration.
-  orgUnitId        String?
+  orgUnitId                      String?
 
   // Tenant isolation (nullable: backward-compat; backfill in 20260626000000_team_tenant_isolation)
   tenantId String?
@@ -5143,19 +5143,25 @@ model Infoboard {
   /// Display sequence within this tenant's Infoboard list (ascending).
   sortOrder Int @default(0)
 
-  // ── Screen 1 presentation controls (INFOBOARD-SCREEN1-URGENT-07C/07E) ─────
+  // ── Screen 1 presentation controls (INFOBOARD-SCREEN1-URGENT-07C/07E/07K) ──
   /// Show club logos on Training cards. Independent from Match/Tournament.
   screen1TrainingShowLogos   Boolean @default(true)
   /// Training logo size preset: SMALL | MEDIUM | LARGE | XLARGE
   screen1TrainingLogoSize    String  @default("MEDIUM")
   /// Show club logos on Match cards. Default true preserves existing behaviour.
-  screen1MatchShowLogos     Boolean @default(true)
+  screen1MatchShowLogos      Boolean @default(true)
   /// Match logo size preset: SMALL | MEDIUM | LARGE | XLARGE
-  screen1MatchLogoSize      String  @default("MEDIUM")
+  screen1MatchLogoSize       String  @default("MEDIUM")
   /// Show club logos on Tournament cards. Independent from Match setting.
   screen1TournamentShowLogos Boolean @default(true)
   /// Tournament logo size preset: SMALL | MEDIUM | LARGE | XLARGE
-  screen1TournamentLogoSize String  @default("MEDIUM")
+  screen1TournamentLogoSize  String  @default("MEDIUM")
+  /// Training team-name font preset. LARGE preserves the accepted baseline.
+  screen1TrainingFontSize    String  @default("LARGE")
+  /// Match team-name font preset. MEDIUM is the physical-TV-safe baseline.
+  screen1MatchFontSize       String  @default("MEDIUM")
+  /// Tournament title font preset. LARGE preserves the accepted baseline.
+  screen1TournamentFontSize  String  @default("LARGE")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
