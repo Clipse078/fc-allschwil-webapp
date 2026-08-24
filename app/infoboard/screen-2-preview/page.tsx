@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
+import { resolveScreen2PreviewFacilities } from "@/lib/infoboard/screen2-preview-facility-resolver";
 import {
   buildAnlageplanLivePayload,
   type AnlageplanSourceDatabase,
@@ -116,99 +117,6 @@ function createPreviewDatabase(): AnlageplanSourceDatabase {
   };
 }
 
-function normalise(value: string): string {
-  return value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, " ")
-    .trim()
-    .replace(/\s+/g, " ");
-}
-
-function pitchIdentity(pitch: PitchOccupancy): string {
-  return normalise(
-    [
-      pitch.code,
-      pitch.displayLabel,
-      pitch.facilityName,
-    ]
-      .filter(Boolean)
-      .join(" "),
-  );
-}
-
-function belongsTo(
-  pitch: PitchOccupancy,
-  facility: "STADION" | "KR2" | "KR3",
-): boolean {
-  const identity = pitchIdentity(pitch);
-
-  if (facility === "STADION") {
-    return identity.includes("STADION");
-  }
-
-  if (facility === "KR2") {
-    return (
-      /\bKR\s*2\b/.test(identity) ||
-      identity.includes("KUNSTRASEN 2")
-    );
-  }
-
-  return (
-    /\bKR\s*3\b/.test(identity) ||
-    identity.includes("KUNSTRASEN 3")
-  );
-}
-
-function halfSide(
-  pitch: PitchOccupancy,
-): "A" | "B" | null {
-  if (pitch.resourceType !== "HALF_PITCH") {
-    return null;
-  }
-
-  const identity = pitchIdentity(pitch);
-
-  if (
-    /\bFELD A\b/.test(identity) ||
-    /\bA\b/.test(identity)
-  ) {
-    return "A";
-  }
-
-  if (
-    /\bFELD B\b/.test(identity) ||
-    /\bB\b/.test(identity)
-  ) {
-    return "B";
-  }
-
-  return null;
-}
-
-function findExactlyOne(
-  pitches: readonly PitchOccupancy[],
-  predicate: (pitch: PitchOccupancy) => boolean,
-  description: string,
-): PitchOccupancy {
-  const matches = pitches.filter(predicate);
-
-  if (matches.length !== 1) {
-    throw new Error(
-      `Screen-2 preview expected exactly one ${description}; found ${matches.length}. ` +
-        `Available: ${pitches
-          .map(
-            (pitch) =>
-              `${pitch.code} | ${pitch.displayLabel ?? ""} | ${pitch.resourceType}`,
-          )
-          .join("; ")}`,
-    );
-  }
-
-  return matches[0];
-}
-
 function event(
   values: Omit<PitchEventSummary, "dressingRooms">,
 ): PitchEventSummary {
@@ -235,61 +143,15 @@ function buildPhysicalTvPreviewFeed(
 
   const pitches = base.pitches;
 
-  const stadionFull = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "STADION") &&
-      pitch.resourceType === "FULL_PITCH",
-    "Stadion FULL_PITCH",
-  );
-
-  const kr2Full = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      pitch.resourceType === "FULL_PITCH",
-    "KR2 FULL_PITCH",
-  );
-
-  const kr2A = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      halfSide(pitch) === "A",
-    "KR2 Feld A",
-  );
-
-  const kr2B = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR2") &&
-      halfSide(pitch) === "B",
-    "KR2 Feld B",
-  );
-
-  const kr3Full = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      pitch.resourceType === "FULL_PITCH",
-    "KR3 FULL_PITCH",
-  );
-
-  const kr3A = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      halfSide(pitch) === "A",
-    "KR3 Feld A",
-  );
-
-  const kr3B = findExactlyOne(
-    pitches,
-    (pitch) =>
-      belongsTo(pitch, "KR3") &&
-      halfSide(pitch) === "B",
-    "KR3 Feld B",
-  );
+  const {
+    hauptfeldFull,
+    kr2Full,
+    kr2HalfA: kr2A,
+    kr2HalfB: kr2B,
+    kr3Full,
+    kr3HalfA: kr3A,
+    kr3HalfB: kr3B,
+  } = resolveScreen2PreviewFacilities(pitches);
 
   const stadionMatch = event({
     eventId: "preview-tv-match-stadion",
@@ -377,7 +239,7 @@ function buildPhysicalTvPreviewFeed(
         nextEvent: null,
       };
 
-      if (pitch.code === stadionFull.code) {
+      if (pitch.code === hauptfeldFull.code) {
         result = {
           ...result,
           state: "OCCUPIED_NOW",
