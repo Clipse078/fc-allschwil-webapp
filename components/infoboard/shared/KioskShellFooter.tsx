@@ -1,15 +1,15 @@
-/**
+﻿/**
  * components/infoboard/shared/KioskShellFooter.tsx
  *
- * INFOBOARD-MAP-02 — Canonical shared kiosk footer.
+ * INFOBOARD-MAP-02 â€” Canonical shared kiosk footer.
  *
- * Used by BOTH InfoboardScreen1 and InfoboardAnlageplan — the source of truth
+ * Used by BOTH InfoboardScreen1 and InfoboardAnlageplan â€” the source of truth
  * for the kiosk shell bottom bar.
  *
  * Behavior (matching Screen 1 canonical footer):
- *   LEFT  — fixed announcement icon + AnnouncementTicker when announcement active;
+ *   LEFT  â€” fixed announcement icon + AnnouncementTicker when announcement active;
  *            otherwise optional board/facility label
- *   RIGHT — "POWERED BY SportClubEvo" product branding
+ *   RIGHT — SportClubEvo product logo branding
  *
  * When announcement is active, the root element receives
  * data-testid="announcement-bar" (backward-compat with Screen 1 tests) and
@@ -20,14 +20,14 @@
  *
  * Invariants:
  *   - Server component wrapper; AnnouncementTicker is a client sub-component
- *   - Inline styles — no CSS module coupling
+ *   - Inline styles â€” no CSS module coupling
  *   - No new Date() without argument
  */
 
 import type { ReactElement } from "react";
 import { AnnouncementTicker } from "@/components/infoboard/screen1/AnnouncementTicker";
 
-// ── Props ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export type KioskShellFooterAnnouncement = {
   enabled: boolean;
@@ -42,7 +42,7 @@ export type KioskShellFooterProps = {
   announcement?: KioskShellFooterAnnouncement | null;
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function KioskShellFooter({
   productLogoSrc,
@@ -152,41 +152,22 @@ export function KioskShellFooter({
           flexShrink: 0,
         }}
       >
-        <span
-          style={{
-            fontSize: "clamp(0.55rem, 0.7vw, 0.82rem)",
-            letterSpacing: "0.12em",
-            color: "rgba(255,255,255,0.30)",
-            textTransform: "uppercase",
-          }}
-        >
-          POWERED BY
-        </span>
-        {productLogoSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={productLogoSrc}
+            src="/images/branding/sportclubevo_logo_alt.png"
             alt="SportClubEvo"
             style={{
-              height: "clamp(16px, 2.2vh, 28px)",
+              display: "block",
               width: "auto",
+              height: "auto",
+              maxHeight: "clamp(22px, 2.7vh, 34px)",
+              maxWidth: "clamp(140px, 12vw, 220px)",
               objectFit: "contain",
-              opacity: 0.7,
+              marginLeft: "auto",
             }}
           />
-        ) : (
-          <span
-            data-testid="kiosk-footer-product-fallback"
-            style={{
-              fontSize: "clamp(0.55rem, 0.7vw, 0.82rem)",
-              color: "rgba(255,255,255,0.30)",
-              fontWeight: 600,
-            }}
-          >
-            SportClubEvo
-          </span>
-        )}
-      </div>
+        </div>
     </footer>
   );
 }
+
+
