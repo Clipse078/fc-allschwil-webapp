@@ -138,6 +138,7 @@ export default async function InfoboardScreen1Page() {
       eventPresentation={payload.eventPresentation}
       theme={payload.theme}
       headerConfig={payload.headerConfig ?? undefined}
+      logoPresentation={payload.logoPresentation ?? undefined}
     />
   );
 }

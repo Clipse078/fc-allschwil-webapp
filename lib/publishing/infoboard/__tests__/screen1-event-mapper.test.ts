@@ -693,13 +693,13 @@ describe("mapScreen1Event — opponentLogoUrl", () => {
       tenantLogoUrl: "https://cdn.example.com/tenant.png",
     });
 
-    expect(result.matchPresentation?.home.clubDisplayName).toBe("FC Allschwil");
-    expect(result.matchPresentation?.home.teamSubDisplayName).toBe("Junioren C2");
+    expect(result.matchPresentation?.home.clubDisplayName).toBe("Junioren C2");
+    expect(result.matchPresentation?.home.teamSubDisplayName).toBeNull();
     expect(result.matchPresentation?.home.clubLogoUrl).toBe(
       "https://cdn.example.com/tenant.png",
     );
-    expect(result.matchPresentation?.away?.clubDisplayName).toBe("FC Therwil");
-    expect(result.matchPresentation?.away?.teamSubDisplayName).toBe("C Gelb");
+    expect(result.matchPresentation?.away?.clubDisplayName).toBe("C Gelb");
+    expect(result.matchPresentation?.away?.teamSubDisplayName).toBeNull();
   });
 
   it("TRAINING events always have opponentLogoUrl null", () => {

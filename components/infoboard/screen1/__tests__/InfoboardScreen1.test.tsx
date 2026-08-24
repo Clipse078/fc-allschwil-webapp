@@ -25,6 +25,7 @@ import {
   computeTournamentParticipantDisplayRows,
   densityTier,
   layoutModeTier,
+  trainingGroupDensityTier,
   LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
@@ -895,7 +896,7 @@ describe("Match row", () => {
     expect(homeTeamRow.textContent).toContain("FC Test");
   });
 
-  it("renders structured club + team presentation with logos when matchPresentation is present", () => {
+  it("renders single-line match team presentation with logos when matchPresentation is present", () => {
     const feed = makeFeed({
       current: [makeEvent({
         type: "MATCH",
@@ -903,13 +904,13 @@ describe("Match row", () => {
         opponentDisplayName: "FC Therwil C Gelb",
         matchPresentation: {
           home: {
-            clubDisplayName: "FC ALLSCHWIL",
-            teamSubDisplayName: "Junioren C2",
+            clubDisplayName: "FC Allschwil Junioren C2",
+            teamSubDisplayName: null,
             clubLogoUrl: "/tenant-logo.png",
           },
           away: {
-            clubDisplayName: "FC THERWIL",
-            teamSubDisplayName: "C Gelb",
+            clubDisplayName: "FC Therwil C Gelb",
+            teamSubDisplayName: null,
             clubLogoUrl: "https://cdn.example.com/therwil.png",
           },
         },
@@ -921,10 +922,10 @@ describe("Match row", () => {
 
     const homeRow = screen.getByTestId("match-home-team-row");
     const awayRow = screen.getByTestId("match-away-team-row");
-    expect(homeRow.textContent).toContain("FC ALLSCHWIL");
-    expect(homeRow.textContent).toContain("Junioren C2");
-    expect(awayRow.textContent).toContain("FC THERWIL");
-    expect(awayRow.textContent).toContain("C Gelb");
+    expect(homeRow.textContent).toContain("FC Allschwil Junioren C2");
+    expect(awayRow.textContent).toContain("FC Therwil C Gelb");
+    expect(homeRow.querySelectorAll('[class*="matchTeamSubName"]').length).toBe(0);
+    expect(awayRow.querySelectorAll('[class*="matchTeamSubName"]').length).toBe(0);
     expect(screen.getByTestId("home-team-logo")).toBeTruthy();
     expect(screen.getByTestId("away-team-logo")).toBeTruthy();
   });
@@ -2227,9 +2228,7 @@ describe("Match logo placement — INFOBOARD-LOGO-02", () => {
     expect(matchAlloc.querySelector("img")).toBeNull();
   });
 
-  it("no logo appears in training group card even with branding (V2: all trainings use TrainingGroupCard)", () => {
-    // INFOBOARD-V2: Solo trainings now render through TrainingGroupCard (training-group testid),
-    // not through the old TrainingDestination (training-allocation testid).
+  it("renders the tenant logo in a training group card by default", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: "KR2", homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
       isEmpty: false,
@@ -2240,9 +2239,8 @@ describe("Match logo placement — INFOBOARD-LOGO-02", () => {
         branding={{ clubLogoSrc: "/logo.png" }}
       />,
     );
-    // TrainingGroupCard uses data-testid="training-group"
     const trainingGroup = screen.getByTestId("training-group");
-    expect(trainingGroup.querySelector("img")).toBeNull();
+    expect(trainingGroup.querySelector("[data-testid='training-team-logo']")).toBeTruthy();
   });
 });
 
@@ -2824,16 +2822,16 @@ describe("Content-demand — computeTrainingGroupDemand", () => {
     expect(computeTrainingGroupDemand(2)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 2 * CARD_DEMAND_TRAINING_ROW);
   });
 
-  it("4-row training demand = base + 4×row", () => {
-    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * CARD_DEMAND_TRAINING_ROW);
+  it("4-row training demand uses compact row weight", () => {
+    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * 0.62);
   });
 
-  it("5-row training demand = base + 5×row", () => {
-    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * CARD_DEMAND_TRAINING_ROW);
+  it("5-row training demand uses compact row weight", () => {
+    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * 0.62);
   });
 
-  it("6-row training demand = base + 6×row", () => {
-    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW);
+  it("6-row training demand uses compact row weight", () => {
+    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * 0.62);
   });
 
   it("demand grows monotonically with row count", () => {
@@ -2900,7 +2898,7 @@ describe("Content-demand — computeMatchDemand", () => {
     expect(computeMatchDemand(event)).toBeCloseTo(CARD_DEMAND_MATCH);
   });
 
-  it("richer match with sub-team lines gets greater demand", () => {
+  it("richer match with end time gets greater demand than match without end time", () => {
     const simple = makeEvent({
       type: "MATCH",
       endAt: null,
@@ -2919,23 +2917,23 @@ describe("Content-demand — computeMatchDemand", () => {
     });
     const richer = makeEvent({
       type: "MATCH",
-      endAt: null,
+      endAt: "2026-09-12T09:30:00.000Z",
       matchPresentation: {
         home: {
-          clubDisplayName: "FC ALLSCHWIL",
-          teamSubDisplayName: "E1",
+          clubDisplayName: "FC ALLSCHWIL E1",
+          teamSubDisplayName: null,
           clubLogoUrl: null,
         },
         away: {
-          clubDisplayName: "FC BINNINGEN",
-          teamSubDisplayName: "E1",
+          clubDisplayName: "FC BINNINGEN E1",
+          teamSubDisplayName: null,
           clubLogoUrl: null,
         },
       },
     });
     expect(computeMatchDemand(richer)).toBeGreaterThan(computeMatchDemand(simple));
     expect(computeMatchDemand(richer)).toBeCloseTo(
-      CARD_DEMAND_MATCH + 2 * CARD_DEMAND_MATCH_SUB_TEAM,
+      CARD_DEMAND_MATCH + CARD_DEMAND_MATCH_END_TIME,
     );
   });
 
@@ -3023,8 +3021,7 @@ describe("Content-demand — computeMatchDemand", () => {
     const simpleDemand = computeMatchDemand(simple);
     const richerDemand = computeMatchDemand(richer);
     expect(richerDemand).toBeGreaterThan(simpleDemand);
-    expect(richerDemand - simpleDemand).toBeGreaterThanOrEqual(0.4);
-    expect(richerDemand - simpleDemand).toBeLessThanOrEqual(1.0);
+    expect(richerDemand - simpleDemand).toBeCloseTo(CARD_DEMAND_MATCH_END_TIME);
   });
 });
 
@@ -3053,7 +3050,7 @@ describe("Content-demand — computeMatchContentSafeMinimum", () => {
     const currentMatch = PREVIEW_FIXTURE.current[0];
     const laterMatch = PREVIEW_FIXTURE.later[1];
     expect(computeMatchContentSafeMinimum(currentMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
-    expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThan(CARD_DEMAND_MATCH);
+    expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThanOrEqual(CARD_DEMAND_MATCH);
   });
 
   it("mixed preview page total demand stays within CARD_DEMAND_PAGE_MAX", () => {
@@ -3166,9 +3163,9 @@ describe("Content-demand — training regression (unchanged)", () => {
     );
   });
 
-  it("6-row training demand unchanged", () => {
+  it("6-row training demand uses compact row weight", () => {
     expect(computeTrainingGroupDemand(6)).toBeCloseTo(
-      CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW,
+      CARD_DEMAND_TRAINING_BASE + 6 * 0.62,
     );
   });
 });
@@ -3219,7 +3216,7 @@ describe("Content-demand — layout mode and pagination", () => {
     ]);
     const total = trainingDemand + matchDemand + tournamentDemand;
     expect(layoutModeTier(total)).toBe("fill");
-    expect(total).toBeCloseTo(4.3 + CARD_DEMAND_MATCH + 2.7, 1);
+    expect(total).toBeCloseTo(computeTrainingGroupDemand(6) + CARD_DEMAND_MATCH + 2.7, 1);
   });
 
   it("pagination still respects CARD_DEMAND_PAGE_MAX", () => {
@@ -3922,5 +3919,178 @@ describe("INFOBOARD-FINAL-C: Screen 1 long text / overflow protection", () => {
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE_HIGH_DENSITY_6} />);
     const list = screen.getByTestId("event-list");
     expect(list.getAttribute("data-layout-mode")).toBe("fill");
+  });
+});
+
+// ── FC Allschwil physical-TV regression (24 Aug 2026) ─────────────────────────
+
+const FCA_TIMEZONE = "Europe/Zurich";
+const FCA_NOW_1843 = "2026-08-24T16:43:00.000Z";
+
+function makeFcaTraining(
+  id: string,
+  teamName: string,
+  startAt: string,
+  endAt: string,
+  temporalBucket: "current" | "next" | "later" = "current",
+): InfoboardScreen1Event {
+  return makeEvent({
+    id,
+    teamDisplayName: teamName,
+    displayTitle: teamName,
+    startAt,
+    endAt,
+    temporalBucket,
+    allocation: {
+      pitchLabel: "KR 1",
+      homeDressingRoomLabel: "Kabine 1",
+      awayDressingRoomLabel: null,
+      refereeDressingRoomLabel: null,
+    },
+  });
+}
+
+describe("FC Allschwil regression — Fixture A expired event", () => {
+  it("17:00–18:30 Junioren F2 is NOT rendered at 18:43", () => {
+    const feed = makeFeed({
+      tenant: {
+        id: "tenant-fca",
+        key: "fc-allschwil",
+        name: "FC Allschwil",
+        timezone: FCA_TIMEZONE,
+      },
+      current: [
+        makeFcaTraining(
+          "fca-f2",
+          "Junioren F2",
+          "2026-08-24T15:00:00.000Z",
+          "2026-08-24T16:30:00.000Z",
+        ),
+      ],
+      isEmpty: false,
+    });
+
+    render(<InfoboardScreen1 feed={feed} currentTimeIso={FCA_NOW_1843} />);
+    expect(screen.queryByText("Junioren F2")).toBeNull();
+    expect(screen.queryAllByTestId("event-row")).toHaveLength(0);
+  });
+});
+
+describe("FC Allschwil regression — Fixture B dense 17:15–18:45 group", () => {
+  const groupStart = "2026-08-24T15:15:00.000Z";
+  const groupEnd = "2026-08-24T16:45:00.000Z";
+
+  it("all four training entries render with compact group density", () => {
+    const feed = makeFeed({
+      tenant: {
+        id: "tenant-fca",
+        key: "fc-allschwil",
+        name: "FC Allschwil",
+        timezone: FCA_TIMEZONE,
+      },
+      current: [
+        makeFcaTraining("fca-e1", "Junioren E1", groupStart, groupEnd),
+        makeFcaTraining("fca-e2", "Junioren E2", groupStart, groupEnd),
+        makeFcaTraining("fca-e3", "Junioren E3", groupStart, groupEnd),
+        makeFcaTraining("fca-f1", "Junioren F1", groupStart, groupEnd),
+      ],
+      isEmpty: false,
+    });
+
+    render(<InfoboardScreen1 feed={feed} currentTimeIso={FCA_NOW_1843} />);
+
+    const groupCard = screen.getByTestId("event-row");
+    expect(groupCard.getAttribute("data-training-count")).toBe("4");
+    expect(groupCard.getAttribute("data-group-density")).toBe("compact");
+
+    const rows = screen.getAllByTestId("training-group-row");
+    expect(rows).toHaveLength(4);
+    expect(screen.getByText("Junioren E1")).toBeTruthy();
+    expect(screen.getByText("Junioren E2")).toBeTruthy();
+    expect(screen.getByText("Junioren E3")).toBeTruthy();
+    expect(screen.getByText("Junioren F1")).toBeTruthy();
+  });
+});
+
+describe("FC Allschwil regression — Fixture C dense 18:45–20:15 group", () => {
+  const groupStart = "2026-08-24T16:45:00.000Z";
+  const groupEnd = "2026-08-24T18:15:00.000Z";
+
+  it("all four upcoming training entries render without dropping the fourth", () => {
+    const feed = makeFeed({
+      tenant: {
+        id: "tenant-fca",
+        key: "fc-allschwil",
+        name: "FC Allschwil",
+        timezone: FCA_TIMEZONE,
+      },
+      next: [
+        makeFcaTraining("fca-a", "Junioren A", groupStart, groupEnd, "next"),
+        makeFcaTraining("fca-d1", "Junioren D-9 D1", groupStart, groupEnd, "next"),
+        makeFcaTraining("fca-d2", "Junioren D-9 D2", groupStart, groupEnd, "next"),
+        makeFcaTraining("fca-d3", "Junioren D-9 D3", groupStart, groupEnd, "next"),
+      ],
+      isEmpty: false,
+    });
+
+    render(<InfoboardScreen1 feed={feed} currentTimeIso={FCA_NOW_1843} />);
+
+    expect(screen.getAllByTestId("training-group-row")).toHaveLength(4);
+    expect(screen.getByText("Junioren A")).toBeTruthy();
+    expect(screen.getByText("Junioren D-9 D1")).toBeTruthy();
+    expect(screen.getByText("Junioren D-9 D2")).toBeTruthy();
+    expect(screen.getByText("Junioren D-9 D3")).toBeTruthy();
+  });
+});
+
+describe("FC Allschwil regression — Fixture D boundary visibility", () => {
+  const training = makeFcaTraining(
+    "fca-boundary",
+    "Junioren F2",
+    "2026-08-24T15:00:00.000Z",
+    "2026-08-24T16:30:00.000Z",
+  );
+
+  function renderAt(iso: string) {
+    const feed = makeFeed({
+      tenant: {
+        id: "tenant-fca",
+        key: "fc-allschwil",
+        name: "FC Allschwil",
+        timezone: FCA_TIMEZONE,
+      },
+      current: [training],
+      isEmpty: false,
+    });
+    return render(<InfoboardScreen1 feed={feed} currentTimeIso={iso} />);
+  }
+
+  it("visible at 17:00 and 18:29", () => {
+    renderAt("2026-08-24T15:00:00.000Z");
+    expect(screen.getByText("Junioren F2")).toBeTruthy();
+
+    renderAt("2026-08-24T16:29:00.000Z");
+    expect(screen.getAllByText("Junioren F2").length).toBeGreaterThan(0);
+  });
+
+  it("not rendered at 18:30 (expired)", () => {
+    renderAt("2026-08-24T16:30:00.000Z");
+    expect(screen.queryByText("Junioren F2")).toBeNull();
+  });
+});
+
+describe("trainingGroupDensityTier — sparse groups unchanged", () => {
+  it("1–3 rows use normal density", () => {
+    expect(trainingGroupDensityTier(1)).toBe("normal");
+    expect(trainingGroupDensityTier(3)).toBe("normal");
+  });
+
+  it("4–5 rows use compact density", () => {
+    expect(trainingGroupDensityTier(4)).toBe("compact");
+    expect(trainingGroupDensityTier(5)).toBe("compact");
+  });
+
+  it("6+ rows use dense density", () => {
+    expect(trainingGroupDensityTier(6)).toBe("dense");
   });
 });

@@ -7,6 +7,7 @@ import {
   enrichMatchIdentityWithTenant,
   resolveInfoboardClubDisplayName,
   resolveInfoboardMatchPresentation,
+  resolveInfoboardMatchTeamDisplayName,
   resolveInfoboardTeamSubDisplayName,
   type InfoboardMatchIdentity,
 } from "../infoboard-match-presentation";
@@ -115,8 +116,36 @@ describe("resolveInfoboardTeamSubDisplayName", () => {
   });
 });
 
+describe("resolveInfoboardMatchTeamDisplayName", () => {
+  it("uses infoboardMatchDisplayName as single unified label", () => {
+    expect(
+      resolveInfoboardMatchTeamDisplayName({
+        clubName: "FC Allschwil",
+        teamName: "FC Allschwil Senioren 50+",
+        teamShortName: "50+",
+        teamAlternativeName: "Senioren 50+",
+        teamInfoboardDisplayName: "FCA Senioren",
+        teamInfoboardMatchDisplayName: "FC Allschwil Senioren 50+",
+        fallbackDisplayName: "FC Allschwil Senioren 50+",
+      }),
+    ).toBe("FC Allschwil Senioren 50+");
+  });
+
+  it("uses external club name for opponent without overrides", () => {
+    expect(
+      resolveInfoboardMatchTeamDisplayName({
+        clubName: "FC Amicitia Riehen",
+        teamName: "FC Amicitia Riehen",
+        teamShortName: null,
+        teamAlternativeName: null,
+        fallbackDisplayName: "FC Amicitia Riehen",
+      }),
+    ).toBe("FC Amicitia Riehen");
+  });
+});
+
 describe("resolveInfoboardMatchPresentation", () => {
-  it("12 — own-team Match pipeline uses infoboardMatchDisplayName", () => {
+  it("12 — own-team Match uses infoboardMatchDisplayName as single line", () => {
     const result = resolveInfoboardMatchPresentation(
       makeIdentity({
         home: {
@@ -135,17 +164,19 @@ describe("resolveInfoboardMatchPresentation", () => {
       "FC Allschwil",
     );
 
-    expect(result?.home.teamSubDisplayName).toBe("FC Allschwil E1");
+    expect(result?.home.clubDisplayName).toBe("FC Allschwil E1");
+    expect(result?.home.teamSubDisplayName).toBeNull();
   });
 
-  it("13 — external opponent remains unchanged", () => {
+  it("13 — external opponent uses unified club label", () => {
     const result = resolveInfoboardMatchPresentation(
       makeIdentity(),
       "https://cdn.example.com/tenant.png",
       "FC Allschwil",
     );
 
-    expect(result?.away?.teamSubDisplayName).toBe("C Gelb");
+    expect(result?.away?.clubDisplayName).toBe("C Gelb");
+    expect(result?.away?.teamSubDisplayName).toBeNull();
   });
 
   it("resolves tenant logo for own-team side and external logo for opponent", () => {
@@ -155,11 +186,11 @@ describe("resolveInfoboardMatchPresentation", () => {
       "FC Allschwil",
     );
 
-    expect(result?.home.clubDisplayName).toBe("FC Allschwil");
-    expect(result?.home.teamSubDisplayName).toBe("Junioren C2");
+    expect(result?.home.clubDisplayName).toBe("Junioren C2");
+    expect(result?.home.teamSubDisplayName).toBeNull();
     expect(result?.home.clubLogoUrl).toBe("https://cdn.example.com/tenant.png");
-    expect(result?.away?.clubDisplayName).toBe("FC Therwil");
-    expect(result?.away?.teamSubDisplayName).toBe("C Gelb");
+    expect(result?.away?.clubDisplayName).toBe("C Gelb");
+    expect(result?.away?.teamSubDisplayName).toBeNull();
     expect(result?.away?.clubLogoUrl).toBe("https://cdn.example.com/therwil.png");
   });
 

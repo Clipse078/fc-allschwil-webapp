@@ -85,6 +85,12 @@ const BOARD = {
   anlageplanBackgroundUrl: null,
   anlageplanJson: null,
   sortOrder: 0,
+  screen1TrainingShowLogos: false,
+  screen1TrainingLogoSize: "SMALL",
+  screen1MatchShowLogos: true,
+  screen1MatchLogoSize: "LARGE",
+  screen1TournamentShowLogos: true,
+  screen1TournamentLogoSize: "XLARGE",
   createdAt: new Date("2026-08-01"),
   updatedAt: new Date("2026-08-01"),
 };
@@ -205,5 +211,38 @@ describe("InboardDetailClient — Übersicht tab", () => {
   it("shows theme", async () => {
     await renderDetailClient();
     expect(screen.getAllByText("Dunkel").length).toBeGreaterThan(0);
+  });
+});
+
+describe("InboardDetailClient — Screen 1 logo toggles", () => {
+  it("uses independent SCE switches for Training, Match, and Turnier", async () => {
+    await renderDetailClient();
+    fireEvent.click(screen.getByTestId("tab-anzeige"));
+
+    const training = document.getElementById("training-show-logos");
+    const match = document.getElementById("match-show-logos");
+    const tournament = document.getElementById("tournament-show-logos");
+
+    expect(training).toHaveAttribute("role", "switch");
+    expect(match).toHaveAttribute("role", "switch");
+    expect(tournament).toHaveAttribute("role", "switch");
+    expect(
+      screen.getByTestId("tab-content-anzeige").querySelector('input[type="checkbox"]'),
+    ).toBeNull();
+
+    expect(training).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("training-logo-size")).toBeDisabled();
+    expect(match).toHaveAttribute("aria-checked", "true");
+    expect(tournament).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(training!);
+    expect(training).toHaveAttribute("aria-checked", "true");
+    expect(match).toHaveAttribute("aria-checked", "true");
+    expect(tournament).toHaveAttribute("aria-checked", "true");
+
+    fireEvent.click(match!);
+    expect(match).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("match-logo-size")).toBeDisabled();
+    expect(tournament).toHaveAttribute("aria-checked", "true");
   });
 });

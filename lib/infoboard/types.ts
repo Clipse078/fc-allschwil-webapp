@@ -35,6 +35,18 @@ export type InboardRow = {
   /** Anlageplan: AnlageplanConfig v1 JSON. null = no config yet. */
   anlageplanJson: string | null;
   sortOrder: number;
+  /** Screen 1 Training logo visibility. Independent from Match/Tournament. */
+  screen1TrainingShowLogos?: boolean;
+  /** Screen 1 Training logo size preset: SMALL | MEDIUM | LARGE | XLARGE. */
+  screen1TrainingLogoSize?: string;
+  /** Screen 1 Match logo visibility. Default true when absent (backward compat). */
+  screen1MatchShowLogos?: boolean;
+  /** Screen 1 Match logo size preset: SMALL | MEDIUM | LARGE | XLARGE. */
+  screen1MatchLogoSize?: string;
+  /** Screen 1 Tournament logo visibility. Independent from Match. */
+  screen1TournamentShowLogos?: boolean;
+  /** Screen 1 Tournament logo size preset. */
+  screen1TournamentLogoSize?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -97,6 +109,12 @@ export type UpdateInfoboardInput = {
   /** Anlageplan: AnlageplanConfig v1 JSON. */
   anlageplanJson?: string | null;
   sortOrder?: number;
+  screen1TrainingShowLogos?: boolean;
+  screen1TrainingLogoSize?: string;
+  screen1MatchShowLogos?: boolean;
+  screen1MatchLogoSize?: string;
+  screen1TournamentShowLogos?: boolean;
+  screen1TournamentLogoSize?: string;
 };
 
 /**

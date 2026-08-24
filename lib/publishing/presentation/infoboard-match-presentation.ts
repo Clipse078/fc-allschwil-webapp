@@ -67,14 +67,55 @@ export function resolveInfoboardClubDisplayName(
 }
 
 /**
- * Resolves the secondary team-specific line for one match side.
+ * Resolves the single unified team display label for one match side.
  *
  * Priority (tenant Team naming architecture, MATCH context):
  *   1. infoboardMatchDisplayName
  *   2. infoboardDisplayName
  *   3. alternativeName
  *   4. shortName
- *   5. name — only when it does not merely repeat the club line
+ *   5. canonical clubName
+ *   6. legacy fallbackDisplayName
+ *   7. team name
+ *
+ * The resolved value is the one and only displayed team label on Screen 1.
+ * No separate club heading or secondary sub-name line.
+ */
+export function resolveInfoboardMatchTeamDisplayName(input: {
+  readonly clubName: string | null | undefined;
+  readonly fallbackDisplayName: string | null | undefined;
+  readonly teamName: string | null | undefined;
+  readonly teamShortName: string | null | undefined;
+  readonly teamAlternativeName: string | null | undefined;
+  readonly teamInfoboardDisplayName?: string | null | undefined;
+  readonly teamInfoboardMatchDisplayName?: string | null | undefined;
+}): string {
+  const configured = resolveInfoboardTeamDisplayName(
+    {
+      infoboardMatchDisplayName: input.teamInfoboardMatchDisplayName,
+      infoboardDisplayName: input.teamInfoboardDisplayName,
+      alternativeName: input.teamAlternativeName,
+      shortName: input.teamShortName,
+    },
+    "MATCH",
+  );
+  if (configured) return configured;
+
+  const club = meaningful(input.clubName);
+  if (club) return club;
+
+  const fallback = meaningful(input.fallbackDisplayName);
+  if (fallback) return fallback;
+
+  return meaningful(input.teamName) ?? "";
+}
+
+/**
+ * Resolves the secondary team-specific line for one match side.
+ *
+ * @deprecated Screen 1 now uses a single unified team label via
+ *   resolveInfoboardMatchTeamDisplayName(). Kept for regression tests of the
+ *   resolver chain; always returns null in production presentation output.
  */
 export function resolveInfoboardTeamSubDisplayName(input: {
   readonly clubDisplayName: string;
@@ -118,13 +159,9 @@ function resolveSidePresentation(
   identity: InfoboardMatchSideIdentity,
   tenantLogoUrl: string | null | undefined,
 ): InfoboardMatchSidePresentation {
-  const clubDisplayName = resolveInfoboardClubDisplayName(
-    identity.clubName,
-    identity.fallbackDisplayName,
-  );
-
-  const teamSubDisplayName = resolveInfoboardTeamSubDisplayName({
-    clubDisplayName,
+  const teamDisplayName = resolveInfoboardMatchTeamDisplayName({
+    clubName: identity.clubName,
+    fallbackDisplayName: identity.fallbackDisplayName,
     teamName: identity.teamName,
     teamShortName: identity.teamShortName,
     teamAlternativeName: identity.teamAlternativeName,
@@ -141,8 +178,8 @@ function resolveSidePresentation(
   );
 
   return {
-    clubDisplayName,
-    teamSubDisplayName,
+    clubDisplayName: teamDisplayName,
+    teamSubDisplayName: null,
     clubLogoUrl,
   };
 }
