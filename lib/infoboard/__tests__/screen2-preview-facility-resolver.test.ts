@@ -1,7 +1,7 @@
 /**
  * lib/infoboard/__tests__/screen2-preview-facility-resolver.test.ts
  *
- * Regression tests for Screen-2 preview facility resolution (INFOBOARD-SCREEN2-URGENT-02B).
+ * Regression tests for Screen-2 preview facility resolution (INFOBOARD-SCREEN2-URGENT-04).
  */
 
 import { describe, it, expect } from "vitest";
@@ -24,7 +24,8 @@ function makePitch(
   };
 }
 
-const FCA_CANONICAL_PITCHES: PitchOccupancy[] = [
+/** Exact runtime evidence from FC Allschwil Screen-2 preview (space-separated Hauptfeld halves). */
+const FCA_RUNTIME_PITCHES: PitchOccupancy[] = [
   makePitch({
     code: "HAUPTFELD",
     displayLabel: "Hauptfeld",
@@ -33,14 +34,14 @@ const FCA_CANONICAL_PITCHES: PitchOccupancy[] = [
     facilityName: "Hauptfeld",
   }),
   makePitch({
-    code: "HAUPTFELD_A",
+    code: "HAUPTFELD A",
     displayLabel: "Hauptfeld A",
     resourceType: "HALF_PITCH",
     facilityId: "fac-hauptfeld",
     facilityName: "Hauptfeld",
   }),
   makePitch({
-    code: "HAUPTFELD_B",
+    code: "HAUPTFELD B",
     displayLabel: "Hauptfeld B",
     resourceType: "HALF_PITCH",
     facilityId: "fac-hauptfeld",
@@ -88,82 +89,82 @@ const FCA_CANONICAL_PITCHES: PitchOccupancy[] = [
     facilityId: "fac-kr3",
     facilityName: "Kunstrasen 3",
   }),
+  makePitch({
+    code: "HALLE_1",
+    displayLabel: "Halle 1",
+    resourceType: "FULL_PITCH",
+    facilityId: "fac-halle-1",
+    facilityName: "Halle 1",
+  }),
+  makePitch({
+    code: "HALLE_2",
+    displayLabel: "Halle 2",
+    resourceType: "FULL_PITCH",
+    facilityId: "fac-halle-2",
+    facilityName: "Halle 2",
+  }),
+  makePitch({
+    code: "HALLE_3",
+    displayLabel: "Halle 3",
+    resourceType: "FULL_PITCH",
+    facilityId: "fac-halle-3",
+    facilityName: "Halle 3",
+  }),
+  makePitch({
+    code: "FELD_C_TEST",
+    displayLabel: "Feld C Test",
+    resourceType: "HALF_PITCH",
+    facilityId: "fac-feld-c-test",
+    facilityName: "Feld C Test",
+  }),
 ];
 
+const FCA_UNDERSCORE_PITCHES: PitchOccupancy[] = FCA_RUNTIME_PITCHES.map(
+  (pitch) => {
+    if (pitch.code === "HAUPTFELD A") {
+      return makePitch({ ...pitch, code: "HAUPTFELD_A" });
+    }
+    if (pitch.code === "HAUPTFELD B") {
+      return makePitch({ ...pitch, code: "HAUPTFELD_B" });
+    }
+    return pitch;
+  },
+);
+
 describe("resolveScreen2PreviewFacilities", () => {
-  it("A — resolves FC Allschwil canonical HAUPTFELD dataset", () => {
-    const resolved = resolveScreen2PreviewFacilities(FCA_CANONICAL_PITCHES);
+  it("A — resolves HAUPTFELD FULL_PITCH", () => {
+    const resolved = resolveScreen2PreviewFacilities(FCA_RUNTIME_PITCHES);
 
     expect(resolved.hauptfeldFull.code).toBe("HAUPTFELD");
     expect(resolved.hauptfeldFull.resourceType).toBe("FULL_PITCH");
   });
 
-  it("B — resolves Hauptfeld halves HAUPTFELD_A and HAUPTFELD_B", () => {
-    const resolved = resolveScreen2PreviewFacilities(FCA_CANONICAL_PITCHES);
+  it("B — resolves actual runtime code HAUPTFELD A as Hauptfeld A", () => {
+    const resolved = resolveScreen2PreviewFacilities(FCA_RUNTIME_PITCHES);
 
-    expect(resolved.hauptfeldHalfA.code).toBe("HAUPTFELD_A");
-    expect(resolved.hauptfeldHalfB.code).toBe("HAUPTFELD_B");
+    expect(resolved.hauptfeldHalfA.code).toBe("HAUPTFELD A");
+    expect(resolved.hauptfeldHalfA.resourceType).toBe("HALF_PITCH");
     expect(resolved.hauptfeldHalfA.facilityId).toBe(
       resolved.hauptfeldFull.facilityId,
     );
   });
 
-  it("C — resolves Kunstrasen 2 and Kunstrasen 3 slots", () => {
-    const resolved = resolveScreen2PreviewFacilities(FCA_CANONICAL_PITCHES);
+  it("C — resolves actual runtime code HAUPTFELD B as Hauptfeld B", () => {
+    const resolved = resolveScreen2PreviewFacilities(FCA_RUNTIME_PITCHES);
 
-    expect(resolved.kr2Full.code).toBe("KUNSTRASEN_2");
-    expect(resolved.kr2HalfA.code).toBe("KUNSTRASEN_2_A");
-    expect(resolved.kr2HalfB.code).toBe("KUNSTRASEN_2_B");
-    expect(resolved.kr3Full.code).toBe("KUNSTRASEN_3");
-    expect(resolved.kr3HalfA.code).toBe("KUNSTRASEN_3_A");
-    expect(resolved.kr3HalfB.code).toBe("KUNSTRASEN_3_B");
+    expect(resolved.hauptfeldHalfB.code).toBe("HAUPTFELD B");
+    expect(resolved.hauptfeldHalfB.resourceType).toBe("HALF_PITCH");
   });
 
-  it("D — ignores unrelated FULL_PITCH resources such as HALLE_1", () => {
-    const pitches = [
-      ...FCA_CANONICAL_PITCHES,
-      makePitch({
-        code: "HALLE_1",
-        displayLabel: "Halle 1",
-        resourceType: "FULL_PITCH",
-        facilityId: "fac-halle-1",
-      }),
-      makePitch({
-        code: "HALLE_2",
-        displayLabel: "Halle 2",
-        resourceType: "FULL_PITCH",
-        facilityId: "fac-halle-2",
-      }),
-      makePitch({
-        code: "HALLE_3",
-        displayLabel: "Halle 3",
-        resourceType: "FULL_PITCH",
-        facilityId: "fac-halle-3",
-      }),
-    ];
+  it("D — resolves underscore-compatible HAUPTFELD_A and HAUPTFELD_B", () => {
+    const resolved = resolveScreen2PreviewFacilities(FCA_UNDERSCORE_PITCHES);
 
-    const resolved = resolveScreen2PreviewFacilities(pitches);
-    expect(resolved.hauptfeldFull.code).toBe("HAUPTFELD");
+    expect(resolved.hauptfeldHalfA.code).toBe("HAUPTFELD_A");
+    expect(resolved.hauptfeldHalfB.code).toBe("HAUPTFELD_B");
   });
 
-  it("E — fails deterministically when Hauptfeld FULL_PITCH is missing", () => {
-    const pitches = FCA_CANONICAL_PITCHES.filter(
-      (pitch) => pitch.code !== "HAUPTFELD",
-    );
-
-    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
-      /expected exactly one Hauptfeld FULL_PITCH; found 0/,
-    );
-    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
-      /Expected canonical code\(s\): HAUPTFELD/,
-    );
-    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
-      /legacy fallback: STADION/,
-    );
-  });
-
-  it("F — falls back to legacy STADION when canonical HAUPTFELD is absent", () => {
-    const legacyPitches = FCA_CANONICAL_PITCHES.map((pitch) => {
+  it("E — falls back to legacy STADION when canonical Hauptfeld resources are absent", () => {
+    const legacyPitches = FCA_RUNTIME_PITCHES.map((pitch) => {
       if (pitch.code === "HAUPTFELD") {
         return makePitch({
           ...pitch,
@@ -171,14 +172,14 @@ describe("resolveScreen2PreviewFacilities", () => {
           displayLabel: "Stadion",
         });
       }
-      if (pitch.code === "HAUPTFELD_A") {
+      if (pitch.code === "HAUPTFELD A") {
         return makePitch({
           ...pitch,
           code: "STADION_A",
           displayLabel: "Stadion A",
         });
       }
-      if (pitch.code === "HAUPTFELD_B") {
+      if (pitch.code === "HAUPTFELD B") {
         return makePitch({
           ...pitch,
           code: "STADION_B",
@@ -194,9 +195,65 @@ describe("resolveScreen2PreviewFacilities", () => {
     expect(resolved.hauptfeldHalfB.code).toBe("STADION_B");
   });
 
-  it("G — rejects ambiguity when both HAUPTFELD and STADION are present", () => {
+  it("F — HALLE_1/2/3 and FELD_C_TEST cannot resolve Hauptfeld slots", () => {
+    const unrelatedOnly = FCA_RUNTIME_PITCHES.filter(
+      (pitch) =>
+        !pitch.code.startsWith("HAUPTFELD") && !pitch.code.startsWith("STADION"),
+    );
+
+    expect(() => resolveScreen2PreviewFacilities(unrelatedOnly)).toThrow(
+      /expected exactly one Hauptfeld FULL_PITCH; found 0/,
+    );
+    expect(() => resolveScreen2PreviewFacilities(unrelatedOnly)).toThrow(
+      /Expected canonical code\(s\): HAUPTFELD/,
+    );
+
+    const withHalleButNoHauptfeld = unrelatedOnly.concat(
+      makePitch({
+        code: "HALLE_1",
+        displayLabel: "Halle 1",
+        resourceType: "FULL_PITCH",
+        facilityId: "fac-halle-1",
+      }),
+    );
+    expect(() => resolveScreen2PreviewFacilities(withHalleButNoHauptfeld)).toThrow(
+      /expected exactly one Hauptfeld FULL_PITCH; found 0/,
+    );
+  });
+
+  it("G — rejects duplicate canonical Hauptfeld half-pitch candidates", () => {
     const ambiguousPitches = [
-      ...FCA_CANONICAL_PITCHES,
+      ...FCA_RUNTIME_PITCHES,
+      makePitch({
+        code: "HAUPTFELD_A",
+        displayLabel: "Hauptfeld A (underscore duplicate)",
+        resourceType: "HALF_PITCH",
+        facilityId: "fac-hauptfeld-dup",
+      }),
+    ];
+
+    expect(() => resolveScreen2PreviewFacilities(ambiguousPitches)).toThrow(
+      /expected exactly one Hauptfeld Feld A; found 2 canonical matches/,
+    );
+  });
+
+  it("resolves all nine Screen-2 slots from exact FC Allschwil runtime fixture", () => {
+    const resolved = resolveScreen2PreviewFacilities(FCA_RUNTIME_PITCHES);
+
+    expect(resolved.hauptfeldFull.code).toBe("HAUPTFELD");
+    expect(resolved.hauptfeldHalfA.code).toBe("HAUPTFELD A");
+    expect(resolved.hauptfeldHalfB.code).toBe("HAUPTFELD B");
+    expect(resolved.kr2Full.code).toBe("KUNSTRASEN_2");
+    expect(resolved.kr2HalfA.code).toBe("KUNSTRASEN_2_A");
+    expect(resolved.kr2HalfB.code).toBe("KUNSTRASEN_2_B");
+    expect(resolved.kr3Full.code).toBe("KUNSTRASEN_3");
+    expect(resolved.kr3HalfA.code).toBe("KUNSTRASEN_3_A");
+    expect(resolved.kr3HalfB.code).toBe("KUNSTRASEN_3_B");
+  });
+
+  it("rejects ambiguity when both HAUPTFELD and STADION are present", () => {
+    const ambiguousPitches = [
+      ...FCA_RUNTIME_PITCHES,
       makePitch({
         code: "STADION",
         displayLabel: "Stadion",
@@ -210,6 +267,22 @@ describe("resolveScreen2PreviewFacilities", () => {
     );
     expect(() => resolveScreen2PreviewFacilities(ambiguousPitches)).toThrow(
       /canonical \(HAUPTFELD\) and legacy \(STADION\)/,
+    );
+  });
+
+  it("fails deterministically when Hauptfeld FULL_PITCH is missing", () => {
+    const pitches = FCA_RUNTIME_PITCHES.filter(
+      (pitch) => pitch.code !== "HAUPTFELD",
+    );
+
+    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
+      /expected exactly one Hauptfeld FULL_PITCH; found 0/,
+    );
+    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
+      /Expected canonical code\(s\): HAUPTFELD/,
+    );
+    expect(() => resolveScreen2PreviewFacilities(pitches)).toThrow(
+      /legacy fallback: STADION/,
     );
   });
 });
