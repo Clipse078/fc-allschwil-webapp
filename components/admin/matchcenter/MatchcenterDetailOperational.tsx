@@ -1,8 +1,6 @@
 "use client";
 
 import {
-  useCallback,
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -15,7 +13,6 @@ import {
   Monitor,
   Save,
   Shirt,
-  Users,
   Volleyball,
   X,
 } from "lucide-react";
@@ -35,15 +32,6 @@ import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/plan
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-
-type TeamItem = {
-  id: string;
-  name: string;
-  category: string;
-  genderGroup: string | null;
-  ageGroup: string | null;
-  isActive: boolean;
-};
 
 export type MatchcenterDetailOperationalProps = {
   matchId: string;
@@ -207,13 +195,6 @@ export function computeAllocationWarning(
   return `Es fehlen noch ${rest.join(", ")} und ${last}.`;
 }
 
-function formatTeamLabel(team: TeamItem): string {
-  const suffix = [team.ageGroup, team.genderGroup]
-    .filter(Boolean)
-    .join(" / ");
-  return suffix ? `${team.name} · ${suffix}` : team.name;
-}
-
 // ── Main component ────────────────────────────────────────────────────────────
 
 /**
@@ -234,8 +215,6 @@ export default function MatchcenterDetailOperational({
   homeAway,
   homeDisplayName,
   awayDisplayName,
-  homeIsOwnTeam,
-  awayIsOwnTeam,
   currentTeamId,
   currentPitchCode,
   currentHomeDressingRoomCode,
@@ -302,7 +281,7 @@ export default function MatchcenterDetailOperational({
   );
 
   // ── Form state ─────────────────────────────────────────────────────────────
-  const [teamId, setTeamId] = useState(currentTeamId ?? "");
+  const teamId = currentTeamId ?? "";
   const [pitchCode, setPitchCode] = useState(currentPitchCode ?? "");
   const [homeDressingRoomCode, setHomeDressingRoomCode] = useState(
     currentHomeDressingRoomCode ?? "",
@@ -314,51 +293,6 @@ export default function MatchcenterDetailOperational({
   const [infoboardVisible, setInfoboardVisible] = useState(
     currentInfoboardVisible,
   );
-
-  // ── Team loading ───────────────────────────────────────────────────────────
-  const [teams, setTeams] = useState<TeamItem[]>([]);
-  const [teamsLoading, setTeamsLoading] = useState(false);
-  const [teamsError, setTeamsError] = useState<string | null>(null);
-
-  const loadTeams = useCallback(async () => {
-    setTeamsLoading(true);
-    setTeamsError(null);
-
-    try {
-      const res = await fetch("/api/teams", { cache: "no-store" });
-      const data = (await res.json().catch(() => null)) as
-        | TeamItem[]
-        | { error?: string }
-        | null;
-
-      if (!res.ok) {
-        throw new Error(
-          !Array.isArray(data)
-            ? ((data as { error?: string })?.error ?? "Teams konnten nicht geladen werden.")
-            : "Teams konnten nicht geladen werden.",
-        );
-      }
-
-      const active = Array.isArray(data)
-        ? data.filter((t) => t.isActive)
-        : [];
-      setTeams(active);
-    } catch (err) {
-      setTeamsError(
-        err instanceof Error
-          ? err.message
-          : "Teams konnten nicht geladen werden.",
-      );
-    } finally {
-      setTeamsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (canManage) {
-      loadTeams();
-    }
-  }, [canManage, loadTeams]);
 
   // ── Save ───────────────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -430,16 +364,6 @@ export default function MatchcenterDetailOperational({
 
   const previewDate = matchDateIso.split("T")[0] ?? matchDateIso;
   const previewHref = `/dashboard/infoboard?date=${previewDate}`;
-
-  // ── Own-side context ───────────────────────────────────────────────────────
-  // For FC Allschwil, the "own team" side is home when isOwnTeam is true for home,
-  // or away when isOwnTeam is true for away. The team selector sets Event.teamId.
-  const ownSideLabel =
-    homeIsOwnTeam
-      ? `${homeDisplayName} (Heim)`
-      : awayIsOwnTeam
-        ? `${awayDisplayName} (Gast)`
-        : "FC Allschwil";
 
   const operationalHistoryLabel = formatOperationalHistoryLabel(
     {
@@ -576,55 +500,6 @@ export default function MatchcenterDetailOperational({
         )}
       </SectionCard>
       ) : null}
-
-      {/* D3 — Team Assignment */}
-      <SectionCard
-        title="Teamzuordnung"
-        description="Zuordnung des internen FC-Allschwil-Teams"
-      >
-        {teamsError ? (
-          <div
-            role="alert"
-            className="fca-status-box fca-status-box-error"
-          >
-            {teamsError}
-          </div>
-        ) : null}
-
-        <div className="space-y-4">
-          <label className="block space-y-2">
-            <span className="fca-label">
-              <Users className="inline h-3.5 w-3.5 align-text-bottom" />{" "}
-              FC-Allschwil-Team ({ownSideLabel})
-            </span>
-
-            <select
-              value={teamId}
-              onChange={(e) => setTeamId(e.target.value)}
-              disabled={!canManage || teamsLoading || saving}
-              className="fca-select"
-              data-testid="team-assignment-select"
-            >
-              <option value="">
-                {teamsLoading
-                  ? "Teams laden..."
-                  : "— Kein Team zugeordnet —"}
-              </option>
-              {teams.map((team) => (
-                <option key={team.id} value={team.id}>
-                  {formatTeamLabel(team)}
-                </option>
-              ))}
-            </select>
-
-            {!ownTeamAssigned && (
-              <p className="text-xs text-amber-700">
-                Kein internes Team zugeordnet.
-              </p>
-            )}
-          </label>
-        </div>
-      </SectionCard>
 
       {/* D4 — Pitch Assignment (HOME only) */}
       {isHomeMatch ? (

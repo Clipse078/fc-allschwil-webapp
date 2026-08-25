@@ -309,24 +309,14 @@ describe("MatchcenterDetail", () => {
     ).toHaveTextContent("Matchbälle mitnehmen");
   });
 
-  it("renders visibility destinations", () => {
+  it("does not render the Sichtbarkeit summary section", () => {
     render(<MatchcenterDetail match={createMatch()} />);
 
-    expect(screen.getByText("Website (inkl. Homepage)")).toBeTruthy();
-    expect(screen.getByText("Infoboard")).toBeTruthy();
-    // Homepage badge removed — website visibility controls both (PUB-02).
-    expect(screen.queryByText("Homepage")).toBeNull();
-    expect(screen.getByText("Wochenplan")).toBeTruthy();
-    expect(screen.getByText("Trainingsplan")).toBeTruthy();
-    expect(screen.getByText("Teamseite")).toBeTruthy();
-
-    expect(
-      screen.getAllByText("Sichtbar").length,
-    ).toBeGreaterThan(0);
-
-    expect(
-      screen.getAllByText("Nicht sichtbar").length,
-    ).toBeGreaterThan(0);
+    expect(screen.queryByText("Sichtbarkeit")).toBeNull();
+    expect(screen.queryByText("Aktive Ausgabekanäle")).toBeNull();
+    expect(screen.queryByText("Website (inkl. Homepage)")).toBeNull();
+    expect(screen.queryByText("Trainingsplan")).toBeNull();
+    expect(screen.queryByText("Teamseite")).toBeNull();
   });
 
   it("renders provider and synchronization metadata inside technical details", () => {

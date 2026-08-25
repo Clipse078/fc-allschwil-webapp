@@ -578,3 +578,46 @@ describe("buildMatchcenterViewModel — wochenplanFilter", () => {
     expect(vm.spielplanung.map((r) => r.match.id)).toEqual(["m-ready-vis"]);
   });
 });
+
+describe("buildMatchcenterViewModel — teamFilter", () => {
+  it("returns all matches when no team filter is set", () => {
+    const teamA = createMatch({ id: "match-a", teamId: "team-a" });
+    const teamB = createMatch({ id: "match-b", teamId: "team-b" });
+
+    const vm = buildMatchcenterViewModel([teamA, teamB]);
+
+    expect(vm.spielplanung.map((row) => row.match.id).sort()).toEqual([
+      "match-a",
+      "match-b",
+    ]);
+  });
+
+  it("filters Spielplanung and Resultate by internal team id", () => {
+    const teamAUpcoming = createMatch({ id: "up-a", teamId: "team-a" });
+    const teamBUpcoming = createMatch({ id: "up-b", teamId: "team-b" });
+    const teamACompleted = createMatch({
+      id: "res-a",
+      teamId: "team-a",
+      status: "COMPLETED",
+      scoreHome: 1,
+      scoreAway: 0,
+    });
+    const teamBCompleted = createMatch({
+      id: "res-b",
+      teamId: "team-b",
+      status: "COMPLETED",
+      scoreHome: 2,
+      scoreAway: 1,
+    });
+
+    const vm = buildMatchcenterViewModel(
+      [teamAUpcoming, teamBUpcoming, teamACompleted, teamBCompleted],
+      { teamFilter: "team-a" },
+    );
+
+    expect(vm.spielplanung.map((row) => row.match.id)).toEqual(["up-a"]);
+    expect(vm.resultate.map((match) => match.id)).toEqual(["res-a"]);
+    expect(vm.kpis.anstehend).toBe(1);
+    expect(vm.kpis.resultate).toBe(1);
+  });
+});

@@ -84,18 +84,10 @@ function createProps(
   };
 }
 
-function setupTeamsFetch(teams: object[] = []) {
-  mockFetch.mockImplementation((url: string) => {
-    if (url === "/api/teams") {
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(teams),
-      });
-    }
-    return Promise.resolve({
-      ok: true,
-      json: () => Promise.resolve({}),
-    });
+function setupDefaultFetch() {
+  mockFetch.mockResolvedValue({
+    ok: true,
+    json: () => Promise.resolve({}),
   });
 }
 
@@ -104,7 +96,18 @@ function setupTeamsFetch(teams: object[] = []) {
 describe("MatchcenterDetailOperational", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    setupTeamsFetch();
+    setupDefaultFetch();
+  });
+
+  it("does not render the Teamzuordnung section", async () => {
+    render(<MatchcenterDetailOperational {...createProps()} />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("pitch-assignment-select")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText("Teamzuordnung")).toBeNull();
+    expect(screen.queryByTestId("team-assignment-select")).toBeNull();
   });
 
   // ── D2 Readiness ─────────────────────────────────────────────────────────
@@ -137,7 +140,7 @@ describe("MatchcenterDetailOperational", () => {
     });
   });
 
-  it("shows Nicht relevant for away matches", async () => {
+  it("shows Nicht relevant for away matches without team assignment controls", async () => {
     render(
       <MatchcenterDetailOperational
         {...createProps({
@@ -148,26 +151,20 @@ describe("MatchcenterDetailOperational", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();
+    expect(screen.queryByTestId("team-assignment-select")).toBeNull();
+    expect(screen.queryByText("Teamzuordnung")).toBeNull();
     expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
   });
 
-  it("shows Nicht relevant when homeAway is null", async () => {
+  it("shows Nicht relevant when homeAway is null without team assignment controls", async () => {
     render(
       <MatchcenterDetailOperational
         {...createProps({ homeAway: null })}
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();
+    expect(screen.queryByTestId("team-assignment-select")).toBeNull();
+    expect(screen.queryByText("Teamzuordnung")).toBeNull();
     expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
   });
 
@@ -273,12 +270,6 @@ describe("MatchcenterDetailOperational", () => {
 
   it("calls PATCH API and shows success toast on save", async () => {
     mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/teams") {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      }
       if (url === "/api/matchcenter/match-test-1") {
         return Promise.resolve({
           ok: true,
@@ -304,12 +295,6 @@ describe("MatchcenterDetailOperational", () => {
 
   it("shows error toast when save fails", async () => {
     mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/teams") {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve([]),
-        });
-      }
       if (url === "/api/matchcenter/match-test-1") {
         return Promise.resolve({
           ok: false,
@@ -515,9 +500,6 @@ describe("MatchcenterDetailOperational — RESOURCE-AVAILABILITY-UX-01 availabil
   function installAvailabilityFetchMock() {
     const availabilityCalls: string[] = [];
     mockFetch.mockImplementation((url: string) => {
-      if (url === "/api/teams") {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-      }
       if (url.startsWith("/api/facilities/availability")) {
         availabilityCalls.push(url);
         if (url.includes("group=PITCH_HALL")) {
@@ -588,7 +570,7 @@ describe("MatchcenterDetailOperational — RESOURCE-AVAILABILITY-UX-01 availabil
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
+      expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
     });
     expect(availabilityCalls).toHaveLength(0);
   });
@@ -674,7 +656,7 @@ describe("operational cutoff", () => {
     expect(screen.queryByTestId("infoboard-readiness-ready")).toBeNull();
   });
 
-  it("does not render home facility pickers for away matches", async () => {
+  it("does not render home facility pickers or team assignment for away matches", async () => {
     render(
       <MatchcenterDetailOperational
         {...createProps({
@@ -685,10 +667,8 @@ describe("operational cutoff", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
-    });
-
+    expect(screen.queryByTestId("team-assignment-select")).toBeNull();
+    expect(screen.queryByText("Teamzuordnung")).toBeNull();
     expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
     expect(screen.queryByTestId("home-dressing-room-select")).toBeNull();
     expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();

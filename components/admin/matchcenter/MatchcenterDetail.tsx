@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   CalendarDays,
-  Check,
   Clock3,
   Cloud,
   ExternalLink,
@@ -15,7 +14,6 @@ import {
   ShieldCheck,
   Trophy,
   Users,
-  X,
 } from "lucide-react";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
 import {
@@ -128,34 +126,6 @@ function valueOrFallback(
   }
 
   return String(value);
-}
-
-function BooleanStatus({
-  active,
-  label,
-}: {
-  active: boolean;
-  label: string;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5">
-      <span className="text-sm text-[var(--foreground)]">
-        {label}
-      </span>
-
-      <Badge
-        variant={active ? "success" : "default"}
-        size="sm"
-      >
-        {active ? (
-          <Check className="h-3 w-3" />
-        ) : (
-          <X className="h-3 w-3" />
-        )}
-        {active ? "Sichtbar" : "Nicht sichtbar"}
-      </Badge>
-    </div>
-  );
 }
 
 function DetailRow({
@@ -386,42 +356,11 @@ export default function MatchcenterDetail({
           </div>
         }
         sidebar={
-          <>
-            <MatchLifecycleCard
-              matchId={match.id}
-              matchTitle={match.title}
-              canDelete={canDelete}
-            />
-
-            <SectionCard
-              title="Sichtbarkeit"
-              description="Aktive Ausgabekanäle"
-            >
-              <div className="space-y-2">
-                <BooleanStatus
-                  active={match.visibility.websiteVisible}
-                  label="Website (inkl. Homepage)"
-                />
-                <BooleanStatus
-                  active={match.visibility.infoboardVisible}
-                  label="Infoboard"
-                />
-                <BooleanStatus
-                  active={match.visibility.wochenplanVisible}
-                  label="Wochenplan"
-                />
-                <BooleanStatus
-                  active={match.visibility.trainingsplanVisible}
-                  label="Trainingsplan"
-                />
-                <BooleanStatus
-                  active={match.visibility.teamPageVisible}
-                  label="Teamseite"
-                />
-              </div>
-            </SectionCard>
-
-          </>
+          <MatchLifecycleCard
+            matchId={match.id}
+            matchTitle={match.title}
+            canDelete={canDelete}
+          />
         }
       >
         <MatchcenterDetailOperational

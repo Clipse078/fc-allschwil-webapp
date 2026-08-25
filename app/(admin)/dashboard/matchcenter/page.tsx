@@ -20,6 +20,11 @@ import {
   normalizeMatchcenterTab,
   normalizeMatchcenterWochenplanFilter,
 } from "@/lib/matchcenter/view-model";
+import {
+  normalizeMatchcenterTeamFilter,
+  toMatchcenterTeamOptions,
+} from "@/lib/matchcenter/navigation";
+import { getTeamsListData } from "@/lib/teams/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 import { ToastProvider } from "@/components/ui/ToastProvider";
@@ -30,6 +35,7 @@ type MatchcenterPageProps = {
     month?: string;
     filter?: string;
     wochenplan?: string;
+    team?: string;
   }>;
 };
 
@@ -90,6 +96,12 @@ export default async function MatchcenterPage({
     },
   );
 
+  const tenantTeams = await getTeamsListData(tenantId);
+  const activeTeams = tenantTeams.filter((team) => team.isActive);
+  const validTeamIds = new Set(activeTeams.map((team) => team.id));
+  const teamFilter = normalizeMatchcenterTeamFilter(params.team, validTeamIds);
+  const teamOptions = toMatchcenterTeamOptions(activeTeams);
+
   const monthWindow = {
     param: resolvedMonth.param,
     label: formatMonthLabel(resolvedMonth, locale, timezone),
@@ -120,6 +132,8 @@ export default async function MatchcenterPage({
           tab={tab}
           actionFilter={actionFilter}
           wochenplanFilter={wochenplanFilter}
+          teamFilter={teamFilter}
+          teamOptions={teamOptions}
           monthWindow={monthWindow}
           timezone={timezone}
           locale={locale}

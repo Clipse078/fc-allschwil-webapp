@@ -103,12 +103,19 @@ function createMatch(
   };
 }
 
+const DEFAULT_TEAM_OPTIONS = [
+  { id: "team-1", label: "Junioren C1" },
+  { id: "team-2", label: "Frauen 1" },
+];
+
 function renderOverview(
   matches: MatchcenterMatchSummary[],
   props: Partial<{
     tab: "SPIELPLANUNG" | "RESULTATE";
     actionFilter: "ALLE" | "OFFEN" | "ERLEDIGT";
     wochenplanFilter: "ALLE" | "IM_WOCHENPLAN" | "NICHT_IM_WOCHENPLAN";
+    teamFilter: string | null;
+    teamOptions: { id: string; label: string }[];
   }> = {},
 ) {
   return render(
@@ -117,6 +124,8 @@ function renderOverview(
       tab={props.tab ?? "SPIELPLANUNG"}
       actionFilter={props.actionFilter ?? "ALLE"}
       wochenplanFilter={props.wochenplanFilter ?? "ALLE"}
+      teamFilter={props.teamFilter ?? null}
+      teamOptions={props.teamOptions ?? DEFAULT_TEAM_OPTIONS}
       monthWindow={DEFAULT_MONTH_WINDOW}
     />,
   );
@@ -532,5 +541,83 @@ describe("MatchcenterOverview — reconciliation admin surface", () => {
     expect(
       screen.queryByTestId("matchcenter-reconciliation-panel"),
     ).toBeNull();
+  });
+});
+
+describe("MatchcenterOverview — team filter", () => {
+  it("renders Alle Teams by default and lists canonical tenant teams", () => {
+    renderOverview([createMatch()]);
+
+    expect(screen.getByTestId("matchcenter-team-filter-trigger")).toHaveTextContent(
+      "Alle Teams",
+    );
+  });
+
+  it("filters Spielplanung rows by selected internal team", () => {
+    const teamOne = createMatch({ id: "match-team-1", teamId: "team-1" });
+    const teamTwo = createMatch({ id: "match-team-2", teamId: "team-2" });
+
+    renderOverview([teamOne, teamTwo], { teamFilter: "team-1" });
+
+    expect(screen.getByTestId("matchcenter-team-filter-trigger")).toHaveTextContent(
+      "Junioren C1",
+    );
+    expect(
+      screen.getByTestId("matchcenter-spielplanung-row-match-team-1"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("matchcenter-spielplanung-row-match-team-2"),
+    ).toBeNull();
+  });
+
+  it("filters Resultate by the same team selection", () => {
+    const completedOne = createMatch({
+      id: "res-team-1",
+      teamId: "team-1",
+      status: "COMPLETED",
+      scoreHome: 2,
+      scoreAway: 1,
+    });
+    const completedTwo = createMatch({
+      id: "res-team-2",
+      teamId: "team-2",
+      status: "COMPLETED",
+      scoreHome: 1,
+      scoreAway: 0,
+    });
+
+    renderOverview([completedOne, completedTwo], {
+      tab: "RESULTATE",
+      teamFilter: "team-2",
+    });
+
+    expect(screen.getByTestId("matchcenter-team-filter-trigger")).toHaveTextContent(
+      "Frauen 1",
+    );
+    expect(screen.getByTestId("matchcenter-resultate-list")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("matchcenter-result-row-res-team-2"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("matchcenter-result-row-res-team-1"),
+    ).toBeNull();
+  });
+
+  it("preserves team selection when switching tabs", () => {
+    renderOverview([createMatch()], { teamFilter: "team-1" });
+
+    expect(screen.getByTestId("matchcenter-tab-resultate")).toHaveAttribute(
+      "href",
+      "/dashboard/matchcenter?tab=resultate&month=2026-08&team=team-1",
+    );
+  });
+
+  it("preserves team and month query state together", () => {
+    renderOverview([createMatch()], { teamFilter: "team-2", actionFilter: "OFFEN" });
+
+    expect(screen.getByTestId("matchcenter-month-next")).toHaveAttribute(
+      "href",
+      "/dashboard/matchcenter?tab=spielplanung&month=2026-09&filter=offen&team=team-2",
+    );
   });
 });

@@ -113,14 +113,21 @@ export function buildMatchcenterViewModel(
   options: {
     actionFilter?: MatchcenterActionFilter;
     wochenplanFilter?: MatchcenterWochenplanFilter;
+    /** Internal canonical Team.id — when set, only that team's matches are shown. */
+    teamFilter?: string | null;
     now?: Date;
   } = {},
 ): MatchcenterViewModel {
   const actionFilter = options.actionFilter ?? "ALLE";
   const wochenplanFilter = options.wochenplanFilter ?? "ALLE";
+  const teamFilter = options.teamFilter ?? null;
   const now = options.now;
 
-  const wochenplanFiltered = matches.filter((match) => {
+  const teamScoped = teamFilter
+    ? matches.filter((match) => match.teamId === teamFilter)
+    : matches;
+
+  const wochenplanFiltered = teamScoped.filter((match) => {
     if (wochenplanFilter === "IM_WOCHENPLAN") {
       return match.visibility.wochenplanVisible === true;
     }

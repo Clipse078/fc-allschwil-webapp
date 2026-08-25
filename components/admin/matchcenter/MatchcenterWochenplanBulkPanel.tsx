@@ -35,6 +35,9 @@ import { CenterDateGroup } from "@/components/centers/CenterDateGroup";
 import { MatchCard, type MatchCardDensity } from "./MatchCard";
 import { MatchInspector } from "./MatchInspector";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
+import {
+  buildMatchcenterHref,
+} from "@/lib/matchcenter/navigation";
 import type {
   MatchcenterRowViewModel,
   MatchcenterActionFilter,
@@ -64,18 +67,10 @@ function buildHref(
     month: string;
     actionFilter: MatchcenterActionFilter;
     wochenplanFilter: MatchcenterWochenplanFilter;
+    teamFilter: string | null;
   },
 ): string {
-  const search = new URLSearchParams();
-  search.set("tab", params.tab.toLowerCase());
-  search.set("month", params.month);
-  if (params.tab === "SPIELPLANUNG") {
-    search.set("filter", params.actionFilter.toLowerCase());
-  }
-  if (params.wochenplanFilter !== "ALLE") {
-    search.set("wochenplan", params.wochenplanFilter.toLowerCase());
-  }
-  return `${basePath}?${search.toString()}`;
+  return buildMatchcenterHref(basePath, params);
 }
 
 // ── Day-grouping utility ─────────────────────────────────────────────────────
@@ -161,6 +156,7 @@ type MatchcenterWochenplanBulkPanelProps = {
   monthParam: string;
   actionFilter: MatchcenterActionFilter;
   wochenplanFilter: MatchcenterWochenplanFilter;
+  teamFilter: string | null;
 };
 
 export default function MatchcenterWochenplanBulkPanel({
@@ -174,6 +170,7 @@ export default function MatchcenterWochenplanBulkPanel({
   monthParam,
   actionFilter,
   wochenplanFilter,
+  teamFilter,
 }: MatchcenterWochenplanBulkPanelProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -295,6 +292,7 @@ export default function MatchcenterWochenplanBulkPanel({
                   month: monthParam,
                   actionFilter: item.key,
                   wochenplanFilter,
+                  teamFilter,
                 })}
                 data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
                 aria-current={isActive ? "true" : undefined}
@@ -325,6 +323,7 @@ export default function MatchcenterWochenplanBulkPanel({
                   month: monthParam,
                   actionFilter,
                   wochenplanFilter: item.key,
+                  teamFilter,
                 })}
                 data-testid={`matchcenter-wochenplan-filter-${item.key.toLowerCase()}`}
                 aria-current={isActive ? "true" : undefined}

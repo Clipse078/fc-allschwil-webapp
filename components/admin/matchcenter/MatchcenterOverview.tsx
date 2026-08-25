@@ -7,6 +7,10 @@ import {
   type MatchcenterTab,
   type MatchcenterWochenplanFilter,
 } from "@/lib/matchcenter/view-model";
+import {
+  buildMatchcenterHref,
+  type MatchcenterTeamOption,
+} from "@/lib/matchcenter/navigation";
 import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/ui/page/EmptyState";
 import { SectionCard } from "@/components/ui/page/SectionCard";
@@ -15,6 +19,7 @@ import { CenterSummaryStrip } from "@/components/centers/CenterSummaryStrip";
 import MatchcenterResultRow from "./MatchcenterResultRow";
 import MatchcenterWochenplanBulkPanel from "./MatchcenterWochenplanBulkPanel";
 import MatchcenterReconciliationPanel from "./MatchcenterReconciliationPanel";
+import MatchcenterTeamFilter from "./MatchcenterTeamFilter";
 
 // WOCHENPLAN_FILTERS — used by the Resultate tab filter (Spielplanung filters
 // are now rendered inside MatchcenterWochenplanBulkPanel for C2 unified toolbar)
@@ -37,6 +42,8 @@ type MatchcenterOverviewProps = {
   tab: MatchcenterTab;
   actionFilter: MatchcenterActionFilter;
   wochenplanFilter: MatchcenterWochenplanFilter;
+  teamFilter: string | null;
+  teamOptions: MatchcenterTeamOption[];
   monthWindow: MatchcenterMonthWindowLike;
   basePath?: string;
   timezone?: string;
@@ -64,18 +71,10 @@ function buildHref(
     month: string;
     actionFilter: MatchcenterActionFilter;
     wochenplanFilter: MatchcenterWochenplanFilter;
+    teamFilter: string | null;
   },
 ): string {
-  const search = new URLSearchParams();
-  search.set("tab", params.tab.toLowerCase());
-  search.set("month", params.month);
-  if (params.tab === "SPIELPLANUNG") {
-    search.set("filter", params.actionFilter.toLowerCase());
-  }
-  if (params.wochenplanFilter !== "ALLE") {
-    search.set("wochenplan", params.wochenplanFilter.toLowerCase());
-  }
-  return `${basePath}?${search.toString()}`;
+  return buildMatchcenterHref(basePath, params);
 }
 
 export default function MatchcenterOverview({
@@ -83,6 +82,8 @@ export default function MatchcenterOverview({
   tab,
   actionFilter,
   wochenplanFilter,
+  teamFilter,
+  teamOptions,
   monthWindow,
   basePath = "/dashboard/matchcenter",
   timezone = "Europe/Zurich",
@@ -94,11 +95,18 @@ export default function MatchcenterOverview({
   const viewModel = buildMatchcenterViewModel(matches, {
     actionFilter,
     wochenplanFilter,
+    teamFilter,
   });
 
   // Build "Heute" href that navigates to today's month with filters preserved
   const todayHref = currentMonthParam
-    ? buildHref(basePath, { tab, month: currentMonthParam, actionFilter, wochenplanFilter })
+    ? buildHref(basePath, {
+        tab,
+        month: currentMonthParam,
+        actionFilter,
+        wochenplanFilter,
+        teamFilter,
+      })
     : undefined;
 
   // Summary strip metrics (actionable: Offen and Erledigt link to filters)
@@ -122,6 +130,7 @@ export default function MatchcenterOverview({
               month: monthWindow.param,
               actionFilter: "OFFEN",
               wochenplanFilter,
+              teamFilter,
             }),
             active: actionFilter === "OFFEN",
             "data-testid": "matchcenter-kpi-offen",
@@ -136,6 +145,7 @@ export default function MatchcenterOverview({
               month: monthWindow.param,
               actionFilter: "ERLEDIGT",
               wochenplanFilter,
+              teamFilter,
             }),
             active: actionFilter === "ERLEDIGT",
             "data-testid": "matchcenter-kpi-bereit",
@@ -183,6 +193,7 @@ export default function MatchcenterOverview({
                 month: monthWindow.param,
                 actionFilter,
                 wochenplanFilter,
+                teamFilter,
               })}
               role="tab"
               aria-selected={isActive}
@@ -209,17 +220,29 @@ export default function MatchcenterOverview({
             month: monthWindow.previousParam,
             actionFilter,
             wochenplanFilter,
+            teamFilter,
           })}
           nextHref={buildHref(basePath, {
             tab,
             month: monthWindow.nextParam,
             actionFilter,
             wochenplanFilter,
+            teamFilter,
           })}
           todayHref={todayHref}
           data-testid-label="matchcenter-month-label"
           data-testid-previous="matchcenter-month-previous"
           data-testid-next="matchcenter-month-next"
+        />
+
+        <MatchcenterTeamFilter
+          teams={teamOptions}
+          teamFilter={teamFilter}
+          basePath={basePath}
+          tab={tab}
+          month={monthWindow.param}
+          actionFilter={actionFilter}
+          wochenplanFilter={wochenplanFilter}
         />
       </div>
 
@@ -260,6 +283,7 @@ export default function MatchcenterOverview({
                           month: monthWindow.param,
                           actionFilter: item.key,
                           wochenplanFilter,
+                          teamFilter,
                         })}
                         data-testid={`matchcenter-filter-${item.key.toLowerCase()}`}
                         aria-current={isActive ? "true" : undefined}
@@ -302,6 +326,7 @@ export default function MatchcenterOverview({
               monthParam={monthWindow.param}
               actionFilter={actionFilter}
               wochenplanFilter={wochenplanFilter}
+              teamFilter={teamFilter}
             />
           )}
         </>
@@ -323,6 +348,7 @@ export default function MatchcenterOverview({
                     month: monthWindow.param,
                     actionFilter,
                     wochenplanFilter: item.key,
+                    teamFilter,
                   })}
                   data-testid={`matchcenter-wochenplan-filter-resultate-${item.key.toLowerCase()}`}
                   aria-current={isActive ? "true" : undefined}
