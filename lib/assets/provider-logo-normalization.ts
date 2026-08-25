@@ -1,7 +1,7 @@
 /**
  * lib/assets/provider-logo-normalization.ts
  *
- * MEDIA-LOGO-01B — provider-neutral club logo normalization foundation.
+ * MEDIA-LOGO-01B/01C — provider-neutral club logo normalization foundation.
  *
  * Transforms untrusted provider-supplied crest bytes (or a bounded HTTP(S)
  * fetch) into a canonical SCE-managed transparent PNG suitable for every
@@ -22,11 +22,11 @@
  *   - Vercel Node runtime with sharp native binary (default for App Router API
  *     routes and server actions). Edge runtime is NOT targeted.
  *
- * ─── White-background cleanup ────────────────────────────────────────────────
+ * ─── White-background cleanup (01C) ────────────────────────────────────────
  *
- * Deferred to a follow-up MEDIA-LOGO slice. Conservative border-connected
- * near-white removal is not implemented here — only transparent-preserving
- * conversion / resize / SVG rasterization.
+ * After bounded resize/rasterization, border-connected near-white opaque
+ * backgrounds are removed via lib/assets/provider-logo-background.ts.
+ * Internal whites enclosed by artwork are preserved.
  */
 
 import { createHash } from "node:crypto";
@@ -34,6 +34,8 @@ import { createHash } from "node:crypto";
 import { fileTypeFromBuffer } from "file-type";
 import sharp from "sharp";
 
+import { applyProviderLogoBackgroundCleanup, pngNeedsBorderBackgroundCleanup } from "@/lib/assets/provider-logo-background";
+import { isUnsafeSvgPayload } from "@/lib/assets/provider-logo-svg-safety";
 import { isVercelBlobUrl, type UploadLogoResult } from "@/lib/assets/storage";
 import type { NormalizedProviderClubLogoScope } from "@/lib/assets/tenant-paths";
 import { MAX_LOGO_FILE_SIZE_BYTES } from "@/lib/assets/validation";
@@ -66,13 +68,6 @@ export const ALLOWED_PROVIDER_LOGO_SOURCE_MIME_TYPES = new Set([
   "image/svg+xml",
 ]);
 
-const SVG_UNSAFE_PATTERNS: RegExp[] = [
-  /<script[\s>]/i,
-  /javascript:/i,
-  /<foreignObject/i,
-  /\bon[a-z]+\s*=/i,
-];
-
 export type NormalizeProviderLogoResult = {
   buffer: Buffer;
   mime: typeof NORMALIZED_PROVIDER_LOGO_MIME;
@@ -97,11 +92,6 @@ function isAllowedProviderLogoUrl(url: string): boolean {
   } catch {
     return false;
   }
-}
-
-function isUnsafeSvgPayload(buffer: Buffer): boolean {
-  const text = buffer.toString("utf8", 0, Math.min(buffer.length, 256_000));
-  return SVG_UNSAFE_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 async function sniffProviderSourceMime(buffer: Buffer): Promise<string | null> {
@@ -182,17 +172,24 @@ export async function normalizeProviderLogoBytes(
       return null;
     }
 
-    const detected = await fileTypeFromBuffer(data);
+    const cleaned = await applyProviderLogoBackgroundCleanup(data);
+    const cleanedMeta = await sharp(cleaned).metadata();
+
+    const detected = await fileTypeFromBuffer(cleaned);
     if (detected?.mime !== NORMALIZED_PROVIDER_LOGO_MIME) {
       return null;
     }
 
+    if (cleaned.length > MAX_PROVIDER_LOGO_SOURCE_BYTES) {
+      return null;
+    }
+
     return {
-      buffer: data,
+      buffer: cleaned,
       mime: NORMALIZED_PROVIDER_LOGO_MIME,
       sourceFingerprint,
-      width: info.width,
-      height: info.height,
+      width: cleanedMeta.width ?? info.width,
+      height: cleanedMeta.height ?? info.height,
     };
   } catch {
     return null;
@@ -213,7 +210,7 @@ async function needsProviderLogoRasterProcessing(buffer: Buffer): Promise<boolea
     return true;
   }
 
-  return false;
+  return pngNeedsBorderBackgroundCleanup(buffer);
 }
 
 /**
