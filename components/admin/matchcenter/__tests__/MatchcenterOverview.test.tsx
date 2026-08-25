@@ -33,11 +33,13 @@ function createMatch(
   return {
     id: "match-1",
     tenantId: "tenant-1",
+    teamId: "team-1",
+    seasonId: "season-2026-2027",
     type: "MATCH",
     title: "FC Allschwil – Gegner",
     description: null,
     status: "SCHEDULED",
-    startAt: new Date("2026-08-22T16:00:00.000Z"),
+    startAt: new Date("2026-09-05T16:00:00.000Z"),
     endAt: null,
     location: "Im Brüel",
     competitionLabel: "Meisterschaft",
@@ -84,7 +86,7 @@ function createMatch(
       pitchCode: "KR2",
       homeDressingRoomCode: "G1",
       awayDressingRoomCode: "G2",
-      meetingTime: new Date("2026-08-22T15:00:00.000Z"),
+      meetingTime: new Date("2026-09-05T15:00:00.000Z"),
       remarks: null,
     },
     visibility: {

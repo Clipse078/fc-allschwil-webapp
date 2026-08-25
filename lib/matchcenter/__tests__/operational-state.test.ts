@@ -24,6 +24,8 @@ function createMatch(
   return {
     id: "match-1",
     tenantId: "tenant-1",
+    teamId: "team-1",
+    seasonId: "season-2026-2027",
     type: "MATCH",
     title: "FC Allschwil B2 – Gegner",
     description: null,

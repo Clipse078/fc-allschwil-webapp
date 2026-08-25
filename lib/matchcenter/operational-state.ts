@@ -65,8 +65,9 @@ const NOT_APPLICABLE: MatchcenterOperationalAssessment = {
  */
 export function assessMatchOperationalState(
   match: MatchcenterMatchSummary,
+  now?: Date,
 ): MatchcenterOperationalAssessment {
-  if (isMatchCompleted(match) || isMatchCancelledOrPostponed(match)) {
+  if (isMatchCompleted(match, now) || isMatchCancelledOrPostponed(match, now)) {
     return NOT_APPLICABLE;
   }
 

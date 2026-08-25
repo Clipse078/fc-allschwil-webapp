@@ -3,79 +3,109 @@
  *
  * MATCHCENTER-UX-01 — canonical match lifecycle / result-display semantics.
  *
- * Root cause of the "fake 0:0" bug (see Phase 0 investigation):
- *   `MatchExternalMapping.scoreHome` / `scoreAway` are written directly from
- *   the SFV `scoreTeamA` / `scoreTeamB` fields (see
- *   lib/integrations/sfv/sync/schedule-mapper.ts::buildMappingFields), and
- *   the SFV API returns `0` — never `null` — for a fixture that has not been
- *   played yet. Nullability of scoreHome/scoreAway therefore cannot be used
- *   to decide whether a real result exists.
- *
- *   The canonical, already-correct source of truth is `Event.status`
- *   (EventStatus). `buildResultLabel()` in schedule-mapper.ts already gates
- *   `resultLabel` on status (only COMPLETED/LIVE produce a label), but the
- *   previous Matchcenter UI ignored that and read scoreHome/scoreAway first,
- *   which reintroduced the exact bug resultLabel was designed to avoid.
- *
- * This module is the single place Matchcenter presentation code should call
- * to decide "is this match completed?" and "what score, if any, should be
- * shown?". Pure, synchronous, no I/O.
+ * TEAM-SFV-02B: delegates lifecycle classification to lib/sporting-data while
+ * preserving the existing Matchcenter helper surface for #402/#403 consumers.
  */
 
-import { resolveMatchResultDisplay } from "@/lib/sporting-data/resolve-match-result-display";
+import {
+  classifySportingMatchLifecycle,
+  isSportingMatchCancelled,
+  isSportingMatchCompleted,
+  isSportingMatchLive,
+  isSportingMatchPostponed,
+  type SportingMatchLifecycle,
+} from "@/lib/sporting-data/lifecycle";
+import { resolveSportingResultDisplay } from "@/lib/sporting-data/resolve-sporting-result-display";
 import type { MatchcenterMatchSummary } from "./types";
 
 export type MatchcenterLifecycleStage = "UPCOMING" | "COMPLETED";
 
-type StatusSource = Pick<MatchcenterMatchSummary, "status">;
-type ScoreSource = Pick<
-  MatchcenterMatchSummary,
-  "status" | "scoreHome" | "scoreAway" | "resultLabel"
->;
+type LifecycleSource = {
+  status: string;
+  startAt?: Date;
+  synchronization?: Pick<
+    MatchcenterMatchSummary["synchronization"],
+    "providerMatchStateName"
+  >;
+};
 
-function normalizedStatus(status: string): string {
-  return status.trim().toUpperCase();
+function resolveLifecycle(match: LifecycleSource, now?: Date): SportingMatchLifecycle {
+  if (!match.startAt) {
+    const status = match.status.trim().toUpperCase();
+    if (status === "COMPLETED") return "COMPLETED";
+    if (status === "LIVE") return "LIVE";
+    if (status === "POSTPONED") return "POSTPONED";
+    if (status === "CANCELLED" || status === "CANCELED") return "CANCELLED";
+    return "UPCOMING";
+  }
+
+  return classifySportingMatchLifecycle({
+    status: match.status,
+    startAt: match.startAt,
+    providerMatchStateName:
+      match.synchronization?.providerMatchStateName ?? null,
+    now,
+  }).lifecycle;
 }
 
-/** True only for the canonical, definitively-played EventStatus. */
-export function isMatchCompleted(match: StatusSource): boolean {
-  return normalizedStatus(match.status) === "COMPLETED";
+/** True when the canonical sporting lifecycle is COMPLETED. */
+export function isMatchCompleted(
+  match: LifecycleSource,
+  now?: Date,
+): boolean {
+  return isSportingMatchCompleted(resolveLifecycle(match, now));
 }
 
 /** True for POSTPONED/CANCELED — never a real result, never operationally actionable. */
-export function isMatchCancelledOrPostponed(match: StatusSource): boolean {
-  const status = normalizedStatus(match.status);
-  return status === "CANCELED" || status === "CANCELLED" || status === "POSTPONED";
+export function isMatchCancelledOrPostponed(
+  match: LifecycleSource,
+  now?: Date,
+): boolean {
+  const lifecycle = resolveLifecycle(match, now);
+  return (
+    isSportingMatchCancelled(lifecycle) || isSportingMatchPostponed(lifecycle)
+  );
 }
 
-export function isMatchLive(match: StatusSource): boolean {
-  return normalizedStatus(match.status) === "LIVE";
+export function isMatchLive(match: LifecycleSource, now?: Date): boolean {
+  return isSportingMatchLive(resolveLifecycle(match, now));
 }
 
 /**
  * Coarse Spielplanung/Resultate bucket for a match.
- * Only a definitively COMPLETED match belongs in Resultate — everything
- * else (SCHEDULED, LIVE, POSTPONED, CANCELED, DRAFT, ARCHIVED) is Spielplanung.
+ * Only a definitively COMPLETED match belongs in Resultate.
  */
 export function getMatchcenterLifecycleStage(
-  match: StatusSource,
+  match: LifecycleSource,
+  now?: Date,
 ): MatchcenterLifecycleStage {
-  return isMatchCompleted(match) ? "COMPLETED" : "UPCOMING";
+  return isMatchCompleted(match, now) ? "COMPLETED" : "UPCOMING";
 }
+
+type ScoreSource = {
+  status: string;
+  startAt?: Date;
+  scoreHome?: number | null;
+  scoreAway?: number | null;
+  resultLabel?: string | null;
+  synchronization?: Pick<
+    MatchcenterMatchSummary["synchronization"],
+    "providerMatchStateName"
+  >;
+};
 
 /**
  * Resolves the score label to display for a match, or `null` when no
  * legitimate result exists yet.
- *
- * Hard rules (MATCHCENTER-UX-01 §12):
- *   SCHEDULED / future            → null (never a fake "0:0")
- *   POSTPONED / CANCELED          → null (status is shown instead)
- *   COMPLETED                    → actual result, including a legitimate "0:0"
- *   LIVE                         → current score when the provider supplies one
  */
-export function getMatchcenterResultLabel(match: ScoreSource): string | null {
-  return resolveMatchResultDisplay({
-    status: match.status,
+export function getMatchcenterResultLabel(
+  match: ScoreSource,
+  now?: Date,
+): string | null {
+  const lifecycle = resolveLifecycle(match, now);
+
+  return resolveSportingResultDisplay({
+    lifecycle,
     resultLabel: match.resultLabel,
     scoreHome: match.scoreHome,
     scoreAway: match.scoreAway,

@@ -43,6 +43,8 @@ function matchAtStage(
   return {
     id: "event-4344423", // stable canonical id — same DB row throughout
     tenantId: "tenant-1",
+    teamId: "team-fca-b2",
+    seasonId: "season-2026-2027",
     type: "MATCH",
     title: "FC Allschwil B2 – SV Muttenz a",
     description: null,

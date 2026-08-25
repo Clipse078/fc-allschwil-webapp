@@ -4,12 +4,15 @@
  * MATCHCENTER-UX-01 — Spielplanung/Resultate partitioning, action filtering,
  * and KPI derivation for the Matchcenter overview.
  *
- * Pure, synchronous aggregation over an already month-scoped match list
- * (see lib/matchcenter/month-range.ts + query-service.ts). No I/O, no React.
+ * TEAM-SFV-02B: uses canonical sporting lifecycle for upcoming/results split.
  */
 
 import type { MatchcenterMatchSummary } from "./types";
-import { isMatchCompleted } from "./match-lifecycle";
+import {
+  isSportingMatchInResultsList,
+  isSportingMatchInUpcomingList,
+  classifySportingMatchLifecycle,
+} from "@/lib/sporting-data/lifecycle";
 import {
   assessMatchOperationalState,
   type MatchcenterOperationalAssessment,
@@ -28,13 +31,13 @@ export type MatchcenterRowViewModel = {
 };
 
 export type MatchcenterKpis = {
-  /** Non-completed matches in the selected month (Spielplanung population). */
+  /** Genuinely upcoming matches (UPCOMING + LIVE) in the selected month. */
   anstehend: number;
   /** Of those, matches with a genuine outstanding operational requirement. */
   offen: number;
   /** Of those, matches with no outstanding operational requirement. */
   bereit: number;
-  /** Definitively completed matches in the selected month (Resultate population). */
+  /** Canonically completed matches in the selected month (Resultate population). */
   resultate: number;
 };
 
@@ -84,27 +87,35 @@ export function normalizeMatchcenterTab(
     : "SPIELPLANUNG";
 }
 
+function resolveLifecycle(
+  match: MatchcenterMatchSummary,
+  now?: Date,
+) {
+  return classifySportingMatchLifecycle({
+    status: match.status,
+    startAt: match.startAt,
+    providerMatchStateName: match.synchronization.providerMatchStateName,
+    now,
+  }).lifecycle;
+}
+
 /**
  * Builds the full Matchcenter view model from an already month-scoped match
  * list: Spielplanung/Resultate partitioning, action-filter application, and
  * KPI counts.
- *
- * KPI counts always reflect the FULL selected-month population (never the
- * active action filter) so switching Alle/Offen/Erledigt never changes the
- * summary numbers shown above the list.
  */
 export function buildMatchcenterViewModel(
   matches: readonly MatchcenterMatchSummary[],
   options: {
     actionFilter?: MatchcenterActionFilter;
     wochenplanFilter?: MatchcenterWochenplanFilter;
+    now?: Date;
   } = {},
 ): MatchcenterViewModel {
   const actionFilter = options.actionFilter ?? "ALLE";
   const wochenplanFilter = options.wochenplanFilter ?? "ALLE";
+  const now = options.now;
 
-  // Apply wochenplan publication filter before partitioning into
-  // Spielplanung/Resultate so KPIs reflect the filtered set.
   const wochenplanFiltered = matches.filter((match) => {
     if (wochenplanFilter === "IM_WOCHENPLAN") {
       return match.visibility.wochenplanVisible === true;
@@ -119,21 +130,34 @@ export function buildMatchcenterViewModel(
   const completed: MatchcenterMatchSummary[] = [];
 
   for (const match of wochenplanFiltered) {
-    if (isMatchCompleted(match)) {
+    const lifecycle = resolveLifecycle(match, now);
+
+    if (isSportingMatchInResultsList(lifecycle)) {
       completed.push(match);
       continue;
     }
-    upcoming.push({ match, assessment: assessMatchOperationalState(match) });
+
+    if (
+      isSportingMatchInUpcomingList(lifecycle, { includePostponed: true })
+    ) {
+      upcoming.push({
+        match,
+        assessment: assessMatchOperationalState(match, now),
+      });
+    }
   }
 
-  const offenCount = upcoming.filter(
+  const upcomingCore = upcoming.filter((row) =>
+    isSportingMatchInUpcomingList(resolveLifecycle(row.match, now)),
+  );
+  const offenCount = upcomingCore.filter(
     (row) => row.assessment.status === "OPEN",
   ).length;
 
   const kpis: MatchcenterKpis = {
-    anstehend: upcoming.length,
+    anstehend: upcomingCore.length,
     offen: offenCount,
-    bereit: upcoming.length - offenCount,
+    bereit: upcomingCore.length - offenCount,
     resultate: completed.length,
   };
 

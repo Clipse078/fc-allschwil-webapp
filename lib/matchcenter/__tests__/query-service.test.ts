@@ -18,6 +18,8 @@ function createEvent(overrides: Record<string, unknown> = {}) {
   return {
     id: "event-1",
     tenantId: "tenant-1",
+    seasonId: "season-2026-2027",
+    teamId: "team-own",
     type: "MATCH",
     source: "SFV",
     status: "SCHEDULED",

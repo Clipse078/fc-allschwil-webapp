@@ -91,6 +91,10 @@ export interface MatchcenterVisibility {
 export interface MatchcenterMatchSummary {
   id: string;
   tenantId: string;
+  /** Canonical Event.teamId — the tenant-owned team assigned to this match. */
+  teamId: string | null;
+  /** Canonical Event.seasonId — used for season isolation in sporting queries. */
+  seasonId: string | null;
   type: "MATCH";
   title: string;
   description: string | null;
@@ -116,8 +120,6 @@ export interface MatchcenterMatchSummary {
 
 export interface MatchcenterMatchDetail
   extends MatchcenterMatchSummary {
-  /** Internal Event.teamId — the FC Allschwil team assigned to this event. */
-  teamId: string | null;
   organizerName: string | null;
   reviewRequestedAt: Date | null;
   reviewedAt: Date | null;

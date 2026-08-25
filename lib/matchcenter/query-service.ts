@@ -78,6 +78,8 @@ interface MatchcenterMappingRecord {
 interface MatchcenterEventRecord {
   id: string;
   tenantId: string | null;
+  seasonId: string | null;
+  teamId: string | null;
   type: string;
   source: string;
   status: string;
@@ -435,6 +437,8 @@ function toSummary(
   return {
     id: event.id,
     tenantId: event.tenantId,
+    teamId: event.teamId,
+    seasonId: event.seasonId,
     type: "MATCH",
     title: event.title,
     description: event.description,
@@ -504,7 +508,6 @@ function toDetail(
 
   return {
     ...summary,
-    teamId: event.team?.id ?? null,
     organizerName: event.organizerName,
     reviewRequestedAt: event.reviewRequestedAt,
     reviewedAt: event.reviewedAt,

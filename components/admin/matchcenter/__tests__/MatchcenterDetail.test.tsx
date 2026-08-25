@@ -52,6 +52,8 @@ function createMatch(
   return {
     id: "match-1",
     tenantId: "tenant-1",
+    teamId: "team-1",
+    seasonId: "season-2026-2027",
     type: "MATCH",
     title: "FC Allschwil E1 – FC Basel E1",
     description: "Meisterschaftsspiel",
@@ -127,7 +129,6 @@ function createMatch(
     reviewedAt:
       new Date("2026-08-19T09:00:00.000Z"),
     reviewNotes: "Freigegeben",
-    teamId: "team-fca",
     providerLeagueId: 10,
     providerLeagueName: "Junioren E",
     providerDivisionId: 20,

@@ -26,6 +26,8 @@ function createMatch(
   return {
     id: "match-1",
     tenantId: "tenant-1",
+    teamId: "team-1",
+    seasonId: "season-2026-2027",
     type: "MATCH",
     title: "FC Allschwil B2 – Gegner",
     description: null,
@@ -178,6 +180,61 @@ describe("buildMatchcenterViewModel", () => {
 
     expect(viewModel.kpis.offen).toBe(0);
     expect(viewModel.kpis.anstehend).toBe(0);
+    expect(viewModel.kpis.resultate).toBe(1);
+    expect(viewModel.spielplanung).toEqual([]);
+  });
+
+  it("excludes past stale SCHEDULED fixtures from Spielplanung when provider is still not played", () => {
+    const stalePast = createMatch({
+      id: "m-stale-past",
+      status: "SCHEDULED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "noch nicht ausgetragen",
+      },
+    });
+    const upcoming = createMatch({
+      id: "m-upcoming",
+      startAt: new Date("2026-09-10T10:00:00.000Z"),
+    });
+
+    const viewModel = buildMatchcenterViewModel([stalePast, upcoming], {
+      now: new Date("2026-08-25T12:00:00.000Z"),
+    });
+
+    expect(viewModel.spielplanung.map((row) => row.match.id)).toEqual([
+      "m-upcoming",
+    ]);
+    expect(viewModel.kpis.anstehend).toBe(1);
+  });
+
+  it("includes provider-completed matches in Resultate even when Event.status is SCHEDULED", () => {
+    const providerCompleted = createMatch({
+      id: "m-provider-completed",
+      status: "SCHEDULED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      scoreHome: 2,
+      scoreAway: 1,
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "ausgetragen",
+      },
+    });
+
+    const viewModel = buildMatchcenterViewModel([providerCompleted], {
+      now: new Date("2026-08-25T12:00:00.000Z"),
+    });
+
+    expect(viewModel.resultate.map((match) => match.id)).toEqual([
+      "m-provider-completed",
+    ]);
     expect(viewModel.kpis.resultate).toBe(1);
     expect(viewModel.spielplanung).toEqual([]);
   });

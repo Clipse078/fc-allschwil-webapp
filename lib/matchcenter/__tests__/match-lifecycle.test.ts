@@ -58,6 +58,42 @@ describe("getMatchcenterLifecycleStage", () => {
   });
 });
 
+describe("getMatchcenterLifecycleStage — TEAM-SFV-02B provider-aware rules", () => {
+  const now = new Date("2026-08-25T12:00:00.000Z");
+
+  it("classifies provider-completed past fixtures as COMPLETED", () => {
+    expect(
+      getMatchcenterLifecycleStage({
+        status: "SCHEDULED",
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        synchronization: {
+          eventLastSyncedAt: null,
+          mappingLastSyncedAt: null,
+          detailSyncedAt: null,
+          providerMatchState: null,
+          providerMatchStateName: "ausgetragen",
+        },
+      }, now),
+    ).toBe("COMPLETED");
+  });
+
+  it("classifies past not-played fixtures as UPCOMING bucket input (not completed)", () => {
+    expect(
+      getMatchcenterLifecycleStage({
+        status: "SCHEDULED",
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        synchronization: {
+          eventLastSyncedAt: null,
+          mappingLastSyncedAt: null,
+          detailSyncedAt: null,
+          providerMatchState: null,
+          providerMatchStateName: "noch nicht ausgetragen",
+        },
+      }, now),
+    ).toBe("UPCOMING");
+  });
+});
+
 describe("getMatchcenterResultLabel — MATCHCENTER-UX-01 §12 hard rules", () => {
   it("A. SCHEDULED / future match never renders a score, even when raw scores are 0/0 (SFV default)", () => {
     expect(
