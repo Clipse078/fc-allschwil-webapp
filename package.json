@@ -32,6 +32,8 @@
     "club-directory-02c:inventory": "tsx scripts/club-directory-02c-sfv-consolidation.ts --inventory",
     "club-directory-02c:dry-run": "tsx scripts/club-directory-02c-sfv-consolidation.ts --dry-run",
     "media-logo-01d2:dry-run": "tsx scripts/media-logo-01d2-provider-logo-backfill-dry-run.ts",
+    "media-logo-01d3:backfill": "tsx scripts/media-logo-01d3-provider-logo-backfill.ts",
+    "media-logo-01d3:sample": "tsx scripts/media-logo-01d3-provider-logo-sample.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
