@@ -92,10 +92,44 @@ export function mapSfvHomeAway(isHome: boolean): CanonicalHomeAway {
  *
  * When matchStateName is null, we fall back to a conservative default.
  */
+export type CanonicalEventStatus =
+  | "SCHEDULED"
+  | "LIVE"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "POSTPONED";
+
+/**
+ * Prevents weaker/incomplete provider payloads from regressing a persisted
+ * terminal Event.status during schedule sync.
+ *
+ * POSTPONED → SCHEDULED is intentionally allowed (reschedule flow).
+ */
+export function resolvePersistedEventStatus(
+  existingStatus: string,
+  incomingStatus: CanonicalEventStatus,
+): CanonicalEventStatus {
+  const existing = existingStatus.trim().toUpperCase();
+
+  if (existing === "COMPLETED" && incomingStatus === "SCHEDULED") {
+    return "COMPLETED";
+  }
+
+  if (existing === "COMPLETED" && incomingStatus === "LIVE") {
+    return "COMPLETED";
+  }
+
+  if (existing === "CANCELLED" && incomingStatus === "SCHEDULED") {
+    return "CANCELLED";
+  }
+
+  return incomingStatus;
+}
+
 export function mapMatchStateToEventStatus(
   matchState: number | null | undefined,
   matchStateName: string | null | undefined,
-): "SCHEDULED" | "LIVE" | "COMPLETED" | "CANCELLED" | "POSTPONED" {
+): CanonicalEventStatus {
   const name = (matchStateName ?? "").toLowerCase();
 
   if (name.includes("annull") || name.includes("annulé") || name.includes("abgesagt")) {

@@ -38,6 +38,7 @@ import {
   buildMappingFields,
   detectChanges,
   mapMatchStateToEventStatus,
+  resolvePersistedEventStatus,
   buildResultLabel,
   classifyParticipant,
   resolvedTeamId,
@@ -364,6 +365,7 @@ export async function updateMatchRecord(
   /** CLUB-DIRECTORY-02: canonical Club Directory identity for external sides. */
   homeExternalTeamId: string | null = null,
   awayExternalTeamId: string | null = null,
+  existingStatus: string = "SCHEDULED",
 ): Promise<SchedulePersistenceOutcome & { status: "updated" | "failed" }> {
   const mappingFields = buildMappingFields(
     entry,
@@ -375,7 +377,11 @@ export async function updateMatchRecord(
   );
   // entry.matchDate is Europe/Zurich civil time (no offset) — see provider-time.ts.
   const kickoff = parseSfvMatchDateTime(entry.matchDate);
-  const status = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
+  const mappedStatus = mapMatchStateToEventStatus(
+    entry.matchState,
+    entry.matchStateName,
+  );
+  const status = resolvePersistedEventStatus(existingStatus, mappedStatus);
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
   const competition = entry.leagueName ?? entry.divisionName ?? null;
   const venue = entry.stadiumPlaygroundName ?? null;
@@ -562,7 +568,14 @@ export async function processScheduleEntry(
     awayExternalTeamId,
   );
   const incomingKickoff = parseSfvMatchDateTime(entry.matchDate);
-  const incomingStatus = mapMatchStateToEventStatus(entry.matchState, entry.matchStateName);
+  const mappedIncomingStatus = mapMatchStateToEventStatus(
+    entry.matchState,
+    entry.matchStateName,
+  );
+  const incomingStatus = resolvePersistedEventStatus(
+    existing.event.status,
+    mappedIncomingStatus,
+  );
   const canonicalHomeAway = mapSfvHomeAway(isHome);
 
   const changes = detectChanges(
@@ -591,6 +604,7 @@ export async function processScheduleEntry(
     isHome,
     homeExternalTeamId,
     awayExternalTeamId,
+    existing.event.status,
   );
 
   if (rawOutcome.status === "failed") {

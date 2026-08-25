@@ -21,6 +21,7 @@ import {
   isLocalTeamId,
   resolveOpponentName,
   mapSfvHomeAway,
+  resolvePersistedEventStatus,
 } from "../sync/schedule-mapper";
 import type { ClubScheduleEntry } from "../client";
 
@@ -185,6 +186,38 @@ describe("mapMatchStateToEventStatus", () => {
 
   it("is case-insensitive — 'Gespielt' maps to COMPLETED", () => {
     expect(mapMatchStateToEventStatus(1, "Gespielt")).toBe("COMPLETED");
+  });
+});
+
+// ── resolvePersistedEventStatus ─────────────────────────────────────────────
+
+describe("resolvePersistedEventStatus", () => {
+  it("keeps COMPLETED when incoming provider payload is SCHEDULED", () => {
+    expect(resolvePersistedEventStatus("COMPLETED", "SCHEDULED")).toBe(
+      "COMPLETED",
+    );
+  });
+
+  it("keeps COMPLETED when incoming provider payload is LIVE", () => {
+    expect(resolvePersistedEventStatus("COMPLETED", "LIVE")).toBe("COMPLETED");
+  });
+
+  it("keeps CANCELLED when incoming provider payload is SCHEDULED", () => {
+    expect(resolvePersistedEventStatus("CANCELLED", "SCHEDULED")).toBe(
+      "CANCELLED",
+    );
+  });
+
+  it("allows POSTPONED to return to SCHEDULED after reschedule", () => {
+    expect(resolvePersistedEventStatus("POSTPONED", "SCHEDULED")).toBe(
+      "SCHEDULED",
+    );
+  });
+
+  it("allows SCHEDULED to advance to COMPLETED", () => {
+    expect(resolvePersistedEventStatus("SCHEDULED", "COMPLETED")).toBe(
+      "COMPLETED",
+    );
   });
 });
 

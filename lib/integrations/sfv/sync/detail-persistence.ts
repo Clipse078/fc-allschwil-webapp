@@ -32,7 +32,7 @@ import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
 import type { MatchDetail } from "../client";
 import type { SfvDetailSyncContext } from "./detail-types";
-import { mapMatchStateToEventStatus } from "./schedule-mapper";
+import { mapMatchStateToEventStatus, resolvePersistedEventStatus } from "./schedule-mapper";
 import { parseSfvMatchDateTime } from "./provider-time";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -127,7 +127,14 @@ export function detectDetailChanges(
   detail: MatchDetail,
 ): boolean {
   const incomingKickoff = parseProviderMatchDate(detail.matchDate);
-  const incomingStatus = mapMatchStateToEventStatus(detail.matchState, detail.matchStateName);
+  const mappedIncomingStatus = mapMatchStateToEventStatus(
+    detail.matchState,
+    detail.matchStateName,
+  );
+  const incomingStatus = resolvePersistedEventStatus(
+    existing.status,
+    mappedIncomingStatus,
+  );
   const incomingLocation = detail.playgroundName ?? null;
   const incomingCompetition = detail.leagueName ?? detail.divisionName ?? null;
   const incomingIntermediate = buildIntermediateResultLabel(
@@ -166,7 +173,11 @@ export async function applyDetailUpdate(
   context: SfvDetailSyncContext,
 ): Promise<DetailPersistenceOutcome> {
   const kickoff = parseProviderMatchDate(detail.matchDate);
-  const status = mapMatchStateToEventStatus(detail.matchState, detail.matchStateName);
+  const mappedStatus = mapMatchStateToEventStatus(
+    detail.matchState,
+    detail.matchStateName,
+  );
+  const status = resolvePersistedEventStatus(mapping.event.status, mappedStatus);
   const location = detail.playgroundName ?? null;
   const competition = detail.leagueName ?? detail.divisionName ?? null;
   const intermediateResultLabel = buildIntermediateResultLabel(
