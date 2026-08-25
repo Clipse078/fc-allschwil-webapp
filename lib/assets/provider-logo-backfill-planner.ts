@@ -21,6 +21,10 @@ import {
 import {
   pngNeedsBorderBackgroundCleanup,
 } from "@/lib/assets/provider-logo-background";
+import {
+  assessProviderLogoQuality,
+  type ProviderLogoQualityClassification,
+} from "@/lib/assets/provider-logo-quality";
 import { isVercelBlobUrl } from "@/lib/assets/storage";
 import {
   getExternalClubLogoKey,
@@ -113,6 +117,11 @@ export type NormalizationDryRunDetails = {
   backgroundCleanup: BackgroundCleanupStatus;
   opaquePixelRatio: number | null;
   failureReason: string | null;
+  qualityClassification: ProviderLogoQualityClassification | null;
+  transparentPixelCount: number | null;
+  opaquePixelCount: number | null;
+  suspiciousExteriorPixelCount: number | null;
+  qualityFlags: string[];
 };
 
 export type LogoBackfillCandidatePlan = {
@@ -436,6 +445,11 @@ export async function dryRunNormalizeProviderLogoSource(
     backgroundCleanup: "NOT_APPLICABLE",
     opaquePixelRatio: null,
     failureReason: null,
+    qualityClassification: null,
+    transparentPixelCount: null,
+    opaquePixelCount: null,
+    suspiciousExteriorPixelCount: null,
+    qualityFlags: [],
   };
 
   const detected = await fileTypeFromBuffer(sourceBuffer);
@@ -481,8 +495,26 @@ export async function dryRunNormalizeProviderLogoSource(
   base.opaquePixelRatio =
     sourceOpaque > 0 ? outputOpaque / sourceOpaque : outputOpaque > 0 ? 1 : 0;
 
-  const neededCleanup = await pngNeedsBorderBackgroundCleanup(normalized.buffer);
-  if (neededCleanup) {
+  const quality = await assessProviderLogoQuality(normalized.buffer);
+  if (quality) {
+    base.qualityClassification = quality.classification;
+    base.transparentPixelCount = quality.transparentPixelCount;
+    base.opaquePixelCount = quality.opaquePixelCount;
+    base.suspiciousExteriorPixelCount = quality.suspiciousExteriorPixelCount;
+    base.qualityFlags = quality.flags;
+  }
+
+  const rasterFormatsNeedingCleanup = new Set([
+    "image/gif",
+    "image/jpeg",
+    "image/jpg",
+  ]);
+  const sourceNeededCleanup =
+    (base.sourceFormat !== null && rasterFormatsNeedingCleanup.has(base.sourceFormat)) ||
+  (base.sourceFormat === "image/png" &&
+      (await pngNeedsBorderBackgroundCleanup(sourceBuffer)));
+
+  if (sourceNeededCleanup || quality?.classification !== "PASS") {
     base.backgroundCleanup = "CLEANUP_APPLIED";
   } else {
     base.backgroundCleanup = "NO_CLEANUP_REQUIRED";
@@ -494,6 +526,8 @@ export async function dryRunNormalizeProviderLogoSource(
     sourceOpaque >= OPAQUE_RATIO_CHECK_MIN_SOURCE_PIXELS &&
     (base.opaquePixelRatio ?? 0) < MIN_OPAQUE_PIXEL_RETENTION_RATIO
   ) {
+    base.backgroundCleanup = "SUSPICIOUS_OUTPUT";
+  } else if (quality?.classification === "FAILED_BACKGROUND_REMOVAL") {
     base.backgroundCleanup = "SUSPICIOUS_OUTPUT";
   }
 
@@ -552,6 +586,14 @@ export function assessBackfillSafety(input: {
     input.normalization.backgroundCleanup === "EMPTY_OR_INVALID_OUTPUT" ||
     input.normalization.backgroundCleanup === "SUSPICIOUS_OUTPUT"
   ) {
+    return "REVIEW_REQUIRED";
+  }
+
+  if (input.normalization.qualityClassification === "FAILED_BACKGROUND_REMOVAL") {
+    return "REVIEW_REQUIRED";
+  }
+
+  if (input.normalization.qualityClassification === "REVIEW_REQUIRED") {
     return "REVIEW_REQUIRED";
   }
 
@@ -666,6 +708,11 @@ export async function planProviderLogoBackfill(input: {
       backgroundCleanup: "NOT_APPLICABLE",
       opaquePixelRatio: null,
       failureReason: null,
+      qualityClassification: null,
+      transparentPixelCount: null,
+      opaquePixelCount: null,
+      suspiciousExteriorPixelCount: null,
+      qualityFlags: [],
     };
 
     if (
@@ -700,6 +747,10 @@ export async function planProviderLogoBackfill(input: {
         blockedReason = "suspicious_output";
       } else if (normalization.backgroundCleanup === "EMPTY_OR_INVALID_OUTPUT") {
         blockedReason = "empty_or_invalid_output";
+      } else if (normalization.qualityClassification === "FAILED_BACKGROUND_REMOVAL") {
+        blockedReason = "failed_background_removal";
+      } else if (normalization.qualityClassification === "REVIEW_REQUIRED") {
+        blockedReason = "quality_review_required";
       } else if (selectionCategory === "ALREADY_NORMALIZED_DATA_URI") {
         blockedReason = "already_normalized_review";
       } else {

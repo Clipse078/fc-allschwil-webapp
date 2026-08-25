@@ -7,13 +7,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyProviderLogoBackgroundCleanup,
+  cleanupProviderLogoBackgroundRgba,
+  clearTransparentPixelRgb,
   hasBorderConnectedNearWhiteBackground,
+  isExteriorBackgroundCandidate,
   isNearWhiteOpaquePixel,
   NEAR_WHITE_MAX_CHANNEL_SPREAD,
   NEAR_WHITE_MIN_ALPHA,
   NEAR_WHITE_MIN_CHANNEL,
   NORMALIZED_LOGO_TRIM_PADDING_PX,
   removeBorderConnectedNearWhiteBackground,
+  removeTransparencyAdjacentExteriorBackground,
 } from "../provider-logo-background";
 import {
   NORMALIZED_PROVIDER_LOGO_MAX_DIMENSION,
@@ -88,6 +92,11 @@ describe("isNearWhiteOpaquePixel", () => {
   it("rejects pale non-white crest tones", () => {
     expect(isNearWhiteOpaquePixel(220, 220, 220, 255)).toBe(false);
     expect(isNearWhiteOpaquePixel(255, 250, 220, 255)).toBe(false);
+  });
+
+  it("accepts JPEG-tuned exterior candidates more permissively", () => {
+    expect(isExteriorBackgroundCandidate(248, 247, 246, 255)).toBe(true);
+    expect(isExteriorBackgroundCandidate(220, 220, 220, 255)).toBe(false);
   });
 });
 
@@ -294,6 +303,57 @@ describe("border-connected background cleanup", () => {
 
     expect(data[crest]).toBe(200);
     expect(data[crest + 3]).toBeGreaterThan(200);
+  });
+
+  it("J. clears RGB on transparent pixels after cleanup", async () => {
+    const source = await createSolidCanvasPng(50, 50, { r: 255, g: 255, b: 255 }, [
+      {
+        left: 15,
+        top: 15,
+        width: 20,
+        height: 20,
+        color: { r: 0, g: 0, b: 0 },
+      },
+    ]);
+
+    const { data, width, height } = await readRawRgba(source);
+    const { rgba } = cleanupProviderLogoBackgroundRgba(data, width, height);
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const offset = pixelOffset(x, y, width);
+        if (rgba[offset + 3] === 0) {
+          expect(rgba[offset]).toBe(0);
+          expect(rgba[offset + 1]).toBe(0);
+          expect(rgba[offset + 2]).toBe(0);
+        }
+      }
+    }
+  });
+
+  it("K. disconnected JPEG near-white corner remnant removed by full pipeline", async () => {
+    const source = await createSolidCanvasPng(60, 60, { r: 0, g: 0, b: 0, alpha: 0 }, [
+      {
+        left: 1,
+        top: 1,
+        width: 10,
+        height: 10,
+        color: { r: 249, g: 250, b: 248 },
+      },
+      {
+        left: 20,
+        top: 20,
+        width: 20,
+        height: 20,
+        color: { r: 0, g: 0, b: 180 },
+      },
+    ]);
+
+    const { data, width, height } = await readRawRgba(source);
+    const { rgba } = cleanupProviderLogoBackgroundRgba(data, width, height);
+
+    expect(rgba[pixelOffset(1, 1, width) + 3]).toBe(0);
+    expect(rgba[pixelOffset(30, 30, width)]).toBe(0);
   });
 });
 

@@ -1,18 +1,22 @@
 /**
  * lib/assets/provider-logo-background.ts
  *
- * MEDIA-LOGO-01C — conservative border-connected near-white background
- * removal for normalized provider crest rasters.
+ * MEDIA-LOGO-01C/01F — conservative spatial background removal for normalized
+ * provider crest rasters.
  *
- * Only pixels that are (1) sufficiently opaque, (2) near-white by a
- * conservative RGB threshold with low channel spread, and (3) connected to
- * the image border via 4-neighbour flood-fill are made transparent.
- * Enclosed internal whites (shields, text, highlights) are preserved.
+ * Two-phase deterministic cleanup:
+ *   1. Border-connected near-white flood-fill (conservative threshold).
+ *   2. Transparency-adjacent exterior flood-fill (JPEG-tuned threshold) to
+ *      remove disconnected corner remnants, halos, and fringe pixels without
+ *      erasing enclosed internal whites.
+ *
+ * Transparent pixels always have RGB cleared to avoid ghost artefacts in
+ * consumers that mishandle zero-alpha colour data.
  */
 
 import sharp from "sharp";
 
-/** Minimum R/G/B for a pixel to qualify as near-white background. */
+/** Minimum R/G/B for a pixel to qualify as near-white background (border BFS). */
 export const NEAR_WHITE_MIN_CHANNEL = 240;
 
 /**
@@ -23,6 +27,24 @@ export const NEAR_WHITE_MAX_CHANNEL_SPREAD = 15;
 
 /** Minimum alpha for a pixel to be treated as opaque background. */
 export const NEAR_WHITE_MIN_ALPHA = 200;
+
+/**
+ * JPEG-tuned exterior background threshold — used only for transparency-adjacent
+ * flood-fill where spatial context already proves exterior placement.
+ */
+export const EXTERIOR_BG_MIN_CHANNEL = 232;
+
+/** Slightly wider spread allowance for JPEG compression fringe pixels. */
+export const EXTERIOR_BG_MAX_CHANNEL_SPREAD = 20;
+
+/** Minimum alpha for exterior fringe candidates. */
+export const EXTERIOR_BG_MIN_ALPHA = 180;
+
+/** Corner band ratio for quality validation sampling. */
+export const EXTERIOR_CORNER_BAND_RATIO = 0.12;
+
+/** Minimum corner band size in pixels. */
+export const EXTERIOR_CORNER_BAND_MIN_PX = 4;
 
 /** Transparent padding preserved around trimmed artwork after cleanup. */
 export const NORMALIZED_LOGO_TRIM_PADDING_PX = 2;
@@ -47,6 +69,30 @@ export function isNearWhiteOpaquePixel(
   return maxChannel - minChannel <= NEAR_WHITE_MAX_CHANNEL_SPREAD;
 }
 
+/**
+ * Permissive exterior-background candidate for transparency-adjacent cleanup.
+ * Only safe when reached from transparent exterior via spatial flood-fill.
+ */
+export function isExteriorBackgroundCandidate(
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): boolean {
+  if (a < EXTERIOR_BG_MIN_ALPHA) {
+    return false;
+  }
+
+  const minChannel = Math.min(r, g, b);
+  const maxChannel = Math.max(r, g, b);
+
+  if (minChannel < EXTERIOR_BG_MIN_CHANNEL) {
+    return false;
+  }
+
+  return maxChannel - minChannel <= EXTERIOR_BG_MAX_CHANNEL_SPREAD;
+}
+
 function pixelOffset(index: number): number {
   return index * 4;
 }
@@ -64,6 +110,14 @@ function readRgba(
   };
 }
 
+function writeTransparentPixel(data: Buffer, index: number): void {
+  const offset = pixelOffset(index);
+  data[offset] = 0;
+  data[offset + 1] = 0;
+  data[offset + 2] = 0;
+  data[offset + 3] = 0;
+}
+
 function collectBorderIndices(width: number, height: number): number[] {
   const indices: number[] = [];
 
@@ -78,6 +132,22 @@ function collectBorderIndices(width: number, height: number): number[] {
   }
 
   return indices;
+}
+
+function isTransparentPixel(a: number): boolean {
+  return a < 128;
+}
+
+function collectNeighbourIndices(index: number, width: number, height: number): number[] {
+  const x = index % width;
+  const y = Math.floor(index / width);
+
+  return [
+    x > 0 ? index - 1 : -1,
+    x < width - 1 ? index + 1 : -1,
+    y > 0 ? index - width : -1,
+    y < height - 1 ? index + width : -1,
+  ];
 }
 
 /**
@@ -116,17 +186,8 @@ export function hasBorderConnectedNearWhiteBackground(
 
   while (queue.length > 0) {
     const index = queue.shift()!;
-    const x = index % width;
-    const y = Math.floor(index / width);
 
-    const neighbours = [
-      x > 0 ? index - 1 : -1,
-      x < width - 1 ? index + 1 : -1,
-      y > 0 ? index - width : -1,
-      y < height - 1 ? index + width : -1,
-    ];
-
-    for (const neighbour of neighbours) {
+    for (const neighbour of collectNeighbourIndices(index, width, height)) {
       if (neighbour < 0 || visited[neighbour]) {
         continue;
       }
@@ -180,24 +241,13 @@ export function removeBorderConnectedNearWhiteBackground(
 
   while (queue.length > 0) {
     const index = queue.shift()!;
-    const offset = pixelOffset(index);
 
-    if (output[offset + 3] !== 0) {
-      output[offset + 3] = 0;
+    if (output[pixelOffset(index) + 3] !== 0) {
+      writeTransparentPixel(output, index);
       changed = true;
     }
 
-    const x = index % width;
-    const y = Math.floor(index / width);
-
-    const neighbours = [
-      x > 0 ? index - 1 : -1,
-      x < width - 1 ? index + 1 : -1,
-      y > 0 ? index - width : -1,
-      y < height - 1 ? index + width : -1,
-    ];
-
-    for (const neighbour of neighbours) {
+    for (const neighbour of collectNeighbourIndices(index, width, height)) {
       if (neighbour < 0 || visited[neighbour]) {
         continue;
       }
@@ -213,6 +263,120 @@ export function removeBorderConnectedNearWhiteBackground(
   }
 
   return { rgba: output, changed };
+}
+
+/**
+ * Removes exterior background pixels reachable from transparent areas through
+ * permissive near-white candidates. Preserves enclosed internal whites.
+ */
+export function removeTransparencyAdjacentExteriorBackground(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): { rgba: Buffer; changed: boolean } {
+  const totalPixels = width * height;
+  const output = Buffer.from(rgba);
+
+  if (totalPixels === 0 || output.length < totalPixels * 4) {
+    return { rgba: output, changed: false };
+  }
+
+  const exterior = new Uint8Array(totalPixels);
+  const queue: number[] = [];
+  let changed = false;
+
+  for (let index = 0; index < totalPixels; index++) {
+    const { a } = readRgba(output, index);
+    if (!isTransparentPixel(a)) {
+      continue;
+    }
+    exterior[index] = 1;
+    queue.push(index);
+  }
+
+  while (queue.length > 0) {
+    const index = queue.shift()!;
+
+    for (const neighbour of collectNeighbourIndices(index, width, height)) {
+      if (neighbour < 0 || exterior[neighbour]) {
+        continue;
+      }
+
+      const { r, g, b, a } = readRgba(output, neighbour);
+      if (!isExteriorBackgroundCandidate(r, g, b, a)) {
+        continue;
+      }
+
+      exterior[neighbour] = 1;
+      queue.push(neighbour);
+
+      if (output[pixelOffset(neighbour) + 3] !== 0) {
+        writeTransparentPixel(output, neighbour);
+        changed = true;
+      }
+    }
+  }
+
+  return { rgba: output, changed };
+}
+
+/** Clears RGB for all fully transparent pixels. */
+export function clearTransparentPixelRgb(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): { rgba: Buffer; changed: boolean } {
+  const totalPixels = width * height;
+  const output = Buffer.from(rgba);
+  let changed = false;
+
+  for (let index = 0; index < totalPixels; index++) {
+    const offset = pixelOffset(index);
+    if (output[offset + 3] !== 0) {
+      continue;
+    }
+
+    if (output[offset] !== 0 || output[offset + 1] !== 0 || output[offset + 2] !== 0) {
+      output[offset] = 0;
+      output[offset + 1] = 0;
+      output[offset + 2] = 0;
+      changed = true;
+    }
+  }
+
+  return { rgba: output, changed };
+}
+
+/**
+ * Full deterministic background cleanup pipeline on raw RGBA buffers.
+ */
+export function cleanupProviderLogoBackgroundRgba(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): { rgba: Buffer; changed: boolean } {
+  let current = Buffer.from(rgba);
+  let changed = false;
+
+  const border = removeBorderConnectedNearWhiteBackground(current, width, height);
+  if (border.changed) {
+    current = Buffer.from(border.rgba);
+    changed = true;
+  }
+
+  const adjacent = removeTransparencyAdjacentExteriorBackground(current, width, height);
+  if (adjacent.changed) {
+    current = Buffer.from(adjacent.rgba);
+    changed = true;
+  }
+
+  const cleared = clearTransparentPixelRgb(current, width, height);
+  if (cleared.changed) {
+    current = Buffer.from(cleared.rgba);
+    changed = true;
+  }
+
+  return { rgba: current, changed };
 }
 
 /**
@@ -237,17 +401,19 @@ export async function applyProviderLogoBackgroundCleanup(
       .raw()
       .toBuffer({ resolveWithObject: true });
 
-    if (!hasBorderConnectedNearWhiteBackground(data, info.width, info.height)) {
-      return pngBuffer;
-    }
-
-    const { rgba, changed } = removeBorderConnectedNearWhiteBackground(
+    const needsBorderCleanup = hasBorderConnectedNearWhiteBackground(
       data,
       info.width,
       info.height,
     );
 
-    if (!changed) {
+    const { rgba, changed } = cleanupProviderLogoBackgroundRgba(
+      data,
+      info.width,
+      info.height,
+    );
+
+    if (!needsBorderCleanup && !changed) {
       return pngBuffer;
     }
 
