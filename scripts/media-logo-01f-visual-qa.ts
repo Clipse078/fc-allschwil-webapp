@@ -34,6 +34,84 @@ export const VISUAL_QA_CLUBS = [
   "HNK Croatia Basel",
 ] as const;
 
+export type VisualQaSelectionCriteria = {
+  clubName: string;
+  reason: string;
+};
+
+/**
+ * Selects diverse visual QA representatives from the cohort by format and geometry.
+ * Named regression clubs are included when present; additional slots favor diversity.
+ */
+export function selectDiverseVisualQaClubs(
+  candidates: readonly LogoBackfillCandidatePlan[],
+  limit = 12,
+): VisualQaSelectionCriteria[] {
+  const selected: VisualQaSelectionCriteria[] = [];
+  const selectedIds = new Set<string>();
+  const selectedNames = new Set<string>();
+
+  function tryAdd(clubName: string, reason: string): void {
+    const match = candidates.find((c) => c.clubName === clubName);
+    if (!match || selectedIds.has(match.externalClubId) || selectedNames.has(match.clubName)) return;
+    selected.push({ clubName: match.clubName, reason });
+    selectedIds.add(match.externalClubId);
+    selectedNames.add(match.clubName);
+  }
+
+  for (const clubName of VISUAL_QA_CLUBS) {
+    tryAdd(clubName, "mandatory_regression_fixture");
+  }
+
+  const safe = candidates.filter(
+    (c) => c.safetyClassification === "SAFE_TO_BACKFILL" && !selectedIds.has(c.externalClubId),
+  );
+
+  const buckets: Array<{ reason: string; pick: (c: LogoBackfillCandidatePlan) => boolean }> = [
+    { reason: "gif_source", pick: (c) => c.normalization.sourceFormat === "image/gif" },
+    { reason: "jpeg_source", pick: (c) => c.normalization.sourceFormat === "image/jpeg" },
+    {
+      reason: "wide_crest",
+      pick: (c) =>
+        (c.normalization.sourceWidth ?? 0) > (c.normalization.sourceHeight ?? 0) * 1.1,
+    },
+    {
+      reason: "tall_crest",
+      pick: (c) =>
+        (c.normalization.sourceHeight ?? 0) > (c.normalization.sourceWidth ?? 0) * 1.1,
+    },
+    {
+      reason: "square_crest",
+      pick: (c) => {
+        const w = c.normalization.sourceWidth ?? 0;
+        const h = c.normalization.sourceHeight ?? 0;
+        if (!w || !h) return false;
+        const ratio = w / h;
+        return ratio > 0.9 && ratio < 1.1;
+      },
+    },
+  ];
+
+  for (const bucket of buckets) {
+    if (selected.length >= limit) break;
+    const match = safe.find((c) => bucket.pick(c));
+    if (!match) continue;
+    selected.push({ clubName: match.clubName, reason: bucket.reason });
+    selectedIds.add(match.externalClubId);
+    selectedNames.add(match.clubName);
+  }
+
+  for (const candidate of safe.sort((a, b) => a.clubName.localeCompare(b.clubName))) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(candidate.externalClubId) || selectedNames.has(candidate.clubName)) continue;
+    selected.push({ clubName: candidate.clubName, reason: "cohort_fill" });
+    selectedIds.add(candidate.externalClubId);
+    selectedNames.add(candidate.clubName);
+  }
+
+  return selected;
+}
+
 const PANEL_WIDTH = 220;
 const PANEL_HEIGHT = 220;
 const LABEL_HEIGHT = 28;
@@ -193,30 +271,32 @@ export async function generateVisualQaContactSheet(input: {
   outputDirectory: string;
 }): Promise<{
   outputDirectory: string;
-  rows: Array<{ clubName: string; quality: string; outputPath: string | null }>;
+  rows: Array<{ clubName: string; quality: string; reason: string; outputPath: string | null }>;
   contactSheetPath: string | null;
+  selectionCriteria: VisualQaSelectionCriteria[];
 }> {
   await mkdir(input.outputDirectory, { recursive: true });
 
-  const rows: Array<{ clubName: string; quality: string; outputPath: string | null }> = [];
+  const selectedCriteria = selectDiverseVisualQaClubs(input.candidates, 12);
+  const rows: Array<{ clubName: string; quality: string; reason: string; outputPath: string | null }> = [];
   const rowBuffers: Buffer[] = [];
 
-  for (const clubName of VISUAL_QA_CLUBS) {
+  for (const { clubName, reason } of selectedCriteria) {
     const candidate = await findCandidate(input.candidates, clubName);
     if (!candidate?.currentLogoUrl) {
-      rows.push({ clubName, quality: "missing", outputPath: null });
+      rows.push({ clubName, quality: "missing", reason, outputPath: null });
       continue;
     }
 
     const decoded = decodeProviderLogoDataUri(candidate.currentLogoUrl);
     if (!decoded) {
-      rows.push({ clubName, quality: "decode_failed", outputPath: null });
+      rows.push({ clubName, quality: "decode_failed", reason, outputPath: null });
       continue;
     }
 
     const normalized = await normalizeProviderLogoBytes(decoded.buffer);
     if (!normalized) {
-      rows.push({ clubName, quality: "normalize_failed", outputPath: null });
+      rows.push({ clubName, quality: "normalize_failed", reason, outputPath: null });
       continue;
     }
 
@@ -234,6 +314,7 @@ export async function generateVisualQaContactSheet(input: {
     rows.push({
       clubName,
       quality: quality?.classification ?? "unknown",
+      reason,
       outputPath,
     });
     rowBuffers.push(row);
@@ -269,6 +350,7 @@ export async function generateVisualQaContactSheet(input: {
     outputDirectory: input.outputDirectory,
     rows,
     contactSheetPath,
+    selectionCriteria: selectedCriteria,
   };
 }
 
