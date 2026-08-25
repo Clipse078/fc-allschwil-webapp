@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useMemo, useRef, useState, type FocusEvent } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Users, X } from "lucide-react";
 import {
   buildMatchcenterHref,
@@ -35,6 +35,8 @@ export default function MatchcenterTeamFilter({
   actionFilter,
   wochenplanFilter,
 }: MatchcenterTeamFilterProps) {
+  const router = useRouter();
+  const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
 
@@ -60,12 +62,31 @@ export default function MatchcenterTeamFilter({
     });
   }
 
+  function selectTeam(nextTeamFilter: string | null) {
+    setOpen(false);
+    setSearch("");
+    router.push(hrefForTeam(nextTeamFilter));
+  }
+
+  function handleTriggerBlur(event: FocusEvent<HTMLButtonElement>) {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (nextTarget && containerRef.current?.contains(nextTarget)) {
+      return;
+    }
+
+    window.setTimeout(() => setOpen(false), 150);
+  }
+
   return (
-    <div className="relative" data-testid="matchcenter-team-filter">
+    <div
+      ref={containerRef}
+      className="relative"
+      data-testid="matchcenter-team-filter"
+    >
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onBlur={handleTriggerBlur}
         className={cn(
           "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
           teamFilter
@@ -81,15 +102,27 @@ export default function MatchcenterTeamFilter({
         <span className="max-w-[160px] truncate">{currentLabel}</span>
         <ChevronDown className="h-3 w-3 shrink-0 opacity-60" aria-hidden />
         {teamFilter ? (
-          <Link
-            href={hrefForTeam(null)}
-            onClick={(event) => event.stopPropagation()}
+          <span
+            role="button"
+            tabIndex={0}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={(event) => {
+              event.stopPropagation();
+              selectTeam(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                event.stopPropagation();
+                selectTeam(null);
+              }
+            }}
             className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full hover:bg-[var(--tenant-primary)]/20"
             aria-label="Teamfilter entfernen"
             data-testid="matchcenter-team-filter-clear"
           >
             <X className="h-2.5 w-2.5" />
-          </Link>
+          </span>
         ) : null}
       </button>
 
@@ -115,9 +148,10 @@ export default function MatchcenterTeamFilter({
 
           <ul className="max-h-64 overflow-y-auto py-1">
             <li role="option" aria-selected={!teamFilter}>
-              <Link
-                href={hrefForTeam(null)}
-                onMouseDown={() => setOpen(false)}
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => selectTeam(null)}
                 className={cn(
                   "flex w-full items-start px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
                   !teamFilter && "bg-[var(--surface-2)] font-semibold",
@@ -125,7 +159,7 @@ export default function MatchcenterTeamFilter({
                 data-testid="matchcenter-team-filter-all"
               >
                 Alle Teams
-              </Link>
+              </button>
             </li>
             {filteredTeams.map((team) => (
               <li
@@ -133,9 +167,10 @@ export default function MatchcenterTeamFilter({
                 role="option"
                 aria-selected={teamFilter === team.id}
               >
-                <Link
-                  href={hrefForTeam(team.id)}
-                  onMouseDown={() => setOpen(false)}
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => selectTeam(team.id)}
                   className={cn(
                     "flex w-full items-start px-3 py-2 text-left text-xs transition-colors hover:bg-[var(--surface-2)]",
                     teamFilter === team.id && "bg-[var(--surface-2)] font-semibold",
@@ -143,7 +178,7 @@ export default function MatchcenterTeamFilter({
                   data-testid={`matchcenter-team-filter-option-${team.id}`}
                 >
                   {team.label}
-                </Link>
+                </button>
               </li>
             ))}
           </ul>

@@ -3,15 +3,18 @@
  */
 
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import MatchcenterOverview from "@/components/admin/matchcenter/MatchcenterOverview";
 import type { MatchcenterMatchSummary } from "@/lib/matchcenter/types";
 
 // MatchcenterWochenplanBulkPanel (rendered inside MatchcenterOverview when
 // there are Spielplanung rows) uses useRouter and useToast. Mock them so the
 // tests can render without a live App Router or toast provider.
+const push = vi.fn();
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ refresh: vi.fn() }),
+  useRouter: () => ({ push, refresh: vi.fn() }),
 }));
 
 vi.mock("@/hooks/use-toast", () => ({
@@ -545,6 +548,22 @@ describe("MatchcenterOverview — reconciliation admin surface", () => {
 });
 
 describe("MatchcenterOverview — team filter", () => {
+  beforeEach(() => {
+    push.mockReset();
+  });
+
+  it("opens the team dropdown and navigates when a team is selected", async () => {
+    const user = userEvent.setup();
+    renderOverview([createMatch()]);
+
+    await user.click(screen.getByTestId("matchcenter-team-filter-trigger"));
+    await user.click(screen.getByTestId("matchcenter-team-filter-option-team-2"));
+
+    expect(push).toHaveBeenCalledWith(
+      "/dashboard/matchcenter?tab=spielplanung&month=2026-08&filter=alle&team=team-2",
+    );
+  });
+
   it("renders Alle Teams by default and lists canonical tenant teams", () => {
     renderOverview([createMatch()]);
 
