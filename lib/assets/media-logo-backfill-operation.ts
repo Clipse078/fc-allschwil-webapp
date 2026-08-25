@@ -99,15 +99,14 @@ export function countMediaLogoQualityMetrics(
   let safeToBackfill = 0;
 
   for (const candidate of candidates) {
-    if (candidate.safetyClassification === "SAFE_TO_BACKFILL") {
-      safeToBackfill++;
-      if (candidate.normalization.qualityClassification === "PASS") {
-        qualityPass++;
-      }
+    if (candidate.safetyClassification !== "SAFE_TO_BACKFILL") {
+      continue;
     }
 
-    if (candidate.safetyClassification === "FAILED_NORMALIZATION") {
-      failedNormalization++;
+    safeToBackfill++;
+
+    if (candidate.normalization.qualityClassification === "PASS") {
+      qualityPass++;
     }
 
     switch (candidate.normalization.qualityClassification) {
@@ -119,6 +118,10 @@ export function countMediaLogoQualityMetrics(
         break;
       default:
         break;
+    }
+
+    if (!candidate.normalization.succeeded) {
+      failedNormalization++;
     }
   }
 
@@ -202,10 +205,7 @@ export function validateMediaLogoFrozenContract(
     reasons.push("runtime_environment_not_allowed");
   }
 
-  const blocked =
-    plan.summary.rowsBlocked +
-    plan.summary.reviewRequired +
-    plan.summary.normalizationFailed;
+  const blocked = plan.summary.rowsBlocked;
 
   return {
     ok: reasons.length === 0,

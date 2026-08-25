@@ -100,6 +100,39 @@ function makeCandidate(
   };
 }
 
+function makeReviewRequiredTenantCandidate(
+  externalClubId: string,
+  clubName: string,
+): LogoBackfillCandidatePlan {
+  return makeCandidate({
+    externalClubId,
+    clubName,
+    selectionCategory: "NORMALIZE_PROVIDER_SOURCE",
+    safetyClassification: "REVIEW_REQUIRED",
+    normalization: {
+      ...makeCandidate({ externalClubId: "x", clubName: "x" }).normalization,
+      qualityClassification: "REVIEW_REQUIRED",
+    },
+    blockedReason: "REVIEW_REQUIRED",
+  });
+}
+
+function makeTenantWideQualityReviewCandidate(
+  externalClubId: string,
+  clubName: string,
+): LogoBackfillCandidatePlan {
+  return makeCandidate({
+    externalClubId,
+    clubName,
+    selectionCategory: "ALREADY_NORMALIZED_DATA_URI",
+    safetyClassification: "NO_CHANGE",
+    normalization: {
+      ...makeCandidate({ externalClubId: "x", clubName: "x" }).normalization,
+      qualityClassification: "REVIEW_REQUIRED",
+    },
+  });
+}
+
 function makeFcAllschwilCandidate(): LogoBackfillCandidatePlan {
   return makeCandidate({
     externalClubId: "fc-allschwil-id",
@@ -287,6 +320,8 @@ describe("validateMediaLogoFrozenContract", () => {
     expect(validation.status).toBe("READY");
     expect(validation.quality.safeToBackfill).toBe(54);
     expect(validation.quality.qualityPass).toBe(54);
+    expect(validation.quality.qualityReviewRequired).toBe(0);
+    expect(validation.blocked).toBe(16);
   });
 
   it("F. blocks on safe count mismatch", () => {
@@ -308,18 +343,17 @@ describe("validateMediaLogoFrozenContract", () => {
     expect(validation.reasons).toContain("plan_fingerprint_mismatch");
   });
 
-  it("H. blocks when quality review is present", () => {
+  it("H. blocks when executable cohort quality review is present", () => {
     const plan = makeValidPlan(MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedEligible);
     plan.candidates[0] = makeCandidate({
       externalClubId: "review-club",
       clubName: "Review Club",
-      safetyClassification: "REVIEW_REQUIRED",
+      safetyClassification: "SAFE_TO_BACKFILL",
       normalization: {
         ...makeCandidate({ externalClubId: "x", clubName: "x" }).normalization,
         qualityClassification: "REVIEW_REQUIRED",
       },
     });
-    plan.summary.safeToBackfill = 53;
 
     const validation = validateMediaLogoFrozenContract(
       plan,
@@ -327,8 +361,66 @@ describe("validateMediaLogoFrozenContract", () => {
     );
 
     expect(validation.ok).toBe(false);
-    expect(validation.reasons).toContain("safe_to_backfill_count_mismatch");
     expect(validation.reasons).toContain("quality_review_required_present");
+    expect(validation.quality.qualityReviewRequired).toBe(1);
+  });
+
+  it("does not block when tenant-wide REVIEW_REQUIRED safety is outside executable cohort", () => {
+    const plan = makeValidPlan(MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedEligible);
+    plan.candidates.push(
+      makeReviewRequiredTenantCandidate("tenant-review-1", "Tenant Review 1"),
+    );
+    plan.summary.reviewRequired = 16;
+    plan.summary.rowsBlocked = 16;
+
+    const validation = validateMediaLogoFrozenContract(
+      plan,
+      MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedFingerprint,
+    );
+
+    expect(validation.ok).toBe(true);
+    expect(validation.status).toBe("READY");
+    expect(validation.reasons).not.toContain("quality_review_required_present");
+    expect(validation.quality.qualityReviewRequired).toBe(0);
+    expect(validation.blocked).toBe(16);
+  });
+
+  it("does not block when multiple tenant-wide quality REVIEW_REQUIRED are outside executable cohort", () => {
+    const plan = makeValidPlan(MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedEligible);
+    plan.candidates.push(
+      makeTenantWideQualityReviewCandidate("quality-review-1", "Quality Review 1"),
+      makeTenantWideQualityReviewCandidate("quality-review-2", "Quality Review 2"),
+      makeTenantWideQualityReviewCandidate("quality-review-3", "Quality Review 3"),
+      makeTenantWideQualityReviewCandidate("quality-review-4", "Quality Review 4"),
+      makeTenantWideQualityReviewCandidate("quality-review-5", "Quality Review 5"),
+      makeTenantWideQualityReviewCandidate("quality-review-6", "Quality Review 6"),
+    );
+
+    const validation = validateMediaLogoFrozenContract(
+      plan,
+      MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedFingerprint,
+    );
+
+    expect(validation.ok).toBe(true);
+    expect(validation.status).toBe("READY");
+    expect(validation.reasons).not.toContain("quality_review_required_present");
+    expect(validation.quality.qualityReviewRequired).toBe(0);
+    expect(validation.quality.qualityPass).toBe(54);
+  });
+
+  it("does not double-count REVIEW_REQUIRED in blocked metric", () => {
+    const plan = makeValidPlan(MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedEligible);
+    plan.summary.rowsBlocked = 16;
+    plan.summary.reviewRequired = 16;
+    plan.summary.normalizationFailed = 0;
+
+    const validation = validateMediaLogoFrozenContract(
+      plan,
+      MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedFingerprint,
+    );
+
+    expect(validation.blocked).toBe(16);
+    expect(validation.blocked).not.toBe(32);
   });
 
   it("I. blocks on collisions", () => {
@@ -506,6 +598,30 @@ describe("runMediaLogoBackfillExecute", () => {
     );
   });
 
+  it("blocks execute with zero mutation when frozen cohort quality precondition fails", async () => {
+    const plan = makeValidPlan(MEDIA_LOGO_01G4_FROZEN_CONTRACT.expectedEligible);
+    plan.candidates[0] = makeCandidate({
+      externalClubId: "review-club",
+      clubName: "Review Club",
+      safetyClassification: "SAFE_TO_BACKFILL",
+      normalization: {
+        ...makeCandidate({ externalClubId: "x", clubName: "x" }).normalization,
+        qualityClassification: "REVIEW_REQUIRED",
+      },
+    });
+    mockRunProviderLogoBackfillDryRun.mockResolvedValue(plan);
+
+    const result = await runMediaLogoBackfillExecute({
+      prisma: mockPrisma as never,
+      confirmationPhrase: MEDIA_LOGO_01G4_FROZEN_CONTRACT.confirmationPhrase,
+    });
+
+    expect(result.status).toBe("BLOCKED");
+    expect(result.mutationStarted).toBe(false);
+    expect(mockExecuteProviderLogoBackfillBatch).not.toHaveBeenCalled();
+    expect(mockPrisma.externalClub.updateMany).not.toHaveBeenCalled();
+  });
+
   it("S. becomes no-op when post-plan has zero safe candidates", async () => {
     const blockedPlan = makeValidPlan(0, {
       summary: {
@@ -536,6 +652,9 @@ describe("runMediaLogoBackfillPreflight", () => {
 
     expect(result.status).toBe("READY");
     expect(result.display.eligible).toBe(54);
+    expect(result.display.qualityPass).toBe(54);
+    expect(result.display.blocked).toBe(16);
+    expect(result.contract.quality.qualityReviewRequired).toBe(0);
   });
 });
 
@@ -563,5 +682,32 @@ describe("countMediaLogoQualityMetrics", () => {
 
     expect(metrics.safeToBackfill).toBe(1);
     expect(metrics.qualityPass).toBe(1);
+  });
+
+  it("counts quality REVIEW_REQUIRED only within SAFE_TO_BACKFILL cohort", () => {
+    const metrics = countMediaLogoQualityMetrics([
+      makeCandidate({ externalClubId: "1", clubName: "One" }),
+      makeTenantWideQualityReviewCandidate("quality-review", "Quality Review"),
+      makeReviewRequiredTenantCandidate("tenant-review", "Tenant Review"),
+    ]);
+
+    expect(metrics.qualityReviewRequired).toBe(0);
+    expect(metrics.qualityPass).toBe(1);
+  });
+
+  it("counts executable cohort REVIEW_REQUIRED quality as blocking metric input", () => {
+    const metrics = countMediaLogoQualityMetrics([
+      makeCandidate({
+        externalClubId: "1",
+        clubName: "One",
+        normalization: {
+          ...makeCandidate({ externalClubId: "x", clubName: "x" }).normalization,
+          qualityClassification: "REVIEW_REQUIRED",
+        },
+      }),
+    ]);
+
+    expect(metrics.qualityReviewRequired).toBe(1);
+    expect(metrics.qualityPass).toBe(0);
   });
 });
