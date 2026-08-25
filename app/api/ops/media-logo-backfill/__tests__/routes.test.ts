@@ -426,7 +426,9 @@ describe("auth helper contract", () => {
     );
 
     expect(authSource).toContain('key !== MEDIA_LOGO_BACKFILL_TENANT_KEY');
-    expect(authSource).toContain("PERMISSIONS.TENANTS_MANAGE");
+    expect(authSource).toContain("PERMISSIONS.WEBSITE_MANAGE");
+    expect(authSource).not.toContain("PERMISSIONS.TENANTS_MANAGE");
+    expect(authSource).toContain("isMediaLogoBackfillAuthEnvironmentAllowed");
   });
 });
 

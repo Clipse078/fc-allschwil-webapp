@@ -5,14 +5,28 @@
  * Remove after successful backfill verification before STAGE merge.
  */
 
+import { MEDIA_LOGO_BACKFILL_TENANT_KEY } from "@/lib/assets/media-logo-backfill-operation";
 import { prisma } from "@/lib/db/prisma";
+import { getRuntimeEnvironment } from "@/lib/env";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { getCurrentTenantContextById } from "@/lib/tenants/context";
-import { MEDIA_LOGO_BACKFILL_TENANT_KEY } from "@/lib/assets/media-logo-backfill-operation";
+
+export function isMediaLogoBackfillAuthEnvironmentAllowed(): boolean {
+  return getRuntimeEnvironment().appEnv === "stage";
+}
 
 export async function requireMediaLogoBackfillApiAccess() {
-  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!isMediaLogoBackfillAuthEnvironmentAllowed()) {
+    return {
+      ok: false as const,
+      status: 403 as const,
+      error: "Forbidden",
+      session: null,
+    };
+  }
+
+  const access = await requireApiPermission(PERMISSIONS.WEBSITE_MANAGE);
   if (!access.ok) {
     return access;
   }

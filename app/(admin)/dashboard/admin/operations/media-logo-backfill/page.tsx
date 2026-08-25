@@ -7,13 +7,18 @@ import { notFound, redirect } from "next/navigation";
 
 import MediaLogoBackfillOperationPanel from "@/components/admin/operations/MediaLogoBackfillOperationPanel";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
+import { isMediaLogoBackfillAuthEnvironmentAllowed } from "@/lib/assets/media-logo-backfill-operation-auth";
 import { MEDIA_LOGO_01G4_FROZEN_CONTRACT } from "@/lib/assets/media-logo-backfill-operation-contract";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 
 export default async function MediaLogoBackfillOperationPage() {
-  await requireAnyPermission([PERMISSIONS.TENANTS_MANAGE]);
+  if (!isMediaLogoBackfillAuthEnvironmentAllowed()) {
+    redirect("/dashboard");
+  }
+
+  await requireAnyPermission([PERMISSIONS.WEBSITE_MANAGE]);
 
   const tenant = await getActiveTenant();
   if (!tenant || tenant.key !== MEDIA_LOGO_01G4_FROZEN_CONTRACT.tenantKey) {
