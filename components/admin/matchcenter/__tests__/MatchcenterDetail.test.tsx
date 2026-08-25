@@ -15,17 +15,6 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock(
-  "@/components/admin/matchcenter/MatchTeamMappingDialog",
-  () => ({
-    default: () => (
-      <button type="button">
-        Team zuordnen
-      </button>
-    ),
-  }),
-);
-
-vi.mock(
   "@/components/admin/matchcenter/MatchcenterDetailOperational",
   () => ({
     default: ({
@@ -173,7 +162,7 @@ describe("MatchcenterDetail", () => {
     );
   });
 
-  it("shows mapping action for an unresolved provider side when allowed", () => {
+  it("does not show provider mapping administration for unresolved sides", () => {
     const base = createMatch();
 
     render(
@@ -191,13 +180,21 @@ describe("MatchcenterDetail", () => {
     );
 
     expect(
-      screen.getByRole("button", {
+      screen.queryByRole("button", {
         name: "Team zuordnen",
       }),
-    ).toBeTruthy();
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("matchcenter-mapping-status-unresolved"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", {
+        name: "Zur Spielplansynchronisation",
+      }),
+    ).toBeNull();
   });
 
-  it("hides mapping action without manage permission", () => {
+  it("does not show mapping administration without manage permission either", () => {
     const base = createMatch();
 
     render(
@@ -219,6 +216,9 @@ describe("MatchcenterDetail", () => {
         name: "Team zuordnen",
       }),
     ).toBeNull();
+    expect(
+      screen.queryByTestId("matchcenter-mapping-status-unresolved"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders a mapped score", () => {
@@ -400,7 +400,7 @@ describe("MatchcenterDetail", () => {
       screen.getAllByText("Nicht hinterlegt").length,
     ).toBeGreaterThan(5);
   });
-  it("shows synchronization guidance for an unresolved provider mapping", () => {
+  it("never shows provider mapping warnings or sync CTAs for unresolved mappings", () => {
     const match = createMatch();
 
     match.away = {
@@ -418,26 +418,19 @@ describe("MatchcenterDetail", () => {
     );
 
     expect(
-      screen.getByTestId(
-        "matchcenter-mapping-status-unresolved",
-      ),
-    ).toBeInTheDocument();
-
+      screen.queryByTestId("matchcenter-mapping-status-unresolved"),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByText("Eine Team-Zuordnung ist offen"),
-    ).toBeInTheDocument();
-
+      screen.queryByText("Eine Team-Zuordnung ist offen"),
+    ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", {
+      screen.queryByRole("link", {
         name: "Zur Spielplansynchronisation",
       }),
-    ).toHaveAttribute(
-      "href",
-      "/dashboard/admin/integrations/sfv",
-    );
+    ).toBeNull();
   });
 
-  it("shows resolved mapping without a dedicated status card", () => {
+  it("does not show a dedicated mapping status card for resolved mappings", () => {
     render(
       <MatchcenterDetail
         match={createMatch()}
@@ -454,7 +447,7 @@ describe("MatchcenterDetail", () => {
       screen.queryByRole("link", {
         name: "Zur Spielplansynchronisation",
       }),
-    ).not.toBeInTheDocument();
+    ).toBeNull();
   });
 
   it("shows Heimspiel badge for a HOME match", () => {
@@ -568,5 +561,168 @@ describe("MatchcenterDetail", () => {
         />,
       ),
     ).not.toThrow();
+  });
+});
+
+describe("MatchcenterDetail — MATCHCENTER-FINAL-A3 mapping UX removal", () => {
+  function unresolvedAwayMatch() {
+    const base = createMatch();
+
+    return createMatch({
+      away: {
+        ...base.away,
+        canonicalTeamId: null,
+        canonicalTeamName: null,
+        resolution: "UNRESOLVED",
+      },
+    });
+  }
+
+  function assertNoMappingAdministration() {
+    expect(
+      screen.queryByRole("button", { name: "Team zuordnen" }),
+    ).toBeNull();
+    expect(
+      screen.queryByTestId("matchcenter-mapping-status-unresolved"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Team-Zuordnung"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Eine Team-Zuordnung ist offen"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "Zur Spielplansynchronisation" }),
+    ).toBeNull();
+  }
+
+  describe("A. FUTURE HOME", () => {
+    it("keeps sporting hero and operational workspace without mapping UX", () => {
+      render(
+        <MatchcenterDetail
+          match={unresolvedAwayMatch()}
+          canManageMappings
+        />,
+      );
+
+      assertNoMappingAdministration();
+      expect(screen.getByTestId("matchcenter-detail-hero")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("matchcenter-detail-operational"),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId("matchcenter-detail-operational"),
+      ).toHaveAttribute("data-homeaway", "HOME");
+      expect(
+        screen.getByTestId("matchcenter-detail-operational"),
+      ).toHaveAttribute("data-operationally-actionable", "true");
+    });
+  });
+
+  describe("B. FUTURE AWAY", () => {
+    it("keeps sporting hero without mapping UX or home facility planning", () => {
+      render(
+        <MatchcenterDetail
+          match={createMatch({
+            homeAway: "AWAY",
+            home: {
+              providerTeamId: 200,
+              providerTeamName: "FC Basel E1",
+              canonicalTeamId: "team-away",
+              canonicalTeamName: "FC Basel E1",
+              displayName: "FC Basel E1",
+              resolution: "RESOLVED",
+              isOwnTeam: false,
+            },
+            away: {
+              providerTeamId: 100,
+              providerTeamName: "FC Allschwil E1",
+              canonicalTeamId: null,
+              canonicalTeamName: null,
+              displayName: "FC Allschwil E1",
+              resolution: "UNRESOLVED",
+              isOwnTeam: true,
+            },
+          })}
+          canManageMappings
+        />,
+      );
+
+      assertNoMappingAdministration();
+      expect(screen.getByTestId("matchcenter-detail-hero")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("matchcenter-detail-operational"),
+      ).toHaveAttribute("data-homeaway", "AWAY");
+    });
+  });
+
+  describe("C. COMPLETED", () => {
+    it("keeps score and logos without mapping UX or operational pickers", () => {
+      render(
+        <MatchcenterDetail
+          match={createMatch({
+            status: "COMPLETED",
+            startAt: new Date("2026-08-24T16:00:00.000Z"),
+            scoreHome: 2,
+            scoreAway: 1,
+            away: {
+              providerTeamId: 200,
+              providerTeamName: "FC Basel E1",
+              canonicalTeamId: null,
+              canonicalTeamName: null,
+              displayName: "FC Basel E1",
+              resolution: "UNRESOLVED",
+              isOwnTeam: false,
+            },
+          })}
+          tenantLogoUrl="https://example.com/club.png"
+        />,
+      );
+
+      assertNoMappingAdministration();
+      expect(
+        screen.getByTestId("matchcenter-detail-result"),
+      ).toHaveTextContent("2:1");
+      expect(screen.getByAltText("Logo FC Allschwil E1")).toBeInTheDocument();
+      expect(
+        screen.getByTestId("matchcenter-detail-operational"),
+      ).toHaveAttribute("data-operationally-actionable", "false");
+    });
+  });
+
+  describe("D. RECONCILIATION", () => {
+    it("preserves Datenprüfung lifecycle without mapping-management UX", () => {
+      render(
+        <MatchcenterDetail
+          match={createMatch({
+            status: "SCHEDULED",
+            startAt: new Date("2026-08-02T16:00:00.000Z"),
+            synchronization: {
+              eventLastSyncedAt: null,
+              mappingLastSyncedAt: null,
+              detailSyncedAt: null,
+              providerMatchState: null,
+              providerMatchStateName: "noch nicht ausgetragen",
+            },
+            away: {
+              providerTeamId: 200,
+              providerTeamName: "FC Basel E1",
+              canonicalTeamId: null,
+              canonicalTeamName: null,
+              displayName: "FC Basel E1",
+              resolution: "UNRESOLVED",
+              isOwnTeam: false,
+            },
+          })}
+          canManageMappings
+        />,
+      );
+
+      assertNoMappingAdministration();
+      expect(
+        screen.getByTestId("matchcenter-detail-status"),
+      ).toHaveTextContent("Datenprüfung");
+      expect(screen.getByTestId("matchcenter-detail-hero")).toBeInTheDocument();
+    });
   });
 });

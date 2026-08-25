@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
-  CircleAlert,
   Clock3,
   Cloud,
   ExternalLink,
@@ -29,7 +28,6 @@ import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { DetailPagePattern } from "@/components/ui/patterns/DetailPagePattern";
-import MatchTeamMappingDialog from "@/components/admin/matchcenter/MatchTeamMappingDialog";
 import MatchcenterDetailOperational from "@/components/admin/matchcenter/MatchcenterDetailOperational";
 import MatchLifecycleCard from "@/components/admin/matchcenter/MatchLifecycleCard";
 import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
@@ -220,20 +218,6 @@ export default function MatchcenterDetail({
   const homeLogoUrl = resolveClubIdentityLogoUrl(match.home, tenantLogoUrl);
   const awayLogoUrl = resolveClubIdentityLogoUrl(match.away, tenantLogoUrl);
 
-  const unresolvedSides = [
-    match.home,
-    match.away,
-  ].filter(
-    (side) => side.resolution === "UNRESOLVED",
-  );
-
-  const hasUnresolvedProviderMapping =
-    match.source.provider !== null &&
-    match.source.externalSeasonId !== null &&
-    unresolvedSides.some(
-      (side) => side.providerTeamId !== null,
-    );
-
   const sourceLabel =
     match.source.provider ??
     match.source.externalSource ??
@@ -286,25 +270,6 @@ export default function MatchcenterDetail({
         ]}
         headerActions={
           <div className="flex flex-wrap items-center gap-2">
-            {canManageMappings &&
-            match.source.provider &&
-            match.source.externalSeasonId !== null &&
-            (
-              match.home.resolution === "UNRESOLVED" ||
-              match.away.resolution === "UNRESOLVED"
-            ) ? (
-              <MatchTeamMappingDialog
-                provider={match.source.provider}
-                externalSeasonId={
-                  match.source.externalSeasonId
-                }
-                sides={[
-                  match.home,
-                  match.away,
-                ]}
-              />
-            ) : null}
-
             <Link
               href="/dashboard/matchcenter"
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 text-sm font-semibold text-[var(--text-2)] transition hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
@@ -481,57 +446,6 @@ export default function MatchcenterDetail({
           dressingRoomOptions={dressingRoomOptions}
           isOperationallyActionable={operationallyActionable}
         />
-
-        {unresolvedSides.length > 0 ? (
-          <SectionCard
-            title="Team-Zuordnung"
-            description="Offene Provider-Team-Zuordnung"
-            bodyClassName="px-5 py-5"
-          >
-            <div
-              className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
-              data-testid="matchcenter-mapping-status-unresolved"
-            >
-              <div className="flex items-start gap-3">
-                <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" />
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-amber-950">
-                    {unresolvedSides.length === 1
-                      ? "Eine Team-Zuordnung ist offen"
-                      : `${unresolvedSides.length} Team-Zuordnungen sind offen`}
-                  </p>
-
-                  <p className="mt-1 text-sm leading-relaxed text-amber-900">
-                    {unresolvedSides
-                      .map((side) => side.displayName)
-                      .join(" und ")}{" "}
-                    {unresolvedSides.length === 1
-                      ? "ist noch keinem internen Team zugeordnet."
-                      : "sind noch keinem internen Team zugeordnet."}
-                  </p>
-
-                  {hasUnresolvedProviderMapping ? (
-                    <>
-                      <p className="mt-2 text-sm leading-relaxed text-amber-900">
-                        Nach dem Speichern einer Zuordnung muss der Spielplan
-                        synchronisiert werden.
-                      </p>
-
-                      <Link
-                        href="/dashboard/admin/integrations/sfv"
-                        className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3.5 py-2 text-sm font-semibold text-amber-950 transition hover:bg-amber-100"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                        Zur Spielplansynchronisation
-                      </Link>
-                    </>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </SectionCard>
-        ) : null}
 
         {!isProtectedSource ? (
           <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
