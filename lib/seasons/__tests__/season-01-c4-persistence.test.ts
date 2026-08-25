@@ -37,10 +37,16 @@
  *   F. Explicitly changing active season still replaces the previous one.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason } from "@/lib/seasons/mutations";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
+import {
+  assertSafeTestDatabase,
+  canRunDbMutatingIntegrationTests,
+} from "@/lib/test/safe-test-database";
+
+const canRun = canRunDbMutatingIntegrationTests();
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,7 +87,11 @@ async function simulateOldSeedGlobalReset(): Promise<void> {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
-describe("SEASON-01-C4 — active season persistence", () => {
+describe.skipIf(!canRun)("SEASON-01-C4 — active season persistence (isolated test DB)", () => {
+  beforeAll(() => {
+    assertSafeTestDatabase();
+  });
+
   const createdSeasonIds: string[] = [];
   const createdTeamIds: string[] = [];
   const createdTeamSeasonIds: string[] = [];

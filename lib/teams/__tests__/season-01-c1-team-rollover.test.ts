@@ -21,7 +21,7 @@
  *   16. repeated rollover does not duplicate TeamSeason
  */
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason } from "@/lib/seasons/mutations";
 import { registerTeamSeason, getExistingTeamsForTenant } from "@/lib/teams/team-registration-service";
@@ -29,12 +29,24 @@ import { getEligibleOrgUnitsForTeamSeason } from "@/lib/teams/team-season-servic
 import { findTeamSeasonsForTenant } from "@/lib/training/queries";
 import { currentTeamSeasonWhere, pickCurrentTeamSeason } from "@/lib/teams/current-season";
 import { ParticipationType } from "@prisma/client";
+import {
+  assertSafeTestDatabase,
+  canRunDbMutatingIntegrationTests,
+} from "@/lib/test/safe-test-database";
+
+const canRun = canRunDbMutatingIntegrationTests();
 
 function randomFutureStartYearBand(): number {
   return 4500 + Math.floor(Math.random() * 900) * 3;
 }
 
-describe("ADMIN-MASTERDATA-UX-01-C1 — Season Team rollover (live DB)", () => {
+describe.skipIf(!canRun)(
+  "ADMIN-MASTERDATA-UX-01-C1 — Season Team rollover (isolated test DB)",
+  () => {
+  beforeAll(() => {
+    assertSafeTestDatabase();
+  });
+
   const tenantIds: string[] = [];
   const seasonIds: string[] = [];
   const teamIds: string[] = [];

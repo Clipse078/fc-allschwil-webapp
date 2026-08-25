@@ -12,20 +12,31 @@
  * See lib/seasons/__tests__/admin-delete-season-01-c1.test.ts for the full
  * C1 test suite (TeamSeason survival, Event/TrainingPlan SetNull, mixed deps).
  *
- * Requires a live PostgreSQL database (DATABASE_URL). Run against a
- * disposable database — never STAGE.
+ * Requires an explicitly isolated local PostgreSQL database via
+ * `TEST_DATABASE_URL`. When unset or unsafe, the entire suite is skipped —
+ * never STAGE.
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason, deleteSeason } from "@/lib/seasons/mutations";
 import { getSeasonDependencyCounts, hasSeasonDependencies } from "@/lib/seasons/queries";
+import {
+  assertSafeTestDatabase,
+  canRunDbMutatingIntegrationTests,
+} from "@/lib/test/safe-test-database";
+
+const canRun = canRunDbMutatingIntegrationTests();
 
 function randomBand(): number {
   return 5000 + Math.floor(Math.random() * 900) * 3;
 }
 
-describe("ADMIN-DELETE-SEASON-01 — Season delete (live DB)", () => {
+describe.skipIf(!canRun)("ADMIN-DELETE-SEASON-01 — Season delete (isolated test DB)", () => {
+  beforeAll(() => {
+    assertSafeTestDatabase();
+  });
+
   const createdSeasonIds: string[] = [];
   const createdTeamIds: string[] = [];
 

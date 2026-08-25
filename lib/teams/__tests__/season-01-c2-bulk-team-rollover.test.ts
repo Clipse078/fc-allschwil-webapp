@@ -23,7 +23,7 @@
  * team-registration-service.test.ts — not duplicated here.
  */
 
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason } from "@/lib/seasons/mutations";
 import {
@@ -33,12 +33,24 @@ import {
 } from "@/lib/teams/team-registration-service";
 import { findTeamSeasonsForTenant } from "@/lib/training/queries";
 import { ParticipationType } from "@prisma/client";
+import {
+  assertSafeTestDatabase,
+  canRunDbMutatingIntegrationTests,
+} from "@/lib/test/safe-test-database";
+
+const canRun = canRunDbMutatingIntegrationTests();
 
 function randomFutureStartYearBand(): number {
   return 5500 + Math.floor(Math.random() * 900) * 3;
 }
 
-describe("ADMIN-MASTERDATA-UX-01-C2 — bulk Season Team rollover (live DB)", () => {
+describe.skipIf(!canRun)(
+  "ADMIN-MASTERDATA-UX-01-C2 — bulk Season Team rollover (isolated test DB)",
+  () => {
+  beforeAll(() => {
+    assertSafeTestDatabase();
+  });
+
   const tenantIds: string[] = [];
   const seasonIds: string[] = [];
   const teamIds: string[] = [];

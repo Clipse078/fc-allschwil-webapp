@@ -1,11 +1,12 @@
 /**
  * SEASON-01 — Season mutation integration tests (lib/seasons/mutations.ts)
  *
- * Requires a live PostgreSQL database (DATABASE_URL). Run against a
- * disposable database — never STAGE. Every fixture uses a randomised,
- * far-future start year band so it can never collide with a real Season
- * (e.g. the STAGE 2025/2026, 2026/2027, 2027/2028, 2099 rows), and every
- * created row is torn down in `afterEach`.
+ * Requires an explicitly isolated local PostgreSQL database via
+ * `TEST_DATABASE_URL`. When unset or unsafe, the entire suite is skipped —
+ * never STAGE, never shared runtime databases. Every fixture uses a
+ * randomised, far-future start year band so it can never collide with a
+ * real Season (e.g. the STAGE 2025/2026, 2026/2027, 2027/2028, 2099 rows),
+ * and every created row is torn down in `afterEach`.
  *
  * Covers the task's Season test list:
  *   1. 2026/2027-equivalent can be created even if the following season
@@ -21,11 +22,17 @@
  *   14. referenced Season (TeamSeason) can now be deleted — C1 decouple
  */
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@/lib/db/prisma";
 import { activateSeason, createSeason, deleteSeason, updateSeasonDetails } from "@/lib/seasons/mutations";
 import { getSeasonsOverviewData } from "@/lib/seasons/queries";
 import { DuplicateSeasonError, SeasonNotFoundError } from "@/lib/seasons/errors";
+import {
+  assertSafeTestDatabase,
+  canRunDbMutatingIntegrationTests,
+} from "@/lib/test/safe-test-database";
+
+const canRun = canRunDbMutatingIntegrationTests();
 
 function randomFutureStartYearBand(): number {
   // Far enough in the future that no real/seeded Season can ever collide,
@@ -33,7 +40,11 @@ function randomFutureStartYearBand(): number {
   return 4000 + Math.floor(Math.random() * 900) * 3;
 }
 
-describe("SEASON-01 — Season mutations (live DB)", () => {
+describe.skipIf(!canRun)("SEASON-01 — Season mutations (isolated test DB)", () => {
+  beforeAll(() => {
+    assertSafeTestDatabase();
+  });
+
   const createdSeasonIds: string[] = [];
   const createdTeamIds: string[] = [];
 
