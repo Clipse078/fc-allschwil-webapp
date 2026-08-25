@@ -40,6 +40,15 @@ export const EXTERIOR_BG_MAX_CHANNEL_SPREAD = 20;
 /** Minimum alpha for exterior fringe candidates. */
 export const EXTERIOR_BG_MIN_ALPHA = 180;
 
+/** Bright fringe halo cleanup — transparency-adjacent only. */
+export const EXTERIOR_FRINGE_MIN_CHANNEL = 225;
+
+export const EXTERIOR_FRINGE_MAX_CHANNEL_SPREAD = 35;
+
+export const EXTERIOR_FRINGE_MIN_LUMINANCE = 225;
+
+export const EXTERIOR_FRINGE_MIN_ALPHA = 160;
+
 /** Corner band ratio for quality validation sampling. */
 export const EXTERIOR_CORNER_BAND_RATIO = 0.12;
 
@@ -91,6 +100,34 @@ export function isExteriorBackgroundCandidate(
   }
 
   return maxChannel - minChannel <= EXTERIOR_BG_MAX_CHANNEL_SPREAD;
+}
+
+/**
+ * Permissive bright fringe candidate for halo cleanup adjacent to transparency.
+ */
+export function isExteriorFringeCandidate(
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): boolean {
+  if (a < EXTERIOR_FRINGE_MIN_ALPHA) {
+    return false;
+  }
+
+  const minChannel = Math.min(r, g, b);
+  const maxChannel = Math.max(r, g, b);
+
+  if (minChannel < EXTERIOR_FRINGE_MIN_CHANNEL) {
+    return false;
+  }
+
+  if (maxChannel - minChannel > EXTERIOR_FRINGE_MAX_CHANNEL_SPREAD) {
+    return false;
+  }
+
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  return luminance >= EXTERIOR_FRINGE_MIN_LUMINANCE;
 }
 
 function pixelOffset(index: number): number {
@@ -265,14 +302,11 @@ export function removeBorderConnectedNearWhiteBackground(
   return { rgba: output, changed };
 }
 
-/**
- * Removes exterior background pixels reachable from transparent areas through
- * permissive near-white candidates. Preserves enclosed internal whites.
- */
-export function removeTransparencyAdjacentExteriorBackground(
+function floodFillFromTransparency(
   rgba: Buffer,
   width: number,
   height: number,
+  isCandidate: (r: number, g: number, b: number, a: number) => boolean,
 ): { rgba: Buffer; changed: boolean } {
   const totalPixels = width * height;
   const output = Buffer.from(rgba);
@@ -303,7 +337,7 @@ export function removeTransparencyAdjacentExteriorBackground(
       }
 
       const { r, g, b, a } = readRgba(output, neighbour);
-      if (!isExteriorBackgroundCandidate(r, g, b, a)) {
+      if (!isCandidate(r, g, b, a)) {
         continue;
       }
 
@@ -318,6 +352,29 @@ export function removeTransparencyAdjacentExteriorBackground(
   }
 
   return { rgba: output, changed };
+}
+
+/**
+ * Removes exterior background pixels reachable from transparent areas through
+ * permissive near-white candidates. Preserves enclosed internal whites.
+ */
+export function removeTransparencyAdjacentExteriorBackground(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): { rgba: Buffer; changed: boolean } {
+  return floodFillFromTransparency(rgba, width, height, isExteriorBackgroundCandidate);
+}
+
+/**
+ * Removes bright exterior fringe / halo pixels adjacent to transparency.
+ */
+export function removeTransparencyAdjacentExteriorFringe(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): { rgba: Buffer; changed: boolean } {
+  return floodFillFromTransparency(rgba, width, height, isExteriorFringeCandidate);
 }
 
 /** Clears RGB for all fully transparent pixels. */
@@ -367,6 +424,12 @@ export function cleanupProviderLogoBackgroundRgba(
   const adjacent = removeTransparencyAdjacentExteriorBackground(current, width, height);
   if (adjacent.changed) {
     current = Buffer.from(adjacent.rgba);
+    changed = true;
+  }
+
+  const fringe = removeTransparencyAdjacentExteriorFringe(current, width, height);
+  if (fringe.changed) {
+    current = Buffer.from(fringe.rgba);
     changed = true;
   }
 
