@@ -34,6 +34,7 @@ import {
   processCompetition,
   archiveAbsentCompetitions,
 } from "./competition-persistence";
+import { syncTeamSeasonCompetitionsFromTeamList } from "./team-season-competition-sync";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -99,6 +100,9 @@ export async function syncSfvCompetitions(
           message: `Failed to fetch team list from SFV for competition extraction: ${safe.message}`,
         },
       ],
+      teamSeasonCompetitionsLinked: 0,
+      teamSeasonCompetitionsSkipped: 0,
+      teamSeasonCompetitionLinkFailed: 0,
     });
   }
 
@@ -159,6 +163,14 @@ export async function syncSfvCompetitions(
     }
   }
 
+  // ── Link TeamSeasonCompetition rows ─────────────────────────────────────
+
+  const teamSeasonCompetitionSync = await syncTeamSeasonCompetitionsFromTeamList(
+    tenantId,
+    rawTeams,
+    context.seasonId,
+  );
+
   // ── Finalize ─────────────────────────────────────────────────────────────
 
   const finishedAt = new Date();
@@ -171,6 +183,9 @@ export async function syncSfvCompetitions(
     archived,
     failed,
     errors,
+    teamSeasonCompetitionsLinked: teamSeasonCompetitionSync.linked,
+    teamSeasonCompetitionsSkipped: teamSeasonCompetitionSync.skipped,
+    teamSeasonCompetitionLinkFailed: teamSeasonCompetitionSync.failed,
   });
 
   if (result.failed === 0 && result.errors.length === 0) {
@@ -184,7 +199,16 @@ export async function syncSfvCompetitions(
 
 type CountFields = Pick<
   SfvCompetitionSyncResult,
-  "fetched" | "created" | "updated" | "unchanged" | "archived" | "failed" | "errors"
+  | "fetched"
+  | "created"
+  | "updated"
+  | "unchanged"
+  | "archived"
+  | "failed"
+  | "errors"
+  | "teamSeasonCompetitionsLinked"
+  | "teamSeasonCompetitionsSkipped"
+  | "teamSeasonCompetitionLinkFailed"
 >;
 
 function buildResult(

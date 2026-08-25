@@ -68,4 +68,10 @@ export type SfvCompetitionSyncResult = {
   archived: number;
   failed: number;
   errors: SyncErrorEntry[];
+  /** TeamSeasonCompetition rows linked during this sync run. */
+  teamSeasonCompetitionsLinked: number;
+  /** Teams skipped (no mapping, unresolved TeamSeason, or missing Competition). */
+  teamSeasonCompetitionsSkipped: number;
+  /** TeamSeasonCompetition link failures. */
+  teamSeasonCompetitionLinkFailed: number;
 };

@@ -32,11 +32,16 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+vi.mock("../team-season-competition-sync", () => ({
+  syncTeamSeasonCompetitionsFromTeamList: vi.fn(),
+}));
+
 import { requireEnabledSfvConfigForTenant } from "@/lib/integrations/sfv/tenant-config-service";
 import { markCompetitionSyncSuccessful } from "@/lib/integrations/sfv/tenant-config-repository";
 import { fetchTeamList } from "@/lib/integrations/sfv/client";
 import { prisma } from "@/lib/db/prisma";
 import { syncSfvCompetitions } from "../competition-sync";
+import { syncTeamSeasonCompetitionsFromTeamList } from "../team-season-competition-sync";
 
 // ── Fixtures ────────────────────────────────────────────────────────────────────
 
@@ -96,6 +101,12 @@ beforeEach(() => {
   vi.mocked(prisma.competition.update).mockResolvedValue({} as never);
   vi.mocked(prisma.competition.updateMany).mockResolvedValue({ count: 0 } as never);
   vi.mocked(markCompetitionSyncSuccessful).mockResolvedValue(undefined as never);
+  vi.mocked(syncTeamSeasonCompetitionsFromTeamList).mockResolvedValue({
+    linked: 0,
+    skipped: 2,
+    failed: 0,
+    errors: [],
+  });
 });
 
 // ── A. syncSfvCompetitions ────────────────────────────────────────────────────
@@ -112,6 +123,8 @@ describe("A. syncSfvCompetitions", () => {
     expect(result.unchanged).toBe(0);
     expect(result.failed).toBe(0);
     expect(result.errors).toHaveLength(0);
+    expect(result.teamSeasonCompetitionsLinked).toBe(0);
+    expect(result.teamSeasonCompetitionsSkipped).toBe(2);
   });
 
   it("marks competition sync as successful on zero failures", async () => {

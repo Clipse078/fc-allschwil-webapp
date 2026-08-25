@@ -22,6 +22,7 @@
  * shown?". Pure, synchronous, no I/O.
  */
 
+import { resolveMatchResultDisplay } from "@/lib/sporting-data/resolve-match-result-display";
 import type { MatchcenterMatchSummary } from "./types";
 
 export type MatchcenterLifecycleStage = "UPCOMING" | "COMPLETED";
@@ -73,14 +74,10 @@ export function getMatchcenterLifecycleStage(
  *   LIVE                         → current score when the provider supplies one
  */
 export function getMatchcenterResultLabel(match: ScoreSource): string | null {
-  if (!isMatchCompleted(match) && !isMatchLive(match)) {
-    return null;
-  }
-
-  if (match.scoreHome !== null && match.scoreAway !== null) {
-    return `${match.scoreHome}:${match.scoreAway}`;
-  }
-
-  const resultLabel = match.resultLabel?.trim();
-  return resultLabel ? resultLabel : null;
+  return resolveMatchResultDisplay({
+    status: match.status,
+    resultLabel: match.resultLabel,
+    scoreHome: match.scoreHome,
+    scoreAway: match.scoreAway,
+  });
 }

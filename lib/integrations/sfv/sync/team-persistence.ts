@@ -26,6 +26,8 @@
 import { prisma } from "@/lib/db/prisma";
 import type { Prisma } from "@prisma/client";
 import type { TeamDetail } from "../client";
+import { SFV_PROVIDER } from "../season-bridge";
+import { resolveTeamSeasonIdForExternalMapping } from "../team-season-resolution";
 import type { SfvTeamSyncContext } from "./types";
 import {
   buildNewTeamFields,
@@ -57,6 +59,7 @@ export type TeamPersistenceOutcome =
 type ExistingMappingRow = {
   id: string;
   teamId: string;
+  teamSeasonId: string | null;
   providerTeamName: string | null;
   providerLeagueId: number | null;
   providerLeagueName: string | null;
@@ -82,6 +85,7 @@ export async function loadExistingMappings(
     select: {
       id: true,
       teamId: true,
+      teamSeasonId: true,
       externalTeamId: true,
       providerTeamName: true,
       providerLeagueId: true,
@@ -139,6 +143,50 @@ export async function loadCrossSeasonTeamIds(
   return map;
 }
 
+async function resolveTeamSeasonIdForSync(
+  teamId: string,
+  context: SfvTeamSyncContext,
+): Promise<string | null> {
+  return resolveTeamSeasonIdForExternalMapping({
+    tenantId: context.tenantId,
+    teamId,
+    provider: SFV_PROVIDER,
+    externalSeasonId: context.seasonId,
+  });
+}
+
+async function linkMappingTeamSeasonIfResolvable(
+  mappingId: string,
+  teamId: string,
+  existingTeamSeasonId: string | null,
+  context: SfvTeamSyncContext,
+): Promise<TeamPersistenceOutcome> {
+  if (existingTeamSeasonId !== null) {
+    return { status: "unchanged" };
+  }
+
+  const teamSeasonId = await resolveTeamSeasonIdForSync(teamId, context);
+  if (teamSeasonId === null) {
+    return { status: "unchanged" };
+  }
+
+  try {
+    await prisma.teamExternalMapping.updateMany({
+      where: { id: mappingId, teamSeasonId: null },
+      data: { teamSeasonId },
+    });
+    return { status: "updated" };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown error linking TeamSeason.";
+    return {
+      status: "failed",
+      code: "TEAM_SEASON_LINK_FAILED",
+      message: `Failed to link TeamSeason for mapping ${mappingId}: ${message}`,
+    };
+  }
+}
+
 // ── Create ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -189,10 +237,18 @@ export async function createTeamWithMapping(
         select: { id: true },
       });
 
+      const resolvedTeamSeasonId = await resolveTeamSeasonIdForExternalMapping({
+        tenantId: context.tenantId,
+        teamId: team.id,
+        provider: SFV_PROVIDER,
+        externalSeasonId: context.seasonId,
+      });
+
       await tx.teamExternalMapping.create({
         data: {
           tenantId: context.tenantId,
           teamId: team.id,
+          teamSeasonId: resolvedTeamSeasonId,
           ...mappingFields,
         },
       });
@@ -243,10 +299,13 @@ export async function linkExistingTeamToNewSeason(
       return createTeamWithMapping(detail, context);
     }
 
+    const resolvedTeamSeasonId = await resolveTeamSeasonIdForSync(teamId, context);
+
     await prisma.teamExternalMapping.create({
       data: {
         tenantId: context.tenantId,
         teamId,
+        teamSeasonId: resolvedTeamSeasonId,
         ...mappingFields,
       },
     });
@@ -274,10 +333,16 @@ export async function linkExistingTeamToNewSeason(
  */
 export async function updateMappingFields(
   mappingId: string,
+  teamId: string,
   detail: TeamDetail,
   context: SfvTeamSyncContext,
+  existingTeamSeasonId: string | null = null,
 ): Promise<TeamPersistenceOutcome> {
   const mappingFields = buildMappingFields(detail, context);
+  const resolvedTeamSeasonId =
+    existingTeamSeasonId === null
+      ? await resolveTeamSeasonIdForSync(teamId, context)
+      : null;
 
   try {
     await prisma.teamExternalMapping.update({
@@ -289,6 +354,9 @@ export async function updateMappingFields(
         providerOrganisationId: mappingFields.providerOrganisationId,
         providerIsActive: mappingFields.providerIsActive,
         lastSyncedAt: mappingFields.lastSyncedAt,
+        ...(existingTeamSeasonId === null && resolvedTeamSeasonId
+          ? { teamSeasonId: resolvedTeamSeasonId }
+          : {}),
       },
     });
 
@@ -368,8 +436,22 @@ export async function processTeamDetail(
 
   const incomingFields = buildMappingFields(detail, context);
   if (!hasProviderChanges(existing, incomingFields)) {
+    if (existing.teamSeasonId === null) {
+      return linkMappingTeamSeasonIfResolvable(
+        existing.id,
+        existing.teamId,
+        existing.teamSeasonId,
+        context,
+      );
+    }
     return { status: "unchanged" };
   }
 
-  return updateMappingFields(existing.id, detail, context);
+  return updateMappingFields(
+    existing.id,
+    existing.teamId,
+    detail,
+    context,
+    existing.teamSeasonId,
+  );
 }

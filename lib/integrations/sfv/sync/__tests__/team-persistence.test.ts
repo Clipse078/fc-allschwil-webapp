@@ -57,12 +57,16 @@ const mockTeamFindFirst = vi.fn();
 const mockTeamUpdate = vi.fn();
 const mockTransaction = vi.fn();
 
+const mockTeamExternalMappingUpdateMany = vi.fn();
+const mockResolveTeamSeasonId = vi.fn();
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     teamExternalMapping: {
       findMany: (...args: unknown[]) => mockTeamExternalMappingFindMany(...args),
       create: (...args: unknown[]) => mockTeamExternalMappingCreate(...args),
       update: (...args: unknown[]) => mockTeamExternalMappingUpdate(...args),
+      updateMany: (...args: unknown[]) => mockTeamExternalMappingUpdateMany(...args),
     },
     team: {
       findUnique: (...args: unknown[]) => mockTeamFindUnique(...args),
@@ -74,6 +78,11 @@ vi.mock("@/lib/db/prisma", () => ({
     },
     $transaction: (...args: unknown[]) => mockTransaction(...args),
   },
+}));
+
+vi.mock("@/lib/integrations/sfv/team-season-resolution", () => ({
+  resolveTeamSeasonIdForExternalMapping: (...args: unknown[]) =>
+    mockResolveTeamSeasonId(...args),
 }));
 
 const {
@@ -115,6 +124,7 @@ function makeDetail(overrides: Partial<TeamDetail> = {}): TeamDetail {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockResolveTeamSeasonId.mockResolvedValue("ts-2027");
 });
 
 // ── loadCrossSeasonTeamIds ────────────────────────────────────────────────────
@@ -177,6 +187,7 @@ describe("linkExistingTeamToNewSeason", () => {
         data: expect.objectContaining({
           tenantId: TENANT_ID,
           teamId: "team-existing",
+          teamSeasonId: "ts-2027",
           externalTeamId: 31927,
           externalSeasonId: 2027,
         }),
@@ -241,6 +252,7 @@ describe("processTeamDetail — resolution order", () => {
         {
           id: "mapping-1",
           teamId: "team-existing",
+          teamSeasonId: null,
           providerTeamName: "Old name",
           providerLeagueId: 1,
           providerLeagueName: "Old league",
@@ -318,8 +330,10 @@ describe("updateMappingFields — provider naming cannot overwrite tenant-manage
 
     const outcome = await updateMappingFields(
       "mapping-1",
+      "team-existing",
       makeDetail({ teamName: "FC Allschwil C1 (Renamed by SFV)" }),
       CONTEXT_2027,
+      "ts-existing",
     );
 
     expect(outcome).toEqual({ status: "updated" });
@@ -332,8 +346,10 @@ describe("updateMappingFields — provider naming cannot overwrite tenant-manage
 
     await updateMappingFields(
       "mapping-1",
+      "team-existing",
       makeDetail({ teamName: "A completely different provider name" }),
       CONTEXT_2027,
+      "ts-existing",
     );
 
     const updateArgs = mockTeamExternalMappingUpdate.mock.calls[0][0];
@@ -352,5 +368,35 @@ describe("updateMappingFields — provider naming cannot overwrite tenant-manage
     expect(updateArgs.data).not.toHaveProperty("shortName");
     expect(updateArgs.data).not.toHaveProperty("alternativeName");
     expect(updateArgs.data).not.toHaveProperty("isActive");
+  });
+});
+
+describe("processTeamDetail — TeamSeason linkage on unchanged mappings", () => {
+  it("links teamSeasonId when provider data is unchanged but link was missing", async () => {
+    const existingMappings = new Map([
+      [
+        31927,
+        {
+          id: "mapping-1",
+          teamId: "team-existing",
+          teamSeasonId: null,
+          providerTeamName: "FC Allschwil C1",
+          providerLeagueId: 17131,
+          providerLeagueName: "Junioren C Promotion",
+          providerOrganisationId: 8,
+          providerIsActive: true,
+        },
+      ],
+    ]);
+
+    mockTeamExternalMappingUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    const outcome = await processTeamDetail(makeDetail(), CONTEXT_2027, existingMappings);
+
+    expect(outcome.status).toBe("updated");
+    expect(mockTeamExternalMappingUpdateMany).toHaveBeenCalledWith({
+      where: { id: "mapping-1", teamSeasonId: null },
+      data: { teamSeasonId: "ts-2027" },
+    });
   });
 });

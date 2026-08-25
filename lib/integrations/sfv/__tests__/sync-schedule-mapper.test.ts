@@ -131,8 +131,20 @@ describe("buildNewEventFields homeAway", () => {
 // ── mapMatchStateToEventStatus ────────────────────────────────────────────────
 
 describe("mapMatchStateToEventStatus", () => {
+  it("maps 'ausgetragen' to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "ausgetragen")).toBe("COMPLETED");
+  });
+
   it("maps 'gespielt' to COMPLETED", () => {
     expect(mapMatchStateToEventStatus(1, "gespielt")).toBe("COMPLETED");
+  });
+
+  it("maps 'abgeschlossen' to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "abgeschlossen")).toBe("COMPLETED");
+  });
+
+  it("maps 'beendet' to COMPLETED", () => {
+    expect(mapMatchStateToEventStatus(1, "beendet")).toBe("COMPLETED");
   });
 
   it("maps 'joué' to COMPLETED", () => {

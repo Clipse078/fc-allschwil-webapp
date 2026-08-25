@@ -107,6 +107,7 @@ export function mapMatchStateToEventStatus(
   }
 
   if (
+    name.includes("ausgetragen") ||
     name.includes("gespielt") ||
     name.includes("joué") ||
     name.includes("abgeschlossen") ||
