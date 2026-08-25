@@ -31,6 +31,7 @@
     "team-sfv-mapping-04:dry-run": "tsx scripts/team-sfv-mapping-04-stale-match-reconciliation.ts --dry-run",
     "club-directory-02c:inventory": "tsx scripts/club-directory-02c-sfv-consolidation.ts --inventory",
     "club-directory-02c:dry-run": "tsx scripts/club-directory-02c-sfv-consolidation.ts --dry-run",
+    "media-logo-01d2:dry-run": "tsx scripts/media-logo-01d2-provider-logo-backfill-dry-run.ts",
     "deploy:check": "npm run db:generate && npm run lint && npm run build"
   },
   "dependencies": {
