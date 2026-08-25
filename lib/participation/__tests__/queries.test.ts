@@ -1,6 +1,5 @@
 /**
- * TEAM-COCKPIT-02B — attendance query aggregation tests
- * TEAM-COCKPIT-03G — attendance event discovery season isolation tests
+ * TEAM-COCKPIT-03G — participation event discovery season isolation tests
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
@@ -8,15 +7,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     teamSeason: { findFirst: vi.fn() },
-    playerSquadMember: { findMany: vi.fn() },
-    attendanceRecord: { findMany: vi.fn() },
     trainingSession: { findMany: vi.fn() },
     event: { findMany: vi.fn() },
   },
 }));
 
 import { prisma } from "@/lib/db/prisma";
-import { getTeamAttendanceOverview, listAttendanceEventOptions } from "../queries";
+import { listUpcomingParticipationEvents } from "../queries";
 
 const TENANT_A = "tenant-a";
 const TENANT_B = "tenant-b";
@@ -52,48 +49,23 @@ function mockCalendarEvents(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockTeamSeason();
+  mockTrainingSessions();
+  mockCalendarEvents();
 });
 
-describe("TEAM-COCKPIT-02B — getTeamAttendanceOverview", () => {
-  it("aggregates player attendance counts and percentage", async () => {
-    vi.mocked(prisma.playerSquadMember.findMany).mockResolvedValue([
-      {
-        personId: "p1",
-        shirtNumber: 10,
-        sortOrder: 0,
-        person: { firstName: "Max", lastName: "Muster", displayName: null },
-      },
-    ] as never);
-    vi.mocked(prisma.attendanceRecord.findMany).mockResolvedValue([
-      { personId: "p1", status: "PRESENT" },
-      { personId: "p1", status: "ABSENT" },
-      { personId: "p1", status: "OPEN" },
-    ] as never);
-
-    const overview = await getTeamAttendanceOverview("tenant-a", "ts-01");
-
-    expect(overview.players).toHaveLength(1);
-    expect(overview.players[0]?.eventCount).toBe(3);
-    expect(overview.players[0]?.counts.present).toBe(1);
-    expect(overview.players[0]?.counts.absent).toBe(1);
-    expect(overview.players[0]?.counts.open).toBe(1);
-    expect(overview.players[0]?.percentageLabel).toBe("50%");
-  });
-});
-
-describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () => {
-  beforeEach(() => {
-    mockTeamSeason();
-    mockTrainingSessions();
-    mockCalendarEvents();
-  });
-
+describe("TEAM-COCKPIT-03G — listUpcomingParticipationEvents season isolation", () => {
   it("includes current-season Match", async () => {
     mockCalendarEvents([
       { id: "match-current", type: "MATCH", title: "Heimspiel", startAt: FUTURE_DATE },
     ]);
 
-    const events = await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    const events = await listUpcomingParticipationEvents(
+      TENANT_A,
+      TEAM_SEASON_ID,
+      TEAM_ID,
+      { from: new Date("2026-08-01") },
+    );
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -108,7 +80,12 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
       { id: "tournament-current", type: "TOURNAMENT", title: "Sommerturnier", startAt: FUTURE_DATE },
     ]);
 
-    const events = await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    const events = await listUpcomingParticipationEvents(
+      TENANT_A,
+      TEAM_SEASON_ID,
+      TEAM_ID,
+      { from: new Date("2026-08-01") },
+    );
 
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
@@ -119,7 +96,7 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   });
 
   it("scopes Match discovery to active TeamSeason season", async () => {
-    await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    await listUpcomingParticipationEvents(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
 
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -136,7 +113,7 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   it("scopes Tournament discovery to active TeamSeason season", async () => {
     mockTeamSeason(SEASON_OTHER);
 
-    await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    await listUpcomingParticipationEvents(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
 
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -148,7 +125,7 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   });
 
   it("does not trust client-supplied seasonId — derives from TeamSeason", async () => {
-    await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    await listUpcomingParticipationEvents(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
 
     expect(prisma.teamSeason.findFirst).toHaveBeenCalledWith({
       where: {
@@ -168,14 +145,18 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   it("excludes events when TeamSeason is not found", async () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null);
 
-    const events = await listAttendanceEventOptions(TENANT_A, "foreign-ts", TEAM_ID);
+    const events = await listUpcomingParticipationEvents(
+      TENANT_A,
+      "foreign-ts",
+      TEAM_ID,
+    );
 
     expect(events).toEqual([]);
     expect(prisma.event.findMany).not.toHaveBeenCalled();
   });
 
   it("preserves tenant isolation in event query", async () => {
-    await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    await listUpcomingParticipationEvents(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
 
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -185,7 +166,7 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   });
 
   it("preserves team isolation in event query", async () => {
-    await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    await listUpcomingParticipationEvents(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
 
     expect(prisma.event.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -199,7 +180,12 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
       { id: "session-01", startAt: FUTURE_DATE, title: "Dienstagstraining" },
     ]);
 
-    const events = await listAttendanceEventOptions(TENANT_A, TEAM_SEASON_ID, TEAM_ID);
+    const events = await listUpcomingParticipationEvents(
+      TENANT_A,
+      TEAM_SEASON_ID,
+      TEAM_ID,
+      { from: new Date("2026-08-01") },
+    );
 
     expect(prisma.trainingSession.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -219,7 +205,11 @@ describe("TEAM-COCKPIT-03G — listAttendanceEventOptions season isolation", () 
   it("returns empty when DB excludes foreign-team and foreign-tenant events", async () => {
     mockCalendarEvents([]);
 
-    const events = await listAttendanceEventOptions(TENANT_B, TEAM_SEASON_ID, OTHER_TEAM_ID);
+    const events = await listUpcomingParticipationEvents(
+      TENANT_B,
+      TEAM_SEASON_ID,
+      OTHER_TEAM_ID,
+    );
 
     expect(events).toHaveLength(0);
     expect(prisma.event.findMany).toHaveBeenCalledWith(

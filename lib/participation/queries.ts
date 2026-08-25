@@ -136,6 +136,19 @@ export async function listUpcomingParticipationEvents(
   const from = options?.from ?? new Date();
   const limit = options?.limit ?? 10;
 
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: teamSeasonId,
+      teamId,
+      team: { tenantId },
+    },
+    select: { seasonId: true },
+  });
+
+  if (!teamSeason) {
+    return [];
+  }
+
   const [trainingSessions, calendarEvents] = await Promise.all([
     prisma.trainingSession.findMany({
       where: {
@@ -160,6 +173,7 @@ export async function listUpcomingParticipationEvents(
       where: {
         tenantId,
         teamId,
+        seasonId: teamSeason.seasonId,
         type: { in: ["MATCH", "TOURNAMENT"] },
         startAt: { gte: from },
       },

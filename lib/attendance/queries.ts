@@ -251,6 +251,19 @@ export async function listAttendanceEventOptions(
   teamSeasonId: string,
   teamId: string,
 ): Promise<AttendanceEventOption[]> {
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: teamSeasonId,
+      teamId,
+      team: { tenantId },
+    },
+    select: { seasonId: true },
+  });
+
+  if (!teamSeason) {
+    return [];
+  }
+
   const [trainingSessions, calendarEvents] = await Promise.all([
     prisma.trainingSession.findMany({
       where: {
@@ -274,6 +287,7 @@ export async function listAttendanceEventOptions(
       where: {
         tenantId,
         teamId,
+        seasonId: teamSeason.seasonId,
         type: { in: ["MATCH", "TOURNAMENT"] },
       },
       select: {
