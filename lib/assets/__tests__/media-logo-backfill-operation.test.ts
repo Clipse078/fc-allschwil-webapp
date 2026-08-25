@@ -16,6 +16,7 @@ import {
   sanitizeMediaLogoOperationPayload,
   validateMediaLogoFrozenContract,
 } from "../media-logo-backfill-operation";
+import { MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH } from "../media-logo-backfill-operation-environment";
 import {
   FC_ALLSCHWIL_STAGE_LOGO_TARGET,
   type LogoBackfillCandidatePlan,
@@ -50,6 +51,9 @@ vi.mock("../provider-logo-backfill-executor", async (importOriginal) => {
 });
 
 const ORIGINAL_ENV = { ...process.env };
+
+const STAGE_DATABASE_URL =
+  "postgresql://neondb_owner:secret@ep-wispy-hall-aso93dy6-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require";
 
 function makeCandidate(
   overrides: Partial<LogoBackfillCandidatePlan> &
@@ -216,6 +220,16 @@ function enableAllowedRuntime() {
   process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
 }
 
+function enableControlledPreviewRuntime() {
+  process.env.APP_ENV = "prod";
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "preview";
+  process.env.VERCEL_GIT_COMMIT_REF = MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH;
+  process.env.DATABASE_URL = STAGE_DATABASE_URL;
+  process.env.STAGE_DB_URL = STAGE_DATABASE_URL;
+  process.env.BLOB_READ_WRITE_TOKEN = "blob-token";
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV };
@@ -230,7 +244,7 @@ afterEach(() => {
 });
 
 describe("runtime environment guard", () => {
-  it("D. blocks when APP_ENV is not stage", () => {
+  it("D. blocks when APP_ENV is not stage and Preview is not controlled", () => {
     process.env.APP_ENV = "local";
     expect(isMediaLogoBackfillRuntimeAllowed()).toBe(false);
   });
@@ -238,6 +252,13 @@ describe("runtime environment guard", () => {
   it("D. blocks when not on Vercel runtime", () => {
     delete process.env.VERCEL;
     expect(isMediaLogoBackfillRuntimeAllowed()).toBe(false);
+  });
+
+  it("allows controlled Preview with PROD APP_ENV and STAGE database when Blob is present", () => {
+    enableControlledPreviewRuntime();
+    expect(isMediaLogoBackfillRuntimeAllowed()).toBe(true);
+    expect(assessMediaLogoBackfillRuntimeEnvironment().isStageDatabase).toBe(true);
+    expect(assessMediaLogoBackfillRuntimeEnvironment().appEnv).toBe("prod");
   });
 
   it("E. blocks when Blob capability is absent", () => {

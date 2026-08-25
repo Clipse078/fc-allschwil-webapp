@@ -7,6 +7,7 @@ import { NextRequest } from "next/server";
 
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { MEDIA_LOGO_01G4_FROZEN_CONTRACT } from "@/lib/assets/media-logo-backfill-operation-contract";
+import { MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH } from "@/lib/assets/media-logo-backfill-operation-environment";
 
 const mocks = vi.hoisted(() => ({
   requireApiPermission: vi.fn(),
@@ -37,6 +38,9 @@ vi.mock("@/lib/assets/media-logo-backfill-operation", async (importOriginal) => 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
 
 const ORIGINAL_ENV = { ...process.env };
+
+const STAGE_DATABASE_URL =
+  "postgresql://neondb_owner:secret@ep-wispy-hall-aso93dy6-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require";
 
 const FC_ALLSCHWIL_TENANT = {
   id: "tenant-fc-allschwil",
@@ -99,6 +103,15 @@ function authorizedApiAccess() {
   };
 }
 
+function enableControlledPreviewRuntime() {
+  process.env.APP_ENV = "prod";
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "preview";
+  process.env.VERCEL_GIT_COMMIT_REF = MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH;
+  process.env.DATABASE_URL = STAGE_DATABASE_URL;
+  process.env.STAGE_DB_URL = STAGE_DATABASE_URL;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV };
@@ -132,7 +145,36 @@ describe("route authorization with real auth helper", () => {
     expect(mocks.runMediaLogoBackfillPreflight).toHaveBeenCalled();
   });
 
+  it("10. fc-allschwil WEBSITE_MANAGE user can access GET preflight on controlled Preview", async () => {
+    enableControlledPreviewRuntime();
+
+    const preflightRoute = await import("../preflight/route");
+    const response = await preflightRoute.GET();
+
+    expect(response.status).toBe(200);
+    expect(mocks.requireApiPermission).toHaveBeenCalledWith(PERMISSIONS.WEBSITE_MANAGE);
+    expect(mocks.runMediaLogoBackfillPreflight).toHaveBeenCalled();
+  });
+
   it("3. fc-allschwil WEBSITE_MANAGE user passes POST execute authorization without mutation", async () => {
+    const executeRoute = await import("../execute/route");
+    const response = await executeRoute.POST(
+      new NextRequest("http://x/api/ops/media-logo-backfill/execute", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({}),
+      }),
+    );
+    const body = await response.json();
+
+    expect(mocks.requireApiPermission).toHaveBeenCalledWith(PERMISSIONS.WEBSITE_MANAGE);
+    expect(body.mutationStarted).toBe(false);
+    expect(mocks.runMediaLogoBackfillExecute).toHaveBeenCalled();
+  });
+
+  it("11. controlled Preview POST without confirmation passes auth but remains blocked", async () => {
+    enableControlledPreviewRuntime();
+
     const executeRoute = await import("../execute/route");
     const response = await executeRoute.POST(
       new NextRequest("http://x/api/ops/media-logo-backfill/execute", {

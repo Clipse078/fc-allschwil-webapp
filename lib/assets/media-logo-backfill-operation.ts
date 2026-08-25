@@ -11,6 +11,10 @@
 
 import type { PrismaClient } from "@prisma/client";
 
+import {
+  isMediaLogoBackfillAuthEnvironmentAllowed,
+  isMediaLogoBackfillStageDatabase,
+} from "@/lib/assets/media-logo-backfill-operation-environment";
 import { getRuntimeEnvironment } from "@/lib/env";
 import {
   MEDIA_LOGO_01G4_FROZEN_CONTRACT,
@@ -65,7 +69,7 @@ export function assessMediaLogoBackfillRuntimeEnvironment(): MediaLogoRuntimeEnv
     tenantKey: MEDIA_LOGO_BACKFILL_TENANT_KEY,
     appEnv: runtime.appEnv,
     vercelEnv: runtime.vercelEnv,
-    isStageDatabase: runtime.isStage,
+    isStageDatabase: isMediaLogoBackfillStageDatabase(),
     isVercelRuntime: runtime.isVercel,
     databaseUrl: runtime.hasDatabaseUrl ? "PRESENT" : "ABSENT",
     databaseHost: maskDatabaseUrl(process.env.DATABASE_URL),
@@ -77,6 +81,7 @@ export function isMediaLogoBackfillRuntimeAllowed(
   environment: MediaLogoRuntimeEnvironmentReport = assessMediaLogoBackfillRuntimeEnvironment(),
 ): boolean {
   return (
+    isMediaLogoBackfillAuthEnvironmentAllowed() &&
     environment.isStageDatabase &&
     environment.isVercelRuntime &&
     environment.databaseUrl === "PRESENT" &&

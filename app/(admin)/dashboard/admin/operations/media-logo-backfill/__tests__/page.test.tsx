@@ -1,11 +1,13 @@
 /**
  * @vitest-environment jsdom
  *
- * MEDIA-LOGO-01G7 — temporary operation page authorization tests.
+ * MEDIA-LOGO-01G7/G10 — temporary operation page authorization tests.
  */
 
 import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH } from "@/lib/assets/media-logo-backfill-operation-environment";
 
 const mocks = vi.hoisted(() => ({
   requireAnyPermission: vi.fn(),
@@ -16,7 +18,6 @@ const mocks = vi.hoisted(() => ({
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
   }),
-  isMediaLogoBackfillAuthEnvironmentAllowed: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-any-permission", () => ({
@@ -25,10 +26,6 @@ vi.mock("@/lib/permissions/require-any-permission", () => ({
 
 vi.mock("@/lib/tenants/active-tenant", () => ({
   getActiveTenant: mocks.getActiveTenant,
-}));
-
-vi.mock("@/lib/assets/media-logo-backfill-operation-auth", () => ({
-  isMediaLogoBackfillAuthEnvironmentAllowed: mocks.isMediaLogoBackfillAuthEnvironmentAllowed,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -42,6 +39,9 @@ vi.mock("@/components/admin/operations/MediaLogoBackfillOperationPanel", () => (
 
 const ORIGINAL_ENV = { ...process.env };
 
+const STAGE_DATABASE_URL =
+  "postgresql://neondb_owner:secret@ep-wispy-hall-aso93dy6-pooler.c-4.eu-central-1.aws.neon.tech/neondb?sslmode=require";
+
 const FC_ALLSCHWIL_TENANT = {
   id: "tenant-fc-allschwil",
   key: "fc-allschwil",
@@ -49,10 +49,20 @@ const FC_ALLSCHWIL_TENANT = {
   status: "ACTIVE",
 };
 
+function enableControlledPreviewRuntime() {
+  process.env.APP_ENV = "prod";
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "preview";
+  process.env.VERCEL_GIT_COMMIT_REF = MEDIA_LOGO_CONTROLLED_PREVIEW_BRANCH;
+  process.env.DATABASE_URL = STAGE_DATABASE_URL;
+  process.env.STAGE_DB_URL = STAGE_DATABASE_URL;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV };
-  mocks.isMediaLogoBackfillAuthEnvironmentAllowed.mockReturnValue(true);
+  process.env.NODE_ENV = "test";
+  process.env.APP_ENV = "stage";
   mocks.requireAnyPermission.mockResolvedValue({
     user: { id: "user-michael", activeTenantId: FC_ALLSCHWIL_TENANT.id },
   });
@@ -72,8 +82,18 @@ describe("MediaLogoBackfillOperationPage", () => {
     expect(mocks.requireAnyPermission).toHaveBeenCalledWith(["website.manage"]);
   });
 
-  it("6. redirects when APP_ENV is not stage", async () => {
-    mocks.isMediaLogoBackfillAuthEnvironmentAllowed.mockReturnValue(false);
+  it("9. allows Michael-equivalent fc-allschwil user on controlled Preview", async () => {
+    enableControlledPreviewRuntime();
+
+    const Page = (await import("../page")).default;
+    render(await Page());
+
+    expect(screen.getByTestId("media-logo-backfill-panel")).toBeInTheDocument();
+    expect(mocks.requireAnyPermission).toHaveBeenCalledWith(["website.manage"]);
+  });
+
+  it("6. redirects when APP_ENV is not stage and Preview is not controlled", async () => {
+    process.env.APP_ENV = "local";
 
     const Page = (await import("../page")).default;
 
@@ -81,8 +101,8 @@ describe("MediaLogoBackfillOperationPage", () => {
     expect(mocks.requireAnyPermission).not.toHaveBeenCalled();
   });
 
-  it("7. redirects in production environment", async () => {
-    mocks.isMediaLogoBackfillAuthEnvironmentAllowed.mockReturnValue(false);
+  it("7. redirects in production environment without controlled Preview", async () => {
+    process.env.APP_ENV = "prod";
 
     const Page = (await import("../page")).default;
 

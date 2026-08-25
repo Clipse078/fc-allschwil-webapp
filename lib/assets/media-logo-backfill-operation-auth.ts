@@ -5,16 +5,14 @@
  * Remove after successful backfill verification before STAGE merge.
  */
 
+import { isMediaLogoBackfillAuthEnvironmentAllowed } from "@/lib/assets/media-logo-backfill-operation-environment";
 import { MEDIA_LOGO_BACKFILL_TENANT_KEY } from "@/lib/assets/media-logo-backfill-operation";
 import { prisma } from "@/lib/db/prisma";
-import { getRuntimeEnvironment } from "@/lib/env";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { getCurrentTenantContextById } from "@/lib/tenants/context";
 
-export function isMediaLogoBackfillAuthEnvironmentAllowed(): boolean {
-  return getRuntimeEnvironment().appEnv === "stage";
-}
+export { isMediaLogoBackfillAuthEnvironmentAllowed } from "@/lib/assets/media-logo-backfill-operation-environment";
 
 export async function requireMediaLogoBackfillApiAccess() {
   if (!isMediaLogoBackfillAuthEnvironmentAllowed()) {
