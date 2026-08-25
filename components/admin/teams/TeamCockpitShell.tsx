@@ -8,9 +8,11 @@ import TeamCockpitOverview from "@/components/admin/teams/TeamCockpitOverview";
 import TeamTrainingSchedule from "@/components/admin/teams/TeamTrainingSchedule";
 import TeamAdministrationSection from "@/components/admin/teams/TeamAdministrationSection";
 import TeamAttendanceSection from "@/components/admin/teams/TeamAttendanceSection";
+import TeamParticipationSection from "@/components/admin/teams/TeamParticipationSection";
 import type { TeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import type { TeamTrainingScheduleEntry } from "@/lib/teams/team-training-schedule";
 import type { TeamAttendanceOverview } from "@/lib/attendance/types";
+import type { TeamUpcomingParticipation } from "@/lib/participation/types";
 import { SectionCard } from "@/components/ui/page";
 
 type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
@@ -128,6 +130,7 @@ type Props = {
   cockpitMetrics: TeamCockpitMetrics;
   trainingSchedule: TeamTrainingScheduleEntry[];
   attendanceOverview: TeamAttendanceOverview | null;
+  upcomingParticipation: TeamUpcomingParticipation | null;
   canManage: boolean;
   canDelete: boolean;
   availableOrgUnits: OrgUnitOption[];
@@ -140,6 +143,7 @@ export default function TeamCockpitShell({
   cockpitMetrics,
   trainingSchedule,
   attendanceOverview,
+  upcomingParticipation,
   canManage,
   canDelete,
   availableOrgUnits,
@@ -213,6 +217,15 @@ export default function TeamCockpitShell({
           teamSeasonId={attendanceOverview.teamSeasonId}
           initialOverview={attendanceOverview}
           canManage={canManage}
+        />
+      ) : null}
+
+      {/* TEAM-COCKPIT-03A: upcoming participation responses for the current season. */}
+      {upcomingParticipation ? (
+        <TeamParticipationSection
+          teamId={team.id}
+          teamSeasonId={upcomingParticipation.teamSeasonId}
+          initialUpcoming={upcomingParticipation}
         />
       ) : null}
 

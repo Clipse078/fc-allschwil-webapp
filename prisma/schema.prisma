@@ -351,6 +351,23 @@ enum AttendanceStatus {
   INJURED
 }
 
+// TEAM-COCKPIT-03A — pre-event participation response status.
+// Distinct from AttendanceStatus — represents player/parent RSVP before the event.
+enum ParticipationResponseStatus {
+  OPEN
+  YES
+  NO
+  MAYBE
+}
+
+// TEAM-COCKPIT-03A — who submitted the participation response.
+enum ParticipationResponseSource {
+  PLAYER
+  PARENT
+  TRAINER
+  STAFF
+}
+
 enum InitiativeStatus {
   PLANNED
   IN_PROGRESS
@@ -712,6 +729,8 @@ model Tenant {
   waitingListEntries              WaitingListEntry[]               @relation("TenantWaitingListEntries")
   // TEAM-COCKPIT-02B: canonical per-event attendance records
   attendanceRecords               AttendanceRecord[]               @relation("TenantAttendanceRecords")
+  // TEAM-COCKPIT-03A: pre-event participation responses
+  participationResponses          ParticipationResponse[]          @relation("TenantParticipationResponses")
   // COMM-01A: tenant-scoped communication/collaboration foundation
   communicationThreads            CommunicationThread[]
   communicationMessages           CommunicationMessage[]
@@ -789,6 +808,9 @@ model User {
   // TEAM-COCKPIT-02B: attendance audit back-relations
   recordedAttendanceRecords     AttendanceRecord[] @relation("AttendanceRecordedByUser")
   updatedAttendanceRecords      AttendanceRecord[] @relation("AttendanceUpdatedByUser")
+  // TEAM-COCKPIT-03A: participation response audit back-relations
+  respondedParticipationResponses ParticipationResponse[] @relation("ParticipationRespondedByUser")
+  updatedParticipationResponses   ParticipationResponse[] @relation("ParticipationUpdatedByUser")
 
   // COMM-01A: communication foundation back-relations
   createdCommunicationThreads  CommunicationThread[]  @relation("CommunicationThreadCreatedBy")
@@ -1408,6 +1430,8 @@ model Person {
   waitingListEntries              WaitingListEntry[]       @relation("WaitingListEntryPerson")
   // TEAM-COCKPIT-02B: canonical attendance history for this Person
   attendanceRecords               AttendanceRecord[]       @relation("PersonAttendanceRecords")
+  // TEAM-COCKPIT-03A: pre-event participation responses for this Person
+  participationResponses          ParticipationResponse[]  @relation("PersonParticipationResponses")
 
   @@index([lastName, firstName])
   @@index([email])
@@ -1694,6 +1718,8 @@ model TeamSeason {
   waitingListEntries     WaitingListEntry[]      @relation("WaitingListEntryTeamSeason")
   // TEAM-COCKPIT-02B: roster-context attendance records for this TeamSeason
   attendanceRecords      AttendanceRecord[]      @relation("TeamSeasonAttendanceRecords")
+  // TEAM-COCKPIT-03A: roster-context participation responses for this TeamSeason
+  participationResponses ParticipationResponse[] @relation("TeamSeasonParticipationResponses")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -1878,6 +1904,8 @@ model Event {
   tournamentResourceAllocations TournamentResourceAllocation[]
   // TEAM-COCKPIT-02B: per-player attendance for match/tournament events
   attendanceRecords             AttendanceRecord[]             @relation("EventAttendanceRecords")
+  // TEAM-COCKPIT-03A: per-player participation for match/tournament events
+  participationResponses        ParticipationResponse[]        @relation("EventParticipationResponses")
 
   @@index([seasonId, type])
   @@index([teamId, type])
@@ -4624,6 +4652,8 @@ model TrainingSession {
   sessionAllocations TrainingSessionAllocation[]
   // TEAM-COCKPIT-02B: per-player attendance for this training occurrence
   attendanceRecords  AttendanceRecord[]          @relation("TrainingSessionAttendanceRecords")
+  // TEAM-COCKPIT-03A: per-player participation for this training occurrence
+  participationResponses ParticipationResponse[] @relation("TrainingSessionParticipationResponses")
 
   /// Canonical rule: one generated session per series per date. Never duplicated.
   @@unique([trainingSeriesId, date])
@@ -5494,6 +5524,66 @@ model AttendanceRecord {
   event           Event?           @relation("EventAttendanceRecords", fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   recordedByUser  User?            @relation("AttendanceRecordedByUser", fields: [recordedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   updatedByUser   User?            @relation("AttendanceUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@unique([personId, trainingSessionId])
+  @@unique([personId, eventId])
+  @@index([tenantId])
+  @@index([tenantId, teamSeasonId])
+  @@index([tenantId, personId])
+  @@index([teamSeasonId, personId])
+  @@index([teamSeasonId, eventKind])
+  @@index([trainingSessionId])
+  @@index([eventId])
+  @@index([tenantId, status])
+}
+
+// ---------------------------------------------------------------------------
+// TEAM-COCKPIT-03A — ParticipationResponse
+//
+// Canonical pre-event participation/RSVP response from players or parents.
+// Distinct from AttendanceRecord — participation is intent before the event;
+// attendance is what actually happened after/at the event.
+//
+// Event reference strategy (mirrors AttendanceRecord / WeekplannerItem):
+//   TRAINING   → trainingSessionId (canonical TrainingSession occurrence)
+//   MATCH      → eventId (Event.type = MATCH)
+//   TOURNAMENT → eventId (Event.type = TOURNAMENT)
+//
+// Invariants:
+//   - tenantId is required and always from trusted session context.
+//   - teamSeasonId provides roster/filter context for Team Cockpit views.
+//   - OPEN is the implicit default until a response is recorded.
+//   - Participation responses must NOT alter attendance statistics.
+// ---------------------------------------------------------------------------
+model ParticipationResponse {
+  id                String                       @id @default(cuid())
+  tenantId          String
+  personId          String
+  teamSeasonId      String
+  eventKind         AttendanceEventKind
+  /// Set when eventKind = TRAINING. Null for MATCH/TOURNAMENT.
+  trainingSessionId String?
+  /// Set when eventKind = MATCH | TOURNAMENT. Null for TRAINING.
+  eventId           String?
+  status            ParticipationResponseStatus  @default(OPEN)
+  /// Optional reason or note (e.g. illness, late decision).
+  note              String?
+  /// When the player/parent/trainer submitted a non-OPEN response.
+  respondedAt       DateTime?
+  /// Who submitted the response (player, parent, trainer, staff).
+  responseSource    ParticipationResponseSource?
+  respondedByUserId String?
+  updatedByUserId   String?
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+
+  tenant          Tenant           @relation("TenantParticipationResponses", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  person          Person           @relation("PersonParticipationResponses", fields: [personId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  teamSeason      TeamSeason       @relation("TeamSeasonParticipationResponses", fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  trainingSession TrainingSession? @relation("TrainingSessionParticipationResponses", fields: [trainingSessionId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  event           Event?           @relation("EventParticipationResponses", fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  respondedByUser User?            @relation("ParticipationRespondedByUser", fields: [respondedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  updatedByUser   User?            @relation("ParticipationUpdatedByUser", fields: [updatedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
 
   @@unique([personId, trainingSessionId])
   @@unique([personId, eventId])

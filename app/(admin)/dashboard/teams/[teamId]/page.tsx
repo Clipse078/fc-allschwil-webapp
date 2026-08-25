@@ -10,6 +10,7 @@ import { getTeamDetailData } from "@/lib/teams/queries";
 import { buildTeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import { getTeamTrainingSchedule } from "@/lib/teams/team-training-schedule";
 import { getTeamAttendanceOverview } from "@/lib/attendance/queries";
+import { getUpcomingParticipationForTeam } from "@/lib/participation/queries";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
@@ -76,7 +77,7 @@ export default async function TeamDetailPage({ params }: Props) {
   const teamOrgUnit = team.currentSeasonOrgUnit ?? team.orgUnit ?? null;
   const teamOrgUnitId = teamOrgUnit?.id ?? null;
 
-  const [teamScopedAssignments, teamEligibleUsers, teamRolesForResponsibilities, trainingSchedule, attendanceOverview] =
+  const [teamScopedAssignments, teamEligibleUsers, teamRolesForResponsibilities, trainingSchedule, attendanceOverview, upcomingParticipation] =
     await Promise.all([
       teamOrgUnitId
         ? getScopedAssignmentsForOrgUnit(tenantId, teamOrgUnitId)
@@ -99,6 +100,9 @@ export default async function TeamDetailPage({ params }: Props) {
         : Promise.resolve([]),
       team.currentTeamSeasonId
         ? getTeamAttendanceOverview(tenantId, team.currentTeamSeasonId)
+        : Promise.resolve(null),
+      team.currentTeamSeasonId
+        ? getUpcomingParticipationForTeam(tenantId, team.currentTeamSeasonId, teamId)
         : Promise.resolve(null),
     ]);
 
@@ -154,6 +158,7 @@ export default async function TeamDetailPage({ params }: Props) {
             cockpitMetrics={cockpitMetrics}
             trainingSchedule={trainingSchedule}
             attendanceOverview={attendanceOverview}
+            upcomingParticipation={upcomingParticipation}
             canManage={canManage}
             canDelete={canDelete}
             availableOrgUnits={availableOrgUnits.map((ou) => ({
