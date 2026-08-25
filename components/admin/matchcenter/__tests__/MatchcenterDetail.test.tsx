@@ -31,14 +31,19 @@ vi.mock(
     default: ({
       matchId,
       homeAway,
+      isOperationallyActionable,
     }: {
       matchId: string;
       homeAway: string | null;
+      isOperationallyActionable?: boolean;
     }) => (
       <div
         data-testid="matchcenter-detail-operational"
         data-match-id={matchId}
         data-homeaway={homeAway ?? ""}
+        data-operationally-actionable={
+          isOperationallyActionable === false ? "false" : "true"
+        }
       >
         MatchcenterDetailOperational
       </div>
@@ -288,25 +293,15 @@ describe("MatchcenterDetail", () => {
     expect(screen.queryByTestId("matchcenter-detail-result")).toBeNull();
   });
 
-  it("renders operational information", () => {
+  it("renders operational remarks inside technical details", () => {
     render(<MatchcenterDetail match={createMatch()} />);
 
     expect(
-      screen.getByTestId("matchcenter-detail-pitch"),
-    ).toHaveTextContent("KR2");
+      screen.getByTestId("matchcenter-technical-details"),
+    ).toBeInTheDocument();
 
     expect(
-      screen.getByText("G1"),
-    ).toBeTruthy();
-
-    expect(
-      screen.getByText("G2"),
-    ).toBeTruthy();
-
-    expect(
-      screen.getByTestId(
-        "matchcenter-detail-meeting-time",
-      ),
+      screen.getByTestId("matchcenter-detail-meeting-time"),
     ).not.toHaveTextContent("Nicht hinterlegt");
 
     expect(
@@ -334,15 +329,12 @@ describe("MatchcenterDetail", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("renders provider and synchronization metadata", () => {
+  it("renders provider and synchronization metadata inside technical details", () => {
     render(<MatchcenterDetail match={createMatch()} />);
 
-    expect(
-      screen.getAllByText("SFV").length,
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      screen.getAllByText("10001").length,
-    ).toBeGreaterThanOrEqual(1);
+    expect(screen.getByTestId("matchcenter-technical-details")).toBeInTheDocument();
+    expect(screen.getAllByText("SFV").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("10001").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Junioren E")).toBeTruthy();
     expect(screen.getByText("Stärkeklasse 1")).toBeTruthy();
     expect(screen.getByText("2026/2027")).toBeTruthy();
@@ -445,7 +437,7 @@ describe("MatchcenterDetail", () => {
     );
   });
 
-  it("shows a resolved mapping status without synchronization guidance", () => {
+  it("shows resolved mapping without a dedicated status card", () => {
     render(
       <MatchcenterDetail
         match={createMatch()}
@@ -453,14 +445,10 @@ describe("MatchcenterDetail", () => {
     );
 
     expect(
-      screen.getByTestId(
-        "matchcenter-mapping-status-resolved",
+      screen.queryByTestId(
+        "matchcenter-mapping-status-unresolved",
       ),
-    ).toBeInTheDocument();
-
-    expect(
-      screen.getByText("Teams vollständig zugeordnet"),
-    ).toBeInTheDocument();
+    ).not.toBeInTheDocument();
 
     expect(
       screen.queryByRole("link", {
@@ -515,6 +503,35 @@ describe("MatchcenterDetail", () => {
     expect(
       screen.getByTestId("matchcenter-detail-operational"),
     ).toBeInTheDocument();
+  });
+
+  it("passes operational cutoff to the operational workspace for past matches", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          status: "COMPLETED",
+          startAt: new Date("2026-08-24T16:00:00.000Z"),
+          scoreHome: 2,
+          scoreAway: 1,
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-detail-operational"),
+    ).toHaveAttribute("data-operationally-actionable", "false");
+  });
+
+  it("renders match hero with club logos when tenant logo is provided", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch()}
+        tenantLogoUrl="https://example.com/club.png"
+      />,
+    );
+
+    expect(screen.getByTestId("matchcenter-detail-hero")).toBeInTheDocument();
+    expect(screen.getByAltText("Logo FC Allschwil E1")).toBeInTheDocument();
   });
 
   it("does not crash with all optional fields null", () => {

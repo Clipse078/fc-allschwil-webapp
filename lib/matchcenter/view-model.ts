@@ -152,7 +152,11 @@ export function buildMatchcenterViewModel(
     }
 
     if (
-      isSportingMatchInUpcomingList(lifecycle, { includePostponed: true })
+      isSportingMatchInUpcomingList(lifecycle, {
+        includePostponed: true,
+        startAt: match.startAt,
+        now: now ?? new Date(),
+      })
     ) {
       upcoming.push({
         match,

@@ -141,26 +141,48 @@ export function isSportingMatchNeedsReconciliation(
   return lifecycle === "NEEDS_RECONCILIATION";
 }
 
+export type SportingUpcomingListOptions = {
+  /**
+   * When true, POSTPONED fixtures with a future effective kickoff may appear
+   * in Spielplanung. Past postponed fixtures are always excluded.
+   */
+  includePostponed?: boolean;
+  /** Effective scheduled kickoff — required when includePostponed is true. */
+  startAt?: Date;
+  now?: Date;
+};
+
 /**
- * Spielplanung bucket — genuinely upcoming fixtures only.
+ * Spielplanung bucket — operational upcoming fixtures.
  *
- * Includes UPCOMING and LIVE. POSTPONED is surfaced in Spielplanung for
- * Matchcenter continuity (#402/#403) but excluded from the "anstehend" KPI
- * unless callers opt in via includePostponedInUpcoming.
+ * Includes UPCOMING and LIVE. POSTPONED is included only when the effective
+ * kickoff is still in the future (rescheduled/postponed-to-future continuity).
+ * Past postponed fixtures must not remain in normal Spielplanung.
  */
 export function isSportingMatchInUpcomingList(
   lifecycle: SportingMatchLifecycle,
-  options: { includePostponed?: boolean } = {},
+  options: SportingUpcomingListOptions = {},
 ): boolean {
   if (lifecycle === "UPCOMING" || lifecycle === "LIVE") {
     return true;
   }
 
   if (options.includePostponed && lifecycle === "POSTPONED") {
-    return true;
+    if (!options.startAt || !options.now) {
+      return false;
+    }
+    return !isPastKickoff(options.startAt, options.now);
   }
 
   return false;
+}
+
+/** True when kickoff is strictly before the reference instant. */
+export function isSportingMatchPastKickoff(
+  startAt: Date,
+  now: Date = new Date(),
+): boolean {
+  return isPastKickoff(startAt, now);
 }
 
 /** Resultate bucket — only definitively completed matches. */

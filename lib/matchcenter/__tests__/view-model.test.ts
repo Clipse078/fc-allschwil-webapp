@@ -307,6 +307,7 @@ describe("buildMatchcenterViewModel", () => {
     const postponed = createMatch({
       id: "m-postponed",
       status: "POSTPONED",
+      startAt: new Date("2026-09-05T16:00:00.000Z"),
       scoreHome: 0,
       scoreAway: 0,
     });
@@ -317,13 +318,46 @@ describe("buildMatchcenterViewModel", () => {
       scoreAway: 0,
     });
 
-    const viewModel = buildMatchcenterViewModel([postponed, cancelled]);
+    const viewModel = buildMatchcenterViewModel([postponed, cancelled], {
+      now: new Date("2026-08-25T12:00:00.000Z"),
+    });
 
     expect(viewModel.resultate).toEqual([]);
     expect(viewModel.spielplanung.map((row) => row.match.id)).toEqual([
       "m-postponed",
     ]);
     expect(viewModel.needsReconciliation).toEqual([]);
+  });
+
+  it("excludes past postponed fixtures from Spielplanung (02.08-style regression)", () => {
+    const pastPostponed = createMatch({
+      id: "m-past-postponed",
+      status: "POSTPONED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "verschoben",
+      },
+    });
+    const futureUpcoming = createMatch({
+      id: "m-future",
+      startAt: new Date("2026-09-10T10:00:00.000Z"),
+    });
+
+    const viewModel = buildMatchcenterViewModel(
+      [pastPostponed, futureUpcoming],
+      { now: new Date("2026-08-25T12:00:00.000Z") },
+    );
+
+    expect(viewModel.spielplanung.map((row) => row.match.id)).toEqual([
+      "m-future",
+    ]);
+    expect(viewModel.resultate).toEqual([]);
+    expect(viewModel.needsReconciliation).toEqual([]);
+    expect(viewModel.kpis.anstehend).toBe(1);
   });
 
   it("does not treat future 0:0 as a completed result", () => {

@@ -166,6 +166,7 @@ export default async function MatchcenterDetailPage({
         canSubmitPlanning={canSubmitPlanning}
         canValidatePlanning={canValidatePlanning}
         isProtectedSource={isProtectedSource}
+        tenantLogoUrl={tenantContext.logoUrl}
       />
     </ToastProvider>
   );

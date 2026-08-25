@@ -30,6 +30,7 @@ import {
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
 import { formatAvailabilitySuffix } from "@/components/admin/training/FacilityResourceSelector";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import { formatOperationalHistoryLabel } from "@/lib/matchcenter/operational-history";
 import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 
@@ -102,6 +103,11 @@ export type MatchcenterDetailOperationalProps = {
    * pickers replace the legacy code-based <select>.
    */
   dressingRoomFacilityGroups?: FacilityGroup[];
+  /**
+   * Canonical operational cutoff — when false, no editable facility planning
+   * or readiness workflow is shown. Historical allocations may render read-only.
+   */
+  isOperationallyActionable?: boolean;
 };
 
 // ── Readiness helpers ─────────────────────────────────────────────────────────
@@ -243,6 +249,7 @@ export default function MatchcenterDetailOperational({
   dressingRoomOptions = [],
   pitchHallFacilityGroups,
   dressingRoomFacilityGroups,
+  isOperationallyActionable = true,
 }: MatchcenterDetailOperationalProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -434,9 +441,42 @@ export default function MatchcenterDetailOperational({
         ? `${awayDisplayName} (Gast)`
         : "FC Allschwil";
 
+  const operationalHistoryLabel = formatOperationalHistoryLabel(
+    {
+      pitchCode: currentPitchCode,
+      homeDressingRoomCode: currentHomeDressingRoomCode,
+      awayDressingRoomCode: currentAwayDressingRoomCode,
+    },
+    {
+      pitchOptions: effectivePitchOptions,
+      dressingRoomOptions: effectiveDressingRoomOptions,
+    },
+  );
+
+  if (!isOperationallyActionable) {
+    return (
+      <div className="space-y-5" data-testid="matchcenter-operational-history">
+        {operationalHistoryLabel ? (
+          <SectionCard
+            title="Organisation"
+            description="Historische Zuteilungen"
+          >
+            <p
+              className="text-sm font-medium text-[var(--foreground)]"
+              data-testid="matchcenter-operational-history-label"
+            >
+              {operationalHistoryLabel}
+            </p>
+          </SectionCard>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* D2 — Infoboard Readiness */}
+      {/* D2 — Infoboard Readiness (HOME actionable only) */}
+      {isHomeMatch ? (
       <SectionCard
         title="Infoboard-Bereitschaft"
         description="Prüfung der Voraussetzungen für die Infoboard-Anzeige"
@@ -535,6 +575,7 @@ export default function MatchcenterDetailOperational({
           </div>
         )}
       </SectionCard>
+      ) : null}
 
       {/* D3 — Team Assignment */}
       <SectionCard
@@ -585,7 +626,8 @@ export default function MatchcenterDetailOperational({
         </div>
       </SectionCard>
 
-      {/* D4 — Pitch Assignment */}
+      {/* D4 — Pitch Assignment (HOME only) */}
+      {isHomeMatch ? (
       <SectionCard
         title="Sportanlage und Spielfeld"
         description="Spielfeldwahl für dieses Match"
@@ -628,8 +670,10 @@ export default function MatchcenterDetailOperational({
           </label>
         )}
       </SectionCard>
+      ) : null}
 
-      {/* D5 — Dressing Room Assignment */}
+      {/* D5 — Dressing Room Assignment (HOME only) */}
+      {isHomeMatch ? (
       <SectionCard
         title="Garderobenzuteilung"
         description="Garderobenzuteilung für Heim- und Gastteam"
@@ -712,6 +756,7 @@ export default function MatchcenterDetailOperational({
           </div>
         )}
       </SectionCard>
+      ) : null}
 
       {/* D6 — Publication */}
       <SectionCard

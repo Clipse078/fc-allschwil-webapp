@@ -149,16 +149,11 @@ describe("MatchcenterDetailOperational", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("infoboard-readiness-not-relevant"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
     });
 
-    expect(
-      screen.getByText(
-        "Auswärtsspiele werden nicht auf dem FC-Allschwil-Infoboard angezeigt.",
-      ),
-    ).toBeInTheDocument();
+    expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();
+    expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
   });
 
   it("shows Nicht relevant when homeAway is null", async () => {
@@ -169,10 +164,11 @@ describe("MatchcenterDetailOperational", () => {
     );
 
     await waitFor(() => {
-      expect(
-        screen.getByTestId("infoboard-readiness-not-relevant"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
     });
+
+    expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();
+    expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
   });
 
   // ── D4 Pitch ─────────────────────────────────────────────────────────────
@@ -592,7 +588,7 @@ describe("MatchcenterDetailOperational — RESOURCE-AVAILABILITY-UX-01 availabil
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("infoboard-readiness-not-relevant")).toBeInTheDocument();
+      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
     });
     expect(availabilityCalls).toHaveLength(0);
   });
@@ -644,5 +640,57 @@ describe("PUB-02 — computeAllocationWarning", () => {
   it("AW-9: homeAway=null → null (no warning)", () => {
     const result = computeAllocationWarning(null, true, null, null, null);
     expect(result).toBeNull();
+  });
+});
+
+describe("operational cutoff", () => {
+  it("shows read-only history instead of editable controls when not actionable", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          isOperationallyActionable: false,
+          currentPitchCode: "STADION",
+          currentHomeDressingRoomCode: "O1",
+          currentAwayDressingRoomCode: "E1",
+          pitchOptions: [{ code: "STADION", name: "Kunstrasen 2" }],
+          dressingRoomOptions: [
+            { code: "O1", name: "O1" },
+            { code: "E1", name: "E1" },
+          ],
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("matchcenter-operational-history"),
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByTestId("matchcenter-operational-history-label"),
+    ).toHaveTextContent("Kunstrasen 2 · Heim O1 · Gast E1");
+    expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
+    expect(screen.queryByTestId("infoboard-readiness-ready")).toBeNull();
+  });
+
+  it("does not render home facility pickers for away matches", async () => {
+    render(
+      <MatchcenterDetailOperational
+        {...createProps({
+          homeAway: "AWAY",
+          homeIsOwnTeam: false,
+          awayIsOwnTeam: true,
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("team-assignment-select")).toBeInTheDocument();
+    });
+
+    expect(screen.queryByTestId("pitch-assignment-select")).toBeNull();
+    expect(screen.queryByTestId("home-dressing-room-select")).toBeNull();
+    expect(screen.queryByTestId("infoboard-readiness-not-relevant")).toBeNull();
   });
 });

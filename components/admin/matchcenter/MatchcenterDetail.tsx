@@ -3,24 +3,19 @@ import {
   ArrowLeft,
   CalendarDays,
   Check,
-  CheckCircle2,
   CircleAlert,
   Clock3,
   Cloud,
   ExternalLink,
   FileCheck2,
-  Flag,
   Globe2,
-  Home,
   Info,
   MapPin,
   Radio,
   RefreshCw,
   ShieldCheck,
-  Shirt,
   Trophy,
   Users,
-  Volleyball,
   X,
 } from "lucide-react";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
@@ -41,6 +36,10 @@ import type { FacilityResourceOption } from "@/lib/facilities/resource-options";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
 import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
+import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
+import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
+import { resolveMatchcenterCompactSideName } from "@/lib/matchcenter/team-display";
+import { isMatchOperationallyActionable } from "@/lib/matchcenter/operational-state";
 
 type MatchcenterDetailProps = {
   match: MatchcenterMatchDetail;
@@ -69,6 +68,8 @@ type MatchcenterDetailProps = {
   canSubmitPlanning?: boolean;
   canValidatePlanning?: boolean;
   isProtectedSource?: boolean;
+  /** Canonical tenant/club logo for own-team identity — MATCHCENTER-UX-03-C1. */
+  tenantLogoUrl?: string | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -200,6 +201,7 @@ export default function MatchcenterDetail({
   canSubmitPlanning = false,
   canValidatePlanning = false,
   isProtectedSource = false,
+  tenantLogoUrl = null,
 }: MatchcenterDetailProps) {
   const lifecycleClassification = getMatchcenterLifecycleClassification(match);
   const statusLabel =
@@ -211,6 +213,12 @@ export default function MatchcenterDetail({
     getMatchcenterLifecycleVariant(lifecycleClassification);
 
   const result = getMatchcenterResultLabel(match);
+  const operationallyActionable = isMatchOperationallyActionable(match);
+
+  const homeName = resolveMatchcenterCompactSideName(match.home);
+  const awayName = resolveMatchcenterCompactSideName(match.away);
+  const homeLogoUrl = resolveClubIdentityLogoUrl(match.home, tenantLogoUrl);
+  const awayLogoUrl = resolveClubIdentityLogoUrl(match.away, tenantLogoUrl);
 
   const unresolvedSides = [
     match.home,
@@ -241,13 +249,6 @@ export default function MatchcenterDetail({
         ? "Auswärtsspiel"
         : null;
 
-  const homeAwayVariant: BadgeVariant =
-    normalizedHomeAway === "HOME"
-      ? "success"
-      : normalizedHomeAway === "AWAY"
-        ? "default"
-        : "outline";
-
   // ISO date string for the operational workspace (serializable to client)
   const matchDateIso = match.startAt.toISOString();
   // RESOURCE-AVAILABILITY-UX-01 — same start/end passed to the live
@@ -264,31 +265,15 @@ export default function MatchcenterDetail({
           "Matchdetails und operative Informationen"
         }
         headerBadge={
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant={statusVariant}
-              data-testid="matchcenter-detail-status"
-            >
-              {lifecycleClassification.lifecycle === "LIVE" ? (
-                <Radio className="h-3.5 w-3.5" />
-              ) : null}
-              {statusLabel}
-            </Badge>
-
-            {homeAwayLabel ? (
-              <Badge
-                variant={homeAwayVariant}
-                data-testid="matchcenter-detail-homeaway"
-              >
-                {normalizedHomeAway === "HOME" ? (
-                  <Home className="h-3.5 w-3.5" />
-                ) : (
-                  <Flag className="h-3.5 w-3.5" />
-                )}
-                {homeAwayLabel}
-              </Badge>
+          <Badge
+            variant={statusVariant}
+            data-testid="matchcenter-detail-status"
+          >
+            {lifecycleClassification.lifecycle === "LIVE" ? (
+              <Radio className="h-3.5 w-3.5" />
             ) : null}
-          </div>
+            {statusLabel}
+          </Badge>
         }
         breadcrumbs={[
           {
@@ -330,106 +315,110 @@ export default function MatchcenterDetail({
           </div>
         }
         summary={
-          <SectionCard
-            accent
-            bodyClassName="px-5 py-6"
-          >
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-center">
-              <div className="min-w-0 text-center lg:text-left">
-                <div className="mb-2 flex items-center justify-center gap-2 lg:justify-start">
-                  <Home className="h-4 w-4 text-[var(--muted)]" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    Heimteam
-                  </span>
-                </div>
-
-                <p
-                  className={
-                    match.home.isOwnTeam
-                      ? "text-xl font-bold text-[var(--foreground)]"
-                      : "text-xl font-semibold text-[var(--foreground)]"
-                  }
-                  data-testid="matchcenter-detail-home-team"
-                >
-                  {match.home.displayName}
-                </p>
-
-                <div className="mt-2 flex justify-center lg:justify-start">
-                  <Badge
-                    variant={
-                      match.home.resolution === "RESOLVED"
-                        ? "success"
-                        : "warning"
+          <div className="space-y-4">
+            <div
+              className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4"
+              data-testid="matchcenter-detail-hero"
+            >
+              <div className="flex min-w-0 items-center justify-end gap-3">
+                <div className="min-w-0 text-right">
+                  <p
+                    className={
+                      match.home.isOwnTeam
+                        ? "truncate text-lg font-bold text-[var(--foreground)]"
+                        : "truncate text-lg font-semibold text-[var(--foreground)]"
                     }
-                    size="sm"
+                    data-testid="matchcenter-detail-home-team"
                   >
-                    {match.home.resolution === "RESOLVED"
-                      ? "Zugeordnet"
-                      : "Nicht zugeordnet"}
-                  </Badge>
+                    {homeName}
+                  </p>
                 </div>
+                <ClubLogo
+                  logoUrl={homeLogoUrl}
+                  name={homeName}
+                  size="lg"
+                  bare
+                  className="shrink-0"
+                />
               </div>
 
-              <div className="flex flex-col items-center justify-center">
+              <div className="flex flex-col items-center justify-center px-2">
                 {result ? (
                   <div
-                    className="rounded-2xl bg-[var(--foreground)] px-6 py-3 text-3xl font-bold tabular-nums text-white shadow-sm"
+                    className="rounded-xl bg-[var(--foreground)] px-5 py-2.5 text-2xl font-bold tabular-nums text-white"
                     data-testid="matchcenter-detail-result"
                   >
                     {result}
                   </div>
                 ) : (
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-6 py-3 text-xl font-bold uppercase tracking-wide text-[var(--muted)]">
+                  <div className="text-lg font-semibold uppercase tracking-wide text-[var(--muted)]">
                     vs.
                   </div>
                 )}
 
                 {match.intermediateResultLabel ? (
                   <p
-                    className="mt-2 text-xs font-medium text-[var(--muted)]"
+                    className="mt-1.5 text-xs text-[var(--muted)]"
                     data-testid="matchcenter-detail-intermediate-result"
                   >
-                    Halbzeit: {match.intermediateResultLabel}
+                    HZ {match.intermediateResultLabel}
                   </p>
                 ) : null}
               </div>
 
-              <div className="min-w-0 text-center lg:text-right">
-                <div className="mb-2 flex items-center justify-center gap-2 lg:justify-end">
-                  <Flag className="h-4 w-4 text-[var(--muted)]" />
-                  <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                    Auswärtsteam
-                  </span>
-                </div>
-
-                <p
-                  className={
-                    match.away.isOwnTeam
-                      ? "text-xl font-bold text-[var(--foreground)]"
-                      : "text-xl font-semibold text-[var(--foreground)]"
-                  }
-                  data-testid="matchcenter-detail-away-team"
-                >
-                  {match.away.displayName}
-                </p>
-
-                <div className="mt-2 flex justify-center lg:justify-end">
-                  <Badge
-                    variant={
-                      match.away.resolution === "RESOLVED"
-                        ? "success"
-                        : "warning"
+              <div className="flex min-w-0 items-center gap-3">
+                <ClubLogo
+                  logoUrl={awayLogoUrl}
+                  name={awayName}
+                  size="lg"
+                  bare
+                  className="shrink-0"
+                />
+                <div className="min-w-0">
+                  <p
+                    className={
+                      match.away.isOwnTeam
+                        ? "truncate text-lg font-bold text-[var(--foreground)]"
+                        : "truncate text-lg font-semibold text-[var(--foreground)]"
                     }
-                    size="sm"
+                    data-testid="matchcenter-detail-away-team"
                   >
-                    {match.away.resolution === "RESOLVED"
-                      ? "Zugeordnet"
-                      : "Nicht zugeordnet"}
-                  </Badge>
+                    {awayName}
+                  </p>
                 </div>
               </div>
             </div>
-          </SectionCard>
+
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-[var(--text-2)]">
+              {match.competitionLabel ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <Trophy className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  {match.competitionLabel}
+                </span>
+              ) : null}
+              <span
+                className="inline-flex items-center gap-1.5"
+                data-testid="matchcenter-detail-start"
+              >
+                <CalendarDays className="h-3.5 w-3.5 text-[var(--muted)]" />
+                {formatDateTime(match.startAt, locale, timezone)}
+              </span>
+              {match.location ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-[var(--muted)]" />
+                  {match.location}
+                </span>
+              ) : null}
+              {homeAwayLabel ? (
+                <span
+                  className="text-xs font-semibold text-[var(--muted)]"
+                  data-testid="matchcenter-detail-homeaway"
+                >
+                  {homeAwayLabel}
+                </span>
+              ) : null}
+            </div>
+          </div>
         }
         sidebar={
           <>
@@ -467,42 +456,6 @@ export default function MatchcenterDetail({
               </div>
             </SectionCard>
 
-            <SectionCard
-              title="Quelle"
-              description="Herkunft und Provider"
-            >
-              <dl>
-                <DetailRow
-                  label="Quelle"
-                  value={valueOrFallback(sourceLabel)}
-                  icon={<Cloud className="h-3.5 w-3.5" />}
-                />
-                <DetailRow
-                  label="Event-Quelle"
-                  value={valueOrFallback(match.source.eventSource)}
-                />
-                <DetailRow
-                  label="Externe Quelle"
-                  value={valueOrFallback(match.source.externalSource)}
-                />
-                <DetailRow
-                  label="Externe ID"
-                  value={valueOrFallback(match.source.externalSourceId)}
-                />
-                <DetailRow
-                  label="Provider Match-ID"
-                  value={valueOrFallback(match.source.externalMatchId)}
-                />
-                <DetailRow
-                  label="Saison-ID"
-                  value={valueOrFallback(match.source.externalSeasonId)}
-                />
-                <DetailRow
-                  label="Matchnummer"
-                  value={valueOrFallback(match.source.matchNumber)}
-                />
-              </dl>
-            </SectionCard>
           </>
         }
       >
@@ -526,31 +479,15 @@ export default function MatchcenterDetail({
           canManage={canManageMappings}
           pitchOptions={pitchOptions}
           dressingRoomOptions={dressingRoomOptions}
+          isOperationallyActionable={operationallyActionable}
         />
 
-        <SectionCard
-          title="Team-Zuordnung"
-          description="Status der Provider-Teams im Matchcenter"
-          bodyClassName="px-5 py-5"
-        >
-          {unresolvedSides.length === 0 ? (
-            <div
-              className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3"
-              data-testid="matchcenter-mapping-status-resolved"
-            >
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-700" />
-
-              <div>
-                <p className="text-sm font-semibold text-emerald-900">
-                  Teams vollständig zugeordnet
-                </p>
-                <p className="mt-1 text-sm leading-relaxed text-emerald-800">
-                  Heim- und Auswärtsteam sind mit internen
-                  Matchcenter-Teams verknüpft.
-                </p>
-              </div>
-            </div>
-          ) : (
+        {unresolvedSides.length > 0 ? (
+          <SectionCard
+            title="Team-Zuordnung"
+            description="Offene Provider-Team-Zuordnung"
+            bodyClassName="px-5 py-5"
+          >
             <div
               className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4"
               data-testid="matchcenter-mapping-status-unresolved"
@@ -577,10 +514,8 @@ export default function MatchcenterDetail({
                   {hasUnresolvedProviderMapping ? (
                     <>
                       <p className="mt-2 text-sm leading-relaxed text-amber-900">
-                        Nach dem Speichern einer Zuordnung muss
-                        der Spielplan synchronisiert werden.
-                        Erst danach werden betroffene Matches
-                        mit der neuen Zuordnung aktualisiert.
+                        Nach dem Speichern einer Zuordnung muss der Spielplan
+                        synchronisiert werden.
                       </p>
 
                       <Link
@@ -595,252 +530,227 @@ export default function MatchcenterDetail({
                 </div>
               </div>
             </div>
-          )}
-        </SectionCard>
+          </SectionCard>
+        ) : null}
 
-        <SectionCard
-          title="Spieldaten"
-          description="Zeitpunkt, Wettbewerb und Spielstätte"
-        >
-          <dl>
-            <DetailRow
-              label="Anspielzeit"
-              value={formatDateTime(
-                match.startAt,
-                locale,
-                timezone,
-              )}
-              icon={<CalendarDays className="h-3.5 w-3.5" />}
-              testId="matchcenter-detail-start"
-            />
-            <DetailRow
-              label="Ende"
-              value={formatDateTime(
-                match.endAt,
-                locale,
-                timezone,
-              )}
-              icon={<Clock3 className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Wettbewerb"
-              value={valueOrFallback(match.competitionLabel)}
-              icon={<Trophy className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Spielort"
-              value={valueOrFallback(match.location)}
-              icon={<MapPin className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Provider-Spielstätte"
-              value={valueOrFallback(match.providerVenueName)}
-            />
-            <DetailRow
-              label="Organisator"
-              value={valueOrFallback(match.organizerName)}
-              icon={<Users className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Heim/Auswärts"
-              value={valueOrFallback(match.homeAway)}
-            />
-          </dl>
-        </SectionCard>
-
-        <SectionCard
-          title="Operative Informationen"
-          description="Club-verwaltete Angaben für den Spielbetrieb"
-        >
-          <dl>
-            <DetailRow
-              label="Feld"
-              value={valueOrFallback(match.operational.pitchCode)}
-              icon={<Volleyball className="h-3.5 w-3.5" />}
-              testId="matchcenter-detail-pitch"
-            />
-            <DetailRow
-              label="Garderobe Heim"
-              value={valueOrFallback(
-                match.operational.homeDressingRoomCode,
-              )}
-              icon={<Shirt className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Garderobe Gast"
-              value={valueOrFallback(
-                match.operational.awayDressingRoomCode,
-              )}
-              icon={<Shirt className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Treffpunkt"
-              value={formatTime(
-                match.operational.meetingTime,
-                locale,
-                timezone,
-              )}
-              icon={<Clock3 className="h-3.5 w-3.5" />}
-              testId="matchcenter-detail-meeting-time"
-            />
-            <DetailRow
-              label="Bemerkungen"
-              value={valueOrFallback(match.operational.remarks)}
-              icon={<Info className="h-3.5 w-3.5" />}
-              testId="matchcenter-detail-remarks"
-            />
-          </dl>
-        </SectionCard>
-
-        <SectionCard
-          title="Provider-Details"
-          description="Erweiterte Wettbewerbs- und Zuordnungsdaten"
-        >
-          <dl>
-            <DetailRow
-              label="Liga"
-              value={valueOrFallback(match.providerLeagueName)}
-              icon={<Trophy className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Liga-ID"
-              value={valueOrFallback(match.providerLeagueId)}
-            />
-            <DetailRow
-              label="Division"
-              value={valueOrFallback(match.providerDivisionName)}
-            />
-            <DetailRow
-              label="Division-ID"
-              value={valueOrFallback(match.providerDivisionId)}
-            />
-            <DetailRow
-              label="Runde"
-              value={valueOrFallback(match.providerRoundNumber)}
-            />
-            <DetailRow
-              label="Organisation-ID"
-              value={valueOrFallback(
-                match.providerOrganisationId,
-              )}
-            />
-            <DetailRow
-              label="Spielfeld-ID"
-              value={valueOrFallback(match.providerPlaygroundId)}
-            />
-            <DetailRow
-              label="Saison"
-              value={valueOrFallback(match.providerSeasonName)}
-            />
-          </dl>
-        </SectionCard>
-
-        <SectionCard
-          title="Synchronisierung"
-          description="Letzte Aktualisierungen der Matchdaten"
-        >
-          <dl>
-            <DetailRow
-              label="Event synchronisiert"
-              value={formatDateTime(
-                match.synchronization.eventLastSyncedAt,
-                locale,
-                timezone,
-              )}
-              icon={<RefreshCw className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Mapping synchronisiert"
-              value={formatDateTime(
-                match.synchronization.mappingLastSyncedAt,
-                locale,
-                timezone,
-              )}
-              icon={<ExternalLink className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Details synchronisiert"
-              value={formatDateTime(
-                match.synchronization.detailSyncedAt,
-                locale,
-                timezone,
-              )}
-              icon={<Cloud className="h-3.5 w-3.5" />}
-              testId="matchcenter-detail-synced"
-            />
-            <DetailRow
-              label="Provider-Status"
-              value={valueOrFallback(
-                match.synchronization.providerMatchStateName,
-              )}
-            />
-            <DetailRow
-              label="Provider-Statuscode"
-              value={valueOrFallback(
-                match.synchronization.providerMatchState,
-              )}
-            />
-          </dl>
-        </SectionCard>
-
-        <SectionCard
-          title="Freigabe"
-          description="Review- und Publikationsinformationen"
-        >
-          <dl>
-            <DetailRow
-              label="Review-Status"
-              value={valueOrFallback(match.reviewStage)}
-              icon={<ShieldCheck className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Review angefordert"
-              value={formatDateTime(
-                match.reviewRequestedAt,
-                locale,
-                timezone,
-              )}
-            />
-            <DetailRow
-              label="Review abgeschlossen"
-              value={formatDateTime(
-                match.reviewedAt,
-                locale,
-                timezone,
-              )}
-              icon={<FileCheck2 className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Publiziert"
-              value={formatDateTime(
-                match.publishedAt,
-                locale,
-                timezone,
-              )}
-              icon={<Globe2 className="h-3.5 w-3.5" />}
-            />
-            <DetailRow
-              label="Review-Notiz"
-              value={valueOrFallback(match.reviewNotes)}
-            />
-          </dl>
-          {/* ORG-ACCESS-03: planning workflow actions for MANUAL matches */}
-          {!isProtectedSource && (
-            <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-4">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-medium text-[var(--muted)]">Planungsstatus:</span>
-                <PlanningWorkflowBadge stage={match.reviewStage} size="sm" />
-              </div>
-              <PlanningWorkflowActionsClient
-                recordId={match.id}
-                domain="match"
-                planningStage={match.reviewStage}
-                isCoordinator={canValidatePlanning}
-                isProtectedSource={isProtectedSource}
-              />
+        {!isProtectedSource ? (
+          <div className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-[var(--muted)]">
+                Planungsstatus
+              </span>
+              <PlanningWorkflowBadge stage={match.reviewStage} size="sm" />
             </div>
-          )}
-        </SectionCard>
+            <PlanningWorkflowActionsClient
+              recordId={match.id}
+              domain="match"
+              planningStage={match.reviewStage}
+              isCoordinator={canValidatePlanning}
+              isProtectedSource={isProtectedSource}
+            />
+          </div>
+        ) : null}
+
+        <details
+          className="rounded-lg border border-[var(--border)] bg-[var(--surface)] text-sm"
+          data-testid="matchcenter-technical-details"
+        >
+          <summary className="cursor-pointer list-none px-4 py-3 font-medium text-[var(--foreground)] marker:content-none [&::-webkit-details-marker]:hidden">
+            Technische Details
+          </summary>
+
+          <div className="space-y-6 border-t border-[var(--border)] px-4 py-4">
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Quelle
+              </h3>
+              <dl>
+                <DetailRow
+                  label="Quelle"
+                  value={valueOrFallback(sourceLabel)}
+                  icon={<Cloud className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Event-Quelle"
+                  value={valueOrFallback(match.source.eventSource)}
+                />
+                <DetailRow
+                  label="Externe ID"
+                  value={valueOrFallback(match.source.externalSourceId)}
+                />
+                <DetailRow
+                  label="Provider Match-ID"
+                  value={valueOrFallback(match.source.externalMatchId)}
+                />
+                <DetailRow
+                  label="Saison-ID"
+                  value={valueOrFallback(match.source.externalSeasonId)}
+                />
+                <DetailRow
+                  label="Matchnummer"
+                  value={valueOrFallback(match.source.matchNumber)}
+                />
+              </dl>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Provider
+              </h3>
+              <dl>
+                <DetailRow
+                  label="Liga"
+                  value={valueOrFallback(match.providerLeagueName)}
+                  icon={<Trophy className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Liga-ID"
+                  value={valueOrFallback(match.providerLeagueId)}
+                />
+                <DetailRow
+                  label="Division"
+                  value={valueOrFallback(match.providerDivisionName)}
+                />
+                <DetailRow
+                  label="Division-ID"
+                  value={valueOrFallback(match.providerDivisionId)}
+                />
+                <DetailRow
+                  label="Runde"
+                  value={valueOrFallback(match.providerRoundNumber)}
+                />
+                <DetailRow
+                  label="Organisation-ID"
+                  value={valueOrFallback(match.providerOrganisationId)}
+                />
+                <DetailRow
+                  label="Spielfeld-ID"
+                  value={valueOrFallback(match.providerPlaygroundId)}
+                />
+                <DetailRow
+                  label="Saison"
+                  value={valueOrFallback(match.providerSeasonName)}
+                />
+                <DetailRow
+                  label="Provider-Spielstätte"
+                  value={valueOrFallback(match.providerVenueName)}
+                />
+                <DetailRow
+                  label="Organisator"
+                  value={valueOrFallback(match.organizerName)}
+                  icon={<Users className="h-3.5 w-3.5" />}
+                />
+              </dl>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Synchronisierung
+              </h3>
+              <dl>
+                <DetailRow
+                  label="Event synchronisiert"
+                  value={formatDateTime(
+                    match.synchronization.eventLastSyncedAt,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<RefreshCw className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Mapping synchronisiert"
+                  value={formatDateTime(
+                    match.synchronization.mappingLastSyncedAt,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<ExternalLink className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Details synchronisiert"
+                  value={formatDateTime(
+                    match.synchronization.detailSyncedAt,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<Cloud className="h-3.5 w-3.5" />}
+                  testId="matchcenter-detail-synced"
+                />
+                <DetailRow
+                  label="Provider-Status"
+                  value={valueOrFallback(
+                    match.synchronization.providerMatchStateName,
+                  )}
+                />
+                <DetailRow
+                  label="Provider-Statuscode"
+                  value={valueOrFallback(
+                    match.synchronization.providerMatchState,
+                  )}
+                />
+              </dl>
+            </div>
+
+            <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                Freigabe
+              </h3>
+              <dl>
+                <DetailRow
+                  label="Review-Status"
+                  value={valueOrFallback(match.reviewStage)}
+                  icon={<ShieldCheck className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Review angefordert"
+                  value={formatDateTime(
+                    match.reviewRequestedAt,
+                    locale,
+                    timezone,
+                  )}
+                />
+                <DetailRow
+                  label="Review abgeschlossen"
+                  value={formatDateTime(
+                    match.reviewedAt,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<FileCheck2 className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Publiziert"
+                  value={formatDateTime(
+                    match.publishedAt,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<Globe2 className="h-3.5 w-3.5" />}
+                />
+                <DetailRow
+                  label="Review-Notiz"
+                  value={valueOrFallback(match.reviewNotes)}
+                />
+                <DetailRow
+                  label="Treffpunkt"
+                  value={formatTime(
+                    match.operational.meetingTime,
+                    locale,
+                    timezone,
+                  )}
+                  icon={<Clock3 className="h-3.5 w-3.5" />}
+                  testId="matchcenter-detail-meeting-time"
+                />
+                <DetailRow
+                  label="Bemerkungen"
+                  value={valueOrFallback(match.operational.remarks)}
+                  icon={<Info className="h-3.5 w-3.5" />}
+                  testId="matchcenter-detail-remarks"
+                />
+              </dl>
+            </div>
+          </div>
+        </details>
       </DetailPagePattern>
     </PageShell>
   );

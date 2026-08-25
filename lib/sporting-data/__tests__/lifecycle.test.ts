@@ -73,6 +73,26 @@ describe("classifySportingMatchLifecycle", () => {
     ).toBe("POSTPONED");
   });
 
+  it("past postponed is excluded from Spielplanung upcoming list", () => {
+    expect(
+      isSportingMatchInUpcomingList("POSTPONED", {
+        includePostponed: true,
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        now: NOW,
+      }),
+    ).toBe(false);
+  });
+
+  it("future postponed remains in Spielplanung upcoming list", () => {
+    expect(
+      isSportingMatchInUpcomingList("POSTPONED", {
+        includePostponed: true,
+        startAt: new Date("2026-09-05T16:00:00.000Z"),
+        now: NOW,
+      }),
+    ).toBe(true);
+  });
+
   it("7. cancelled → CANCELLED", () => {
     expect(
       classifySportingMatchLifecycle({
@@ -111,6 +131,8 @@ describe("classifySportingMatchLifecycle", () => {
     for (const lifecycle of lifecycles) {
       const inUpcoming = isSportingMatchInUpcomingList(lifecycle, {
         includePostponed: true,
+        startAt: new Date("2026-09-05T16:00:00.000Z"),
+        now: NOW,
       });
       const inResults = isSportingMatchInResultsList(lifecycle);
       expect(inUpcoming && inResults).toBe(false);

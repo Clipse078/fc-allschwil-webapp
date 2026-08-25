@@ -18,8 +18,13 @@
  * Pure, synchronous, no I/O.
  */
 
+import { isSportingMatchPastKickoff } from "@/lib/sporting-data/lifecycle";
 import type { MatchcenterMatchSummary } from "./types";
-import { isMatchCancelledOrPostponed, isMatchCompleted } from "./match-lifecycle";
+import {
+  getMatchcenterLifecycleClassification,
+  isMatchCancelledOrPostponed,
+  isMatchCompleted,
+} from "./match-lifecycle";
 
 export type MatchcenterActionStatus =
   | "READY"
@@ -53,6 +58,41 @@ const NOT_APPLICABLE: MatchcenterOperationalAssessment = {
   teamUnresolved: false,
 };
 
+type OperationalMatchSource = Pick<
+  MatchcenterMatchSummary,
+  "status" | "startAt" | "synchronization" | "homeAway"
+>;
+
+/**
+ * Canonical gate for future-event operational preparation (pitch, dressing rooms,
+ * readiness, publication controls). Past fixtures — including unresolved past
+ * states — are never operationally actionable regardless of lifecycle label.
+ */
+export function isMatchOperationallyActionable(
+  match: OperationalMatchSource,
+  now?: Date,
+): boolean {
+  const referenceNow = now ?? new Date();
+
+  if (isSportingMatchPastKickoff(match.startAt, referenceNow)) {
+    return false;
+  }
+
+  const lifecycle = getMatchcenterLifecycleClassification(match, referenceNow)
+    .lifecycle;
+
+  if (
+    lifecycle === "COMPLETED" ||
+    lifecycle === "CANCELLED" ||
+    lifecycle === "POSTPONED" ||
+    lifecycle === "NEEDS_RECONCILIATION"
+  ) {
+    return false;
+  }
+
+  return lifecycle === "UPCOMING" || lifecycle === "LIVE";
+}
+
 /**
  * Assesses the operational action state of a single match.
  *
@@ -67,7 +107,13 @@ export function assessMatchOperationalState(
   match: MatchcenterMatchSummary,
   now?: Date,
 ): MatchcenterOperationalAssessment {
-  if (isMatchCompleted(match, now) || isMatchCancelledOrPostponed(match, now)) {
+  const referenceNow = now ?? new Date();
+
+  if (
+    isSportingMatchPastKickoff(match.startAt, referenceNow) ||
+    isMatchCompleted(match, referenceNow) ||
+    isMatchCancelledOrPostponed(match, referenceNow)
+  ) {
     return NOT_APPLICABLE;
   }
 

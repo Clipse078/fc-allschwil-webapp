@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   assessMatchOperationalState,
+  isMatchOperationallyActionable,
   isMatchOperationallyOpen,
 } from "../operational-state";
 import type { MatchcenterMatchSummary, MatchcenterSide } from "../types";
@@ -83,6 +84,50 @@ function createMatch(
     ...overrides,
   };
 }
+
+describe("isMatchOperationallyActionable", () => {
+  it("returns false for past completed matches", () => {
+    const match = createMatch({
+      status: "COMPLETED",
+      startAt: new Date("2026-08-24T16:00:00.000Z"),
+    });
+
+    expect(
+      isMatchOperationallyActionable(match, new Date("2026-08-25T12:00:00.000Z")),
+    ).toBe(false);
+  });
+
+  it("returns true for future home matches", () => {
+    const match = createMatch({
+      status: "SCHEDULED",
+      startAt: new Date("2026-09-10T10:00:00.000Z"),
+    });
+
+    expect(
+      isMatchOperationallyActionable(match, new Date("2026-08-25T12:00:00.000Z")),
+    ).toBe(true);
+  });
+
+  it("returns false for past unresolved fixtures without inventing completion", () => {
+    const match = createMatch({
+      status: "SCHEDULED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "noch nicht ausgetragen",
+      },
+    });
+
+    expect(
+      isMatchOperationallyActionable(match, new Date("2026-08-25T12:00:00.000Z")),
+    ).toBe(false);
+    expect(assessMatchOperationalState(match, new Date("2026-08-25T12:00:00.000Z"))
+      .status).toBe("NOT_APPLICABLE");
+  });
+});
 
 describe("assessMatchOperationalState — MATCHCENTER-UX-01 §10 hard rule", () => {
   it("D. a COMPLETED match with missing pitch/dressing rooms has ZERO open actions", () => {

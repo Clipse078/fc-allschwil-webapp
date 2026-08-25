@@ -115,6 +115,8 @@ export async function listUpcomingMatches(
     }).filter((view) =>
       isSportingMatchInUpcomingList(view.lifecycle, {
         includePostponed: true,
+        startAt: view.startAt,
+        now: input.now ?? new Date(),
       }),
     ),
   );
