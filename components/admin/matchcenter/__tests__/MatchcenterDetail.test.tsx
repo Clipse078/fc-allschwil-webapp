@@ -58,8 +58,8 @@ function createMatch(
     title: "FC Allschwil E1 – FC Basel E1",
     description: "Meisterschaftsspiel",
     status: "SCHEDULED",
-    startAt: new Date("2026-08-22T16:00:00.000Z"),
-    endAt: new Date("2026-08-22T18:00:00.000Z"),
+    startAt: new Date("2026-09-22T16:00:00.000Z"),
+    endAt: new Date("2026-09-22T18:00:00.000Z"),
     location: "Im Brüel",
     competitionLabel: "Meisterschaft",
     homeAway: "HOME",
@@ -245,6 +245,47 @@ describe("MatchcenterDetail", () => {
     expect(
       screen.getByTestId("matchcenter-detail-result"),
     ).toHaveTextContent("2:2");
+  });
+
+  it("uses canonical lifecycle for provider-completed fixtures still marked SCHEDULED", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          status: "SCHEDULED",
+          startAt: new Date("2026-08-02T16:00:00.000Z"),
+          scoreHome: 2,
+          scoreAway: 1,
+          synchronization: {
+            eventLastSyncedAt: null,
+            mappingLastSyncedAt: null,
+            detailSyncedAt: null,
+            providerMatchState: null,
+            providerMatchStateName: "ausgetragen",
+          },
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("matchcenter-detail-status"),
+    ).toHaveTextContent("Abgeschlossen");
+    expect(
+      screen.getByTestId("matchcenter-detail-result"),
+    ).toHaveTextContent("2:1");
+  });
+
+  it("does not show a fake score for future SCHEDULED fixtures with 0:0 placeholders", () => {
+    render(
+      <MatchcenterDetail
+        match={createMatch({
+          status: "SCHEDULED",
+          scoreHome: 0,
+          scoreAway: 0,
+        })}
+      />,
+    );
+
+    expect(screen.queryByTestId("matchcenter-detail-result")).toBeNull();
   });
 
   it("renders operational information", () => {

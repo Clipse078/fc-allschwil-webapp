@@ -275,6 +275,115 @@ describe("buildMatchcenterViewModel", () => {
       "m-result-older",
     ]);
   });
+
+  it("routes NEEDS_RECONCILIATION fixtures to the admin bucket only", () => {
+    const stalePast = createMatch({
+      id: "m-reconcile",
+      status: "SCHEDULED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "noch nicht ausgetragen",
+      },
+    });
+
+    const viewModel = buildMatchcenterViewModel([stalePast], {
+      now: new Date("2026-08-25T12:00:00.000Z"),
+    });
+
+    expect(viewModel.needsReconciliation.map((row) => row.match.id)).toEqual([
+      "m-reconcile",
+    ]);
+    expect(viewModel.spielplanung).toEqual([]);
+    expect(viewModel.resultate).toEqual([]);
+    expect(viewModel.kpis.anstehend).toBe(0);
+    expect(viewModel.kpis.resultate).toBe(0);
+  });
+
+  it("excludes POSTPONED from Resultate and CANCELLED from all buckets", () => {
+    const postponed = createMatch({
+      id: "m-postponed",
+      status: "POSTPONED",
+      scoreHome: 0,
+      scoreAway: 0,
+    });
+    const cancelled = createMatch({
+      id: "m-cancelled",
+      status: "CANCELLED",
+      scoreHome: 0,
+      scoreAway: 0,
+    });
+
+    const viewModel = buildMatchcenterViewModel([postponed, cancelled]);
+
+    expect(viewModel.resultate).toEqual([]);
+    expect(viewModel.spielplanung.map((row) => row.match.id)).toEqual([
+      "m-postponed",
+    ]);
+    expect(viewModel.needsReconciliation).toEqual([]);
+  });
+
+  it("does not treat future 0:0 as a completed result", () => {
+    const futurePlaceholder = createMatch({
+      id: "m-future-zero",
+      status: "SCHEDULED",
+      startAt: new Date("2026-09-10T10:00:00.000Z"),
+      scoreHome: 0,
+      scoreAway: 0,
+    });
+
+    const viewModel = buildMatchcenterViewModel([futurePlaceholder], {
+      now: new Date("2026-08-25T12:00:00.000Z"),
+    });
+
+    expect(viewModel.resultate).toEqual([]);
+    expect(viewModel.spielplanung.map((row) => row.match.id)).toEqual([
+      "m-future-zero",
+    ]);
+  });
+
+  it("keeps KPI buckets mutually exclusive", () => {
+    const open = createMatch({
+      id: "m-open",
+      operational: {
+        pitchCode: null,
+        homeDressingRoomCode: null,
+        awayDressingRoomCode: null,
+        meetingTime: null,
+        remarks: null,
+      },
+    });
+    const ready = createMatch({ id: "m-ready" });
+    const completed = createMatch({ id: "m-completed", status: "COMPLETED" });
+    const reconcile = createMatch({
+      id: "m-reconcile",
+      status: "SCHEDULED",
+      startAt: new Date("2026-08-02T16:00:00.000Z"),
+      synchronization: {
+        eventLastSyncedAt: null,
+        mappingLastSyncedAt: null,
+        detailSyncedAt: null,
+        providerMatchState: null,
+        providerMatchStateName: "noch nicht ausgetragen",
+      },
+    });
+
+    const viewModel = buildMatchcenterViewModel(
+      [open, ready, completed, reconcile],
+      { now: new Date("2026-08-25T12:00:00.000Z") },
+    );
+
+    expect(viewModel.kpis).toEqual({
+      anstehend: 2,
+      offen: 1,
+      bereit: 1,
+      resultate: 1,
+    });
+    expect(viewModel.needsReconciliation).toHaveLength(1);
+  });
 });
 
 describe("normalizeMatchcenterActionFilter", () => {

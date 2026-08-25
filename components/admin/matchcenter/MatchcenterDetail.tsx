@@ -24,7 +24,12 @@ import {
   X,
 } from "lucide-react";
 import type { MatchcenterMatchDetail } from "@/lib/matchcenter/types";
-import { getMatchcenterResultLabel } from "@/lib/matchcenter/match-lifecycle";
+import {
+  getMatchcenterLifecycleClassification,
+  getMatchcenterLifecycleLabel,
+  getMatchcenterLifecycleVariant,
+  getMatchcenterResultLabel,
+} from "@/lib/matchcenter/match-lifecycle";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
 import { PageShell } from "@/components/ui/page/PageShell";
 import { SectionCard } from "@/components/ui/page/SectionCard";
@@ -67,23 +72,11 @@ type MatchcenterDetailProps = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  SCHEDULED: "Geplant",
-  LIVE: "Live",
-  COMPLETED: "Abgeschlossen",
-  POSTPONED: "Verschoben",
-  CANCELED: "Abgesagt",
-  CANCELLED: "Abgesagt",
   DRAFT: "Entwurf",
   ARCHIVED: "Archiviert",
 };
 
 const STATUS_VARIANTS: Record<string, BadgeVariant> = {
-  SCHEDULED: "info",
-  LIVE: "success",
-  COMPLETED: "default",
-  POSTPONED: "warning",
-  CANCELED: "danger",
-  CANCELLED: "danger",
   DRAFT: "outline",
   ARCHIVED: "outline",
 };
@@ -208,11 +201,14 @@ export default function MatchcenterDetail({
   canValidatePlanning = false,
   isProtectedSource = false,
 }: MatchcenterDetailProps) {
+  const lifecycleClassification = getMatchcenterLifecycleClassification(match);
   const statusLabel =
-    STATUS_LABELS[match.status] ?? match.status;
+    STATUS_LABELS[match.status] ??
+    getMatchcenterLifecycleLabel(lifecycleClassification);
 
   const statusVariant =
-    STATUS_VARIANTS[match.status] ?? "default";
+    STATUS_VARIANTS[match.status] ??
+    getMatchcenterLifecycleVariant(lifecycleClassification);
 
   const result = getMatchcenterResultLabel(match);
 
@@ -273,7 +269,7 @@ export default function MatchcenterDetail({
               variant={statusVariant}
               data-testid="matchcenter-detail-status"
             >
-              {match.status === "LIVE" ? (
+              {lifecycleClassification.lifecycle === "LIVE" ? (
                 <Radio className="h-3.5 w-3.5" />
               ) : null}
               {statusLabel}

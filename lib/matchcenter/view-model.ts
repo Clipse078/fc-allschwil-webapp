@@ -8,11 +8,13 @@
  */
 
 import type { MatchcenterMatchSummary } from "./types";
+import type { SportingReconciliationIssue } from "@/lib/sporting-data/lifecycle";
 import {
   isSportingMatchInResultsList,
   isSportingMatchInUpcomingList,
-  classifySportingMatchLifecycle,
+  isSportingMatchNeedsReconciliation,
 } from "@/lib/sporting-data/lifecycle";
+import { getMatchcenterLifecycleClassification } from "./match-lifecycle";
 import {
   assessMatchOperationalState,
   type MatchcenterOperationalAssessment,
@@ -28,6 +30,11 @@ export type MatchcenterWochenplanFilter =
 export type MatchcenterRowViewModel = {
   match: MatchcenterMatchSummary;
   assessment: MatchcenterOperationalAssessment;
+};
+
+export type MatchcenterReconciliationRow = {
+  match: MatchcenterMatchSummary;
+  reconciliationIssue: SportingReconciliationIssue | null;
 };
 
 export type MatchcenterKpis = {
@@ -47,6 +54,8 @@ export type MatchcenterViewModel = {
   spielplanung: MatchcenterRowViewModel[];
   /** Resultate rows, descending by kickoff (most recent result first). */
   resultate: MatchcenterMatchSummary[];
+  /** Administrative fixtures requiring data review — never in Spielplanung/Resultate. */
+  needsReconciliation: MatchcenterReconciliationRow[];
 };
 
 function isValidActionFilter(
@@ -91,12 +100,7 @@ function resolveLifecycle(
   match: MatchcenterMatchSummary,
   now?: Date,
 ) {
-  return classifySportingMatchLifecycle({
-    status: match.status,
-    startAt: match.startAt,
-    providerMatchStateName: match.synchronization.providerMatchStateName,
-    now,
-  }).lifecycle;
+  return getMatchcenterLifecycleClassification(match, now).lifecycle;
 }
 
 /**
@@ -128,12 +132,22 @@ export function buildMatchcenterViewModel(
 
   const upcoming: MatchcenterRowViewModel[] = [];
   const completed: MatchcenterMatchSummary[] = [];
+  const needsReconciliation: MatchcenterReconciliationRow[] = [];
 
   for (const match of wochenplanFiltered) {
-    const lifecycle = resolveLifecycle(match, now);
+    const classification = getMatchcenterLifecycleClassification(match, now);
+    const lifecycle = classification.lifecycle;
 
     if (isSportingMatchInResultsList(lifecycle)) {
       completed.push(match);
+      continue;
+    }
+
+    if (isSportingMatchNeedsReconciliation(lifecycle)) {
+      needsReconciliation.push({
+        match,
+        reconciliationIssue: classification.reconciliationIssue,
+      });
       continue;
     }
 
@@ -175,5 +189,15 @@ export function buildMatchcenterViewModel(
     (a, b) => b.startAt.getTime() - a.startAt.getTime(),
   );
 
-  return { kpis, spielplanung, resultate };
+  const reconciliationSorted = [...needsReconciliation].sort(
+    (left, right) =>
+      left.match.startAt.getTime() - right.match.startAt.getTime(),
+  );
+
+  return {
+    kpis,
+    spielplanung,
+    resultate,
+    needsReconciliation: reconciliationSorted,
+  };
 }

@@ -499,3 +499,38 @@ describe("MatchcenterOverview — Resultate", () => {
     expect(link).toHaveAttribute("href", "/dashboard/matchcenter/match-1");
   });
 });
+
+describe("MatchcenterOverview — reconciliation admin surface", () => {
+  it("shows a restrained Datenprüfung banner for NEEDS_RECONCILIATION fixtures", () => {
+    renderOverview([
+      createMatch({
+        id: "match-reconcile",
+        status: "SCHEDULED",
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        synchronization: {
+          eventLastSyncedAt: null,
+          mappingLastSyncedAt: null,
+          detailSyncedAt: null,
+          providerMatchState: null,
+          providerMatchStateName: "noch nicht ausgetragen",
+        },
+      }),
+    ]);
+
+    expect(
+      screen.getByTestId("matchcenter-reconciliation-panel"),
+    ).toHaveTextContent("Datenprüfung erforderlich · 1");
+    expect(
+      screen.getByTestId("matchcenter-reconciliation-row-match-reconcile"),
+    ).toBeTruthy();
+    expect(screen.getByText("Keine Matches gefunden")).toBeTruthy();
+  });
+
+  it("does not show the reconciliation banner when no fixtures need review", () => {
+    renderOverview([createMatch()]);
+
+    expect(
+      screen.queryByTestId("matchcenter-reconciliation-panel"),
+    ).toBeNull();
+  });
+});

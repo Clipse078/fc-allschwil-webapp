@@ -14,6 +14,7 @@ import { CenterPeriodNavigation } from "@/components/centers/CenterPeriodNavigat
 import { CenterSummaryStrip } from "@/components/centers/CenterSummaryStrip";
 import MatchcenterResultRow from "./MatchcenterResultRow";
 import MatchcenterWochenplanBulkPanel from "./MatchcenterWochenplanBulkPanel";
+import MatchcenterReconciliationPanel from "./MatchcenterReconciliationPanel";
 
 // WOCHENPLAN_FILTERS — used by the Resultate tab filter (Spielplanung filters
 // are now rendered inside MatchcenterWochenplanBulkPanel for C2 unified toolbar)
@@ -224,6 +225,12 @@ export default function MatchcenterOverview({
 
       {/* ── Operational summary ─────────────────────────────────────────────── */}
       <CenterSummaryStrip metrics={summaryMetrics} />
+
+      <MatchcenterReconciliationPanel
+        rows={viewModel.needsReconciliation}
+        locale={locale}
+        timezone={timezone}
+      />
 
       {tab === "SPIELPLANUNG" ? (
         <>

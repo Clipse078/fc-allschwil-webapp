@@ -7,12 +7,14 @@
  * preserving the existing Matchcenter helper surface for #402/#403 consumers.
  */
 
+import type { BadgeVariant } from "@/components/ui/Badge";
 import {
   classifySportingMatchLifecycle,
   isSportingMatchCancelled,
   isSportingMatchCompleted,
   isSportingMatchLive,
   isSportingMatchPostponed,
+  type SportingLifecycleClassification,
   type SportingMatchLifecycle,
 } from "@/lib/sporting-data/lifecycle";
 import { resolveSportingResultDisplay } from "@/lib/sporting-data/resolve-sporting-result-display";
@@ -29,14 +31,25 @@ type LifecycleSource = {
   >;
 };
 
-function resolveLifecycle(match: LifecycleSource, now?: Date): SportingMatchLifecycle {
+export function getMatchcenterLifecycleClassification(
+  match: LifecycleSource,
+  now?: Date,
+): SportingLifecycleClassification {
   if (!match.startAt) {
     const status = match.status.trim().toUpperCase();
-    if (status === "COMPLETED") return "COMPLETED";
-    if (status === "LIVE") return "LIVE";
-    if (status === "POSTPONED") return "POSTPONED";
-    if (status === "CANCELLED" || status === "CANCELED") return "CANCELLED";
-    return "UPCOMING";
+    if (status === "COMPLETED") {
+      return { lifecycle: "COMPLETED", reconciliationIssue: null };
+    }
+    if (status === "LIVE") {
+      return { lifecycle: "LIVE", reconciliationIssue: null };
+    }
+    if (status === "POSTPONED") {
+      return { lifecycle: "POSTPONED", reconciliationIssue: null };
+    }
+    if (status === "CANCELLED" || status === "CANCELED") {
+      return { lifecycle: "CANCELLED", reconciliationIssue: null };
+    }
+    return { lifecycle: "UPCOMING", reconciliationIssue: null };
   }
 
   return classifySportingMatchLifecycle({
@@ -45,7 +58,41 @@ function resolveLifecycle(match: LifecycleSource, now?: Date): SportingMatchLife
     providerMatchStateName:
       match.synchronization?.providerMatchStateName ?? null,
     now,
-  }).lifecycle;
+  });
+}
+
+function resolveLifecycle(match: LifecycleSource, now?: Date): SportingMatchLifecycle {
+  return getMatchcenterLifecycleClassification(match, now).lifecycle;
+}
+
+const LIFECYCLE_LABELS: Record<SportingMatchLifecycle, string> = {
+  UPCOMING: "Geplant",
+  LIVE: "Live",
+  COMPLETED: "Abgeschlossen",
+  POSTPONED: "Verschoben",
+  CANCELLED: "Abgesagt",
+  NEEDS_RECONCILIATION: "Datenprüfung",
+};
+
+const LIFECYCLE_VARIANTS: Record<SportingMatchLifecycle, BadgeVariant> = {
+  UPCOMING: "info",
+  LIVE: "success",
+  COMPLETED: "default",
+  POSTPONED: "warning",
+  CANCELLED: "danger",
+  NEEDS_RECONCILIATION: "warning",
+};
+
+export function getMatchcenterLifecycleLabel(
+  classification: SportingLifecycleClassification,
+): string {
+  return LIFECYCLE_LABELS[classification.lifecycle];
+}
+
+export function getMatchcenterLifecycleVariant(
+  classification: SportingLifecycleClassification,
+): BadgeVariant {
+  return LIFECYCLE_VARIANTS[classification.lifecycle];
 }
 
 /** True when the canonical sporting lifecycle is COMPLETED. */
