@@ -114,14 +114,16 @@ function RotatingPages({
 
     const id = window.setInterval(() => {
       if (controlled) {
-        onPageChange?.((visiblePage + 1) % pageCount);
+        onPageChange?.(
+          (normalizePageIndex(activePage ?? 0, pageCount) + 1) % pageCount,
+        );
       } else {
         setUncontrolledPage((prev) => (prev + 1) % pageCount);
       }
     }, intervalMs);
 
     return () => window.clearInterval(id);
-  }, [autoRotate, controlled, intervalMs, onPageChange, pageCount, visiblePage]);
+  }, [activePage, autoRotate, controlled, intervalMs, onPageChange, pageCount]);
 
   return (
     <div
