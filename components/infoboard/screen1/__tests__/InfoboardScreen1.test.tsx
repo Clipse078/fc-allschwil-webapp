@@ -26,7 +26,7 @@ import {
   densityTier,
   layoutModeTier,
   trainingGroupDensityTier,
-  formatTrainingTimeRange,
+  resolveTrainingCohortTimePresentation,
   LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
@@ -730,8 +730,8 @@ describe("Training row", () => {
   });
 });
 
-describe("Training time presentation — complete interval in time column", () => {
-  it("renders HH:mm – HH:mm in the dedicated time area for a solo training", () => {
+describe("Training time presentation — left TIME card contract", () => {
+  it("renders start + bis end once for a solo training", () => {
     const feed = makeFeed({
       current: [
         makeEvent({
@@ -744,10 +744,34 @@ describe("Training time presentation — complete interval in time column", () =
     });
     render(<InfoboardScreen1 feed={feed} />);
 
-    const timeRange = screen.getByTestId("training-time-range");
-    expect(timeRange.textContent).toBe("15:45 – 17:15");
-    expect(timeRange.closest('[data-testid="training-group-time-row"]')).toBeTruthy();
-    expect(timeRange.closest('[data-testid="training-group-row"]')).toBeNull();
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("15:45");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 17:15");
+    expect(screen.queryByTestId("training-row-end-annotation")).toBeNull();
+  });
+
+  it("renders shared start + bis end once for a same-end cohort", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: "2026-09-12T15:15:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f1",
+          startAt: "2026-09-12T15:15:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F1",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("17:15");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 18:45");
+    expect(screen.queryAllByTestId("training-row-end-annotation")).toHaveLength(0);
   });
 
   it("does not render bis end-time suffixes behind team names", () => {
@@ -775,20 +799,46 @@ describe("Training time presentation — complete interval in time column", () =
       expect(row.textContent?.toLowerCase()).not.toMatch(/\bbis\b/);
     }
 
-    const timeRanges = screen.getAllByTestId("training-time-range");
-    expect(timeRanges).toHaveLength(2);
-    expect(timeRanges[0].textContent).toBe("15:45 – 17:15");
-    expect(timeRanges[1].textContent).toBe("15:45 – 18:45");
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("15:45");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 17:15");
+
+    const annotations = screen.getAllByTestId("training-row-end-annotation");
+    expect(annotations).toHaveLength(1);
+    expect(annotations[0].textContent).toBe("bis 18:45");
   });
 
-  it("formatTrainingTimeRange helper matches Screen 1 semantics", () => {
-    expect(
-      formatTrainingTimeRange(
-        "2026-09-12T13:45:00.000Z",
-        "2026-09-12T15:15:00.000Z",
-        "Europe/Zurich",
-      ),
-    ).toBe("15:45 – 17:15");
+  it("resolveTrainingCohortTimePresentation uses majority end for mixed cohorts", () => {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const items: FlatEvent[] = [
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+        }),
+        temporal: "current",
+      },
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+        }),
+        temporal: "current",
+      },
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T16:45:00.000Z",
+        }),
+        temporal: "current",
+      },
+    ];
+
+    const presentation = resolveTrainingCohortTimePresentation(items, "Europe/Zurich");
+    expect(presentation.startTime).toBe("15:45");
+    expect(presentation.primaryEndTime).toBe("17:15");
+    expect(presentation.allSameEnd).toBe(false);
+    expect(presentation.rowEndAnnotations).toEqual([null, null, "18:45"]);
+    expect(presentation.hasRowEndAnnotations).toBe(true);
   });
 });
 

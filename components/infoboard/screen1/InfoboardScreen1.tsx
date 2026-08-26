@@ -391,24 +391,71 @@ function formatTime(isoString: string, timeZone: string): string {
   }).format(new Date(isoString));
 }
 
+export type TrainingCohortTimePresentation = {
+  readonly startTime: string;
+  readonly primaryEndTime: string | null;
+  readonly allSameEnd: boolean;
+  readonly rowEndAnnotations: readonly (string | null)[];
+  readonly hasRowEndAnnotations: boolean;
+};
+
 /**
- * Formats a training interval for the dedicated time column.
- * Returns "HH:mm – HH:mm" when an end time exists; start time only otherwise.
+ * Resolves left TIME-card content for a same-start training cohort.
+ *
+ * Same-end cohorts show start + "bis end" once in the TIME zone.
+ * Mixed-end cohorts use the majority end in the TIME card and surface
+ * differing row ends as aligned secondary annotations — never in team names.
  *
  * Exported for regression testing.
  */
-export function formatTrainingTimeRange(
-  startAt: string,
-  endAt: string | null,
+export function resolveTrainingCohortTimePresentation(
+  items: readonly FlatEvent[],
   timeZone: string,
-): string {
-  const startTime = formatTime(startAt, timeZone);
-  if (endAt === null) return startTime;
+): TrainingCohortTimePresentation {
+  const first = items[0];
+  const startTime = formatTime(first.event.startAt, timeZone);
+  const firstEndAt = first.event.endAt;
+  const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
 
-  const endTime = formatTime(endAt, timeZone);
-  if (endTime === startTime) return startTime;
+  const endCounts = new Map<string, number>();
+  for (const item of items) {
+    const endAt = item.event.endAt;
+    if (endAt !== null) {
+      endCounts.set(endAt, (endCounts.get(endAt) ?? 0) + 1);
+    }
+  }
 
-  return `${startTime} – ${endTime}`;
+  let primaryEndAt: string | null = null;
+  if (allSameEnd) {
+    primaryEndAt = firstEndAt;
+  } else if (endCounts.size > 0) {
+    let maxCount = 0;
+    for (const [endAt, count] of endCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryEndAt = endAt;
+      }
+    }
+  }
+
+  const primaryEndTime =
+    primaryEndAt !== null ? formatTime(primaryEndAt, timeZone) : null;
+
+  const rowEndAnnotations = items.map((item) => {
+    const rowEndAt = item.event.endAt;
+    if (primaryEndAt === null || rowEndAt === null || rowEndAt === primaryEndAt) {
+      return null;
+    }
+    return formatTime(rowEndAt, timeZone);
+  });
+
+  return {
+    startTime,
+    primaryEndTime,
+    allSameEnd,
+    rowEndAnnotations,
+    hasRowEndAnnotations: rowEndAnnotations.some((annotation) => annotation !== null),
+  };
 }
 
 function formatDressingRoomLabel(label: string): string {
@@ -926,9 +973,11 @@ function TrainingGroupCard({
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
+  const startAt = first.event.startAt;
   const label = statusLabel(temporal);
   const stripe = stripeKey("TRAINING");
   const groupDensity = trainingGroupDensityTier(items.length);
+  const timePresentation = resolveTrainingCohortTimePresentation(items, timeZone);
 
   return (
     <li
@@ -942,41 +991,69 @@ function TrainingGroupCard({
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
-      {/* TIME — one complete interval per training row */}
-      <div className={`${styles.cardTimeZone} ${styles.trainingGroupTimeZone}`}>
-        {label !== null ? (
-          <span
-            className={styles.statusLabel}
-            data-testid={`status-label-${temporal}`}
-            data-status={temporal === "current" ? "current" : "next"}
-          >
-            {label}
-          </span>
-        ) : (
-          <span className={styles.trainingGroupZoneSpacer} aria-hidden="true" />
-        )}
-
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => (
-            <div
-              key={it.event.id}
-              className={styles.trainingGroupAlignedRow}
-              data-testid="training-group-time-row"
+      {/* TIME — shared start/end once; row annotations only for mixed-end cohorts */}
+      <div
+        className={
+          timePresentation.hasRowEndAnnotations
+            ? `${styles.cardTimeZone} ${styles.trainingGroupTimeZone}`
+            : styles.cardTimeZone
+        }
+        data-testid="training-group-time-zone"
+      >
+        <div className={styles.trainingGroupTimeHeader}>
+          {label !== null && (
+            <span
+              className={styles.statusLabel}
+              data-testid={`status-label-${temporal}`}
+              data-status={temporal === "current" ? "current" : "next"}
             >
-              <time
-                className={styles.trainingGroupTimeRange}
-                dateTime={it.event.startAt}
-                data-testid="training-time-range"
-              >
-                {formatTrainingTimeRange(
-                  it.event.startAt,
-                  it.event.endAt,
-                  timeZone,
-                )}
-              </time>
-            </div>
-          ))}
+              {label}
+            </span>
+          )}
+
+          <time
+            className={styles.eventTime}
+            dateTime={startAt}
+            data-testid="training-cohort-start-time"
+          >
+            {timePresentation.startTime}
+          </time>
+
+          {timePresentation.primaryEndTime !== null && (
+            <span
+              className={styles.eventEndTime}
+              aria-label="Bis"
+              data-testid="training-cohort-end-time"
+            >
+              bis {timePresentation.primaryEndTime}
+            </span>
+          )}
         </div>
+
+        {timePresentation.hasRowEndAnnotations && (
+          <div className={styles.trainingGroupRows}>
+            {items.map((it, index) => {
+              const rowEndAnnotation = timePresentation.rowEndAnnotations[index];
+              return (
+                <div
+                  key={it.event.id}
+                  className={styles.trainingGroupAlignedRow}
+                  data-testid="training-group-time-row"
+                >
+                  {rowEndAnnotation !== null && (
+                    <span
+                      className={styles.trainingGroupRowEndTime}
+                      aria-label="Bis"
+                      data-testid="training-row-end-annotation"
+                    >
+                      bis {rowEndAnnotation}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* EVENT */}
