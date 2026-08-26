@@ -132,7 +132,7 @@ describe("INFOBOARD-ROLLING-01K — footer-safe pagination", () => {
     expect(root.lastElementChild).toBe(footer);
     expect(main.getAttribute("data-safe-page-capacity")).toBe("8.5");
 
-    const rootCss = cssBlock(".root {");
+    const rootCss = cssBlock(".root {\n  display: grid");
     const mainCss = cssBlock(".main {");
     expect(rootCss).toContain("grid-template-rows: auto minmax(0, 1fr) auto");
     expect(rootCss).toContain("height: 100svh");
