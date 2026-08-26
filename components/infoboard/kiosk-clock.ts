@@ -68,10 +68,12 @@ export function formatKioskDateLine(isoString: string, timeZone: string): string
  *   - The effect has no dependencies so it runs once per mount and is fully
  *     cleaned up on unmount.
  */
-export function useKioskClock(initialTimeIso: string): string {
+export function useKioskClock(initialTimeIso: string, live = true): string {
   const [timeIso, setTimeIso] = useState(initialTimeIso);
 
   useEffect(() => {
+    if (!live) return undefined;
+
     // Short initial sync — lets the server-rendered time hydrate cleanly before
     // switching to the live browser clock.
     const syncId = setTimeout(() => {
@@ -87,7 +89,7 @@ export function useKioskClock(initialTimeIso: string): string {
       clearTimeout(syncId);
       clearInterval(tickId);
     };
-  }, []);
+  }, [initialTimeIso, live]);
 
-  return timeIso;
+  return live ? timeIso : initialTimeIso;
 }

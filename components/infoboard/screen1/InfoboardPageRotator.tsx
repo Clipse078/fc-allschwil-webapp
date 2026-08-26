@@ -31,6 +31,14 @@ type InfoboardPageRotatorProps = {
   intervalMs?: number;
   /** Identity of the paginated feed; changes restart rolling from Page 1. */
   contentKey?: string;
+  /** Preview-only controlled page index. Omit to preserve production behavior. */
+  activePage?: number;
+  /** Receives controlled page changes from the production rotation sequence. */
+  onPageChange?: (page: number) => void;
+  /** Preview-only rotation switch. Defaults to true for production. */
+  autoRotate?: boolean;
+  /** Reports the production pagination result to Preview Studio chrome. */
+  onPageCountChange?: (pageCount: number) => void;
 };
 
 function normalizePageIndex(index: number, pageCount: number): number {
@@ -42,9 +50,17 @@ export function InfoboardPageRotator({
   children,
   intervalMs = 12_000,
   contentKey,
+  activePage,
+  onPageChange,
+  autoRotate = true,
+  onPageCountChange,
 }: InfoboardPageRotatorProps): ReactNode {
   const childArray = Children.toArray(children);
   const pageCount = childArray.length;
+
+  useEffect(() => {
+    onPageCountChange?.(Math.max(1, pageCount));
+  }, [onPageCountChange, pageCount]);
 
   if (pageCount <= 0) {
     return null;
@@ -64,6 +80,9 @@ export function InfoboardPageRotator({
       key={rotationKey}
       pages={childArray}
       intervalMs={intervalMs}
+      activePage={activePage}
+      onPageChange={onPageChange}
+      autoRotate={autoRotate}
     />
   );
 }
@@ -71,26 +90,38 @@ export function InfoboardPageRotator({
 function RotatingPages({
   pages,
   intervalMs,
+  activePage,
+  onPageChange,
+  autoRotate,
 }: {
   pages: ReactNode[];
   intervalMs: number;
+  activePage?: number;
+  onPageChange?: (page: number) => void;
+  autoRotate: boolean;
 }): ReactNode {
   const pageCount = pages.length;
-  const [currentPage, setCurrentPage] = useState(0);
+  const [uncontrolledPage, setUncontrolledPage] = useState(0);
+  const controlled = activePage !== undefined;
+  const currentPage = controlled ? activePage : uncontrolledPage;
   const visiblePage = normalizePageIndex(currentPage, pageCount);
   const activeChild = pages[visiblePage] ?? pages[0] ?? null;
 
   // Same-size feed refreshes preserve the interval. A changed page count
   // remounts this stage through rotationKey and therefore restarts at Page 1.
   useEffect(() => {
-    if (intervalMs <= 0) return undefined;
+    if (!autoRotate || intervalMs <= 0) return undefined;
 
     const id = window.setInterval(() => {
-      setCurrentPage((prev) => (prev + 1) % pageCount);
+      if (controlled) {
+        onPageChange?.((visiblePage + 1) % pageCount);
+      } else {
+        setUncontrolledPage((prev) => (prev + 1) % pageCount);
+      }
     }, intervalMs);
 
     return () => window.clearInterval(id);
-  }, [intervalMs, pageCount]);
+  }, [autoRotate, controlled, intervalMs, onPageChange, pageCount, visiblePage]);
 
   return (
     <div

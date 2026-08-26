@@ -130,4 +130,43 @@ describe("InfoboardPageRotator", () => {
     });
     expect(screen.getByText("Page 2 refreshed")).toBeTruthy();
   });
+
+  it("supports stable preview-only manual page control", async () => {
+    const onPageChange = vi.fn();
+    render(
+      <InfoboardPageRotator
+        activePage={1}
+        autoRotate={false}
+        onPageChange={onPageChange}
+        intervalMs={12_000}
+      >
+        {pageMarkup("event-list", "Page 1")}
+        {pageMarkup("event-list-page-1", "Page 2")}
+      </InfoboardPageRotator>,
+    );
+    expect(screen.getByText("Page 2")).toBeTruthy();
+    await act(async () => vi.advanceTimersByTime(36_000));
+    expect(screen.getByText("Page 2")).toBeTruthy();
+    expect(onPageChange).not.toHaveBeenCalled();
+  });
+
+  it("advances the controlled Preview Studio page after the production 12 seconds", async () => {
+    const onPageChange = vi.fn();
+    const onPageCountChange = vi.fn();
+    render(
+      <InfoboardPageRotator
+        activePage={0}
+        autoRotate
+        onPageChange={onPageChange}
+        onPageCountChange={onPageCountChange}
+      >
+        {pageMarkup("event-list", "Page 1")}
+        {pageMarkup("event-list-page-1", "Page 2")}
+        {pageMarkup("event-list-page-2", "Page 3")}
+      </InfoboardPageRotator>,
+    );
+    expect(onPageCountChange).toHaveBeenCalledWith(3);
+    await act(async () => vi.advanceTimersByTime(12_000));
+    expect(onPageChange).toHaveBeenCalledWith(1);
+  });
 });

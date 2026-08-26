@@ -353,6 +353,26 @@ export const NAV_SECTIONS: NavSection[] = [
         label: "Infoboard",
         href: "/dashboard/infoboard",
         permissionKeys: [PERMISSIONS.INFOBOARD_MANAGE, PERMISSIONS.EVENTS_PUBLISH_INFOBOARD],
+        children: [
+          {
+            key: "infoboard-overview",
+            label: "Übersicht",
+            href: "/dashboard/infoboard",
+            permissionKeys: [
+              PERMISSIONS.INFOBOARD_MANAGE,
+              PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
+            ],
+          },
+          {
+            key: "infoboard-preview",
+            label: "Vorschau",
+            href: "/dashboard/infoboard/preview",
+            permissionKeys: [
+              PERMISSIONS.INFOBOARD_MANAGE,
+              PERMISSIONS.EVENTS_PUBLISH_INFOBOARD,
+            ],
+          },
+        ],
       },
     ],
   },
