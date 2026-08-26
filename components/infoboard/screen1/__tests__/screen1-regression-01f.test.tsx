@@ -10,6 +10,9 @@ import {
   InfoboardScreen1,
   buildDisplayList,
   computeTrainingGroupDemand,
+  computeMatchDemand,
+  paginateDisplayList,
+  CARD_DEMAND_PAGE_MAX,
   type DisplayItem,
   type FlatEvent,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
@@ -18,7 +21,6 @@ import {
   resolveWednesdayPreviewCurrentTimeIso,
   WEDNESDAY_2026_08_26_PREVIEW_TIMES,
 } from "@/components/infoboard/screen1/wednesday-2026-08-26-fixture";
-import { admitDisplayItemsByCapacity } from "@/lib/publishing/infoboard/screen1-capacity-admission";
 import {
   getScreen1LifecyclePhase,
   SCREEN1_POST_EVENT_GRACE_MINUTES,
@@ -202,21 +204,48 @@ describe("INFOBOARD-REGRESSION-01F — adaptive admission", () => {
     }
   });
 
-  it("admission keeps complete cohorts and excludes overflow later blocks", () => {
-    type Item = { id: string; temporal: "current" | "next" | "later" };
-    const items: Item[] = [
-      { id: "1545", temporal: "next" },
-      { id: "1715", temporal: "later" },
-      { id: "1845", temporal: "later" },
-    ];
-    const demands = [
-      computeTrainingGroupDemand(4),
-      computeTrainingGroupDemand(5),
-      computeTrainingGroupDemand(6),
-    ];
+  it("chronological pagination keeps dense 18:45 cohort instead of leapfrogging", () => {
+    function cohortItem(
+      startAt: string,
+      rowCount: number,
+      temporal: "current" | "next" | "later" = "later",
+    ): DisplayItem {
+      const groupItems: FlatEvent[] = Array.from({ length: rowCount }, (_, i) => ({
+        temporal,
+        event: {
+          id: `${startAt}-${i}`,
+          type: "TRAINING",
+          startAt,
+          endAt: "2026-08-26T15:15:00.000Z",
+          teamDisplayName: `Team ${i}`,
+        } as InfoboardScreen1Event,
+      }));
+      return { kind: "training-group", items: groupItems, temporal };
+    }
 
-    const admitted = admitDisplayItemsByCapacity(items, demands, (item) => item.temporal, 12);
-    expect(admitted.map((item) => item.id)).toEqual(["1545", "1715"]);
+    const items: DisplayItem[] = [
+      cohortItem("2026-08-26T13:45:00.000Z", 4, "next"),
+      cohortItem("2026-08-26T15:15:00.000Z", 5),
+      cohortItem("2026-08-26T16:45:00.000Z", 6),
+    ];
+    const demands = items.map((item) =>
+      item.kind === "training-group"
+        ? computeTrainingGroupDemand(item.items.length)
+        : computeMatchDemand(item.item.event),
+    );
+
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    const flattenedStarts = pages.flat().map((item) =>
+      item.kind === "training-group"
+        ? item.items[0]?.event.startAt
+        : item.item.event.startAt,
+    );
+    expect(flattenedStarts).toEqual([
+      "2026-08-26T13:45:00.000Z",
+      "2026-08-26T15:15:00.000Z",
+      "2026-08-26T16:45:00.000Z",
+    ]);
+    expect(pages.length).toBeGreaterThan(1);
   });
 });
 

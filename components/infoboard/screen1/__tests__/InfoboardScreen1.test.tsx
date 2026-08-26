@@ -17,6 +17,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import {
   InfoboardScreen1,
+  buildDisplayList,
   computeTrainingGroupDemand,
   computeEventDemand,
   computeMatchDemand,
@@ -4326,6 +4327,226 @@ describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
     expect(f3Row).toBeTruthy();
     expect(annotation.textContent).toBe("bis 18:45");
     expect(f3Row?.contains(annotation)).toBe(true);
+  });
+});
+
+// ── INFOBOARD-ROLLING-01D — chronological rolling pagination ────────────────
+
+function flattenPaginatedItems(pages: DisplayItem[][]): DisplayItem[] {
+  return pages.flat();
+}
+
+function displayItemKey(item: DisplayItem): string {
+  if (item.kind === "training-group") {
+    return `training:${item.items[0]?.event.startAt ?? "unknown"}`;
+  }
+  return `event:${item.item.event.id}`;
+}
+
+function makeCohortDisplayItem(
+  startAt: string,
+  rowCount: number,
+  temporal: FlatEvent["temporal"] = "later",
+): DisplayItem {
+  const groupItems: FlatEvent[] = Array.from({ length: rowCount }, (_, i) => ({
+    temporal,
+    event: makeEvent({
+      id: `cohort-${startAt}-${i}`,
+      type: "TRAINING",
+      startAt,
+      endAt: "2026-08-26T15:15:00.000Z",
+      teamDisplayName: `Team ${i}`,
+      temporalBucket: temporal,
+    }),
+  }));
+  return { kind: "training-group", items: groupItems, temporal };
+}
+
+function makeMatchDisplayItem(
+  id: string,
+  startAt: string,
+  temporal: FlatEvent["temporal"] = "later",
+): DisplayItem {
+  return {
+    kind: "event",
+    item: {
+      event: makeEvent({
+        id,
+        type: "MATCH",
+        startAt,
+        endAt: "2026-08-26T19:45:00.000Z",
+        temporalBucket: temporal,
+      }),
+      temporal,
+    },
+  };
+}
+
+function buildFlatListFromFeed(feed: InfoboardScreen1Feed): FlatEvent[] {
+  const result: FlatEvent[] = [];
+  for (const event of feed.current) {
+    result.push({ event, temporal: "current" });
+  }
+  for (const event of feed.next) {
+    result.push({ event, temporal: "next" });
+  }
+  for (const event of feed.later) {
+    result.push({ event, temporal: "later" });
+  }
+  return result;
+}
+
+function formatZurichTime(iso: string): string {
+  return new Intl.DateTimeFormat("de-CH", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Zurich",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+describe("INFOBOARD-ROLLING-01D — chronological rolling pagination", () => {
+  it("TEST A — no leapfrogging when dense cohort does not fit on current page", () => {
+    const items: DisplayItem[] = [
+      makeCohortDisplayItem("2026-08-26T13:45:00.000Z", 4, "next"),
+      makeCohortDisplayItem("2026-08-26T15:15:00.000Z", 5),
+      makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 6),
+      makeMatchDisplayItem("match-1945", "2026-08-26T17:45:00.000Z"),
+      makeCohortDisplayItem("2026-08-26T18:15:00.000Z", 2),
+    ];
+    const demands = items.map((item) =>
+      item.kind === "training-group"
+        ? computeTrainingGroupDemand(item.items.length)
+        : computeMatchDemand(item.item.event),
+    );
+
+    const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
+    const flattened = flattenPaginatedItems(pages);
+    const flattenedKeys = flattened.map(displayItemKey);
+
+    expect(flattenedKeys).toEqual(items.map(displayItemKey));
+    expect(flattenedKeys).not.toEqual([
+      displayItemKey(items[0]),
+      displayItemKey(items[1]),
+      displayItemKey(items[3]),
+      displayItemKey(items[4]),
+    ]);
+
+    const denseIndex = flattenedKeys.indexOf(displayItemKey(items[2]));
+    const matchIndex = flattenedKeys.indexOf(displayItemKey(items[3]));
+    expect(denseIndex).toBeGreaterThanOrEqual(0);
+    expect(matchIndex).toBeGreaterThan(denseIndex);
+  });
+
+  it("TEST B — consecutive page packing preserves order without omission", () => {
+    const items: DisplayItem[] = ["A", "B", "C", "D", "E"].map((label, index) =>
+      makeCohortDisplayItem(
+        `2026-08-26T1${index}:00:00.000Z`,
+        index % 2 === 0 ? 3 : 2,
+      ),
+    );
+    const demands = items.map((item) =>
+      item.kind === "training-group"
+        ? computeTrainingGroupDemand(item.items.length)
+        : CARD_DEMAND_MATCH,
+    );
+
+    const flattened = flattenPaginatedItems(
+      paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX),
+    );
+
+    expect(flattened.map(displayItemKey)).toEqual(items.map(displayItemKey));
+    expect(new Set(flattened.map(displayItemKey)).size).toBe(items.length);
+  });
+
+  it("TEST C — dense training cohort remains atomic on one page", () => {
+    const denseCohort = makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 6);
+    const pages = paginateDisplayList(
+      [denseCohort],
+      [computeTrainingGroupDemand(6)],
+      CARD_DEMAND_PAGE_MAX,
+    );
+
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toHaveLength(1);
+    expect(pages[0]?.[0]?.kind).toBe("training-group");
+    if (pages[0]?.[0]?.kind === "training-group") {
+      expect(pages[0][0].items).toHaveLength(6);
+    }
+  });
+
+  it("TEST D — oversized single card appears alone and is not discarded", () => {
+    const oversizedDemand = CARD_DEMAND_PAGE_MAX + 2;
+    const oversizedCohort = makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 6);
+    const followUp = makeMatchDisplayItem("match-follow", "2026-08-26T17:45:00.000Z");
+    const pages = paginateDisplayList(
+      [oversizedCohort, followUp],
+      [oversizedDemand, computeMatchDemand(followUp.item.event)],
+      CARD_DEMAND_PAGE_MAX,
+    );
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0]).toHaveLength(1);
+    expect(pages[1]).toHaveLength(1);
+    expect(flattenPaginatedItems(pages).map(displayItemKey)).toEqual([
+      displayItemKey(oversizedCohort),
+      displayItemKey(followUp),
+    ]);
+  });
+
+  it("TEST E — current and next items remain first across rolling pages", () => {
+    const items: DisplayItem[] = [
+      makeCohortDisplayItem("2026-08-26T11:00:00.000Z", 6, "current"),
+      makeCohortDisplayItem("2026-08-26T13:45:00.000Z", 5, "next"),
+      makeCohortDisplayItem("2026-08-26T15:15:00.000Z", 4),
+      makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 3),
+    ];
+    const demands = items.map((item) =>
+      item.kind === "training-group"
+        ? computeTrainingGroupDemand(item.items.length)
+        : CARD_DEMAND_MATCH,
+    );
+
+    const flattened = flattenPaginatedItems(
+      paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX),
+    );
+
+    expect(flattened[0]?.kind === "training-group" && flattened[0].temporal).toBe("current");
+    expect(flattened[1]?.kind === "training-group" && flattened[1].temporal).toBe("next");
+    expect(flattened.map(displayItemKey)).toEqual(items.map(displayItemKey));
+  });
+
+  it("TEST F — Wednesday sparse midday regression keeps 18:45 in chronological pages", async () => {
+    const { buildWednesday20260826Feed } = await import(
+      "@/components/infoboard/screen1/wednesday-2026-08-26-fixture"
+    );
+    const nowIso = "2026-08-26T10:45:00.000Z"; // 12:45 Zurich
+    const feed = buildWednesday20260826Feed(nowIso);
+    const displayList = buildDisplayList(buildFlatListFromFeed(feed));
+    const demands = displayList.map((item) =>
+      item.kind === "training-group"
+        ? computeTrainingGroupDemand(item.items.length)
+        : computeMatchDemand(item.item.event),
+    );
+    const flattened = flattenPaginatedItems(
+      paginateDisplayList(displayList, demands, CARD_DEMAND_PAGE_MAX),
+    );
+
+    const cohortTimes = flattened.map((item) =>
+      formatZurichTime(
+        item.kind === "training-group"
+          ? item.items[0]?.event.startAt ?? ""
+          : item.item.event.startAt,
+      ),
+    );
+
+    expect(cohortTimes).toEqual(
+      expect.arrayContaining(["15:45", "17:15", "18:45", "19:45", "20:15"]),
+    );
+    expect(cohortTimes.indexOf("18:45")).toBeGreaterThan(cohortTimes.indexOf("17:15"));
+    expect(cohortTimes.indexOf("19:45")).toBeGreaterThan(cohortTimes.indexOf("18:45"));
+    expect(cohortTimes.indexOf("20:15")).toBeGreaterThan(cohortTimes.indexOf("19:45"));
+    expect(cohortTimes.filter((time) => time === "18:45")).toHaveLength(1);
   });
 });
 
