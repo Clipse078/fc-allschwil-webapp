@@ -168,7 +168,7 @@ export const CARD_DEMAND_PAGE_MAX = 12.0;
  */
 export function computeTrainingGroupDemand(rowCount: number): number {
   const rows = Math.max(1, rowCount);
-  const rowWeight = rows >= 4 ? 0.62 : CARD_DEMAND_TRAINING_ROW;
+  const rowWeight = rows >= 4 ? 0.65 : CARD_DEMAND_TRAINING_ROW;
   return CARD_DEMAND_TRAINING_BASE + rows * rowWeight;
 }
 

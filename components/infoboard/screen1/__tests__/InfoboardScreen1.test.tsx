@@ -2935,15 +2935,15 @@ describe("Content-demand â€” computeTrainingGroupDemand", () => {
   });
 
   it("4-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * 0.62);
+    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * 0.65);
   });
 
   it("5-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * 0.62);
+    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * 0.65);
   });
 
   it("6-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * 0.62);
+    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * 0.65);
   });
 
   it("demand grows monotonically with row count", () => {
@@ -3277,7 +3277,7 @@ describe("Content-demand â€” training regression (unchanged)", () => {
 
   it("6-row training demand uses compact row weight", () => {
     expect(computeTrainingGroupDemand(6)).toBeCloseTo(
-      CARD_DEMAND_TRAINING_BASE + 6 * 0.62,
+      CARD_DEMAND_TRAINING_BASE + 6 * 0.65,
     );
   });
 });
