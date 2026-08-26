@@ -30,6 +30,7 @@ import {
 import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-feed-expiry";
 
 const AT_1457 = "2026-08-26T12:57:00.000Z";
+const AT_1615 = "2026-08-26T14:15:00.000Z";
 const AT_1815 = "2026-08-26T16:15:00.000Z";
 const BRANDING = { clubLogoSrc: null, productLogoSrc: null };
 
@@ -167,18 +168,18 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
     ]);
   });
 
-  it("TEST B/C/D — 18:15 admits 20:15 and rotates all three pages across refresh", async () => {
+  it("TEST B/C/D — 16:15 admits 20:15 and rotates all three pages across refresh", async () => {
     vi.useFakeTimers();
-    vi.setSystemTime(new Date(AT_1815));
-    const feed = await buildProductionFeed(AT_1815);
-    const refreshFeed = await buildProductionFeed("2026-08-26T16:15:18.000Z");
+    vi.setSystemTime(new Date(AT_1615));
+    const feed = await buildProductionFeed(AT_1615);
+    const refreshFeed = await buildProductionFeed("2026-08-26T14:15:18.000Z");
     const items = displayItems(feed);
     const demands = items.map(itemDemand);
     const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
 
     expect(items.map(itemTime)).toEqual(["15:45", "17:15", "18:45", "19:45", "20:15"]);
     expect(demands).toHaveLength(5);
-    [1.55, 4.25, 4.9, 2.32, 2.1].forEach((expected, index) => {
+    [3.6, 4.25, 4.9, 2.32, 2.1].forEach((expected, index) => {
       expect(demands[index]).toBeCloseTo(expected);
     });
     expect(pages.map((page) => page.map(itemTime))).toEqual([
@@ -191,7 +192,7 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
     const view = render(
       <InfoboardScreen1
         feed={feed}
-        currentTimeIso={AT_1815}
+        currentTimeIso={AT_1615}
         branding={BRANDING}
       />,
     );
@@ -206,7 +207,7 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
     view.rerender(
       <InfoboardScreen1
         feed={refreshFeed}
-        currentTimeIso={AT_1815}
+        currentTimeIso={AT_1615}
         branding={BRANDING}
       />,
     );
