@@ -116,6 +116,8 @@ afterEach(() => {
 
 describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
   it("TEST A — 14:57 excludes 20:15 from the production rolling feed", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(AT_1457));
     const feed = await buildProductionFeed(AT_1457);
     const visibleFeed = filterExpiredScreen1Feed(feed, new Date(AT_1457));
     const items = displayItems(visibleFeed);
@@ -139,6 +141,29 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
     expect(pages.map((page) => page.map(itemTime))).toEqual([
       ["15:45", "17:15"],
       ["18:45"],
+    ]);
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        currentTimeIso={AT_1457}
+        branding={BRANDING}
+      />,
+    );
+    const rotator = screen.getByTestId("infoboard-page-rotator");
+    expect(rotator.dataset.pageCount).toBe("2");
+
+    const sequence = [activeTimes()];
+    for (let elapsed = 12_000; elapsed <= 48_000; elapsed += 12_000) {
+      await act(async () => vi.advanceTimersByTime(12_000));
+      sequence.push(activeTimes());
+    }
+    expect(sequence).toEqual([
+      ["15:45", "17:15"],
+      ["18:45"],
+      ["15:45", "17:15"],
+      ["18:45"],
+      ["15:45", "17:15"],
     ]);
   });
 
