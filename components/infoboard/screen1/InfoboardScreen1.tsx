@@ -391,6 +391,26 @@ function formatTime(isoString: string, timeZone: string): string {
   }).format(new Date(isoString));
 }
 
+/**
+ * Formats a training interval for the dedicated time column.
+ * Returns "HH:mm – HH:mm" when an end time exists; start time only otherwise.
+ *
+ * Exported for regression testing.
+ */
+export function formatTrainingTimeRange(
+  startAt: string,
+  endAt: string | null,
+  timeZone: string,
+): string {
+  const startTime = formatTime(startAt, timeZone);
+  if (endAt === null) return startTime;
+
+  const endTime = formatTime(endAt, timeZone);
+  if (endTime === startTime) return startTime;
+
+  return `${startTime} – ${endTime}`;
+}
+
 function formatDressingRoomLabel(label: string): string {
   return label.replace(/^kabine\s+/i, "").trim();
 }
@@ -906,18 +926,9 @@ function TrainingGroupCard({
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
-  const startAt = first.event.startAt;
-  const startTime = formatTime(startAt, timeZone);
   const label = statusLabel(temporal);
   const stripe = stripeKey("TRAINING");
   const groupDensity = trainingGroupDensityTier(items.length);
-
-  // Shared end time is displayed once in the TIME zone when all grouped
-  // trainings end together. Differing end times remain visible per team row.
-  const firstEndAt = first.event.endAt;
-  const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
-  const commonEndTime =
-    allSameEnd && firstEndAt !== null ? formatTime(firstEndAt, timeZone) : null;
 
   return (
     <li
@@ -931,9 +942,9 @@ function TrainingGroupCard({
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
-      {/* TIME */}
-      <div className={styles.cardTimeZone}>
-        {label !== null && (
+      {/* TIME — one complete interval per training row */}
+      <div className={`${styles.cardTimeZone} ${styles.trainingGroupTimeZone}`}>
+        {label !== null ? (
           <span
             className={styles.statusLabel}
             data-testid={`status-label-${temporal}`}
@@ -941,17 +952,31 @@ function TrainingGroupCard({
           >
             {label}
           </span>
+        ) : (
+          <span className={styles.trainingGroupZoneSpacer} aria-hidden="true" />
         )}
 
-        <time className={styles.eventTime} dateTime={startAt}>
-          {startTime}
-        </time>
-
-        {commonEndTime !== null && (
-          <span className={styles.eventEndTime} aria-label="Bis">
-            bis {commonEndTime}
-          </span>
-        )}
+        <div className={styles.trainingGroupRows}>
+          {items.map((it) => (
+            <div
+              key={it.event.id}
+              className={styles.trainingGroupAlignedRow}
+              data-testid="training-group-time-row"
+            >
+              <time
+                className={styles.trainingGroupTimeRange}
+                dateTime={it.event.startAt}
+                data-testid="training-time-range"
+              >
+                {formatTrainingTimeRange(
+                  it.event.startAt,
+                  it.event.endAt,
+                  timeZone,
+                )}
+              </time>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* EVENT */}
@@ -967,50 +992,33 @@ function TrainingGroupCard({
         </span>
 
         <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const rowEndAt = it.event.endAt;
-            const rowEndTime =
-              !allSameEnd && rowEndAt !== null
-                ? formatTime(rowEndAt, timeZone)
-                : null;
-
-            return (
-              <div
-                key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-                data-testid="training-group-row"
-              >
-                <span className={styles.trainingGroupTeamName}>
-                  {showLogos && clubLogoSrc !== null && (
-                    // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
-                    <img
-                      src={clubLogoSrc}
-                      alt=""
-                      aria-hidden="true"
-                      className={styles.trainingClubLogo}
-                      data-testid="training-team-logo"
-                      data-event-id={it.event.id}
-                    />
+          {items.map((it) => (
+            <div
+              key={it.event.id}
+              className={styles.trainingGroupAlignedRow}
+              data-testid="training-group-row"
+            >
+              <span className={styles.trainingGroupTeamName}>
+                {showLogos && clubLogoSrc !== null && (
+                  // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
+                  <img
+                    src={clubLogoSrc}
+                    alt=""
+                    aria-hidden="true"
+                    className={styles.trainingClubLogo}
+                    data-testid="training-team-logo"
+                    data-event-id={it.event.id}
+                  />
+                )}
+                <span className={styles.trainingGroupTeamText}>
+                  {stripClubPrefix(
+                    it.event.teamDisplayName ?? it.event.displayTitle,
+                    clubName,
                   )}
-                  <span className={styles.trainingGroupTeamText}>
-                    {stripClubPrefix(
-                      it.event.teamDisplayName ?? it.event.displayTitle,
-                      clubName,
-                    )}
-
-                    {rowEndTime !== null && (
-                      <span
-                        className={styles.trainingGroupRowEndTime}
-                        aria-label="Bis"
-                      >
-                        {" "}bis {rowEndTime}
-                      </span>
-                    )}
-                  </span>
                 </span>
-              </div>
-            );
-          })}
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 

@@ -26,6 +26,7 @@ import {
   densityTier,
   layoutModeTier,
   trainingGroupDensityTier,
+  formatTrainingTimeRange,
   LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
@@ -729,9 +730,69 @@ describe("Training row", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ Match rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+describe("Training time presentation — complete interval in time column", () => {
+  it("renders HH:mm – HH:mm in the dedicated time area for a solo training", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    const timeRange = screen.getByTestId("training-time-range");
+    expect(timeRange.textContent).toBe("15:45 – 17:15");
+    expect(timeRange.closest('[data-testid="training-group-time-row"]')).toBeTruthy();
+    expect(timeRange.closest('[data-testid="training-group-row"]')).toBeNull();
+  });
+
+  it("does not render bis end-time suffixes behind team names", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f3",
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    const teamRows = screen.getAllByTestId("training-group-row");
+    for (const row of teamRows) {
+      expect(row.textContent?.toLowerCase()).not.toMatch(/\bbis\b/);
+    }
+
+    const timeRanges = screen.getAllByTestId("training-time-range");
+    expect(timeRanges).toHaveLength(2);
+    expect(timeRanges[0].textContent).toBe("15:45 – 17:15");
+    expect(timeRanges[1].textContent).toBe("15:45 – 18:45");
+  });
+
+  it("formatTrainingTimeRange helper matches Screen 1 semantics", () => {
+    expect(
+      formatTrainingTimeRange(
+        "2026-09-12T13:45:00.000Z",
+        "2026-09-12T15:15:00.000Z",
+        "Europe/Zurich",
+      ),
+    ).toBe("15:45 – 17:15");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("Match row", () => {
   it("renders home team name", () => {

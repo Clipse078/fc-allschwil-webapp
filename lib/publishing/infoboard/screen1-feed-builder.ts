@@ -75,6 +75,49 @@ export const SCREEN1_HORIZON_HOURS = 4;
 /** SCREEN1_HORIZON_HOURS expressed in milliseconds for use with `Date` math. */
 export const SCREEN1_HORIZON_MS = SCREEN1_HORIZON_HOURS * 60 * 60 * 1000;
 
+/**
+ * Minimum rendered display cards when the rolling window is sparse.
+ * Fill-forward logic never splits a same-start temporal cohort.
+ */
+export const MIN_DISPLAY_CARDS = 3;
+
+/**
+ * Selects fill-forward events while preserving same-start temporal cohort
+ * integrity. Candidates must be pre-sorted by startAt ascending.
+ *
+ * When a cohort is included, every event sharing that startAt is included —
+ * even if the cohort size exceeds the remaining fill budget.
+ */
+export function selectFillEventsPreservingStartCohorts<T extends { startAt: Date }>(
+  candidates: readonly T[],
+  needed: number,
+): T[] {
+  if (needed <= 0 || candidates.length === 0) return [];
+
+  const cohorts: T[][] = [];
+  for (const event of candidates) {
+    const lastCohort = cohorts[cohorts.length - 1];
+    if (
+      lastCohort !== undefined &&
+      lastCohort[0].startAt.getTime() === event.startAt.getTime()
+    ) {
+      lastCohort.push(event);
+    } else {
+      cohorts.push([event]);
+    }
+  }
+
+  const fillEvents: T[] = [];
+  let fillCount = 0;
+  for (const cohort of cohorts) {
+    if (fillCount >= needed) break;
+    fillEvents.push(...cohort);
+    fillCount += cohort.length;
+  }
+
+  return fillEvents;
+}
+
 // ── Feed builder input ─────────────────────────────────────────────────────────
 
 /**
@@ -191,8 +234,6 @@ export async function buildInfoboardScreen1Feed(
   // This ensures a board at 09:00 is not empty when the first training starts
   // at 16:00 — it shows the next relevant activities of the day.
 
-  const MIN_DISPLAY_CARDS = 3;
-
   const windowEventCount =
     grouped.current.length + grouped.next.length + grouped.later.length;
 
@@ -219,9 +260,12 @@ export async function buildInfoboardScreen1Feed(
       })
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
-    // Fill up to MIN_DISPLAY_CARDS total
+    // Fill up to MIN_DISPLAY_CARDS total without splitting same-start cohorts.
     const needed = MIN_DISPLAY_CARDS - windowEventCount;
-    fillEvents = todayFillCandidates.slice(0, Math.max(0, needed));
+    fillEvents = selectFillEventsPreservingStartCohorts(
+      todayFillCandidates,
+      Math.max(0, needed),
+    );
   }
 
   // Step 4: Determine empty-state reason before mapping.

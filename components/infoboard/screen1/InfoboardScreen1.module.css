@@ -1192,6 +1192,40 @@
   min-width: 0;
 }
 
+.trainingGroupTimeZone {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  row-gap: clamp(2px, 0.35vh, 5px);
+  justify-content: stretch;
+}
+
+.trainingGroupZoneSpacer {
+  display: block;
+  min-height: 0;
+  visibility: hidden;
+}
+
+.trainingGroupTimeRange {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-event-time);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ib-text);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTimeRange {
+  font-size: clamp(0.95rem, 1.2vw, 1.45rem);
+  line-height: 1.05;
+}
+
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTimeRange {
+  font-size: clamp(0.9rem, 1.1vw, 1.35rem);
+  line-height: 1.02;
+}
+
 /* ─── Sparse layout mode ─────────────────────────────────────────────────────
  *
  * When total page demand is LOW (data-layout-mode="sparse"), cards must NOT
