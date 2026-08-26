@@ -29,6 +29,8 @@ type InfoboardPageRotatorProps = {
   children: ReactNode;
   /** Rotation interval in milliseconds. Defaults to 12 000 ms (12 s). */
   intervalMs?: number;
+  /** Identity of the paginated feed; changes restart rolling from Page 1. */
+  contentKey?: string;
 };
 
 function normalizePageIndex(index: number, pageCount: number): number {
@@ -39,6 +41,7 @@ function normalizePageIndex(index: number, pageCount: number): number {
 export function InfoboardPageRotator({
   children,
   intervalMs = 12_000,
+  contentKey,
 }: InfoboardPageRotatorProps): ReactNode {
   const childArray = Children.toArray(children);
   const pageCount = childArray.length;
@@ -49,7 +52,13 @@ export function InfoboardPageRotator({
   const visiblePage = normalizePageIndex(currentPage, pageCount);
   const activeChild = childArray[visiblePage] ?? childArray[0] ?? null;
 
-  // Keep state aligned when feed refresh changes the page count after hydration.
+  // Repacked lifecycle content always restarts at Page 1; otherwise the same
+  // numeric index could display a stale position from the previous packing.
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [contentKey]);
+
+  // Keep state aligned for generic callers that only change the page count.
   useEffect(() => {
     setCurrentPage((prev) => normalizePageIndex(prev, pageCount));
   }, [pageCount]);
