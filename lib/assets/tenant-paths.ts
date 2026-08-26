@@ -64,6 +64,28 @@ export function getExternalTeamLogoKey(
   return `clubs/${tenantKey}/teams/${externalTeamId}.${ext}`;
 }
 
+// ── MEDIA-LOGO-01B: normalized provider club crest paths ──────────────────────
+//
+// Provider-normalized crests use a deterministic PNG key so repeated sync of
+// an unchanged source overwrites the same object instead of creating orphans.
+// When a stable provider club id is known, every team under that club shares
+// one normalized asset (see lib/club-directory/logo.ts club-level crest model).
+
+export type NormalizedProviderClubLogoScope =
+  | { provider: string; providerClubId: number }
+  | { externalClubId: string };
+
+export function getNormalizedProviderClubLogoKey(
+  tenantKey: string,
+  scope: NormalizedProviderClubLogoScope,
+): string {
+  if ("providerClubId" in scope) {
+    const provider = scope.provider.trim().toLowerCase();
+    return `clubs/${tenantKey}/provider/${provider}/${scope.providerClubId}.png`;
+  }
+  return `clubs/${tenantKey}/${scope.externalClubId}.png`;
+}
+
 // ── INFOBOARD-MAP-01: Anlageplan background paths ─────────────────────────────
 //
 // Background images are stored in the public sportclubevo-assets store under

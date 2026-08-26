@@ -50,7 +50,9 @@ import {
   getAnlageplanBgKey,
   getExternalClubLogoKey,
   getExternalTeamLogoKey,
+  getNormalizedProviderClubLogoKey,
   getTenantLogoKey,
+  type NormalizedProviderClubLogoScope,
 } from "@/lib/assets/tenant-paths";
 
 // ── Vercel Blob URL detection ─────────────────────────────────────────────────
@@ -237,6 +239,52 @@ export async function uploadExternalTeamLogo(
     buffer,
     declaredMime,
   );
+}
+
+// ── MEDIA-LOGO-01B: normalized provider club crest upload ─────────────────────
+//
+// Separate from tenant-managed uploads: accepts only pre-normalized PNG bytes
+// produced by lib/assets/provider-logo-normalization.ts. GIF and other
+// provider source formats never pass through the tenant upload allowlist.
+
+/**
+ * Uploads a provider-normalized club crest PNG to a deterministic key.
+ * Overwrites the same key on refresh — no duplicate blobs per unchanged club.
+ */
+export async function uploadNormalizedProviderClubLogo(
+  tenantKey: string,
+  scope: NormalizedProviderClubLogoScope,
+  buffer: Uint8Array,
+): Promise<UploadLogoResult> {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (!token) {
+    return {
+      ok: false,
+      status: 503,
+      error:
+        "Logo-Upload ist derzeit nicht verfügbar (Speicher nicht konfiguriert). " +
+        "Bitte BLOB_READ_WRITE_TOKEN im Vercel-Projekt konfigurieren.",
+    };
+  }
+
+  const detected = await fileTypeFromBuffer(buffer);
+  if (!detected || detected.mime !== "image/png") {
+    return {
+      ok: false,
+      status: 400,
+      error: "Normalisiertes Provider-Logo ist kein gültiges PNG.",
+    };
+  }
+
+  const storageKey = getNormalizedProviderClubLogoKey(tenantKey, scope);
+  const blob = await put(storageKey, Buffer.from(buffer), {
+    access: "public",
+    contentType: "image/png",
+    token,
+    allowOverwrite: true,
+  });
+
+  return { ok: true, publicUrl: blob.url };
 }
 
 // ── INFOBOARD-MAP-01: Anlageplan background upload ────────────────────────────
