@@ -84,13 +84,20 @@ describe("screen1-feed-expiry — FC Allschwil Fixture A (expired training)", ()
     isEmpty: false,
   });
 
-  it("at 18:43 Europe/Zurich the 17:00–18:30 training is NOT active", () => {
+  it("at 18:43 Europe/Zurich the 17:00–18:30 training remains in post-event grace", () => {
     const now = new Date("2026-08-24T16:43:00.000Z");
-    expect(isScreen1EventActiveAt(training, now)).toBe(false);
+    expect(isScreen1EventActiveAt(training, now)).toBe(true);
   });
 
-  it("filterExpiredScreen1Feed removes the expired training from current", () => {
+  it("filterExpiredScreen1Feed keeps training during grace at 18:43", () => {
     const now = new Date("2026-08-24T16:43:00.000Z");
+    const filtered = filterExpiredScreen1Feed(feed, now);
+    expect(filtered.current).toHaveLength(1);
+    expect(filtered.isEmpty).toBe(false);
+  });
+
+  it("filterExpiredScreen1Feed removes the training after grace at 18:46", () => {
+    const now = new Date("2026-08-24T16:46:00.000Z");
     const filtered = filterExpiredScreen1Feed(feed, now);
     expect(filtered.current).toHaveLength(0);
     expect(filtered.isEmpty).toBe(true);
