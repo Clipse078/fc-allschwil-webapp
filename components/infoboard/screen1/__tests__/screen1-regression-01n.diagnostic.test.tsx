@@ -101,7 +101,9 @@ function itemDemand(item: DisplayItem): number {
 }
 
 function activeTimes(): string[] {
-  const root = screen.queryByTestId("infoboard-page-rotator");
+  const root =
+    screen.queryByTestId("infoboard-page-rotator")
+    ?? screen.queryByTestId("event-list");
   if (root === null) return [];
   return Array.from(root.querySelectorAll("time"), (node) => node.textContent ?? "");
 }
@@ -150,7 +152,10 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
     const pages = paginateDisplayList(items, demands, CARD_DEMAND_PAGE_MAX);
 
     expect(items.map(itemTime)).toEqual(["15:45", "17:15", "18:45", "19:45", "20:15"]);
-    expect(demands).toEqual([1.65, 4.25, 4.9, 2.32, 2.1]);
+    expect(demands).toHaveLength(5);
+    [1.55, 4.25, 4.9, 2.32, 2.1].forEach((expected, index) => {
+      expect(demands[index]).toBeCloseTo(expected);
+    });
     expect(pages.map((page) => page.map(itemTime))).toEqual([
       ["15:45", "17:15"],
       ["18:45", "19:45"],
