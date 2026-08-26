@@ -156,11 +156,16 @@ export const CARD_DEMAND_TOURNAMENT_PARTICIPANT = 0.3;
 /** Centre participant grid columns — matches tournamentParticipants CSS. */
 export const TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS = 2;
 /**
- * Maximum total demand per rendered page.
- * When the visible set exceeds this threshold the display list is split
- * into pages and rotated automatically. Normal days produce a single page.
+ * Maximum total demand per rendered page inside the footer-safe content area.
+ *
+ * The former 12.0 limit modelled the complete viewport even though the kiosk
+ * shell permanently consumes height for its header, optional subtitle, main
+ * padding/card gaps, and footer. 8.5 is the conservative capacity calibrated
+ * for that actual remaining region at the physical-TV target viewport. The
+ * semantic demand weights remain unchanged, so approved training-row spacing
+ * is preserved; oversized consecutive cohorts move to another page instead.
  */
-export const CARD_DEMAND_PAGE_MAX = 12.0;
+export const CARD_DEMAND_PAGE_MAX = 8.5;
 
 /**
  * Demand for a training-group card with `rowCount` simultaneous training rows.
@@ -1360,6 +1365,17 @@ export function InfoboardScreen1({
 
   // Split into pages based on demand. Normal days: single page (no rotation).
   const pages = paginateDisplayList(displayList, rawItemDemands);
+  const paginationContentKey = pages
+    .map((page) =>
+      page
+        .map((item) =>
+          item.kind === "training-group"
+            ? item.items.map(({ event }) => event.id).join(",")
+            : item.item.event.id,
+        )
+        .join(":"),
+    )
+    .join("|");
 
   // ── Page renderer (used for each page in the rotator) ────────────────────
   function renderPage(pageItems: DisplayItem[], pageIndex: number): ReactElement {
@@ -1463,7 +1479,11 @@ export function InfoboardScreen1({
       />
 
       {/* ── Main: event list (demand-paginated, rotated when multi-page) ── */}
-      <main className={styles.main}>
+      <main
+        className={styles.main}
+        data-testid="infoboard-content-region"
+        data-safe-page-capacity={CARD_DEMAND_PAGE_MAX}
+      >
         {visibleFeed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">
             <p className={styles.emptyFullMessage}>
@@ -1474,7 +1494,10 @@ export function InfoboardScreen1({
           </div>
         ) : (
           <>
-            <InfoboardPageRotator intervalMs={12_000}>
+            <InfoboardPageRotator
+              intervalMs={12_000}
+              contentKey={paginationContentKey}
+            >
               {pages.map((pageItems, pageIndex) => renderPage(pageItems, pageIndex))}
             </InfoboardPageRotator>
           </>

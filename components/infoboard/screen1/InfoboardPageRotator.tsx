@@ -20,7 +20,7 @@
  */
 "use client";
 
-import { useState, useEffect, useRef, Children } from "react";
+import { useState, useEffect, Children } from "react";
 import type { ReactNode } from "react";
 import styles from "./InfoboardScreen1.module.css";
 
@@ -29,6 +29,8 @@ type InfoboardPageRotatorProps = {
   children: ReactNode;
   /** Rotation interval in milliseconds. Defaults to 12 000 ms (12 s). */
   intervalMs?: number;
+  /** Identity of the paginated feed; changes restart rolling from Page 1. */
+  contentKey?: string;
 };
 
 function normalizePageIndex(index: number, pageCount: number): number {
@@ -39,34 +41,10 @@ function normalizePageIndex(index: number, pageCount: number): number {
 export function InfoboardPageRotator({
   children,
   intervalMs = 12_000,
+  contentKey,
 }: InfoboardPageRotatorProps): ReactNode {
   const childArray = Children.toArray(children);
   const pageCount = childArray.length;
-  const pageCountRef = useRef(pageCount);
-  pageCountRef.current = pageCount;
-
-  const [currentPage, setCurrentPage] = useState(0);
-  const visiblePage = normalizePageIndex(currentPage, pageCount);
-  const activeChild = childArray[visiblePage] ?? childArray[0] ?? null;
-
-  // Keep state aligned when feed refresh changes the page count after hydration.
-  useEffect(() => {
-    setCurrentPage((prev) => normalizePageIndex(prev, pageCount));
-  }, [pageCount]);
-
-  // Stable interval — depends only on intervalMs so feed refreshes do not reset
-  // the rotation clock when pageCount stays above one.
-  useEffect(() => {
-    if (intervalMs <= 0) return undefined;
-
-    const id = window.setInterval(() => {
-      const count = pageCountRef.current;
-      if (count <= 1) return;
-      setCurrentPage((prev) => (prev + 1) % count);
-    }, intervalMs);
-
-    return () => window.clearInterval(id);
-  }, [intervalMs]);
 
   if (pageCount <= 0) {
     return null;
@@ -74,8 +52,45 @@ export function InfoboardPageRotator({
 
   // Single page: return directly without wrapper overhead.
   if (pageCount <= 1) {
-    return activeChild;
+    return childArray[0] ?? null;
   }
+
+  // A changed feed identity or page count remounts only the small stateful
+  // stage. This starts repacked content at Page 1 without synchronously
+  // setting state from an effect.
+  const rotationKey = `${contentKey ?? "stable"}:${pageCount}`;
+  return (
+    <RotatingPages
+      key={rotationKey}
+      pages={childArray}
+      intervalMs={intervalMs}
+    />
+  );
+}
+
+function RotatingPages({
+  pages,
+  intervalMs,
+}: {
+  pages: ReactNode[];
+  intervalMs: number;
+}): ReactNode {
+  const pageCount = pages.length;
+  const [currentPage, setCurrentPage] = useState(0);
+  const visiblePage = normalizePageIndex(currentPage, pageCount);
+  const activeChild = pages[visiblePage] ?? pages[0] ?? null;
+
+  // Same-size feed refreshes preserve the interval. A changed page count
+  // remounts this stage through rotationKey and therefore restarts at Page 1.
+  useEffect(() => {
+    if (intervalMs <= 0) return undefined;
+
+    const id = window.setInterval(() => {
+      setCurrentPage((prev) => (prev + 1) % pageCount);
+    }, intervalMs);
+
+    return () => window.clearInterval(id);
+  }, [intervalMs, pageCount]);
 
   return (
     <div

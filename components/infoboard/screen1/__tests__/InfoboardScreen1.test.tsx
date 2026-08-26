@@ -474,7 +474,7 @@ describe("Event list â€” flat model", () => {
     expect(headings).toHaveLength(0);
   });
 
-  it("5 rows render for the target preview fixture", () => {
+  it("target preview fixture paginates instead of rendering beyond safe capacity", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE}
@@ -483,7 +483,8 @@ describe("Event list â€” flat model", () => {
       />,
     );
     const rows = screen.getAllByTestId("event-row");
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(3);
+    expect(screen.getByTestId("infoboard-page-rotator").getAttribute("data-page-count")).toBe("2");
   });
 
   it("events from current, next, and later all appear in one flat list", () => {
@@ -2225,7 +2226,7 @@ describe("Card-based layout â€” no table-row appearance", () => {
     expect(eventList.getAttribute("data-count")).toBe("2");
   });
 
-  it("data-count is 5 for the full preview fixture", () => {
+  it("data-count reflects the footer-safe first page of the full preview fixture", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE}
@@ -2234,7 +2235,7 @@ describe("Card-based layout â€” no table-row appearance", () => {
       />,
     );
     const eventList = screen.getByTestId("event-list");
-    expect(eventList.getAttribute("data-count")).toBe("5");
+    expect(eventList.getAttribute("data-count")).toBe("3");
   });
 });
 
@@ -2618,7 +2619,7 @@ describe("Training aggregation â€” missing allocation warning remains visib
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 describe("Physical-TV fit â€” dense layout renders all required events", () => {
-  it("full 5-event preview fixture renders exactly 5 cards (no clipping)", () => {
+  it("full 5-event preview fixture uses two footer-safe pages", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE}
@@ -2627,10 +2628,11 @@ describe("Physical-TV fit â€” dense layout renders all required events", ()
       />,
     );
     const rows = screen.getAllByTestId("event-row");
-    expect(rows).toHaveLength(5);
+    expect(rows).toHaveLength(3);
+    expect(screen.getByTestId("infoboard-page-rotator").getAttribute("data-page-count")).toBe("2");
   });
 
-  it("data-count=5 on 5-event list (adaptive density tier enabled)", () => {
+  it("data-count=3 on the safe first page (adaptive density tier enabled)", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE}
@@ -2638,7 +2640,7 @@ describe("Physical-TV fit â€” dense layout renders all required events", ()
         eventPresentation={PREVIEW_TARGET_TOURNAMENT_EXTENSIONS}
       />,
     );
-    expect(screen.getByTestId("event-list").getAttribute("data-count")).toBe("5");
+    expect(screen.getByTestId("event-list").getAttribute("data-count")).toBe("3");
   });
 
   it("1-event hero layout: data-count=1", () => {
@@ -3165,7 +3167,7 @@ describe("Content-demand â€” computeMatchContentSafeMinimum", () => {
     expect(computeMatchContentSafeMinimum(laterMatch)).toBeGreaterThanOrEqual(CARD_DEMAND_MATCH);
   });
 
-  it("mixed preview page total demand stays within CARD_DEMAND_PAGE_MAX", () => {
+  it("mixed preview total demand exceeds the footer-safe page capacity", () => {
     const matchCurrent = computeMatchDemand(PREVIEW_FIXTURE.current[0]);
     const trainingNext = computeTrainingGroupDemand(1);
     const tournamentLater = computeTournamentDemand(
@@ -3175,7 +3177,7 @@ describe("Content-demand â€” computeMatchContentSafeMinimum", () => {
     const trainingLater = computeTrainingGroupDemand(1);
     const total =
       matchCurrent + trainingNext + tournamentLater + matchLater + trainingLater;
-    expect(total).toBeLessThanOrEqual(CARD_DEMAND_PAGE_MAX);
+    expect(total).toBeGreaterThan(CARD_DEMAND_PAGE_MAX);
     expect(total).toBeGreaterThan(10);
   });
 
