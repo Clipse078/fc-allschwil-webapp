@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewStudio } from "@/components/infoboard/preview/PreviewStudio";
@@ -78,18 +78,20 @@ describe("PreviewStudio", () => {
       "Infoboard Vorschau Screen 1",
     ) as HTMLIFrameElement;
     const postMessage = vi.spyOn(frame.contentWindow!, "postMessage");
-    window.dispatchEvent(
-      new MessageEvent("message", {
-        origin: window.location.origin,
-        source: frame.contentWindow,
-        data: {
-          source: "infoboard-preview-frame",
-          type: "STATE",
-          page: 0,
-          pageCount: 3,
-        },
-      }),
-    );
+    act(() => {
+      window.dispatchEvent(
+        new MessageEvent("message", {
+          origin: window.location.origin,
+          source: frame.contentWindow,
+          data: {
+            source: "infoboard-preview-frame",
+            type: "STATE",
+            page: 0,
+            pageCount: 3,
+          },
+        }),
+      );
+    });
     expect(screen.getByText("Seite 1 von 3")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Nächste Seite" }));
     expect(postMessage).toHaveBeenCalledWith(

@@ -37,6 +37,7 @@ export default async function InfoboardPreviewFramePage({
   ]);
   const tenant = await getActiveTenant();
   if (!tenant?.timezone) notFound();
+  const previewTenant = { ...tenant, timezone: tenant.timezone };
 
   const params = await searchParams;
   const preview = parseInfoboardPreviewMoment(
@@ -50,7 +51,7 @@ export default async function InfoboardPreviewFramePage({
 
   if (preview.screen === "1") {
     const { payload, weather } = await buildScreen1PreviewData(
-      tenant,
+      previewTenant,
       preview.now,
     );
     return (
@@ -69,7 +70,7 @@ export default async function InfoboardPreviewFramePage({
     );
   }
 
-  const data = await buildScreen2PreviewData(tenant, preview.now);
+  const data = await buildScreen2PreviewData(previewTenant, preview.now);
   if (data.renderer === "anlageplan") {
     return (
       <PreviewFrameStatic>
