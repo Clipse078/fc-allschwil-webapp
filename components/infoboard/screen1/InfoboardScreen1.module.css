@@ -334,19 +334,12 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;
   gap: var(--ib-card-gap);
   list-style: none;
   margin: 0;
   padding: 0;
   min-height: 0;
-  /* Content-safe demand unit: one demand point = 1/PAGE_MAX of the content viewport.
-     Cards receive min-height = demand × unit before flex-grow distributes surplus. */
-  --ib-content-viewport: calc(
-    100dvh - var(--ib-header-height) - var(--ib-footer-height) - 2 * var(--ib-sp-3)
-  );
-  --ib-demand-unit-height: calc(
-    var(--ib-content-viewport) / var(--ib-page-demand-max, 12)
-  );
 }
 
 /* ─── Event card ─────────────────────────────────────────────────────────── */
@@ -359,17 +352,12 @@
   border: 1px solid var(--ib-border);
   border-left: var(--ib-stripe-width) solid transparent;
   border-radius: var(--ib-radius);
-  /* Content-aware flex-grow: each card gets space proportional to its
-     semantic content demand (set via --ib-card-demand CSS custom property).
-     Denser cards (e.g. 6-row training groups) receive proportionally more
-     of the available viewport height than compact cards (1-row training,
-     match). Falls back to flex: 1 when no demand is set.
-     Content-safe first: min-height from demand units prevents flex-shrink
-     from clipping rendered content; surplus height is distributed via flex-grow. */
-  flex-grow: var(--ib-card-demand, 1);
+  /* Content-driven card height: demand metadata informs density tiers and
+     pagination only — cards never stretch to absorb leftover viewport height. */
+  flex-grow: 0;
   flex-shrink: 0;
-  flex-basis: 0;
-  min-height: calc(var(--ib-card-demand, 1) * var(--ib-demand-unit-height, 0px));
+  flex-basis: auto;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -1192,51 +1180,6 @@
   min-width: 0;
 }
 
-.trainingGroupTimeZone {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  row-gap: clamp(2px, 0.35vh, 5px);
-  justify-content: stretch;
-  align-content: stretch;
-}
-
-.trainingGroupTimeHeader {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 4px;
-  align-self: start;
-  min-width: 0;
-}
-
-.trainingGroupZoneSpacer {
-  display: block;
-  min-height: 0;
-  visibility: hidden;
-}
-
-.trainingGroupTimeRange {
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-event-time);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--ib-text);
-  line-height: 1.1;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTimeRange {
-  font-size: clamp(0.95rem, 1.2vw, 1.45rem);
-  line-height: 1.05;
-}
-
-.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTimeRange {
-  font-size: clamp(0.9rem, 1.1vw, 1.35rem);
-  line-height: 1.02;
-}
-
 /* ─── Sparse layout mode ─────────────────────────────────────────────────────
  *
  * When total page demand is LOW (data-layout-mode="sparse"), cards must NOT
@@ -1244,29 +1187,12 @@
  * TRAINING card should appear substantial and readable — but not stretched
  * to fill the entire screen with empty interior.
  *
- * Fix:
- *   max-height: calc(var(--ib-card-demand, 1) * 25vh)
+ * All cards are content-sized (flex-grow:0). Sparse mode is retained as a
+ * semantic signal for density-tier selection and regression assertions.
  *
- * This cap is demand-proportional so:
- *   - 1 simple MATCH (demand 2.2): max ≈ 594px at 1080p (≈55vh) ✓
- *   - 2 simple MATCH (demand 2.2 each): each ≈ 594px, fill mode engages ✓
- *   - 1 TRAINING 1-row (demand 1.55): max ≈ 419px — comfortable ✓
- *
- * As demand approaches the fill threshold (4.0), max-height approaches
- * 100vh — becoming equivalent to no constraint. Continuity is preserved.
- *
- * The event list itself (flex: 1) still fills main; only the cards are
- * bounded. Unused space within the list shows the dark board background
- * anchored below the activity stack, never centring the cards.
- *
- * FILL mode (data-layout-mode="fill") restores unconstrained flex-grow
- * for dense / ultra pages where every pixel of viewport must be used.
- * No rule is needed — the default .eventCard behaviour applies.
+ * FILL mode (data-layout-mode="fill") applies tighter density tiers when
+ * many cards share the viewport — not viewport-height stretching.
  */
-
-.eventList[data-layout-mode="sparse"] .eventCard {
-  max-height: calc(var(--ib-card-demand, 1) * 25vh);
-}
 
 .eventList[data-layout-mode="sparse"] {
   --ib-tournament-logo-size: var(--ib-tournament-logo-size-large);
@@ -1328,6 +1254,7 @@
   display: grid;
   grid-auto-rows: minmax(clamp(24px, 3.2vh, 44px), auto);
   align-items: stretch;
+  align-content: start;
   min-width: 0;
 }
 
@@ -1438,8 +1365,8 @@
  */
 .eventCard[data-type="TRAINING"] .trainingGroupZone {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  align-content: stretch;
+  grid-template-rows: auto auto;
+  align-content: start;
   justify-content: stretch;
   row-gap: clamp(5px, 0.55vh, 8px);
 }
@@ -1463,10 +1390,20 @@
 
 /* All value grids begin at the identical second-row origin. */
 .eventCard[data-type="TRAINING"] .trainingGroupZone > .trainingGroupRows {
-  align-self: stretch;
+  align-self: start;
   min-height: 0;
   margin: 0;
   padding: 0;
+}
+
+.trainingGroupRowContent {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  width: 100%;
 }
 
 /* ─── Grouped-training row density (per-card, 4+ rows) ─────────────────────

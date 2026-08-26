@@ -991,68 +991,34 @@ function TrainingGroupCard({
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
-      {/* TIME — shared start/end once; row annotations only for mixed-end cohorts */}
-      <div
-        className={
-          timePresentation.hasRowEndAnnotations
-            ? `${styles.cardTimeZone} ${styles.trainingGroupTimeZone}`
-            : styles.cardTimeZone
-        }
-        data-testid="training-group-time-zone"
-      >
-        <div className={styles.trainingGroupTimeHeader}>
-          {label !== null && (
-            <span
-              className={styles.statusLabel}
-              data-testid={`status-label-${temporal}`}
-              data-status={temporal === "current" ? "current" : "next"}
-            >
-              {label}
-            </span>
-          )}
-
-          <time
-            className={styles.eventTime}
-            dateTime={startAt}
-            data-testid="training-cohort-start-time"
+      {/* TIME — shared start + majority end once in the left card */}
+      <div className={styles.cardTimeZone} data-testid="training-group-time-zone">
+        {label !== null && (
+          <span
+            className={styles.statusLabel}
+            data-testid={`status-label-${temporal}`}
+            data-status={temporal === "current" ? "current" : "next"}
           >
-            {timePresentation.startTime}
-          </time>
+            {label}
+          </span>
+        )}
 
-          {timePresentation.primaryEndTime !== null && (
-            <span
-              className={styles.eventEndTime}
-              aria-label="Bis"
-              data-testid="training-cohort-end-time"
-            >
-              bis {timePresentation.primaryEndTime}
-            </span>
-          )}
-        </div>
+        <time
+          className={styles.eventTime}
+          dateTime={startAt}
+          data-testid="training-cohort-start-time"
+        >
+          {timePresentation.startTime}
+        </time>
 
-        {timePresentation.hasRowEndAnnotations && (
-          <div className={styles.trainingGroupRows}>
-            {items.map((it, index) => {
-              const rowEndAnnotation = timePresentation.rowEndAnnotations[index];
-              return (
-                <div
-                  key={it.event.id}
-                  className={styles.trainingGroupAlignedRow}
-                  data-testid="training-group-time-row"
-                >
-                  {rowEndAnnotation !== null && (
-                    <span
-                      className={styles.trainingGroupRowEndTime}
-                      aria-label="Bis"
-                      data-testid="training-row-end-annotation"
-                    >
-                      bis {rowEndAnnotation}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        {timePresentation.primaryEndTime !== null && (
+          <span
+            className={styles.eventEndTime}
+            aria-label="Bis"
+            data-testid="training-cohort-end-time"
+          >
+            bis {timePresentation.primaryEndTime}
+          </span>
         )}
       </div>
 
@@ -1069,33 +1035,50 @@ function TrainingGroupCard({
         </span>
 
         <div className={styles.trainingGroupRows}>
-          {items.map((it) => (
-            <div
-              key={it.event.id}
-              className={styles.trainingGroupAlignedRow}
-              data-testid="training-group-row"
-            >
-              <span className={styles.trainingGroupTeamName}>
-                {showLogos && clubLogoSrc !== null && (
-                  // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
-                  <img
-                    src={clubLogoSrc}
-                    alt=""
-                    aria-hidden="true"
-                    className={styles.trainingClubLogo}
-                    data-testid="training-team-logo"
-                    data-event-id={it.event.id}
-                  />
-                )}
-                <span className={styles.trainingGroupTeamText}>
-                  {stripClubPrefix(
-                    it.event.teamDisplayName ?? it.event.displayTitle,
-                    clubName,
+          {items.map((it, index) => {
+            const rowEndAnnotation = timePresentation.rowEndAnnotations[index];
+            return (
+              <div
+                key={it.event.id}
+                className={styles.trainingGroupAlignedRow}
+              >
+                <div className={styles.trainingGroupRowContent}>
+                  <span
+                    className={styles.trainingGroupTeamName}
+                    data-testid="training-group-row"
+                  >
+                    {showLogos && clubLogoSrc !== null && (
+                      // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
+                      <img
+                        src={clubLogoSrc}
+                        alt=""
+                        aria-hidden="true"
+                        className={styles.trainingClubLogo}
+                        data-testid="training-team-logo"
+                        data-event-id={it.event.id}
+                      />
+                    )}
+                    <span className={styles.trainingGroupTeamText}>
+                      {stripClubPrefix(
+                        it.event.teamDisplayName ?? it.event.displayTitle,
+                        clubName,
+                      )}
+                    </span>
+                  </span>
+
+                  {rowEndAnnotation !== null && (
+                    <span
+                      className={styles.trainingGroupRowEndTime}
+                      aria-label="Bis"
+                      data-testid="training-row-end-annotation"
+                    >
+                      bis {rowEndAnnotation}
+                    </span>
                   )}
-                </span>
-              </span>
-            </div>
-          ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 

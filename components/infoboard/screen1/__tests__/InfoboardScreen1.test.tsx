@@ -4206,4 +4206,123 @@ describe("trainingGroupDensityTier â€” sparse groups unchanged", () => {
   });
 });
 
+describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
+  function renderTrainingGroup(rowCount: number, temporal: "current" | "next" = "next") {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const sharedEnd = "2026-09-12T15:15:00.000Z";
+    const events = Array.from({ length: rowCount }, (_, index) =>
+      makeEvent({
+        id: `tr-${index}`,
+        startAt: sharedStart,
+        endAt: sharedEnd,
+        teamDisplayName: `JUNIOREN T${index + 1}`,
+      }),
+    );
+    const feed = makeFeed({
+      current: temporal === "current" ? events : [],
+      next: temporal === "next" ? events : [],
+      isEmpty: false,
+    });
+  return render(<InfoboardScreen1 feed={feed} />);
+  }
+
+  function trainingCard(rowCount: string): HTMLElement {
+    const card = screen.getAllByTestId("event-row").find(
+      (row) =>
+        row.getAttribute("data-type") === "TRAINING" &&
+        row.getAttribute("data-training-count") === rowCount,
+    );
+    if (card === undefined) {
+      throw new Error(`Expected training card with ${rowCount} rows`);
+    }
+    return card;
+  }
+
+  it("assigns expected group-density tiers for 1/4/5/6 row cards", () => {
+    for (const [rows, density] of [
+      ["1", "normal"],
+      ["4", "compact"],
+      ["5", "compact"],
+      ["6", "dense"],
+    ] as const) {
+      renderTrainingGroup(Number(rows));
+      expect(trainingCard(rows).getAttribute("data-group-density")).toBe(density);
+    }
+  });
+
+  it("sparse 4-row card uses content-driven flex (no viewport stretch)", () => {
+    renderTrainingGroup(4);
+    const list = screen.getByTestId("event-list");
+    const card = trainingCard("4");
+
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+    expect(window.getComputedStyle(card).flexGrow).toBe("0");
+    expect(window.getComputedStyle(card).flexBasis).toBe("auto");
+  });
+
+  it("keeps compact row spacing contract for a 4-row training cohort", () => {
+    renderTrainingGroup(4);
+    const card = trainingCard("4");
+    const rowGrids = card.querySelectorAll('[class*="trainingGroupRows"]');
+
+    expect(within(card).getAllByTestId("training-group-row")).toHaveLength(4);
+    for (const grid of rowGrids) {
+      const style = window.getComputedStyle(grid);
+      expect(style.alignContent).not.toBe("space-between");
+      expect(style.alignContent).not.toBe("space-around");
+      expect(style.justifyContent).not.toBe("space-between");
+      expect(style.flexGrow).not.toBe("1");
+      expect(grid.className).not.toMatch(/space-between|space-around|1fr/);
+    }
+  });
+
+  it("trainingGroupRows grids remain content-driven (no viewport distribution classes)", () => {
+    renderTrainingGroup(4);
+    const rowGrids = trainingCard("4").querySelectorAll('[class*="trainingGroupRows"]');
+    expect(rowGrids.length).toBeGreaterThan(0);
+
+    for (const grid of rowGrids) {
+      const style = window.getComputedStyle(grid);
+      expect(style.alignContent).not.toBe("space-between");
+      expect(style.alignContent).not.toBe("space-around");
+      expect(style.justifyContent).not.toBe("space-between");
+      expect(style.flexGrow).not.toBe("1");
+    }
+  });
+
+  it("mixed-end annotation is rendered on the differing training row", () => {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const feed = makeFeed({
+      next: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f3",
+          startAt: sharedStart,
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    const card = trainingCard("2");
+    const timeZone = card.querySelector('[data-testid="training-group-time-zone"]');
+    const annotation = within(card).getByTestId("training-row-end-annotation");
+    const f3Row = within(card)
+      .getAllByTestId("training-group-row")
+      .find((row) => row.textContent?.includes("F3"));
+
+    expect(timeZone?.textContent).toContain("15:45");
+    expect(timeZone?.textContent).toContain("bis 17:15");
+    expect(f3Row).toBeTruthy();
+    expect(annotation.textContent).toBe("bis 18:45");
+    expect(f3Row?.parentElement?.contains(annotation)).toBe(true);
+  });
+});
 

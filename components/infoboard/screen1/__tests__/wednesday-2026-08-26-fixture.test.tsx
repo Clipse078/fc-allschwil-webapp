@@ -120,4 +120,14 @@ describe("Wednesday 2026-08-26 golden fixture", () => {
     const groupCard = findTrainingGroupCard("4");
     expect(within(groupCard).getByText("JUNIOREN G")).toBeTruthy();
   });
+
+  it("15:44 morning preview keeps the 15:45 cohort content-sized", () => {
+    renderWednesdayAt("15:44");
+
+    const groupCard = findTrainingGroupCard("4");
+
+    expect(groupCard.getAttribute("data-group-density")).toBe("compact");
+    expect(window.getComputedStyle(groupCard).flexGrow).toBe("0");
+    expect(window.getComputedStyle(groupCard).flexBasis).toBe("auto");
+  });
 });
