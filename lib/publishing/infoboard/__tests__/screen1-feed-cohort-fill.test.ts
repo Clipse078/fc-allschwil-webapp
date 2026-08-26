@@ -1,8 +1,9 @@
 /**
  * Regression tests for MIN_DISPLAY_CARDS fill-forward cohort integrity.
  *
- * INFOBOARD-REGRESSION-01C — ensures same-start temporal cohorts are never
- * split when the display-window fallback selects future events.
+ * INFOBOARD-REGRESSION-01C / 01F — ensures same-start temporal cohorts are never
+ * split when the display-window fallback selects future events, and that sparse
+ * same-day mornings supply additional complete cohorts for viewport admission.
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -178,7 +179,7 @@ describe("buildInfoboardScreen1Feed — MIN_DISPLAY_CARDS cohort fill", () => {
     expect(ids).toContain("f2");
     expect(ids).toContain("f3");
     expect(ids).toContain("g");
-    expect(ids).not.toContain("d1-later");
+    expect(ids).toContain("d1-later");
 
     const cohortIds = ids.filter((id) =>
       ["e3", "f2", "f3", "g"].includes(id),
@@ -203,7 +204,7 @@ describe("buildInfoboardScreen1Feed — MIN_DISPLAY_CARDS cohort fill", () => {
     expect(ids).toContain("b");
     expect(ids).toContain("c");
     expect(ids).toContain("d");
-    expect(ids).not.toContain("e");
+    expect(ids).toContain("e");
   });
 
   it("E. events already inside rolling window → existing behavior preserved", async () => {

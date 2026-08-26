@@ -115,32 +115,41 @@ describe("screen1-feed-expiry — Fixture D (boundary)", () => {
     );
   });
 
-  it("18:30 local (16:30Z) — expired at end time (no grace)", () => {
+  it("18:30 local (16:30Z) — remains visible during post-event grace", () => {
     expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:30:00.000Z"))).toBe(
-      false,
+      true,
     );
   });
 
-  it("18:31 local (16:31Z) — expired after end", () => {
-    expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:31:00.000Z"))).toBe(
+  it("18:44 local (16:44Z) — still active within 15-minute grace", () => {
+    expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:44:00.000Z"))).toBe(
+      true,
+    );
+  });
+
+  it("18:45 local (16:45Z) — expired after grace window", () => {
+    expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:45:00.000Z"))).toBe(
       false,
     );
   });
 });
 
 describe("screen1-feed-expiry — MATCH and TOURNAMENT types", () => {
-  it("expires MATCH at explicit endAt", () => {
+  it("expires MATCH after post-event grace", () => {
     const match = makeEvent({
       type: "MATCH",
       startAt: "2026-08-24T15:00:00.000Z",
       endAt: "2026-08-24T16:30:00.000Z",
     });
     expect(isScreen1EventActiveAt(match, new Date("2026-08-24T16:30:00.000Z"))).toBe(
+      true,
+    );
+    expect(isScreen1EventActiveAt(match, new Date("2026-08-24T16:45:00.000Z"))).toBe(
       false,
     );
   });
 
-  it("expires TOURNAMENT at explicit endAt", () => {
+  it("expires TOURNAMENT after post-event grace", () => {
     const tournament = makeEvent({
       type: "TOURNAMENT",
       startAt: "2026-08-24T08:00:00.000Z",
@@ -148,6 +157,9 @@ describe("screen1-feed-expiry — MATCH and TOURNAMENT types", () => {
     });
     expect(
       isScreen1EventActiveAt(tournament, new Date("2026-08-24T12:00:00.000Z")),
+    ).toBe(true);
+    expect(
+      isScreen1EventActiveAt(tournament, new Date("2026-08-24T12:15:00.000Z")),
     ).toBe(false);
   });
 
@@ -161,6 +173,9 @@ describe("screen1-feed-expiry — MATCH and TOURNAMENT types", () => {
       true,
     );
     expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:30:00.000Z"))).toBe(
+      true,
+    );
+    expect(isScreen1EventActiveAt(training, new Date("2026-08-24T16:45:00.000Z"))).toBe(
       false,
     );
   });

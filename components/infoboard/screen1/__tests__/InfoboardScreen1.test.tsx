@@ -4062,7 +4062,7 @@ function makeFcaTraining(
 }
 
 describe("FC Allschwil regression â€” Fixture A expired event", () => {
-  it("17:00â€“18:30 Junioren F2 is NOT rendered at 18:43", () => {
+  it("17:00â€“18:30 Junioren F2 is NOT rendered after post-event grace at 18:46", () => {
     const feed = makeFeed({
       tenant: {
         id: "tenant-fca",
@@ -4081,7 +4081,7 @@ describe("FC Allschwil regression â€” Fixture A expired event", () => {
       isEmpty: false,
     });
 
-    render(<InfoboardScreen1 feed={feed} currentTimeIso={FCA_NOW_1843} />);
+    render(<InfoboardScreen1 feed={feed} currentTimeIso="2026-08-24T16:46:00.000Z" />);
     expect(screen.queryByText("Junioren F2")).toBeNull();
     expect(screen.queryAllByTestId("event-row")).toHaveLength(0);
   });
@@ -4176,16 +4176,19 @@ describe("FC Allschwil regression â€” Fixture D boundary visibility", () =>
     return render(<InfoboardScreen1 feed={feed} currentTimeIso={iso} />);
   }
 
-  it("visible at 17:00 and 18:29", () => {
+  it("visible through post-event grace until 18:44", () => {
     renderAt("2026-08-24T15:00:00.000Z");
     expect(screen.getByText("Junioren F2")).toBeTruthy();
 
     renderAt("2026-08-24T16:29:00.000Z");
     expect(screen.getAllByText("Junioren F2").length).toBeGreaterThan(0);
+
+    renderAt("2026-08-24T16:44:00.000Z");
+    expect(screen.getAllByText("Junioren F2").length).toBeGreaterThan(0);
   });
 
-  it("not rendered at 18:30 (expired)", () => {
-    renderAt("2026-08-24T16:30:00.000Z");
+  it("not rendered after grace at 18:45", () => {
+    renderAt("2026-08-24T16:45:00.000Z");
     expect(screen.queryByText("Junioren F2")).toBeNull();
   });
 });
@@ -4263,26 +4266,26 @@ describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
   it("keeps compact row spacing contract for a 4-row training cohort", () => {
     renderTrainingGroup(4);
     const card = trainingCard("4");
-    const rowGrids = card.querySelectorAll('[class*="trainingGroupRows"]');
+    const rowMatrix = card.querySelector('[data-testid="training-row-matrix"]');
 
     expect(within(card).getAllByTestId("training-group-row")).toHaveLength(4);
-    for (const grid of rowGrids) {
-      const style = window.getComputedStyle(grid);
+    expect(rowMatrix).toBeTruthy();
+    if (rowMatrix instanceof HTMLElement) {
+      const style = window.getComputedStyle(rowMatrix);
       expect(style.alignContent).not.toBe("space-between");
       expect(style.alignContent).not.toBe("space-around");
       expect(style.justifyContent).not.toBe("space-between");
       expect(style.flexGrow).not.toBe("1");
-      expect(grid.className).not.toMatch(/space-between|space-around|1fr/);
+      expect(rowMatrix.className).not.toMatch(/space-between|space-around|1fr/);
     }
   });
 
-  it("trainingGroupRows grids remain content-driven (no viewport distribution classes)", () => {
+  it("training row matrix remains content-driven (no viewport distribution classes)", () => {
     renderTrainingGroup(4);
-    const rowGrids = trainingCard("4").querySelectorAll('[class*="trainingGroupRows"]');
-    expect(rowGrids.length).toBeGreaterThan(0);
-
-    for (const grid of rowGrids) {
-      const style = window.getComputedStyle(grid);
+    const rowMatrix = trainingCard("4").querySelector('[data-testid="training-row-matrix"]');
+    expect(rowMatrix).toBeTruthy();
+    if (rowMatrix instanceof HTMLElement) {
+      const style = window.getComputedStyle(rowMatrix);
       expect(style.alignContent).not.toBe("space-between");
       expect(style.alignContent).not.toBe("space-around");
       expect(style.justifyContent).not.toBe("space-between");
@@ -4322,7 +4325,7 @@ describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
     expect(timeZone?.textContent).toContain("bis 17:15");
     expect(f3Row).toBeTruthy();
     expect(annotation.textContent).toBe("bis 18:45");
-    expect(f3Row?.parentElement?.contains(annotation)).toBe(true);
+    expect(f3Row?.contains(annotation)).toBe(true);
   });
 });
 

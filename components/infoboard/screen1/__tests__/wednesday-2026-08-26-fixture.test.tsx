@@ -89,10 +89,8 @@ describe("Wednesday 2026-08-26 golden fixture", () => {
     }
 
     const teamRows = within(denseCard).getAllByTestId("training-group-row");
-    const kabineZone = denseCard.querySelector('[class*="cardDressingRoomZone"]');
-    expect(kabineZone).toBeTruthy();
-    const kabineAlignedRows = kabineZone?.querySelectorAll('[class*="trainingGroupAlignedRow"]');
-    expect(kabineAlignedRows?.length).toBe(6);
+    const matrixRows = denseCard.querySelectorAll('[data-testid="training-matrix-row"]');
+    expect(matrixRows.length).toBe(6);
     expect(teamRows).toHaveLength(6);
   });
 

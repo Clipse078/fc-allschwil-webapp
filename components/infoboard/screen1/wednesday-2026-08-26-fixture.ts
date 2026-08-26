@@ -145,14 +145,21 @@ export const WEDNESDAY_2026_08_26_ALL_EVENTS: readonly InfoboardScreen1Event[] =
 ];
 
 export const WEDNESDAY_2026_08_26_PREVIEW_TIMES = {
+  "11:00": "2026-08-26T09:00:00.000Z",
+  "13:44": "2026-08-26T11:44:00.000Z",
+  "13:45": "2026-08-26T11:45:00.000Z",
+  "15:29": "2026-08-26T13:29:00.000Z",
   "15:44": "2026-08-26T13:44:00.000Z",
   "15:45": "2026-08-26T13:45:00.000Z",
   "17:14": "2026-08-26T15:14:00.000Z",
   "17:15": "2026-08-26T15:15:00.000Z",
   "18:44": "2026-08-26T16:44:00.000Z",
   "18:45": "2026-08-26T16:45:00.000Z",
+  "19:44": "2026-08-26T17:44:00.000Z",
   "19:45": "2026-08-26T17:45:00.000Z",
   "20:15": "2026-08-26T18:15:00.000Z",
+  "21:45": "2026-08-26T19:45:00.000Z",
+  "22:01": "2026-08-26T20:01:00.000Z",
 } as const;
 
 export type WednesdayPreviewAtKey = keyof typeof WEDNESDAY_2026_08_26_PREVIEW_TIMES;
@@ -202,10 +209,22 @@ function assignTemporalBuckets(
     };
   }
 
+  if (future.length === 0) {
+    return { current: [], next: [], later: [] };
+  }
+
+  const earliestStartMs = new Date(future[0].startAt).getTime();
+  const nextCohort = future.filter(
+    (event) => new Date(event.startAt).getTime() === earliestStartMs,
+  );
+  const laterEvents = future.filter(
+    (event) => new Date(event.startAt).getTime() !== earliestStartMs,
+  );
+
   return {
     current: [],
-    next: future.length > 0 ? [withBucket(future[0], "next")] : [],
-    later: future.slice(1).map((event) => withBucket(event, "later")),
+    next: nextCohort.map((event) => withBucket(event, "next")),
+    later: laterEvents.map((event) => withBucket(event, "later")),
   };
 }
 

@@ -524,7 +524,7 @@ function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
  * time. This satisfies the "one training and six simultaneous trainings
  * should feel like the same component" requirement.
  */
-function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
+export function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
   // First pass: bucket ALL training events by startAt
   const trainingByStart = new Map<string, FlatEvent[]>();
   for (const item of flatList) {
@@ -1022,27 +1022,34 @@ function TrainingGroupCard({
         )}
       </div>
 
-      {/* EVENT */}
-      <div
-        className={`${styles.cardEventZone} ${styles.trainingGroupZone}`}
-        data-testid="training-group"
-      >
-        <span
-          className={styles.eventTypeLabel}
-          data-event-type="TRAINING"
+      {/* TRAINING / KABINE / PLATZ — one shared row matrix (cols 2–4) */}
+      <div className={styles.trainingMatrix} data-testid="training-group">
+        <div
+          className={styles.trainingMatrixHeaders}
+          data-testid="training-matrix-headers"
         >
-          TRAINING
-        </span>
+          <span
+            className={styles.eventTypeLabel}
+            data-event-type="TRAINING"
+          >
+            TRAINING
+          </span>
+          <span className={styles.destLabel}>KABINE</span>
+          <span className={styles.destLabel}>PLATZ</span>
+        </div>
 
-        <div className={styles.trainingGroupRows}>
+        <div className={styles.trainingRowMatrix} data-testid="training-row-matrix">
           {items.map((it, index) => {
             const rowEndAnnotation = timePresentation.rowEndAnnotations[index];
+            const { homeDressingRoomLabel, pitchLabel } = it.event.allocation;
+
             return (
               <div
                 key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
+                className={styles.trainingMatrixRow}
+                data-testid="training-matrix-row"
               >
-                <div className={styles.trainingGroupRowContent}>
+                <div className={styles.trainingMatrixCell}>
                   <span
                     className={styles.trainingGroupTeamName}
                     data-testid="training-group-row"
@@ -1064,83 +1071,50 @@ function TrainingGroupCard({
                         clubName,
                       )}
                     </span>
+                    {rowEndAnnotation !== null && (
+                      <span
+                        className={styles.trainingGroupRowEndTime}
+                        aria-label="Bis"
+                        data-testid="training-row-end-annotation"
+                      >
+                        bis {rowEndAnnotation}
+                      </span>
+                    )}
                   </span>
+                </div>
 
-                  {rowEndAnnotation !== null && (
+                <div className={styles.trainingMatrixCell}>
+                  {homeDressingRoomLabel !== null ? (
+                    <span className={styles.trainingGroupRoomValue}>
+                      {formatDressingRoomLabel(homeDressingRoomLabel)}
+                    </span>
+                  ) : (
                     <span
-                      className={styles.trainingGroupRowEndTime}
-                      aria-label="Bis"
-                      data-testid="training-row-end-annotation"
+                      className={styles.dressingRoomMissing}
+                      data-testid="dressing-room-unassigned-warning"
                     >
-                      bis {rowEndAnnotation}
+                      NICHT ZUGETEILT
                     </span>
                   )}
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
-      {/* KABINE */}
-      <div className={`${styles.cardDressingRoomZone} ${styles.trainingGroupZone}`}>
-        <span className={styles.destLabel}>KABINE</span>
-
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const { homeDressingRoomLabel } = it.event.allocation;
-
-            return (
-              <div
-                key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-              >
-                {homeDressingRoomLabel !== null ? (
-                  <span className={styles.trainingGroupRoomValue}>
-                    {formatDressingRoomLabel(homeDressingRoomLabel)}
-                  </span>
-                ) : (
-                  <span
-                    className={styles.dressingRoomMissing}
-                    data-testid="dressing-room-unassigned-warning"
-                  >
-                    NICHT ZUGETEILT
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* PLATZ */}
-      <div className={`${styles.cardPitchZone} ${styles.trainingGroupZone}`}>
-        <span className={styles.destLabel}>PLATZ</span>
-
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const { pitchLabel } = it.event.allocation;
-
-            return (
-              <div
-                key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-              >
-                {pitchLabel !== null ? (
-                  <span
-                    className={styles.trainingGroupPitchValue}
-                    data-testid="pitch-value"
-                  >
-                    {pitchLabel}
-                  </span>
-                ) : (
-                  <span
-                    className={styles.pitchMissing}
-                    data-testid="pitch-unassigned-warning"
-                  >
-                    NICHT ZUGETEILT
-                  </span>
-                )}
+                <div className={styles.trainingMatrixCell}>
+                  {pitchLabel !== null ? (
+                    <span
+                      className={styles.trainingGroupPitchValue}
+                      data-testid="pitch-value"
+                    >
+                      {pitchLabel}
+                    </span>
+                  ) : (
+                    <span
+                      className={styles.pitchMissing}
+                      data-testid="pitch-unassigned-warning"
+                    >
+                      NICHT ZUGETEILT
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

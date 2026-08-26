@@ -1176,8 +1176,111 @@
  * dressing-room and pitch values remain horizontally associated.
  */
 
+/* ─── Training group — shared row matrix (INFOBOARD-REGRESSION-01F) ─────────
+ *
+ * TRAINING / KABINE / PLATZ share ONE deterministic row matrix spanning the
+ * EVENT + KABINE + PLATZ card columns. Each training record is a single grid
+ * row — no independent column lists that can drift vertically.
+ *
+ * Column proportions match the approved physical-TV contract:
+ *   43fr | 24fr | 18fr  (within the 85% content span)
+ */
+
+.eventCard[data-type="TRAINING"] .trainingMatrix {
+  grid-column: 2 / -1;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-content: start;
+  min-width: 0;
+  min-height: 0;
+  border-right: none;
+}
+
+.trainingMatrixHeaders {
+  display: grid;
+  grid-template-columns: 43fr 24fr 18fr;
+  align-items: end;
+  padding: var(--ib-card-pad-v) var(--ib-card-pad-h) 0;
+  column-gap: 0;
+  min-width: 0;
+}
+
+.trainingMatrixHeaders > .destLabel,
+.trainingMatrixHeaders > .eventTypeLabel {
+  display: block;
+  align-self: start;
+  justify-self: start;
+  margin: 0;
+  padding: 0 0 var(--ib-training-header-gap, clamp(5px, 0.55vh, 8px));
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--ib-fs-dest-label);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.trainingMatrixHeaders > .eventTypeLabel {
+  color: var(--ib-training-soft);
+}
+
+.trainingMatrixHeaders > .destLabel {
+  color: var(--ib-training-soft);
+  padding-left: var(--ib-card-pad-h);
+  border-left: 1px solid var(--ib-border);
+}
+
+.trainingRowMatrix {
+  display: grid;
+  grid-auto-rows: var(--ib-training-row-height, minmax(clamp(24px, 3.2vh, 44px), auto));
+  row-gap: var(--ib-training-row-gap, 0);
+  align-content: start;
+  min-width: 0;
+  padding: 0 var(--ib-card-pad-h) var(--ib-card-pad-v);
+}
+
+.trainingMatrixRow {
+  display: grid;
+  grid-template-columns: 43fr 24fr 18fr;
+  align-items: center;
+  min-height: var(--ib-training-row-height, clamp(24px, 3.2vh, 44px));
+  min-width: 0;
+}
+
+.trainingMatrixRow + .trainingMatrixRow {
+  border-top: 1px solid rgba(99, 135, 175, 0.08);
+}
+
+.trainingMatrixCell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  min-height: inherit;
+  padding: var(--ib-training-cell-padding-y, clamp(2px, 0.35vh, 6px)) 0;
+  box-sizing: border-box;
+}
+
+.trainingMatrixCell:not(:first-child) {
+  padding-left: var(--ib-card-pad-h);
+  border-left: 1px solid var(--ib-border);
+}
+
+/* Legacy aliases — retained for regression selectors during migration. */
 .trainingGroupZone {
   min-width: 0;
+}
+
+.trainingGroupRows {
+  display: contents;
+}
+
+.trainingGroupAlignedRow {
+  display: contents;
+}
+
+.trainingGroupRowContent {
+  display: contents;
 }
 
 /* ─── Sparse layout mode ─────────────────────────────────────────────────────
@@ -1223,13 +1326,13 @@
   padding-bottom: clamp(6px, 0.75vh, 11px);
 }
 
-.eventList[data-density="dense"] .trainingGroupRows {
+.eventList[data-density="dense"] .trainingRowMatrix {
   grid-auto-rows: minmax(clamp(26px, 2.9vh, 38px), auto);
 }
 
-.eventList[data-density="dense"] .trainingGroupAlignedRow {
-  padding-top: 1px;
-  padding-bottom: 1px;
+.eventList[data-density="dense"] .trainingMatrixRow {
+  min-height: clamp(26px, 2.9vh, 38px);
+  --ib-training-cell-padding-y: 1px;
 }
 
 /* ultra tier */
@@ -1241,32 +1344,13 @@
   padding-bottom: clamp(5px, 0.65vh, 9px);
 }
 
-.eventList[data-density="ultra"] .trainingGroupRows {
+.eventList[data-density="ultra"] .trainingRowMatrix {
   grid-auto-rows: minmax(clamp(24px, 2.7vh, 36px), auto);
 }
 
-.eventList[data-density="ultra"] .trainingGroupAlignedRow {
-  padding-top: 1px;
-  padding-bottom: 1px;
-}
-
-.trainingGroupRows {
-  display: grid;
-  grid-auto-rows: minmax(clamp(24px, 3.2vh, 44px), auto);
-  align-items: stretch;
-  align-content: start;
-  min-width: 0;
-}
-
-.trainingGroupAlignedRow {
-  display: flex;
-  align-items: center;
-  min-width: 0;
-  padding: clamp(2px, 0.35vh, 6px) 0;
-}
-
-.trainingGroupAlignedRow + .trainingGroupAlignedRow {
-  border-top: 1px solid rgba(99, 135, 175, 0.08);
+.eventList[data-density="ultra"] .trainingMatrixRow {
+  min-height: clamp(24px, 2.7vh, 36px);
+  --ib-training-cell-padding-y: 1px;
 }
 
 .trainingGroupTeamName {
@@ -1349,61 +1433,8 @@
 }
 
 /* Light theme row separators. */
-.root[data-theme="light"] .trainingGroupAlignedRow + .trainingGroupAlignedRow {
+.root[data-theme="light"] .trainingMatrixRow + .trainingMatrixRow {
   border-top-color: rgba(60, 48, 32, 0.06);
-}
-/* Canonical grouped-training section architecture.
- *
- * TRAINING / KABINE / PLATZ are one semantic label row.
- * Every zone therefore uses the same two-row geometry:
- *
- *   LABEL
- *   CONTENT
- *
- * Do not vertically centre the complete zone independently,
- * otherwise differing value typography shifts the labels.
- */
-.eventCard[data-type="TRAINING"] .trainingGroupZone {
-  display: grid;
-  grid-template-rows: auto auto;
-  align-content: start;
-  justify-content: stretch;
-  row-gap: clamp(5px, 0.55vh, 8px);
-}
-
-/* TRAINING / KABINE / PLATZ — exact peer typography. */
-.eventCard[data-type="TRAINING"] .trainingGroupZone > .eventTypeLabel,
-.eventCard[data-type="TRAINING"] .trainingGroupZone > .destLabel {
-  display: block;
-  align-self: start;
-  justify-self: start;
-  margin: 0;
-  padding: 0;
-
-  font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-dest-label);
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-/* All value grids begin at the identical second-row origin. */
-.eventCard[data-type="TRAINING"] .trainingGroupZone > .trainingGroupRows {
-  align-self: start;
-  min-height: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.trainingGroupRowContent {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  gap: 1px;
-  min-width: 0;
-  width: 100%;
 }
 
 /* ─── Grouped-training row density (per-card, 4+ rows) ─────────────────────
@@ -1415,19 +1446,20 @@
  * intrinsic row height; combined with overflow:hidden on .eventCard this clipped
  * the final team entries on 1080p TVs.
  */
-.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupZone,
-.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupZone {
-  grid-template-rows: auto auto;
-  row-gap: clamp(2px, 0.35vh, 5px);
+.eventCard[data-type="TRAINING"][data-group-density="normal"] {
+  --ib-training-row-height: clamp(24px, 3.2vh, 44px);
+  --ib-training-row-gap: 0;
+  --ib-training-cell-padding-y: clamp(2px, 0.35vh, 6px);
+  --ib-training-header-gap: clamp(5px, 0.55vh, 8px);
 }
 
-.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupRows {
-  grid-auto-rows: minmax(clamp(20px, 2.4vh, 30px), auto);
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingMatrixHeaders {
+  --ib-training-header-gap: clamp(2px, 0.35vh, 5px);
 }
 
-.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupAlignedRow {
-  padding-top: 0;
-  padding-bottom: 0;
+.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingRowMatrix {
+  --ib-training-row-height: clamp(20px, 2.4vh, 30px);
+  --ib-training-cell-padding-y: 0;
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTeamName {
@@ -1445,13 +1477,13 @@
   line-height: 1.05;
 }
 
-.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupRows {
-  grid-auto-rows: minmax(clamp(18px, 2.1vh, 28px), auto);
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingMatrixHeaders {
+  --ib-training-header-gap: clamp(2px, 0.35vh, 5px);
 }
 
-.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupAlignedRow {
-  padding-top: 0;
-  padding-bottom: 0;
+.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingRowMatrix {
+  --ib-training-row-height: clamp(18px, 2.1vh, 28px);
+  --ib-training-cell-padding-y: 0;
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTeamName {
