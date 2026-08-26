@@ -33,6 +33,8 @@ export type LiveClockScreen1Props = {
   showTime: boolean;
   showDate: boolean;
   mode?: "combined" | "time" | "date";
+  /** Preview-only escape hatch. Production defaults to the live kiosk clock. */
+  live?: boolean;
 };
 
 export function LiveClockScreen1({
@@ -41,8 +43,9 @@ export function LiveClockScreen1({
   showTime,
   showDate,
   mode = "combined",
+  live = true,
 }: LiveClockScreen1Props): ReactElement | null {
-  const timeIso = useKioskClock(initialTimeIso);
+  const timeIso = useKioskClock(initialTimeIso, live);
 
   const currentTime = formatKioskTime(timeIso, timezone);
   const weekday = formatKioskWeekday(timeIso, timezone);

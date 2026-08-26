@@ -81,6 +81,23 @@ describe("NAV_SECTIONS static structure", () => {
     expect(wochenplanner?.label).toBe("Wochenplanner");
   });
 
+  it("exposes Übersicht and Vorschau inside the Infoboard module", () => {
+    const betrieb = findSection("Betrieb");
+    const infoboard = betrieb!.items.find((item) => item.key === "infoboard");
+    expect(infoboard?.children).toEqual([
+      expect.objectContaining({
+        key: "infoboard-overview",
+        label: "Übersicht",
+        href: "/dashboard/infoboard",
+      }),
+      expect.objectContaining({
+        key: "infoboard-preview",
+        label: "Vorschau",
+        href: "/dashboard/infoboard/preview",
+      }),
+    ]);
+  });
+
   it("TournamentCenter points to /dashboard/tournamentcenter", () => {
     const betrieb = findSection("Betrieb");
     const planung = betrieb!.items.find((i) => i.key === "planung");

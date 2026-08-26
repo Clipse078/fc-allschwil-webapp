@@ -39,6 +39,8 @@ export type KioskShellHeaderProps = {
   showTime?: boolean;
   showDate?: boolean;
   staticDateFallback?: string | null;
+  /** Keep the simulated Preview Studio moment fixed. Defaults to live kiosk time. */
+  liveClock?: boolean;
 
   /**
    * Canonical weather input for every Infoboard.
@@ -159,6 +161,7 @@ export function KioskShellHeader({
   showTime = true,
   showDate = true,
   staticDateFallback,
+  liveClock = true,
   weather,
   rightContent,
 }: KioskShellHeaderProps): ReactElement {
@@ -309,6 +312,7 @@ export function KioskShellHeader({
                 showTime={true}
                 showDate={false}
                 mode="time"
+                live={liveClock}
               />
             ) : null}
           </div>
@@ -334,6 +338,7 @@ export function KioskShellHeader({
                 showTime={false}
                 showDate={true}
                 mode="date"
+                live={liveClock}
               />
             ) : staticDateFallback != null && showDate ? (
               <span
