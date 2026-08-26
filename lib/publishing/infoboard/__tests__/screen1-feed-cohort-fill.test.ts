@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   buildInfoboardScreen1Feed,
+  countRenderedDisplayBlocks,
   MIN_DISPLAY_CARDS,
   selectFillEventsPreservingStartCohorts,
   SCREEN1_HORIZON_HOURS,
@@ -63,6 +64,31 @@ function allFeedIds(feed: Awaited<ReturnType<typeof buildInfoboardScreen1Feed>>)
 
 // ── Unit tests for cohort selection helper ────────────────────────────────────
 
+describe("countRenderedDisplayBlocks", () => {
+  it("counts same-start trainings as one rendered display block", () => {
+    const sharedStart = new Date("2026-08-26T13:45:00.000Z");
+    const events = [
+      makeEvent({ id: "e3", startAt: sharedStart }),
+      makeEvent({ id: "f2", startAt: sharedStart }),
+      makeEvent({ id: "f3", startAt: sharedStart }),
+      makeEvent({ id: "g", startAt: sharedStart }),
+    ];
+
+    expect(countRenderedDisplayBlocks(events)).toBe(1);
+  });
+
+  it("counts non-training events individually even when they share a start time", () => {
+    const sharedStart = new Date("2026-08-26T13:45:00.000Z");
+    const events = [
+      makeEvent({ id: "t1", type: "TRAINING", startAt: sharedStart }),
+      makeEvent({ id: "m1", type: "MATCH", homeAway: "HOME", startAt: sharedStart }),
+      makeEvent({ id: "tour1", type: "TOURNAMENT", startAt: sharedStart }),
+    ];
+
+    expect(countRenderedDisplayBlocks(events)).toBe(3);
+  });
+});
+
 describe("selectFillEventsPreservingStartCohorts", () => {
   it("includes an entire same-start cohort when partial selection would split it", () => {
     const sharedStart = new Date("2026-08-26T13:45:00.000Z");
@@ -78,12 +104,12 @@ describe("selectFillEventsPreservingStartCohorts", () => {
       }),
     ];
 
-    const selected = selectFillEventsPreservingStartCohorts(candidates, 3);
+    const selected = selectFillEventsPreservingStartCohorts(candidates, 1);
     expect(selected.map((e) => e.id)).toEqual(["e3", "f2", "f3", "g"]);
     expect(selected.some((e) => e.id === "d1")).toBe(false);
   });
 
-  it("stops after the minimum is satisfied without pulling the next cohort", () => {
+  it("stops after the minimum display blocks are satisfied", () => {
     const candidates = [
       makeEvent({ id: "a", startAt: new Date("2026-08-26T12:00:00.000Z") }),
       makeEvent({ id: "b", startAt: new Date("2026-08-26T13:00:00.000Z") }),
@@ -92,12 +118,12 @@ describe("selectFillEventsPreservingStartCohorts", () => {
       makeEvent({ id: "e", startAt: new Date("2026-08-26T15:00:00.000Z") }),
     ];
 
-    const selected = selectFillEventsPreservingStartCohorts(candidates, 3);
+    const selected = selectFillEventsPreservingStartCohorts(candidates, 2);
     expect(selected.map((e) => e.id)).toEqual(["a", "b", "c", "d"]);
     expect(selected.some((e) => e.id === "e")).toBe(false);
   });
 
-  it("includes an entire same-start cohort of six when fill budget is lower", () => {
+  it("includes an entire same-start training cohort when fill budget is lower", () => {
     const sharedStart = new Date("2026-08-26T16:45:00.000Z");
     const candidates = [
       makeEvent({ id: "s1", startAt: sharedStart }),
@@ -109,7 +135,7 @@ describe("selectFillEventsPreservingStartCohorts", () => {
       makeEvent({ id: "later", startAt: new Date("2026-08-26T18:15:00.000Z") }),
     ];
 
-    const selected = selectFillEventsPreservingStartCohorts(candidates, 3);
+    const selected = selectFillEventsPreservingStartCohorts(candidates, 1);
     expect(selected.map((e) => e.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "s6"]);
   });
 });
@@ -277,5 +303,111 @@ describe("buildInfoboardScreen1Feed — MIN_DISPLAY_CARDS cohort fill", () => {
   it("documents MIN_DISPLAY_CARDS and horizon constants used by fill logic", () => {
     expect(MIN_DISPLAY_CARDS).toBe(3);
     expect(SCREEN1_HORIZON_HOURS).toBe(4);
+  });
+
+  it("H. INFOBOARD-REGRESSION-01L — 12:16 sparse day supplies later same-day cohorts", async () => {
+    const now = new Date("2026-08-26T10:16:00.000Z"); // 12:16 Europe/Zurich
+    const cohort1545 = new Date("2026-08-26T13:45:00.000Z");
+    const cohort1715 = new Date("2026-08-26T15:15:00.000Z");
+
+    const events = [
+      makeEvent({
+        id: "e3",
+        startAt: cohort1545,
+        endAt: new Date("2026-08-26T15:15:00.000Z"),
+        team: { name: "JUNIOREN E3", infoboardDisplayName: "JUNIOREN E3" },
+      }),
+      makeEvent({
+        id: "f2",
+        startAt: cohort1545,
+        endAt: new Date("2026-08-26T15:15:00.000Z"),
+        team: { name: "JUNIOREN F2", infoboardDisplayName: "JUNIOREN F2" },
+      }),
+      makeEvent({
+        id: "f3",
+        startAt: cohort1545,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN F3", infoboardDisplayName: "JUNIOREN F3" },
+      }),
+      makeEvent({
+        id: "g",
+        startAt: cohort1545,
+        endAt: new Date("2026-08-26T15:15:00.000Z"),
+        team: { name: "JUNIOREN G", infoboardDisplayName: "JUNIOREN G" },
+      }),
+      makeEvent({
+        id: "d7d1",
+        startAt: cohort1715,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN D-7 D1", infoboardDisplayName: "JUNIOREN D-7 D1" },
+      }),
+      makeEvent({
+        id: "e4",
+        startAt: cohort1715,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN E4", infoboardDisplayName: "JUNIOREN E4" },
+      }),
+      makeEvent({
+        id: "e1",
+        startAt: cohort1715,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN E1", infoboardDisplayName: "JUNIOREN E1" },
+      }),
+      makeEvent({
+        id: "f1",
+        startAt: cohort1715,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN F1", infoboardDisplayName: "JUNIOREN F1" },
+      }),
+      makeEvent({
+        id: "d7d2",
+        startAt: cohort1715,
+        endAt: new Date("2026-08-26T16:45:00.000Z"),
+        team: { name: "JUNIOREN D-7 D2", infoboardDisplayName: "JUNIOREN D-7 D2" },
+      }),
+      makeEvent({
+        id: "completed",
+        startAt: new Date("2026-08-26T08:00:00.000Z"),
+        endAt: new Date("2026-08-26T09:00:00.000Z"),
+        team: { name: "MORNING DONE" },
+      }),
+    ];
+
+    const feed = await buildInfoboardScreen1Feed(
+      makeLoader(events),
+      makeInput({ now }),
+    );
+
+    expect(
+      countRenderedDisplayBlocks(events.filter((event) => event.id !== "completed")),
+    ).toBe(2);
+    expect(
+      countRenderedDisplayBlocks([
+        ...events.filter((event) => ["e3", "f2", "f3", "g"].includes(event.id)),
+      ]),
+    ).toBe(1);
+
+    expect(feed.next.map((event) => event.id).sort()).toEqual([
+      "e3",
+      "f2",
+      "f3",
+      "g",
+    ]);
+    expect(feed.next.every((event) => event.temporalBucket === "next")).toBe(
+      true,
+    );
+
+    const later1715Ids = ["d7d1", "e4", "e1", "f1", "d7d2"];
+    for (const id of later1715Ids) {
+      expect(feed.later.map((event) => event.id)).toContain(id);
+    }
+    expect(
+      feed.later
+        .filter((event) => later1715Ids.includes(event.id))
+        .every((event) => event.temporalBucket === "later"),
+    ).toBe(true);
+
+    expect(allFeedIds(feed)).not.toContain("completed");
+    expect(feed.isEmpty).toBe(false);
   });
 });

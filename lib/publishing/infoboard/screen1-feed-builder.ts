@@ -82,38 +82,89 @@ export const SCREEN1_HORIZON_MS = SCREEN1_HORIZON_HOURS * 60 * 60 * 1000;
  */
 export const MIN_DISPLAY_CARDS = 3;
 
-/**
- * Selects fill-forward events while preserving same-start temporal cohort
- * integrity. Candidates must be pre-sorted by startAt ascending.
- *
- * When a cohort is included, every event sharing that startAt is included —
- * even if the cohort size exceeds the remaining fill budget.
- */
-export function selectFillEventsPreservingStartCohorts<T extends { startAt: Date }>(
-  candidates: readonly T[],
-  needed: number,
-): T[] {
-  if (needed <= 0 || candidates.length === 0) return [];
+type DisplayCohortEvent = { readonly startAt: Date; readonly type: string };
 
+/**
+ * Counts rendered display blocks for sparse-day admission.
+ *
+ * Same-start TRAINING events collapse to one TrainingGroupCard; matches,
+ * tournaments, and other event types each occupy one block (even when they
+ * share a start time with trainings).
+ */
+export function countRenderedDisplayBlocks(
+  events: readonly DisplayCohortEvent[],
+): number {
+  const seenTrainingStarts = new Set<number>();
+  let count = 0;
+
+  for (const event of events) {
+    if (event.type === "TRAINING") {
+      const startMs = event.startAt.getTime();
+      if (!seenTrainingStarts.has(startMs)) {
+        seenTrainingStarts.add(startMs);
+        count++;
+      }
+    } else {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+/**
+ * Groups pre-sorted candidates into display cohorts for fill-forward selection.
+ *
+ * TRAINING events sharing a startAt form one cohort; every other event type
+ * is its own cohort. Order follows first encounter in the sorted candidate list.
+ */
+export function groupEventsIntoDisplayCohorts<T extends DisplayCohortEvent>(
+  events: readonly T[],
+): T[][] {
   const cohorts: T[][] = [];
-  for (const event of candidates) {
-    const lastCohort = cohorts[cohorts.length - 1];
-    if (
-      lastCohort !== undefined &&
-      lastCohort[0].startAt.getTime() === event.startAt.getTime()
-    ) {
-      lastCohort.push(event);
+  const emittedTrainingStarts = new Set<number>();
+
+  for (const event of events) {
+    if (event.type === "TRAINING") {
+      const startMs = event.startAt.getTime();
+      if (emittedTrainingStarts.has(startMs)) continue;
+      emittedTrainingStarts.add(startMs);
+      cohorts.push(
+        events.filter(
+          (candidate) =>
+            candidate.type === "TRAINING" &&
+            candidate.startAt.getTime() === startMs,
+        ),
+      );
     } else {
       cohorts.push([event]);
     }
   }
 
+  return cohorts;
+}
+
+/**
+ * Selects fill-forward events while preserving display-cohort integrity.
+ * Candidates must be pre-sorted by startAt ascending.
+ *
+ * `neededDisplayBlocks` is a rendered-card budget. Same-start TRAINING events
+ * count as one block; when a cohort is included, every event in that cohort is
+ * included even if the cohort exceeds the remaining event count.
+ */
+export function selectFillEventsPreservingStartCohorts<
+  T extends DisplayCohortEvent,
+>(candidates: readonly T[], neededDisplayBlocks: number): T[] {
+  if (neededDisplayBlocks <= 0 || candidates.length === 0) return [];
+
+  const cohorts = groupEventsIntoDisplayCohorts(candidates);
   const fillEvents: T[] = [];
-  let fillCount = 0;
+  let fillBlockCount = 0;
+
   for (const cohort of cohorts) {
-    if (fillCount >= needed) break;
+    if (fillBlockCount >= neededDisplayBlocks) break;
     fillEvents.push(...cohort);
-    fillCount += cohort.length;
+    fillBlockCount++;
   }
 
   return fillEvents;
@@ -227,21 +278,24 @@ export async function buildInfoboardScreen1Feed(
   //   5. Never reintroduce completed activities.
   //   6. If no activities remain today, use empty state.
   //
-  // "Grouped trainings count as one rendered card" — approximated here by
-  // counting eligible events in the fill bucket; the TrainingGroupCard
-  // grouping happens in the component. We fill based on event count and let
-  // the component collapse same-start trainings.
+  // Same-start TRAINING events render as one TrainingGroupCard. Sparse-day fill
+  // reasons about rendered display blocks, not raw event records.
   //
-  // This ensures a board at 09:00 is not empty when the first training starts
-  // at 16:00 — it shows the next relevant activities of the day.
+  // This ensures a board at 12:16 is not sparse when the 15:45 cohort contains
+  // four trainings but only one rendered card — later same-day cohorts are still
+  // supplied for viewport admission.
 
-  const windowEventCount =
-    grouped.current.length + grouped.next.length + grouped.later.length;
+  const windowEvents = [
+    ...grouped.current,
+    ...grouped.next,
+    ...grouped.later,
+  ];
+  const windowDisplayBlockCount = countRenderedDisplayBlocks(windowEvents);
 
   let fillEvents: (typeof selection.eligible)[number][] = [];
   let capacityFillEvents: (typeof selection.eligible)[number][] = [];
 
-  if (windowEventCount < MIN_DISPLAY_CARDS) {
+  if (windowDisplayBlockCount < MIN_DISPLAY_CARDS) {
     // Count how many rendered cards we already have
     // (approximate: current + next group as 1 + each later)
     const alreadyShown = new Set([
@@ -262,11 +316,11 @@ export async function buildInfoboardScreen1Feed(
       })
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
 
-    // Fill up to MIN_DISPLAY_CARDS total without splitting same-start cohorts.
-    const needed = MIN_DISPLAY_CARDS - windowEventCount;
+    // Fill up to MIN_DISPLAY_CARDS rendered blocks without splitting cohorts.
+    const neededDisplayBlocks = MIN_DISPLAY_CARDS - windowDisplayBlockCount;
     fillEvents = selectFillEventsPreservingStartCohorts(
       todayFillCandidates,
-      Math.max(0, needed),
+      Math.max(0, neededDisplayBlocks),
     );
 
     // Step 3c: Same-day capacity candidates (INFOBOARD-REGRESSION-01F)
