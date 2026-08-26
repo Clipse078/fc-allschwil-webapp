@@ -95,6 +95,22 @@ describe("selectFillEventsPreservingStartCohorts", () => {
     expect(selected.map((e) => e.id)).toEqual(["a", "b", "c", "d"]);
     expect(selected.some((e) => e.id === "e")).toBe(false);
   });
+
+  it("includes an entire same-start cohort of six when fill budget is lower", () => {
+    const sharedStart = new Date("2026-08-26T16:45:00.000Z");
+    const candidates = [
+      makeEvent({ id: "s1", startAt: sharedStart }),
+      makeEvent({ id: "s2", startAt: sharedStart }),
+      makeEvent({ id: "s3", startAt: sharedStart }),
+      makeEvent({ id: "s4", startAt: sharedStart }),
+      makeEvent({ id: "s5", startAt: sharedStart }),
+      makeEvent({ id: "s6", startAt: sharedStart }),
+      makeEvent({ id: "later", startAt: new Date("2026-08-26T18:15:00.000Z") }),
+    ];
+
+    const selected = selectFillEventsPreservingStartCohorts(candidates, 3);
+    expect(selected.map((e) => e.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "s6"]);
+  });
 });
 
 // ── Integration tests (A–G) ───────────────────────────────────────────────────
