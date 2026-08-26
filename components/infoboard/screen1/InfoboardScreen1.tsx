@@ -391,6 +391,73 @@ function formatTime(isoString: string, timeZone: string): string {
   }).format(new Date(isoString));
 }
 
+export type TrainingCohortTimePresentation = {
+  readonly startTime: string;
+  readonly primaryEndTime: string | null;
+  readonly allSameEnd: boolean;
+  readonly rowEndAnnotations: readonly (string | null)[];
+  readonly hasRowEndAnnotations: boolean;
+};
+
+/**
+ * Resolves left TIME-card content for a same-start training cohort.
+ *
+ * Same-end cohorts show start + "bis end" once in the TIME zone.
+ * Mixed-end cohorts use the majority end in the TIME card and surface
+ * differing row ends as aligned secondary annotations — never in team names.
+ *
+ * Exported for regression testing.
+ */
+export function resolveTrainingCohortTimePresentation(
+  items: readonly FlatEvent[],
+  timeZone: string,
+): TrainingCohortTimePresentation {
+  const first = items[0];
+  const startTime = formatTime(first.event.startAt, timeZone);
+  const firstEndAt = first.event.endAt;
+  const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
+
+  const endCounts = new Map<string, number>();
+  for (const item of items) {
+    const endAt = item.event.endAt;
+    if (endAt !== null) {
+      endCounts.set(endAt, (endCounts.get(endAt) ?? 0) + 1);
+    }
+  }
+
+  let primaryEndAt: string | null = null;
+  if (allSameEnd) {
+    primaryEndAt = firstEndAt;
+  } else if (endCounts.size > 0) {
+    let maxCount = 0;
+    for (const [endAt, count] of endCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        primaryEndAt = endAt;
+      }
+    }
+  }
+
+  const primaryEndTime =
+    primaryEndAt !== null ? formatTime(primaryEndAt, timeZone) : null;
+
+  const rowEndAnnotations = items.map((item) => {
+    const rowEndAt = item.event.endAt;
+    if (primaryEndAt === null || rowEndAt === null || rowEndAt === primaryEndAt) {
+      return null;
+    }
+    return formatTime(rowEndAt, timeZone);
+  });
+
+  return {
+    startTime,
+    primaryEndTime,
+    allSameEnd,
+    rowEndAnnotations,
+    hasRowEndAnnotations: rowEndAnnotations.some((annotation) => annotation !== null),
+  };
+}
+
 function formatDressingRoomLabel(label: string): string {
   return label.replace(/^kabine\s+/i, "").trim();
 }
@@ -457,7 +524,7 @@ function buildFlatList(feed: InfoboardScreen1Feed): FlatEvent[] {
  * time. This satisfies the "one training and six simultaneous trainings
  * should feel like the same component" requirement.
  */
-function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
+export function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
   // First pass: bucket ALL training events by startAt
   const trainingByStart = new Map<string, FlatEvent[]>();
   for (const item of flatList) {
@@ -907,17 +974,10 @@ function TrainingGroupCard({
   const first = items[0];
   const temporal = first.temporal;
   const startAt = first.event.startAt;
-  const startTime = formatTime(startAt, timeZone);
   const label = statusLabel(temporal);
   const stripe = stripeKey("TRAINING");
   const groupDensity = trainingGroupDensityTier(items.length);
-
-  // Shared end time is displayed once in the TIME zone when all grouped
-  // trainings end together. Differing end times remain visible per team row.
-  const firstEndAt = first.event.endAt;
-  const allSameEnd = items.every((it) => it.event.endAt === firstEndAt);
-  const commonEndTime =
-    allSameEnd && firstEndAt !== null ? formatTime(firstEndAt, timeZone) : null;
+  const timePresentation = resolveTrainingCohortTimePresentation(items, timeZone);
 
   return (
     <li
@@ -931,8 +991,8 @@ function TrainingGroupCard({
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
-      {/* TIME */}
-      <div className={styles.cardTimeZone}>
+      {/* TIME — shared start + majority end once in the left card */}
+      <div className={styles.cardTimeZone} data-testid="training-group-time-zone">
         {label !== null && (
           <span
             className={styles.statusLabel}
@@ -943,136 +1003,118 @@ function TrainingGroupCard({
           </span>
         )}
 
-        <time className={styles.eventTime} dateTime={startAt}>
-          {startTime}
+        <time
+          className={styles.eventTime}
+          dateTime={startAt}
+          data-testid="training-cohort-start-time"
+        >
+          {timePresentation.startTime}
         </time>
 
-        {commonEndTime !== null && (
-          <span className={styles.eventEndTime} aria-label="Bis">
-            bis {commonEndTime}
+        {timePresentation.primaryEndTime !== null && (
+          <span
+            className={styles.eventEndTime}
+            aria-label="Bis"
+            data-testid="training-cohort-end-time"
+          >
+            bis {timePresentation.primaryEndTime}
           </span>
         )}
       </div>
 
-      {/* EVENT */}
-      <div
-        className={`${styles.cardEventZone} ${styles.trainingGroupZone}`}
-        data-testid="training-group"
-      >
-        <span
-          className={styles.eventTypeLabel}
-          data-event-type="TRAINING"
+      {/* TRAINING / KABINE / PLATZ — one shared row matrix (cols 2–4) */}
+      <div className={styles.trainingMatrix} data-testid="training-group">
+        <div
+          className={styles.trainingMatrixHeaders}
+          data-testid="training-matrix-headers"
         >
-          TRAINING
-        </span>
+          <span
+            className={styles.eventTypeLabel}
+            data-event-type="TRAINING"
+          >
+            TRAINING
+          </span>
+          <span className={styles.destLabel}>KABINE</span>
+          <span className={styles.destLabel}>PLATZ</span>
+        </div>
 
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const rowEndAt = it.event.endAt;
-            const rowEndTime =
-              !allSameEnd && rowEndAt !== null
-                ? formatTime(rowEndAt, timeZone)
-                : null;
+        <div className={styles.trainingRowMatrix} data-testid="training-row-matrix">
+          {items.map((it, index) => {
+            const rowEndAnnotation = timePresentation.rowEndAnnotations[index];
+            const { homeDressingRoomLabel, pitchLabel } = it.event.allocation;
 
             return (
               <div
                 key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-                data-testid="training-group-row"
+                className={styles.trainingMatrixRow}
+                data-testid="training-matrix-row"
               >
-                <span className={styles.trainingGroupTeamName}>
-                  {showLogos && clubLogoSrc !== null && (
-                    // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
-                    <img
-                      src={clubLogoSrc}
-                      alt=""
-                      aria-hidden="true"
-                      className={styles.trainingClubLogo}
-                      data-testid="training-team-logo"
-                      data-event-id={it.event.id}
-                    />
-                  )}
-                  <span className={styles.trainingGroupTeamText}>
-                    {stripClubPrefix(
-                      it.event.teamDisplayName ?? it.event.displayTitle,
-                      clubName,
+                <div className={styles.trainingMatrixCell}>
+                  <span
+                    className={styles.trainingGroupTeamName}
+                    data-testid="training-group-row"
+                  >
+                    {showLogos && clubLogoSrc !== null && (
+                      // eslint-disable-next-line @next/next/no-img-element -- tenant-managed crest URL.
+                      <img
+                        src={clubLogoSrc}
+                        alt=""
+                        aria-hidden="true"
+                        className={styles.trainingClubLogo}
+                        data-testid="training-team-logo"
+                        data-event-id={it.event.id}
+                      />
                     )}
-
-                    {rowEndTime !== null && (
+                    <span className={styles.trainingGroupTeamText}>
+                      {stripClubPrefix(
+                        it.event.teamDisplayName ?? it.event.displayTitle,
+                        clubName,
+                      )}
+                    </span>
+                    {rowEndAnnotation !== null && (
                       <span
                         className={styles.trainingGroupRowEndTime}
                         aria-label="Bis"
+                        data-testid="training-row-end-annotation"
                       >
-                        {" "}bis {rowEndTime}
+                        bis {rowEndAnnotation}
                       </span>
                     )}
                   </span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                </div>
 
-      {/* KABINE */}
-      <div className={`${styles.cardDressingRoomZone} ${styles.trainingGroupZone}`}>
-        <span className={styles.destLabel}>KABINE</span>
+                <div className={styles.trainingMatrixCell}>
+                  {homeDressingRoomLabel !== null ? (
+                    <span className={styles.trainingGroupRoomValue}>
+                      {formatDressingRoomLabel(homeDressingRoomLabel)}
+                    </span>
+                  ) : (
+                    <span
+                      className={styles.dressingRoomMissing}
+                      data-testid="dressing-room-unassigned-warning"
+                    >
+                      NICHT ZUGETEILT
+                    </span>
+                  )}
+                </div>
 
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const { homeDressingRoomLabel } = it.event.allocation;
-
-            return (
-              <div
-                key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-              >
-                {homeDressingRoomLabel !== null ? (
-                  <span className={styles.trainingGroupRoomValue}>
-                    {formatDressingRoomLabel(homeDressingRoomLabel)}
-                  </span>
-                ) : (
-                  <span
-                    className={styles.dressingRoomMissing}
-                    data-testid="dressing-room-unassigned-warning"
-                  >
-                    NICHT ZUGETEILT
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* PLATZ */}
-      <div className={`${styles.cardPitchZone} ${styles.trainingGroupZone}`}>
-        <span className={styles.destLabel}>PLATZ</span>
-
-        <div className={styles.trainingGroupRows}>
-          {items.map((it) => {
-            const { pitchLabel } = it.event.allocation;
-
-            return (
-              <div
-                key={it.event.id}
-                className={styles.trainingGroupAlignedRow}
-              >
-                {pitchLabel !== null ? (
-                  <span
-                    className={styles.trainingGroupPitchValue}
-                    data-testid="pitch-value"
-                  >
-                    {pitchLabel}
-                  </span>
-                ) : (
-                  <span
-                    className={styles.pitchMissing}
-                    data-testid="pitch-unassigned-warning"
-                  >
-                    NICHT ZUGETEILT
-                  </span>
-                )}
+                <div className={styles.trainingMatrixCell}>
+                  {pitchLabel !== null ? (
+                    <span
+                      className={styles.trainingGroupPitchValue}
+                      data-testid="pitch-value"
+                    >
+                      {pitchLabel}
+                    </span>
+                  ) : (
+                    <span
+                      className={styles.pitchMissing}
+                      data-testid="pitch-unassigned-warning"
+                    >
+                      NICHT ZUGETEILT
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}

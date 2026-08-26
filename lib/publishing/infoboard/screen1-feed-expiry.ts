@@ -3,8 +3,9 @@
  *
  * Screen-1 runtime expiry filtering for Infoboard feed DTOs.
  *
- * Applies the same effective-end semantics as partitionByTemporalGroup():
- * an event is active while effectiveEnd > now (strict — no post-event grace).
+ * Applies effective-end semantics with a short post-event grace window
+ * (SCREEN1_POST_EVENT_GRACE_MS) so players returning to the Kabine remain
+ * guided briefly after training/match end.
  *
  * Pure functions only — no framework imports, no clock reads.
  */
@@ -13,30 +14,18 @@ import type {
   InfoboardScreen1Event,
   InfoboardScreen1Feed,
 } from "../event-types";
-import { getEffectiveEndAt } from "../time/temporal-grouping";
-
-function toTemporalShape(event: InfoboardScreen1Event): {
-  readonly startAt: Date;
-  readonly endAt: Date | null;
-  readonly type: string;
-} {
-  return {
-    startAt: new Date(event.startAt),
-    endAt: event.endAt !== null ? new Date(event.endAt) : null,
-    type: event.type,
-  };
-}
+import { getScreen1DisplayEndAt } from "./screen1-event-lifecycle";
 
 /**
- * Returns true when the event's effective end time is strictly after `now`.
- * Expired at exactly end time: now >= effectiveEnd → false.
+ * Returns true when the event's display end (effective end + grace) is
+ * strictly after `now`. Expired at exactly grace end: now >= displayEnd → false.
  */
 export function isScreen1EventActiveAt(
   event: InfoboardScreen1Event,
   now: Date,
 ): boolean {
-  const effectiveEnd = getEffectiveEndAt(toTemporalShape(event));
-  return effectiveEnd.getTime() > now.getTime();
+  const displayEnd = getScreen1DisplayEndAt(event);
+  return displayEnd.getTime() > now.getTime();
 }
 
 function filterActiveEvents(

@@ -26,6 +26,7 @@ import {
   densityTier,
   layoutModeTier,
   trainingGroupDensityTier,
+  resolveTrainingCohortTimePresentation,
   LAYOUT_MODE_SPARSE_THRESHOLD,
   paginateDisplayList,
   CARD_DEMAND_TRAINING_BASE,
@@ -729,9 +730,119 @@ describe("Training row", () => {
   });
 });
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€ Match rows â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+describe("Training time presentation — left TIME card contract", () => {
+  it("renders start + bis end once for a solo training", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("15:45");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 17:15");
+    expect(screen.queryByTestId("training-row-end-annotation")).toBeNull();
+  });
+
+  it("renders shared start + bis end once for a same-end cohort", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: "2026-09-12T15:15:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f1",
+          startAt: "2026-09-12T15:15:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F1",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("17:15");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 18:45");
+    expect(screen.queryAllByTestId("training-row-end-annotation")).toHaveLength(0);
+  });
+
+  it("does not render bis end-time suffixes behind team names", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f3",
+          startAt: "2026-09-12T13:45:00.000Z",
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    const teamRows = screen.getAllByTestId("training-group-row");
+    for (const row of teamRows) {
+      expect(row.textContent?.toLowerCase()).not.toMatch(/\bbis\b/);
+    }
+
+    expect(screen.getByTestId("training-cohort-start-time").textContent).toBe("15:45");
+    expect(screen.getByTestId("training-cohort-end-time").textContent).toBe("bis 17:15");
+
+    const annotations = screen.getAllByTestId("training-row-end-annotation");
+    expect(annotations).toHaveLength(1);
+    expect(annotations[0].textContent).toBe("bis 18:45");
+  });
+
+  it("resolveTrainingCohortTimePresentation uses majority end for mixed cohorts", () => {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const items: FlatEvent[] = [
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+        }),
+        temporal: "current",
+      },
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+        }),
+        temporal: "current",
+      },
+      {
+        event: makeEvent({
+          startAt: sharedStart,
+          endAt: "2026-09-12T16:45:00.000Z",
+        }),
+        temporal: "current",
+      },
+    ];
+
+    const presentation = resolveTrainingCohortTimePresentation(items, "Europe/Zurich");
+    expect(presentation.startTime).toBe("15:45");
+    expect(presentation.primaryEndTime).toBe("17:15");
+    expect(presentation.allSameEnd).toBe(false);
+    expect(presentation.rowEndAnnotations).toEqual([null, null, "18:45"]);
+    expect(presentation.hasRowEndAnnotations).toBe(true);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 describe("Match row", () => {
   it("renders home team name", () => {
@@ -3951,7 +4062,7 @@ function makeFcaTraining(
 }
 
 describe("FC Allschwil regression â€” Fixture A expired event", () => {
-  it("17:00â€“18:30 Junioren F2 is NOT rendered at 18:43", () => {
+  it("17:00â€“18:30 Junioren F2 is NOT rendered after post-event grace at 18:46", () => {
     const feed = makeFeed({
       tenant: {
         id: "tenant-fca",
@@ -3970,7 +4081,7 @@ describe("FC Allschwil regression â€” Fixture A expired event", () => {
       isEmpty: false,
     });
 
-    render(<InfoboardScreen1 feed={feed} currentTimeIso={FCA_NOW_1843} />);
+    render(<InfoboardScreen1 feed={feed} currentTimeIso="2026-08-24T16:46:00.000Z" />);
     expect(screen.queryByText("Junioren F2")).toBeNull();
     expect(screen.queryAllByTestId("event-row")).toHaveLength(0);
   });
@@ -4065,16 +4176,19 @@ describe("FC Allschwil regression â€” Fixture D boundary visibility", () =>
     return render(<InfoboardScreen1 feed={feed} currentTimeIso={iso} />);
   }
 
-  it("visible at 17:00 and 18:29", () => {
+  it("visible through post-event grace until 18:44", () => {
     renderAt("2026-08-24T15:00:00.000Z");
     expect(screen.getByText("Junioren F2")).toBeTruthy();
 
     renderAt("2026-08-24T16:29:00.000Z");
     expect(screen.getAllByText("Junioren F2").length).toBeGreaterThan(0);
+
+    renderAt("2026-08-24T16:44:00.000Z");
+    expect(screen.getAllByText("Junioren F2").length).toBeGreaterThan(0);
   });
 
-  it("not rendered at 18:30 (expired)", () => {
-    renderAt("2026-08-24T16:30:00.000Z");
+  it("not rendered after grace at 18:45", () => {
+    renderAt("2026-08-24T16:45:00.000Z");
     expect(screen.queryByText("Junioren F2")).toBeNull();
   });
 });
@@ -4095,4 +4209,123 @@ describe("trainingGroupDensityTier â€” sparse groups unchanged", () => {
   });
 });
 
+describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
+  function renderTrainingGroup(rowCount: number, temporal: "current" | "next" = "next") {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const sharedEnd = "2026-09-12T15:15:00.000Z";
+    const events = Array.from({ length: rowCount }, (_, index) =>
+      makeEvent({
+        id: `tr-${index}`,
+        startAt: sharedStart,
+        endAt: sharedEnd,
+        teamDisplayName: `JUNIOREN T${index + 1}`,
+      }),
+    );
+    const feed = makeFeed({
+      current: temporal === "current" ? events : [],
+      next: temporal === "next" ? events : [],
+      isEmpty: false,
+    });
+  return render(<InfoboardScreen1 feed={feed} />);
+  }
+
+  function trainingCard(rowCount: string): HTMLElement {
+    const card = screen.getAllByTestId("event-row").find(
+      (row) =>
+        row.getAttribute("data-type") === "TRAINING" &&
+        row.getAttribute("data-training-count") === rowCount,
+    );
+    if (card === undefined) {
+      throw new Error(`Expected training card with ${rowCount} rows`);
+    }
+    return card;
+  }
+
+  it("assigns expected group-density tiers for 1/4/5/6 row cards", () => {
+    for (const [rows, density] of [
+      ["1", "normal"],
+      ["4", "compact"],
+      ["5", "compact"],
+      ["6", "dense"],
+    ] as const) {
+      renderTrainingGroup(Number(rows));
+      expect(trainingCard(rows).getAttribute("data-group-density")).toBe(density);
+    }
+  });
+
+  it("sparse 4-row card uses content-driven flex (no viewport stretch)", () => {
+    renderTrainingGroup(4);
+    const list = screen.getByTestId("event-list");
+    const card = trainingCard("4");
+
+    expect(list.getAttribute("data-layout-mode")).toBe("sparse");
+    expect(window.getComputedStyle(card).flexGrow).toBe("0");
+    expect(window.getComputedStyle(card).flexBasis).toBe("auto");
+  });
+
+  it("keeps compact row spacing contract for a 4-row training cohort", () => {
+    renderTrainingGroup(4);
+    const card = trainingCard("4");
+    const rowMatrix = card.querySelector('[data-testid="training-row-matrix"]');
+
+    expect(within(card).getAllByTestId("training-group-row")).toHaveLength(4);
+    expect(rowMatrix).toBeTruthy();
+    if (rowMatrix instanceof HTMLElement) {
+      const style = window.getComputedStyle(rowMatrix);
+      expect(style.alignContent).not.toBe("space-between");
+      expect(style.alignContent).not.toBe("space-around");
+      expect(style.justifyContent).not.toBe("space-between");
+      expect(style.flexGrow).not.toBe("1");
+      expect(rowMatrix.className).not.toMatch(/space-between|space-around|1fr/);
+    }
+  });
+
+  it("training row matrix remains content-driven (no viewport distribution classes)", () => {
+    renderTrainingGroup(4);
+    const rowMatrix = trainingCard("4").querySelector('[data-testid="training-row-matrix"]');
+    expect(rowMatrix).toBeTruthy();
+    if (rowMatrix instanceof HTMLElement) {
+      const style = window.getComputedStyle(rowMatrix);
+      expect(style.alignContent).not.toBe("space-between");
+      expect(style.alignContent).not.toBe("space-around");
+      expect(style.justifyContent).not.toBe("space-between");
+      expect(style.flexGrow).not.toBe("1");
+    }
+  });
+
+  it("mixed-end annotation is rendered on the differing training row", () => {
+    const sharedStart = "2026-09-12T13:45:00.000Z";
+    const feed = makeFeed({
+      next: [
+        makeEvent({
+          id: "tr-e3",
+          startAt: sharedStart,
+          endAt: "2026-09-12T15:15:00.000Z",
+          teamDisplayName: "JUNIOREN E3",
+        }),
+        makeEvent({
+          id: "tr-f3",
+          startAt: sharedStart,
+          endAt: "2026-09-12T16:45:00.000Z",
+          teamDisplayName: "JUNIOREN F3",
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+
+    const card = trainingCard("2");
+    const timeZone = card.querySelector('[data-testid="training-group-time-zone"]');
+    const annotation = within(card).getByTestId("training-row-end-annotation");
+    const f3Row = within(card)
+      .getAllByTestId("training-group-row")
+      .find((row) => row.textContent?.includes("F3"));
+
+    expect(timeZone?.textContent).toContain("15:45");
+    expect(timeZone?.textContent).toContain("bis 17:15");
+    expect(f3Row).toBeTruthy();
+    expect(annotation.textContent).toBe("bis 18:45");
+    expect(f3Row?.contains(annotation)).toBe(true);
+  });
+});
 
