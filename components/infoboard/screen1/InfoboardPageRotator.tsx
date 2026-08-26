@@ -20,8 +20,9 @@
  */
 "use client";
 
-import { useState, useEffect, Children } from "react";
+import { useState, useEffect, useRef, Children } from "react";
 import type { ReactNode } from "react";
+import styles from "./InfoboardScreen1.module.css";
 
 type InfoboardPageRotatorProps = {
   /** Pre-rendered page content (server-side). One child per page. */
@@ -30,26 +31,60 @@ type InfoboardPageRotatorProps = {
   intervalMs?: number;
 };
 
+function normalizePageIndex(index: number, pageCount: number): number {
+  if (pageCount <= 0) return 0;
+  return ((index % pageCount) + pageCount) % pageCount;
+}
+
 export function InfoboardPageRotator({
   children,
   intervalMs = 12_000,
 }: InfoboardPageRotatorProps): ReactNode {
   const childArray = Children.toArray(children);
   const pageCount = childArray.length;
-  const [currentPage, setCurrentPage] = useState(0);
+  const pageCountRef = useRef(pageCount);
+  pageCountRef.current = pageCount;
 
+  const [currentPage, setCurrentPage] = useState(0);
+  const visiblePage = normalizePageIndex(currentPage, pageCount);
+  const activeChild = childArray[visiblePage] ?? childArray[0] ?? null;
+
+  // Keep state aligned when feed refresh changes the page count after hydration.
   useEffect(() => {
-    if (pageCount <= 1) return undefined;
-    const id = setInterval(() => {
-      setCurrentPage((p) => (p + 1) % pageCount);
+    setCurrentPage((prev) => normalizePageIndex(prev, pageCount));
+  }, [pageCount]);
+
+  // Stable interval — depends only on intervalMs so feed refreshes do not reset
+  // the rotation clock when pageCount stays above one.
+  useEffect(() => {
+    if (intervalMs <= 0) return undefined;
+
+    const id = window.setInterval(() => {
+      const count = pageCountRef.current;
+      if (count <= 1) return;
+      setCurrentPage((prev) => (prev + 1) % count);
     }, intervalMs);
-    return () => clearInterval(id);
-  }, [pageCount, intervalMs]);
+
+    return () => window.clearInterval(id);
+  }, [intervalMs]);
+
+  if (pageCount <= 0) {
+    return null;
+  }
 
   // Single page: return directly without wrapper overhead.
   if (pageCount <= 1) {
-    return childArray[0] ?? null;
+    return activeChild;
   }
 
-  return childArray[currentPage] ?? null;
+  return (
+    <div
+      className={styles.pageRotator}
+      data-testid="infoboard-page-rotator"
+      data-page-count={pageCount}
+      data-active-page={visiblePage}
+    >
+      {activeChild}
+    </div>
+  );
 }

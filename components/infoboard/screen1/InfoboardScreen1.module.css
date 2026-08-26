@@ -330,6 +330,15 @@
   padding: var(--ib-sp-3) var(--ib-sp-8) var(--ib-sp-3);
 }
 
+/* Rolling pagination stage — fills main so each page list can distribute vertically. */
+.pageRotator {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .eventList {
   flex: 1;
   display: flex;
@@ -1301,6 +1310,22 @@
   --ib-tournament-logo-size: var(--ib-tournament-logo-size-large);
 }
 
+/* Fill-mode pages with headroom — center the stack and widen card gaps slightly
+ * without stretching card interiors. Dense/ultra tiers keep top alignment so
+ * multi-card pages (e.g. dense training cohort + matches) stay clip-safe. */
+.eventList[data-layout-mode="fill"][data-density="normal"] {
+  justify-content: center;
+  padding-top: clamp(10px, 1.4vh, 20px);
+  padding-bottom: clamp(8px, 1.1vh, 16px);
+  gap: clamp(10px, 1.1vh, 16px);
+}
+
+/* Moderate fill pages that still have measurable demand headroom. */
+.eventList[data-layout-mode="fill"][data-density="dense"] {
+  padding-top: clamp(6px, 0.9vh, 14px);
+  gap: clamp(6px, 0.75vh, 12px);
+}
+
 /* ─── Adaptive density tiers ────────────────────────────────────────────────
  *
  * When total content demand on a page is high, the density tier is set via
@@ -1447,9 +1472,9 @@
  * the final team entries on 1080p TVs.
  */
 .eventCard[data-type="TRAINING"][data-group-density="normal"] {
-  --ib-training-row-height: clamp(24px, 3.2vh, 44px);
-  --ib-training-row-gap: 0;
-  --ib-training-cell-padding-y: clamp(2px, 0.35vh, 6px);
+  --ib-training-row-height: clamp(28px, 3.6vh, 48px);
+  --ib-training-row-gap: clamp(3px, 0.45vh, 7px);
+  --ib-training-cell-padding-y: clamp(3px, 0.4vh, 7px);
   --ib-training-header-gap: clamp(5px, 0.55vh, 8px);
 }
 
@@ -1458,8 +1483,9 @@
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingRowMatrix {
-  --ib-training-row-height: clamp(20px, 2.4vh, 30px);
-  --ib-training-cell-padding-y: 0;
+  --ib-training-row-height: clamp(26px, 3.1vh, 38px);
+  --ib-training-row-gap: clamp(2px, 0.35vh, 5px);
+  --ib-training-cell-padding-y: clamp(2px, 0.28vh, 5px);
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTeamName {
@@ -1482,8 +1508,9 @@
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingRowMatrix {
-  --ib-training-row-height: clamp(18px, 2.1vh, 28px);
-  --ib-training-cell-padding-y: 0;
+  --ib-training-row-height: clamp(24px, 2.8vh, 34px);
+  --ib-training-row-gap: clamp(2px, 0.28vh, 4px);
+  --ib-training-cell-padding-y: clamp(1px, 0.2vh, 3px);
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTeamName {

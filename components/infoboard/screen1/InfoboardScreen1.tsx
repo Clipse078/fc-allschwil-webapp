@@ -56,7 +56,6 @@ import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter
 import { InfoboardPageRotator } from "./InfoboardPageRotator";
 import { useKioskClock } from "@/components/infoboard/kiosk-clock";
 import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-feed-expiry";
-import { admitDisplayItemsByCapacity } from "@/lib/publishing/infoboard/screen1-capacity-admission";
 import {
   DEFAULT_SCREEN1_PRESENTATION,
   MATCH_FONT_SIZE_CSS,
@@ -122,9 +121,6 @@ export type InfoboardScreen1Props = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-/** Prototype max events rendered before showing overflow warning. */
-const PROTOTYPE_CAPACITY = 12;
-
 // ── Content-demand layout model ───────────────────────────────────────────────
 //
 // Each card receives flex-grow proportional to its semantic content demand.
@@ -172,7 +168,7 @@ export const CARD_DEMAND_PAGE_MAX = 12.0;
  */
 export function computeTrainingGroupDemand(rowCount: number): number {
   const rows = Math.max(1, rowCount);
-  const rowWeight = rows >= 4 ? 0.62 : CARD_DEMAND_TRAINING_ROW;
+  const rowWeight = rows >= 4 ? 0.65 : CARD_DEMAND_TRAINING_ROW;
   return CARD_DEMAND_TRAINING_BASE + rows * rowWeight;
 }
 
@@ -558,10 +554,6 @@ export function buildDisplayList(flatList: FlatEvent[]): DisplayItem[] {
   }
 
   return result;
-}
-
-function displayItemTemporal(item: DisplayItem): TemporalBucket {
-  return item.kind === "training-group" ? item.temporal : item.item.temporal;
 }
 
 /**
@@ -1357,20 +1349,7 @@ export function InfoboardScreen1({
     return computeEventDemand(event.type);
   });
 
-  const displayList = admitDisplayItemsByCapacity(
-    rawDisplayList,
-    rawItemDemands,
-    displayItemTemporal,
-    CARD_DEMAND_PAGE_MAX,
-  );
-
-  const totalCards = displayList.length;
-
-  const overflowCount =
-    totalCards > PROTOTYPE_CAPACITY ? totalCards - PROTOTYPE_CAPACITY : 0;
-  const visibleDisplayList = overflowCount > 0
-    ? displayList.slice(0, PROTOTYPE_CAPACITY)
-    : displayList;
+  const displayList = rawDisplayList;
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -1379,20 +1358,14 @@ export function InfoboardScreen1({
   const staticDateLine =
     currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
 
-  // ── Content-demand pre-computation for pagination ────────────────────────
-  const itemDemands: number[] = visibleDisplayList.map((item) => {
-    const rawIndex = rawDisplayList.indexOf(item);
-    return rawIndex >= 0 ? rawItemDemands[rawIndex] ?? 1.0 : 1.0;
-  });
-
   // Split into pages based on demand. Normal days: single page (no rotation).
-  const pages = paginateDisplayList(visibleDisplayList, itemDemands);
+  const pages = paginateDisplayList(displayList, rawItemDemands);
 
   // ── Page renderer (used for each page in the rotator) ────────────────────
   function renderPage(pageItems: DisplayItem[], pageIndex: number): ReactElement {
     // Collect per-item demands for this page's subset
-    const pageStartIndex = visibleDisplayList.indexOf(pageItems[0]);
-    const pageDemands = pageItems.map((_, j) => itemDemands[pageStartIndex + j] ?? 1.0);
+    const pageStartIndex = displayList.indexOf(pageItems[0]);
+    const pageDemands = pageItems.map((_, j) => rawItemDemands[pageStartIndex + j] ?? 1.0);
     const pageTotalDemand = pageDemands.reduce((sum, d) => sum + d, 0);
     const pageDensity = densityTier(pageTotalDemand);
     const pageLayoutMode = layoutModeTier(pageTotalDemand);
@@ -1406,7 +1379,12 @@ export function InfoboardScreen1({
         data-count={pageItems.length}
         data-density={pageDensity}
         data-layout-mode={pageLayoutMode}
-        style={{ "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX } as CSSProperties}
+        style={
+          {
+            "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX,
+            "--ib-page-demand-total": pageTotalDemand,
+          } as CSSProperties
+        }
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];
@@ -1499,16 +1477,6 @@ export function InfoboardScreen1({
             <InfoboardPageRotator intervalMs={12_000}>
               {pages.map((pageItems, pageIndex) => renderPage(pageItems, pageIndex))}
             </InfoboardPageRotator>
-
-            {overflowCount > 0 && (
-              <p
-                className={styles.overflowWarning}
-                data-testid="overflow-warning"
-                role="status"
-              >
-                WEITERE TERMINE VORHANDEN
-              </p>
-            )}
           </>
         )}
       </main>
