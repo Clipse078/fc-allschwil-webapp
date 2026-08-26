@@ -31,31 +31,16 @@ export const LOGO_SIZE_LABELS: Record<InfoboardLogoSize, string> = {
 /** German labels shared by the independent font-size selects. */
 export const FONT_SIZE_LABELS: Record<InfoboardFontSize, string> = LOGO_SIZE_LABELS;
 
-/** Training team-name clamps, including safe caps for grouped-card density. */
-export const TRAINING_FONT_SIZE_CSS: Record<
-  InfoboardFontSize,
-  { normal: string; compact: string; dense: string }
-> = {
-  SMALL: {
-    normal: "clamp(1.52rem, 2.28vw, 3.04rem)",
-    compact: "clamp(0.874rem, 1.178vw, 1.672rem)",
-    dense: "clamp(0.798rem, 1.064vw, 1.52rem)",
-  },
-  MEDIUM: {
-    normal: "clamp(1.76rem, 2.64vw, 3.52rem)",
-    compact: "clamp(1.012rem, 1.364vw, 1.936rem)",
-    dense: "clamp(0.924rem, 1.232vw, 1.76rem)",
-  },
-  LARGE: {
-    normal: "clamp(2rem, 3vw, 4rem)",
-    compact: "clamp(1.15rem, 1.55vw, 2.2rem)",
-    dense: "clamp(1.05rem, 1.4vw, 2rem)",
-  },
-  XLARGE: {
-    normal: "clamp(2.24rem, 3.36vw, 4.48rem)",
-    compact: "clamp(1.15rem, 1.55vw, 2.2rem)",
-    dense: "clamp(1.05rem, 1.4vw, 2rem)",
-  },
+/**
+ * Authoritative Training team-name clamp per administrator-selected preset.
+ * The accepted 17:15 compact-card size is the baseline for each preset;
+ * training row count and card density never alter it.
+ */
+export const TRAINING_FONT_SIZE_CSS: Record<InfoboardFontSize, string> = {
+  SMALL: "clamp(0.874rem, 1.178vw, 1.672rem)",
+  MEDIUM: "clamp(1.012rem, 1.364vw, 1.936rem)",
+  LARGE: "clamp(1.15rem, 1.55vw, 2.2rem)",
+  XLARGE: "clamp(1.15rem, 1.55vw, 2.2rem)",
 };
 
 /** Match primary/opponent clamps; long-name and page-density caps apply after these. */
