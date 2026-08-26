@@ -1482,8 +1482,10 @@
  * the final team entries on 1080p TVs.
  */
 .eventCard[data-type="TRAINING"][data-group-density="normal"] {
-  --ib-training-row-height: clamp(28px, 3.6vh, 48px);
-  --ib-training-row-gap: clamp(3px, 0.45vh, 7px);
+  /* Normal labels can resolve to a ~63px line box at 1080p. Keep the shared
+     matrix track taller than that line box so adjacent records cannot overlap. */
+  --ib-training-row-height: clamp(52px, 6vh, 68px);
+  --ib-training-row-gap: clamp(8px, 0.9vh, 12px);
   --ib-training-cell-padding-y: clamp(3px, 0.4vh, 7px);
   --ib-training-header-gap: clamp(5px, 0.55vh, 8px);
 }
