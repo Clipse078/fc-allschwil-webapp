@@ -89,7 +89,7 @@ export function useKioskClock(initialTimeIso: string, live = true): string {
       clearTimeout(syncId);
       clearInterval(tickId);
     };
-  }, [initialTimeIso, live]);
+  }, [live]);
 
   return live ? timeIso : initialTimeIso;
 }
