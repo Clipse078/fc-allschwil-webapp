@@ -1379,7 +1379,12 @@ export function InfoboardScreen1({
         data-count={pageItems.length}
         data-density={pageDensity}
         data-layout-mode={pageLayoutMode}
-        style={{ "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX } as CSSProperties}
+        style={
+          {
+            "--ib-page-demand-max": CARD_DEMAND_PAGE_MAX,
+            "--ib-page-demand-total": pageTotalDemand,
+          } as CSSProperties
+        }
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];

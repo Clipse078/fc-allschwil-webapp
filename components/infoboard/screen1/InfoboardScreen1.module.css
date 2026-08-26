@@ -330,6 +330,15 @@
   padding: var(--ib-sp-3) var(--ib-sp-8) var(--ib-sp-3);
 }
 
+/* Rolling pagination stage — fills main so each page list can distribute vertically. */
+.pageRotator {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .eventList {
   flex: 1;
   display: flex;
@@ -1299,6 +1308,22 @@
 
 .eventList[data-layout-mode="sparse"] {
   --ib-tournament-logo-size: var(--ib-tournament-logo-size-large);
+}
+
+/* Fill-mode pages with headroom — center the stack and widen card gaps slightly
+ * without stretching card interiors. Dense/ultra tiers keep top alignment so
+ * multi-card pages (e.g. dense training cohort + matches) stay clip-safe. */
+.eventList[data-layout-mode="fill"][data-density="normal"] {
+  justify-content: center;
+  padding-top: clamp(10px, 1.4vh, 20px);
+  padding-bottom: clamp(8px, 1.1vh, 16px);
+  gap: clamp(10px, 1.1vh, 16px);
+}
+
+/* Moderate fill pages that still have measurable demand headroom. */
+.eventList[data-layout-mode="fill"][data-density="dense"] {
+  padding-top: clamp(6px, 0.9vh, 14px);
+  gap: clamp(6px, 0.75vh, 12px);
 }
 
 /* ─── Adaptive density tiers ────────────────────────────────────────────────
