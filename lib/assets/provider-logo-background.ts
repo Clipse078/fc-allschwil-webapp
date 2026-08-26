@@ -49,6 +49,13 @@ export const EXTERIOR_FRINGE_MIN_LUMINANCE = 225;
 
 export const EXTERIOR_FRINGE_MIN_ALPHA = 160;
 
+/**
+ * Maximum min-channel value for strong foreground (colored crest) pixels.
+ * Near-white anti-aliased crest edges adjacent to pixels below this threshold
+ * form topology bridges that must not carry exterior background flood-fill.
+ */
+export const STRONG_FOREGROUND_MAX_CHANNEL = 200;
+
 /** Corner band ratio for quality validation sampling. */
 export const EXTERIOR_CORNER_BAND_RATIO = 0.12;
 
@@ -76,6 +83,61 @@ export function isNearWhiteOpaquePixel(
   }
 
   return maxChannel - minChannel <= NEAR_WHITE_MAX_CHANNEL_SPREAD;
+}
+
+/** Opaque crest pixel with materially non-white color channels. */
+export function isStrongForegroundPixel(
+  r: number,
+  g: number,
+  b: number,
+  a: number,
+): boolean {
+  if (a < NEAR_WHITE_MIN_ALPHA) {
+    return false;
+  }
+
+  return Math.min(r, g, b) < STRONG_FOREGROUND_MAX_CHANNEL;
+}
+
+/**
+ * Near-white pixel 4-adjacent to strong foreground — anti-aliased crest boundary.
+ * Exterior background flood-fill must not cross these pixels into enclosed whites.
+ */
+export function isNearWhiteCrestBridgePixel(
+  rgba: Buffer,
+  index: number,
+  width: number,
+  height: number,
+): boolean {
+  const offset = pixelOffset(index);
+  const r = rgba[offset];
+  const g = rgba[offset + 1];
+  const b = rgba[offset + 2];
+  const a = rgba[offset + 3];
+
+  if (!isNearWhiteOpaquePixel(r, g, b, a)) {
+    return false;
+  }
+
+  for (const neighbour of collectNeighbourIndices(index, width, height)) {
+    if (neighbour < 0) {
+      continue;
+    }
+
+    const neighbourOffset = pixelOffset(neighbour);
+    if (
+      isStrongForegroundPixel(
+        rgba[neighbourOffset],
+        rgba[neighbourOffset + 1],
+        rgba[neighbourOffset + 2],
+        rgba[neighbourOffset + 3],
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /**
@@ -234,6 +296,10 @@ export function hasBorderConnectedNearWhiteBackground(
         continue;
       }
 
+      if (isNearWhiteCrestBridgePixel(rgba, neighbour, width, height)) {
+        continue;
+      }
+
       visited[neighbour] = 1;
       queue.push(neighbour);
     }
@@ -294,12 +360,84 @@ export function removeBorderConnectedNearWhiteBackground(
         continue;
       }
 
+      if (isNearWhiteCrestBridgePixel(output, neighbour, width, height)) {
+        continue;
+      }
+
       visited[neighbour] = 1;
       queue.push(neighbour);
     }
   }
 
   return { rgba: output, changed };
+}
+
+/**
+ * Counts near-white opaque pixels not reachable from the border through
+ * bridge-aware exterior near-white flood-fill — enclosed crest whites.
+ */
+export function countInteriorNearWhiteOpaquePixels(
+  rgba: Buffer,
+  width: number,
+  height: number,
+): number {
+  const totalPixels = width * height;
+  if (totalPixels === 0 || rgba.length < totalPixels * 4) {
+    return 0;
+  }
+
+  const exterior = new Uint8Array(totalPixels);
+  const queue: number[] = [];
+
+  for (const index of collectBorderIndices(width, height)) {
+    const { r, g, b, a } = readRgba(rgba, index);
+    if (!isNearWhiteOpaquePixel(r, g, b, a)) {
+      continue;
+    }
+
+    if (exterior[index]) {
+      continue;
+    }
+
+    exterior[index] = 1;
+    queue.push(index);
+  }
+
+  while (queue.length > 0) {
+    const index = queue.shift()!;
+
+    for (const neighbour of collectNeighbourIndices(index, width, height)) {
+      if (neighbour < 0 || exterior[neighbour]) {
+        continue;
+      }
+
+      const { r, g, b, a } = readRgba(rgba, neighbour);
+      if (!isNearWhiteOpaquePixel(r, g, b, a)) {
+        continue;
+      }
+
+      if (isNearWhiteCrestBridgePixel(rgba, neighbour, width, height)) {
+        continue;
+      }
+
+      exterior[neighbour] = 1;
+      queue.push(neighbour);
+    }
+  }
+
+  let interiorNearWhite = 0;
+  for (let index = 0; index < totalPixels; index++) {
+    if (exterior[index]) {
+      continue;
+    }
+
+    const { r, g, b, a } = readRgba(rgba, index);
+    if (isNearWhiteOpaquePixel(r, g, b, a)) {
+      interiorNearWhite++;
+    }
+  }
+
+  return interiorNearWhite;
 }
 
 function floodFillFromTransparency(
@@ -338,6 +476,10 @@ function floodFillFromTransparency(
 
       const { r, g, b, a } = readRgba(output, neighbour);
       if (!isCandidate(r, g, b, a)) {
+        continue;
+      }
+
+      if (isNearWhiteCrestBridgePixel(output, neighbour, width, height)) {
         continue;
       }
 

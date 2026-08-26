@@ -1,18 +1,22 @@
 /**
  * lib/assets/provider-logo-quality.ts
  *
- * MEDIA-LOGO-01F — post-normalization quality validation for provider crest PNGs.
- * Detects suspicious residual exterior background without rejecting legitimate
- * internal white artwork.
+ * MEDIA-LOGO-01F/01G — post-normalization quality validation for provider crest PNGs.
+ * Detects suspicious residual exterior background and meaningful crest-content loss
+ * without rejecting legitimate internal white artwork.
  */
 
 import sharp from "sharp";
 
 import {
+  countInteriorNearWhiteOpaquePixels,
   EXTERIOR_BG_MIN_CHANNEL,
   hasBorderConnectedNearWhiteBackground,
   isExteriorBackgroundCandidate,
+  isNearWhiteCrestBridgePixel,
+  isNearWhiteOpaquePixel,
 } from "@/lib/assets/provider-logo-background";
+import { NORMALIZED_PROVIDER_LOGO_MAX_DIMENSION } from "@/lib/assets/provider-logo-normalization";
 
 export type ProviderLogoQualityClassification =
   | "PASS"
@@ -24,6 +28,7 @@ export type ProviderLogoQualityResult = {
   transparentPixelCount: number;
   opaquePixelCount: number;
   suspiciousExteriorPixelCount: number;
+  interiorNearWhiteRetentionRatio: number | null;
   flags: string[];
 };
 
@@ -32,6 +37,9 @@ const SUSPICIOUS_CORNER_MIN_CHANNEL = EXTERIOR_BG_MIN_CHANNEL;
 const SUSPICIOUS_CORNER_MIN_ALPHA = 200;
 const FAILED_SUSPICIOUS_EXTERIOR_THRESHOLD = 12;
 const REVIEW_SUSPICIOUS_EXTERIOR_THRESHOLD = 2;
+const MIN_SOURCE_INTERIOR_NEAR_WHITE_FOR_RETENTION = 24;
+const FAILED_INTERIOR_NEAR_WHITE_RETENTION = 0.55;
+const REVIEW_INTERIOR_NEAR_WHITE_RETENTION = 0.8;
 
 function isInExtremeCornerPatch(
   x: number,
@@ -110,12 +118,58 @@ function hasTransparencyAdjacentExteriorCandidate(
       continue;
     }
 
+    if (isNearWhiteCrestBridgePixel(rgba, index, width, height)) {
+      continue;
+    }
+
     if (isAdjacentToTransparent(rgba, index % width, Math.floor(index / width), width, height)) {
       return true;
     }
   }
 
   return false;
+}
+
+function countNearWhiteOpaquePixels(rgba: Buffer, width: number, height: number): number {
+  let count = 0;
+  const totalPixels = width * height;
+
+  for (let index = 0; index < totalPixels; index++) {
+    const offset = index * 4;
+    if (
+      isNearWhiteOpaquePixel(
+        rgba[offset],
+        rgba[offset + 1],
+        rgba[offset + 2],
+        rgba[offset + 3],
+      )
+    ) {
+      count++;
+    }
+  }
+
+  return count;
+}
+
+async function resizeSourceForQualityComparison(sourceBuffer: Buffer): Promise<{
+  rgba: Buffer;
+  width: number;
+  height: number;
+} | null> {
+  try {
+    const { data, info } = await sharp(sourceBuffer, { animated: true })
+      .resize(NORMALIZED_PROVIDER_LOGO_MAX_DIMENSION, NORMALIZED_PROVIDER_LOGO_MAX_DIMENSION, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+
+    return { rgba: data, width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -125,6 +179,7 @@ export function assessProviderLogoQualityFromRgba(
   rgba: Buffer,
   width: number,
   height: number,
+  sourceInteriorNearWhiteCount?: number | null,
 ): ProviderLogoQualityResult {
   const flags: string[] = [];
   let transparentPixelCount = 0;
@@ -154,6 +209,10 @@ export function assessProviderLogoQualityFromRgba(
 
       opaquePixelCount++;
 
+      if (isNearWhiteCrestBridgePixel(rgba, Math.floor(index / 4), width, height)) {
+        continue;
+      }
+
       if (
         isInExtremeCornerPatch(x, y, width, height) &&
         isSuspiciousExtremeCornerOpaquePixel(r, g, b, a)
@@ -175,18 +234,40 @@ export function assessProviderLogoQualityFromRgba(
     flags.push(`suspicious_exterior_pixels:${suspiciousExteriorPixelCount}`);
   }
 
+  let interiorNearWhiteRetentionRatio: number | null = null;
+  if (
+    sourceInteriorNearWhiteCount !== undefined &&
+    sourceInteriorNearWhiteCount !== null &&
+    sourceInteriorNearWhiteCount >= MIN_SOURCE_INTERIOR_NEAR_WHITE_FOR_RETENTION
+  ) {
+    const outputNearWhite = countNearWhiteOpaquePixels(rgba, width, height);
+    interiorNearWhiteRetentionRatio = outputNearWhite / sourceInteriorNearWhiteCount;
+    flags.push(
+      `interior_near_white_retention:${outputNearWhite}/${sourceInteriorNearWhiteCount}`,
+    );
+
+    if (interiorNearWhiteRetentionRatio < FAILED_INTERIOR_NEAR_WHITE_RETENTION) {
+      flags.push("interior_near_white_loss");
+    } else if (interiorNearWhiteRetentionRatio < REVIEW_INTERIOR_NEAR_WHITE_RETENTION) {
+      flags.push("interior_near_white_uncertain");
+    }
+  }
+
   let classification: ProviderLogoQualityClassification = "PASS";
 
   if (
     flags.includes("border_connected_near_white_remains") ||
-    suspiciousExteriorPixelCount >= FAILED_SUSPICIOUS_EXTERIOR_THRESHOLD
+    flags.includes("interior_near_white_loss")
   ) {
     classification = "FAILED_BACKGROUND_REMOVAL";
   } else if (
+    flags.includes("interior_near_white_uncertain") ||
     flags.includes("transparency_adjacent_exterior_candidate_remains") ||
     suspiciousExteriorPixelCount >= REVIEW_SUSPICIOUS_EXTERIOR_THRESHOLD
   ) {
     classification = "REVIEW_REQUIRED";
+  } else if (suspiciousExteriorPixelCount >= FAILED_SUSPICIOUS_EXTERIOR_THRESHOLD) {
+    classification = "FAILED_BACKGROUND_REMOVAL";
   }
 
   return {
@@ -194,6 +275,7 @@ export function assessProviderLogoQualityFromRgba(
     transparentPixelCount,
     opaquePixelCount,
     suspiciousExteriorPixelCount,
+    interiorNearWhiteRetentionRatio,
     flags,
   };
 }
@@ -203,6 +285,7 @@ export function assessProviderLogoQualityFromRgba(
  */
 export async function assessProviderLogoQuality(
   pngBuffer: Buffer,
+  sourceBuffer?: Buffer | null,
 ): Promise<ProviderLogoQualityResult | null> {
   try {
     const image = sharp(pngBuffer);
@@ -218,7 +301,24 @@ export async function assessProviderLogoQuality(
       resolveWithObject: true,
     });
 
-    return assessProviderLogoQualityFromRgba(data, info.width, info.height);
+    let sourceInteriorNearWhiteCount: number | null = null;
+    if (sourceBuffer) {
+      const resizedSource = await resizeSourceForQualityComparison(sourceBuffer);
+      if (resizedSource) {
+        sourceInteriorNearWhiteCount = countInteriorNearWhiteOpaquePixels(
+          resizedSource.rgba,
+          resizedSource.width,
+          resizedSource.height,
+        );
+      }
+    }
+
+    return assessProviderLogoQualityFromRgba(
+      data,
+      info.width,
+      info.height,
+      sourceInteriorNearWhiteCount,
+    );
   } catch {
     return null;
   }

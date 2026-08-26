@@ -495,7 +495,7 @@ export async function dryRunNormalizeProviderLogoSource(
   base.opaquePixelRatio =
     sourceOpaque > 0 ? outputOpaque / sourceOpaque : outputOpaque > 0 ? 1 : 0;
 
-  const quality = await assessProviderLogoQuality(normalized.buffer);
+  const quality = await assessProviderLogoQuality(normalized.buffer, sourceBuffer);
   if (quality) {
     base.qualityClassification = quality.classification;
     base.transparentPixelCount = quality.transparentPixelCount;
