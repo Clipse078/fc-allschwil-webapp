@@ -54,6 +54,12 @@ function cssToken(selector: string, token: string): string {
   return value!;
 }
 
+function cssBlock(selector: string): string {
+  const start = CSS.indexOf(selector);
+  expect(start, `Missing CSS selector ${selector}`).toBeGreaterThanOrEqual(0);
+  return CSS.slice(start, CSS.indexOf("}", start));
+}
+
 function clampMax(value: string): number {
   const max = /clamp\([^,]+,[^,]+,\s*([\d.]+)px\)/.exec(value)?.[1];
   expect(max, `Expected pixel clamp maximum in ${value}`).toBeTruthy();
@@ -245,7 +251,7 @@ describe("INFOBOARD-ROLLING-01L — normal two-row matrix", () => {
     ["15:45", "4", "compact"],
     ["17:15", "5", "compact"],
     ["18:45", "6", "dense"],
-  ] as const)("TEST E — %s cohort preserves its accepted %s-row density", (at, count, density) => {
+  ] as const)("TEST E — %s cohort (%s rows) preserves accepted %s density", (at, count, density) => {
     const nowIso = resolveWednesdayPreviewCurrentTimeIso(at);
     render(
       <InfoboardScreen1
@@ -294,34 +300,19 @@ describe("INFOBOARD-ROLLING-01L — normal two-row matrix", () => {
 
     await act(async () => vi.advanceTimersByTime(24_000));
     const card = trainingCard("2");
+    const root = screen.getByTestId("infoboard-screen1-root");
+    const main = screen.getByTestId("infoboard-content-region");
     const footer = screen.getByTestId("announcement-bar");
-    vi.spyOn(card, "getBoundingClientRect").mockReturnValue({
-      top: 220,
-      bottom: 700,
-      left: 0,
-      right: 1920,
-      width: 1920,
-      height: 480,
-      x: 0,
-      y: 220,
-      toJSON: () => ({}),
-    } as DOMRect);
-    vi.spyOn(footer, "getBoundingClientRect").mockReturnValue({
-      top: 760,
-      bottom: 820,
-      left: 0,
-      right: 1920,
-      width: 1920,
-      height: 60,
-      x: 0,
-      y: 760,
-      toJSON: () => ({}),
-    } as DOMRect);
 
     expect(within(card).getByTestId("training-cohort-start-time")).toHaveTextContent("20:15");
-    expect(card.getBoundingClientRect().bottom).toBeLessThanOrEqual(
-      footer.getBoundingClientRect().top,
+    expect(main.contains(card)).toBe(true);
+    expect(main.nextElementSibling).toBe(footer);
+    expect(root.lastElementChild).toBe(footer);
+    expect(cssBlock(".root {\n  display: grid")).toContain(
+      "grid-template-rows: auto minmax(0, 1fr) auto",
     );
+    expect(cssBlock(".main {")).toContain("overflow: hidden");
+    expect(cssBlock(".main {")).toContain("min-height: 0");
   });
 
   it("TEST H — three-page rotator remains P1 → P2 → P3 → P1", async () => {
