@@ -32,6 +32,7 @@ import {
   MapPin,
   Menu,
   Monitor,
+  MonitorPlay,
   Newspaper,
   Package,
   Palette,
@@ -82,6 +83,7 @@ function getNavIcon(label: string) {
     case "Meetings":                    return ScrollText;
     case "Initiativen":                 return Flag;
     case "Infoboard":                   return Monitor;
+    case "Vorschau":                    return MonitorPlay;
     case "MatchCenter":                 return Volleyball;
     case "Administration":              return Settings2;
     case "Kommunikation":               return Mail;

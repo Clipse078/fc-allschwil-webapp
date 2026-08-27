@@ -65,6 +65,8 @@ export type InfoboardAnlageplanProps = {
     facilityName?: string | null;
   };
   shellConfig?: InfoboardAnlageplanShellConfig | null;
+  /** Preview-only: keep the supplied simulated moment fixed. */
+  liveClock?: boolean;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -75,6 +77,7 @@ export function InfoboardAnlageplan({
   richEventCards = false,
   branding,
   shellConfig,
+  liveClock = true,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
@@ -141,6 +144,7 @@ export function InfoboardAnlageplan({
         weather={showWeather ? weather : null}
         showTime={showTime}
         showDate={showDate}
+        liveClock={liveClock}
       />
 
       {/* ── BODY: map canvas ───────────────────────────────────────────── */}

@@ -132,6 +132,8 @@ export type InfoboardScreen2Props = {
     readonly backgroundColor?: string | null;
     readonly textColor?: string | null;
   } | null;
+  /** Preview-only: keep the supplied simulated moment fixed. */
+  liveClock?: boolean;
 };
 
 // ── Time / date formatting ────────────────────────────────────────────────────
@@ -492,6 +494,7 @@ export function InfoboardScreen2({
   theme = DEFAULT_INFOBOARD_DISPLAY_THEME,
   headerConfig,
   announcement,
+  liveClock = true,
 }: InfoboardScreen2Props): ReactElement {
   const { tenant, pitches, dressingRooms, unallocated } = feed;
   const timeZone = tenant.timezone;
@@ -529,6 +532,7 @@ export function InfoboardScreen2({
         staticDateFallback={staticDateFallback}
         subtitle={subtitleText ?? null}
         subtitleEnabled={subtitleEnabled}
+        liveClock={liveClock}
         rightContent={showWeather ? <HeaderWeather weather={weather} /> : undefined}
       />
 

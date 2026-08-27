@@ -117,6 +117,15 @@ export type InfoboardScreen1Props = {
   presentation?: Screen1PresentationConfig;
   /** @deprecated Compatibility for callers predating generalized presentation. */
   logoPresentation?: Screen1PresentationConfig;
+  /** Preview-only controls around production pagination. Omit on kiosk routes. */
+  previewPagination?: {
+    readonly activePage: number;
+    readonly autoRotate: boolean;
+    readonly onPageChange: (page: number) => void;
+    readonly onPageCountChange: (pageCount: number) => void;
+  };
+  /** Preview-only: keep the supplied simulated moment fixed. */
+  liveClock?: boolean;
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1311,6 +1320,8 @@ export function InfoboardScreen1({
   headerConfig,
   presentation: presentationProp,
   logoPresentation: legacyLogoPresentation,
+  previewPagination,
+  liveClock = true,
 }: InfoboardScreen1Props): ReactElement {
   const presentation =
     presentationProp ?? legacyLogoPresentation ?? DEFAULT_SCREEN1_PRESENTATION;
@@ -1319,7 +1330,7 @@ export function InfoboardScreen1({
   const themeAttr = theme.toLowerCase();
 
   const clockSeed = currentTimeIso ?? feed.generatedAt;
-  const liveTimeIso = useKioskClock(clockSeed);
+  const liveTimeIso = useKioskClock(clockSeed, liveClock);
   const visibleFeed = useMemo(() => {
     if (currentTimeIso == null) return feed;
     return filterExpiredScreen1Feed(feed, new Date(liveTimeIso));
@@ -1476,6 +1487,7 @@ export function InfoboardScreen1({
         staticDateFallback={staticDateLine}
         subtitle={subtitleText != null ? subtitleText.toUpperCase() : null}
         subtitleEnabled={subtitleEnabled}
+        liveClock={liveClock}
       />
 
       {/* ── Main: event list (demand-paginated, rotated when multi-page) ── */}
@@ -1497,6 +1509,10 @@ export function InfoboardScreen1({
             <InfoboardPageRotator
               intervalMs={12_000}
               contentKey={paginationContentKey}
+              activePage={previewPagination?.activePage}
+              onPageChange={previewPagination?.onPageChange}
+              autoRotate={previewPagination?.autoRotate}
+              onPageCountChange={previewPagination?.onPageCountChange}
             >
               {pages.map((pageItems, pageIndex) => renderPage(pageItems, pageIndex))}
             </InfoboardPageRotator>
