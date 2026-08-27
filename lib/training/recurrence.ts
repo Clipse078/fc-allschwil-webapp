@@ -65,6 +65,11 @@ export function dateKeyFromDate(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/** Parses a "YYYY-MM-DD" calendar date key to the UTC-midnight Date used by TrainingSession.date. */
+export function utcMidnightFromDateKey(dateKey: string): Date {
+  return new Date(`${dateKey}T00:00:00.000Z`);
+}
+
 // ── Zoned time-of-day → UTC instant ─────────────────────────────────────────
 
 /**

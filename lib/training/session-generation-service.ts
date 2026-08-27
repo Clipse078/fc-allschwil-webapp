@@ -366,11 +366,29 @@ export async function generateTrainingSessionsForTenant(
 // ── Canonical read API ───────────────────────────────────────────────────────
 
 /**
+ * Normalises a listTrainingSessions date bound.
+ *
+ * TrainingSession.date is stored as a UTC-midnight calendar-date key. Bounds
+ * passed here must therefore already be UTC-midnight Dates built from
+ * YYYY-MM-DD keys (see listTrainingSessionDateBounds() in date-range.ts, and
+ * lib/weekplanner/queries.ts for the same contract). Applying toDateOnlyUtc()
+ * to a timezone-aware window instant would truncate the UTC calendar day and
+ * widen the query by one day for positive-offset zones like Europe/Zurich.
+ */
+function normalizeListTrainingSessionDateBound(date: Date): Date {
+  return toDateOnlyUtc(date);
+}
+
+/**
  * Lists canonical TrainingSession rows for a tenant, with optional filters.
  *
  * This is the single read path every downstream consumer (Weekplanner,
  * Dayplanner, Website, Infoboard) should use — none of them resolve
  * occurrences from TrainingSeries directly.
+ *
+ * `dateFrom` / `dateTo` must be UTC-midnight calendar dates (see
+ * normalizeListTrainingSessionDateBound above) — not timezone-aware window
+ * instants from resolveTraining*Window().from/.to.
  */
 export async function listTrainingSessions(
   tenantId: string,
@@ -380,8 +398,8 @@ export async function listTrainingSessions(
     trainingSeriesId: filter.trainingSeriesId,
     teamSeasonId: filter.teamSeasonId,
     status: filter.status,
-    dateFrom: filter.dateFrom ? toDateOnlyUtc(filter.dateFrom) : undefined,
-    dateTo: filter.dateTo ? toDateOnlyUtc(filter.dateTo) : undefined,
+    dateFrom: filter.dateFrom ? normalizeListTrainingSessionDateBound(filter.dateFrom) : undefined,
+    dateTo: filter.dateTo ? normalizeListTrainingSessionDateBound(filter.dateTo) : undefined,
     includeInactive: filter.includeInactive,
   });
   return rows.map(toDto);

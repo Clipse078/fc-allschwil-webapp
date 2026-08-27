@@ -403,6 +403,45 @@ export function formatTrainingDayLabel(
   }).format(reference);
 }
 
+/**
+ * Derives inclusive UTC-midnight [dateFrom, dateTo] bounds for
+ * listTrainingSessions() from a resolved Monat/Woche/Tag window.
+ *
+ * TrainingSession.date is a pure calendar-date key (UTC-midnight convention),
+ * NOT a timezone-zoned instant. Bounds must therefore be built directly from
+ * the tenant-local YYYY-MM-DD keys — never by truncating window.from/to
+ * instants via toDateOnlyUtc(), which would silently include the previous
+ * UTC calendar day for positive-offset zones like Europe/Zurich.
+ */
+export function listTrainingSessionDateBounds(
+  view: TrainingCenterView,
+  windows: {
+    month: Pick<TrainingMonthWindow, "year" | "month">;
+    week: Pick<TrainingWeekWindow, "days">;
+    day: Pick<TrainingDayWindow, "date">;
+  },
+): { dateFrom: Date; dateTo: Date } {
+  const toUtcMidnight = (dateKey: string) => new Date(`${dateKey}T00:00:00.000Z`);
+
+  if (view === "DAY") {
+    const bound = toUtcMidnight(windows.day.date);
+    return { dateFrom: bound, dateTo: bound };
+  }
+
+  if (view === "WEEK") {
+    return {
+      dateFrom: toUtcMidnight(windows.week.days[0]),
+      dateTo: toUtcMidnight(windows.week.days[windows.week.days.length - 1]),
+    };
+  }
+
+  const lastDay = new Date(Date.UTC(windows.month.year, windows.month.month, 0)).getUTCDate();
+  return {
+    dateFrom: toUtcMidnight(formatDateParam(windows.month.year, windows.month.month, 1)),
+    dateTo: toUtcMidnight(formatDateParam(windows.month.year, windows.month.month, lastDay)),
+  };
+}
+
 /** Normalises a free-form view param to a known TrainingCenterView, defaulting to MONTH. */
 export function normalizeTrainingCenterView(
   value: string | null | undefined,

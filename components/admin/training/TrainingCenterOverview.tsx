@@ -85,6 +85,21 @@ export default function TrainingCenterOverview({
 }: Props) {
   const activeWindow = windowForView(view, monthWindow, weekWindow, dayWindow);
 
+  const dayScopedRows =
+    view === "DAY" ? viewModel.rows.filter((row) => row.session.date === dayWindow.date) : viewModel.rows;
+  const dayScopedFilteredRows =
+    view === "DAY"
+      ? viewModel.filteredRows.filter((row) => row.session.date === dayWindow.date)
+      : viewModel.filteredRows;
+  const displayKpis =
+    view === "DAY"
+      ? {
+          gesamt: dayScopedRows.length,
+          offen: dayScopedRows.filter((row) => row.assessment.status === "OPEN").length,
+          erledigt: dayScopedRows.filter((row) => row.assessment.status !== "OPEN").length,
+        }
+      : viewModel.kpis;
+
   const rowsByDate = new Map<string, typeof viewModel.filteredRows>();
   for (const row of viewModel.filteredRows) {
     const list = rowsByDate.get(row.session.date) ?? [];
@@ -146,9 +161,9 @@ export default function TrainingCenterOverview({
 
       {/* Operational summary ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
-        <SummaryCard label="Trainings" value={viewModel.kpis.gesamt} tone="default" />
-        <SummaryCard label="Offen" value={viewModel.kpis.offen} tone="amber" />
-        <SummaryCard label="Erledigt" value={viewModel.kpis.erledigt} tone="emerald" />
+        <SummaryCard label="Trainings" value={displayKpis.gesamt} tone="default" />
+        <SummaryCard label="Offen" value={displayKpis.offen} tone="amber" />
+        <SummaryCard label="Erledigt" value={displayKpis.erledigt} tone="emerald" />
       </div>
 
       {/* Alle / Offen / Erledigt ─────────────────────────────────────────── */}
@@ -174,7 +189,7 @@ export default function TrainingCenterOverview({
       </div>
 
       {/* View body ──────────────────────────────────────────────────────────── */}
-      {viewModel.filteredRows.length === 0 ? (
+      {(view === "DAY" ? dayScopedFilteredRows.length : viewModel.filteredRows.length) === 0 ? (
         <SectionCard noPadding>
           <EmptyState
             icon={<Dumbbell className="h-8 w-8" />}
@@ -224,7 +239,7 @@ export default function TrainingCenterOverview({
       ) : (
         <SectionCard noPadding>
           <div className="divide-y divide-[var(--border)]" data-testid="trainingcenter-day-list">
-            {viewModel.filteredRows.map((row) => (
+            {dayScopedFilteredRows.map((row) => (
               <TrainingSessionRow
                 key={row.session.id}
                 row={row}

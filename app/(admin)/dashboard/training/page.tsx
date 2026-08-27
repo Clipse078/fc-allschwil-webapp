@@ -13,6 +13,7 @@ import {
   resolveTrainingDayWindow,
   resolveTrainingMonthWindow,
   resolveTrainingWeekWindow,
+  listTrainingSessionDateBounds,
   formatTrainingDayLabel,
   formatTrainingMonthLabel,
   formatTrainingWeekLabel,
@@ -132,10 +133,14 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
     timeZone: timezone,
   });
 
-  const activeRange = view === "WEEK" ? weekWindow : view === "DAY" ? dayWindow : monthWindow;
+  const sessionDateBounds = listTrainingSessionDateBounds(view, {
+    month: monthWindow,
+    week: weekWindow,
+    day: dayWindow,
+  });
 
   const [sessions, allocationSummaries, sessionAllocationOverrides] = await Promise.all([
-    listTrainingSessions(tenantContext.id, { dateFrom: activeRange.from, dateTo: activeRange.to }),
+    listTrainingSessions(tenantContext.id, sessionDateBounds),
     listAllocationSummaryByTenant(tenantContext.id),
     listSessionAllocationSummaryByTenant(tenantContext.id),
   ]);
