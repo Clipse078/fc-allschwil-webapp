@@ -100,7 +100,7 @@ function createEvent(overrides: Record<string, unknown> = {}) {
     status: "SCHEDULED",
     title: "FC Allschwil - Opponent",
     location: "Im Brüel",
-    startAt: new Date("2026-08-20T18:00:00.000Z"),
+    startAt: new Date("2026-09-01T18:00:00.000Z"),
     endAt: null,
     opponentName: "Opponent FC",
     competitionLabel: "Junioren E",
@@ -359,7 +359,7 @@ describe("listTeamSeasonMatches", () => {
         }),
         createEvent({
           id: "event-earlier",
-          startAt: new Date("2026-08-01T18:00:00.000Z"),
+          startAt: new Date("2026-08-26T18:00:00.000Z"),
         }),
       ],
     });
@@ -661,6 +661,69 @@ describe("listTeamSeasonMatches", () => {
     expect(result.upcoming).toHaveLength(1);
     expect(result.upcoming[0]?.side).toBe("HOME");
     expect(result.upcoming[0]?.provider.provider).toBeNull();
+  });
+
+  it("excludes stale past SCHEDULED fixtures from upcoming and completed", async () => {
+    const database = createDatabase({
+      events: [
+        createEvent({
+          id: "event-stale-past",
+          status: "SCHEDULED",
+          startAt: new Date("2026-08-01T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "Geplant",
+            scoreHome: null,
+            scoreAway: null,
+          }),
+        }),
+        createEvent({
+          id: "event-future-scheduled",
+          status: "SCHEDULED",
+          startAt: new Date("2026-09-10T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            externalMatchId: 9002,
+            providerMatchStateName: "Geplant",
+            scoreHome: null,
+            scoreAway: null,
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+
+    expect(result.upcoming.map((match) => match.eventId)).toEqual([
+      "event-future-scheduled",
+    ]);
+    expect(result.completed).toHaveLength(0);
+  });
+
+  it("includes LIVE fixtures in upcoming even when kickoff is in the past", async () => {
+    const database = createDatabase({
+      events: [
+        createEvent({
+          status: "LIVE",
+          startAt: new Date("2026-08-20T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "läuft",
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+
+    expect(result.upcoming).toHaveLength(1);
+    expect(result.upcoming[0]?.lifecycle).toBe("LIVE");
+    expect(result.completed).toHaveLength(0);
   });
 
   it("isolates different team seasons for the same Team entity", async () => {

@@ -4,7 +4,10 @@ import {
   getMatchcenterLifecycleStage,
   getMatchcenterResultLabel,
 } from "@/lib/matchcenter/match-lifecycle";
-import type { SportingMatchLifecycle } from "@/lib/sporting-data/lifecycle";
+import {
+  isSportingMatchPastKickoff,
+  type SportingMatchLifecycle,
+} from "@/lib/sporting-data/lifecycle";
 
 export type TeamMatchPerspectiveSide = "HOME" | "AWAY";
 
@@ -536,6 +539,31 @@ function compareDescending(left: TeamSeasonMatchItem, right: TeamSeasonMatchItem
   return compareAscending(right, left);
 }
 
+/**
+ * Team-page "Nächste Spiele" semantics on top of canonical lifecycle classification.
+ * Excludes stale historical non-completed fixtures while preserving LIVE,
+ * POSTPONED, and CANCELLED continuity.
+ */
+function isTeamSeasonUpcomingItem(item: TeamSeasonMatchItem, now: Date): boolean {
+  if (
+    item.lifecycle === "LIVE" ||
+    item.lifecycle === "POSTPONED" ||
+    item.lifecycle === "CANCELLED"
+  ) {
+    return true;
+  }
+
+  if (item.lifecycle === "NEEDS_RECONCILIATION") {
+    return false;
+  }
+
+  if (item.lifecycle === "UPCOMING") {
+    return !isSportingMatchPastKickoff(item.startAt, now);
+  }
+
+  return false;
+}
+
 export async function listTeamSeasonMatches(
   database: TeamMatchQueryDatabase,
   input: ListTeamSeasonMatchesInput,
@@ -605,7 +633,7 @@ export async function listTeamSeasonMatches(
 
     if (item.lifecycleStage === "COMPLETED") {
       completed.push(item);
-    } else {
+    } else if (isTeamSeasonUpcomingItem(item, now)) {
       upcoming.push(item);
     }
   }
