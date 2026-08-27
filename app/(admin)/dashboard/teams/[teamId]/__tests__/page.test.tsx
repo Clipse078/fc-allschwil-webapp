@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getEligibleTenantMembers: vi.fn(),
   getTeamTrainingSchedule: vi.fn(),
   getTeamAttendanceOverview: vi.fn(),
+  getUpcomingParticipationForTeam: vi.fn(),
   roleFindMany: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NOT_FOUND");
@@ -36,6 +37,9 @@ vi.mock("@/lib/teams/team-training-schedule", () => ({
 }));
 vi.mock("@/lib/attendance/queries", () => ({
   getTeamAttendanceOverview: mocks.getTeamAttendanceOverview,
+}));
+vi.mock("@/lib/participation/queries", () => ({
+  getUpcomingParticipationForTeam: mocks.getUpcomingParticipationForTeam,
 }));
 vi.mock("@/lib/org/queries", () => ({
   getOrgUnits: mocks.getOrgUnits,
@@ -101,7 +105,8 @@ const TEAM_FIXTURE = {
   currentTeamSeasonId: "ts-1",
   currentParticipationType: "COMPETITION",
   currentSeasonOrgUnit: { id: "ou-1", name: "Aktive", key: "aktive", type: "DIVISION" },
-  competition: { id: "comp-1", name: "2. Liga", shortName: "2L" },
+  competition: { id: "comp-1", name: "2. Liga", shortName: "2L", source: "CANONICAL_COMPETITION" },
+  currentSeasonSfvMapping: null,
   providerMapping: null,
   teamSeasons: [
     {
@@ -187,6 +192,7 @@ beforeEach(() => {
     teamSeasonId: "ts-1",
     players: [],
   });
+  mocks.getUpcomingParticipationForTeam.mockResolvedValue(null);
   mocks.roleFindMany.mockResolvedValue([]);
 });
 

@@ -40,13 +40,19 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
+vi.mock("../team-cockpit-sporting-data", () => ({
+  loadCurrentSeasonSfvMapping: vi.fn().mockResolvedValue(null),
+}));
+
 import { prisma } from "@/lib/db/prisma";
+import { loadCurrentSeasonSfvMapping } from "../team-cockpit-sporting-data";
 
 const mockPrisma = prisma as unknown as {
   team: {
     findFirst: ReturnType<typeof vi.fn>;
   };
 };
+const mockLoadMapping = loadCurrentSeasonSfvMapping as ReturnType<typeof vi.fn>;
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -296,19 +302,16 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
   });
 
   it("provider-connected team works: providerMapping surfaces provider + providerTeamName read-only", async () => {
-    const teamRow = {
-      ...makeTeamRow(),
-      externalMappings: [
-        {
-          provider: "SFV",
-          providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
-          providerIsActive: true,
-          externalTeamId: 31927,
-          lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
-        },
-      ],
-    };
+    const teamRow = makeTeamRow({ teamSeasons: [makeTeamSeason(0)] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+    mockLoadMapping.mockResolvedValue({
+      externalTeamId: 31927,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+      providerLeagueName: null,
+      providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
+      lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+    });
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.providerMapping).toEqual({
@@ -321,19 +324,18 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
 
   it("provider sync does not overwrite tenant names: tenant name wins over providerTeamName", async () => {
     const teamRow = {
-      ...makeTeamRow(),
+      ...makeTeamRow({ teamSeasons: [makeTeamSeason(0)] }),
       name: "FC Allschwil Junioren B2",
-      externalMappings: [
-        {
-          provider: "SFV",
-          providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
-          providerIsActive: true,
-          externalTeamId: 31927,
-          lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
-        },
-      ],
     };
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+    mockLoadMapping.mockResolvedValue({
+      externalTeamId: 31927,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+      providerLeagueName: null,
+      providerTeamName: "FC Allschwil Junioren B2 (4. Liga)",
+      lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+    });
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.displayName).toBe("FC Allschwil Junioren B2");
@@ -341,19 +343,16 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
   });
 
   it("providerTeamName can still refresh: providerMapping reflects the latest synced value", async () => {
-    const teamRow = {
-      ...makeTeamRow(),
-      externalMappings: [
-        {
-          provider: "SFV",
-          providerTeamName: "FC Allschwil Junioren B2 (3. Liga)",
-          providerIsActive: true,
-          externalTeamId: 31927,
-          lastSyncedAt: new Date("2027-08-01T00:00:00.000Z"),
-        },
-      ],
-    };
+    const teamRow = makeTeamRow({ teamSeasons: [makeTeamSeason(0)] });
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+    mockLoadMapping.mockResolvedValue({
+      externalTeamId: 31927,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+      providerLeagueName: null,
+      providerTeamName: "FC Allschwil Junioren B2 (3. Liga)",
+      lastSyncedAt: new Date("2027-08-01T00:00:00.000Z"),
+    });
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.providerMapping?.teamName).toBe("FC Allschwil Junioren B2 (3. Liga)");
@@ -372,7 +371,12 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
-    expect(result?.competition).toEqual({ id: "comp-01", name: "Liga 1", shortName: "L1" });
+    expect(result?.competition).toEqual({
+      id: "comp-01",
+      name: "Liga 1",
+      shortName: "L1",
+      source: "CANONICAL_COMPETITION",
+    });
   });
 
   it("TEAMCENTER-UX-01B: competition is null (renders as 'Kein Wettbewerb') when no primary competition exists", async () => {
@@ -390,15 +394,6 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
       name: "FC Allschwil Junioren E3",
       shortName: "E3",
       alternativeName: null,
-      externalMappings: [
-        {
-          provider: "SFV",
-          providerTeamName: "FC Allschwil Junioren E2 (SFV)",
-          providerIsActive: true,
-          externalTeamId: 12345,
-          lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
-        },
-      ],
       teamSeasons: [
         {
           ...makeTeamSeason(0),
@@ -407,6 +402,14 @@ describe("TEAM-IDENTITY-01 — getTeamDetailData naming contract", () => {
       ],
     };
     mockPrisma.team.findFirst.mockResolvedValue(teamRow);
+    mockLoadMapping.mockResolvedValue({
+      externalTeamId: 12345,
+      externalSeasonId: 2027,
+      providerLeagueId: null,
+      providerLeagueName: null,
+      providerTeamName: "FC Allschwil Junioren E2 (SFV)",
+      lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+    });
 
     const result = await getTeamDetailData(TENANT_A, TEAM_ID_A);
     expect(result?.displayName).toBe("FC Allschwil Junioren E3");

@@ -1,6 +1,8 @@
 ﻿import { prisma } from "@/lib/db/prisma";
 import { resolveLongTeamName, resolveCompactTeamName } from "@/lib/teams/team-naming";
 import { currentTeamSeasonWhere, pickCurrentTeamSeason } from "@/lib/teams/current-season";
+import { loadCurrentSeasonSfvMapping } from "@/lib/teams/team-cockpit-sporting-data";
+import { resolveTeamCompetitionDisplay } from "@/lib/teams/team-competition-display";
 
 export async function getAvailableTeamSeasons() {
   const seasons = await prisma.season.findMany({
@@ -211,17 +213,9 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
       // TEAM-IDENTITY-01: read-only provider identity/name for display.
       // Never edited here — provider mapping ownership lives in
       // lib/integrations/sfv/sync/* and the provider-mapping workflow.
-      externalMappings: {
-        orderBy: { lastSyncedAt: "desc" },
-        take: 1,
-        select: {
-          provider: true,
-          providerTeamName: true,
-          providerIsActive: true,
-          externalTeamId: true,
-          lastSyncedAt: true,
-        },
-      },
+      // TEAM-COCKPIT-PREMIUM-01C: do not use team-level latest mapping for
+      // competition resolution — current-season mapping is loaded after
+      // pickCurrentTeamSeason via loadCurrentSeasonSfvMapping().
       teamSeasons: {
         orderBy: {
           season: {
@@ -353,13 +347,29 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
   // made the Team detail page show a different "current" season than the
   // Teams list for the same Team.
   const activeSeasonEntry = pickCurrentTeamSeason(team.teamSeasons);
-  const latestMapping = team.externalMappings?.[0] ?? null;
+  const currentSeasonSfvMapping =
+    activeSeasonEntry !== null
+      ? await loadCurrentSeasonSfvMapping({
+          tenantId,
+          teamSeasonId: activeSeasonEntry.id,
+          seasonKey: activeSeasonEntry.season.key,
+        })
+      : null;
 
   // TEAM-SFV-MAPPING-01 / TEAMCENTER-UX-01B: Liga/Wettbewerb for the Team
-  // detail header/settings surface — sourced strictly from the canonical
-  // TeamSeasonCompetition -> Competition relation of the active season.
-  // Never fabricated/manual.
+  // detail header/settings surface — sourced from the canonical
+  // TeamSeasonCompetition -> Competition relation of the active season,
+  // with resilient SFV providerLeagueName fallback when canonical data is absent.
   const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
+  const resolvedCompetitionDisplay = resolveTeamCompetitionDisplay({
+    providerLeagueName: currentSeasonSfvMapping?.providerLeagueName,
+    canonicalCompetition: primaryCompetition
+      ? {
+          name: primaryCompetition.officialName,
+          shortName: primaryCompetition.shortName,
+        }
+      : null,
+  });
 
   // TEAM-SEASON-ORGUNIT-01: canonical season-scoped OrgUnit for the current season.
   const currentSeasonOrgUnit = activeSeasonEntry?.orgUnits?.[0]?.orgUnit ?? null;
@@ -370,7 +380,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     teamName: team.name,
     teamShortName: team.shortName,
     teamAlternativeName: team.alternativeName,
-    providerTeamName: latestMapping?.providerTeamName ?? null,
+    providerTeamName: currentSeasonSfvMapping?.providerTeamName ?? null,
   };
 
   return {
@@ -409,19 +419,31 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     currentSeasonOrgUnit: currentSeasonOrgUnit
       ? { id: currentSeasonOrgUnit.id, name: currentSeasonOrgUnit.name, key: currentSeasonOrgUnit.key, type: currentSeasonOrgUnit.type }
       : null,
-    competition: primaryCompetition
+    competition: resolvedCompetitionDisplay
       ? {
-          id: primaryCompetition.id,
-          name: primaryCompetition.officialName,
-          shortName: primaryCompetition.shortName,
+          id:
+            resolvedCompetitionDisplay.source === "CANONICAL_COMPETITION"
+              ? primaryCompetition?.id ?? null
+              : null,
+          name: resolvedCompetitionDisplay.name,
+          shortName: resolvedCompetitionDisplay.shortName ?? null,
+          source: resolvedCompetitionDisplay.source,
         }
       : null,
-    providerMapping: latestMapping
+    currentSeasonSfvMapping: currentSeasonSfvMapping
       ? {
-          provider: latestMapping.provider,
-          teamName: latestMapping.providerTeamName,
-          isActive: latestMapping.providerIsActive,
-          lastSyncedAt: latestMapping.lastSyncedAt.toISOString(),
+          externalTeamId: currentSeasonSfvMapping.externalTeamId,
+          externalSeasonId: currentSeasonSfvMapping.externalSeasonId,
+          providerLeagueId: currentSeasonSfvMapping.providerLeagueId,
+          providerLeagueName: currentSeasonSfvMapping.providerLeagueName,
+        }
+      : null,
+    providerMapping: currentSeasonSfvMapping
+      ? {
+          provider: "SFV",
+          teamName: currentSeasonSfvMapping.providerTeamName,
+          isActive: true,
+          lastSyncedAt: currentSeasonSfvMapping.lastSyncedAt.toISOString(),
         }
       : null,
     teamSeasons: team.teamSeasons.map((entry) => ({

@@ -87,7 +87,7 @@ type ProviderMappingInfo = {
 } | null;
 
 type CompetitionInfo = {
-  id: string;
+  id: string | null;
   name: string | null;
   shortName: string | null;
 } | null;
