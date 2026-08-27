@@ -4,10 +4,14 @@
  * Manual page preferences are inputs to pagination, not persisted page results.
  * Every recompute applies preferences then compacts cards forward when capacity
  * allows — expired earlier cards therefore pull later cards back automatically.
+ *
+ * Soft breaks capture predecessor identity at preference creation time via
+ * `softBreakAfterKeys`. When the active predecessor context no longer matches,
+ * the preference no longer forces a break and normal forward packing applies.
  */
 
 import { resolveDisplayItemKey } from "./screen1-studio-keys";
-import type { Screen1StudioConfig } from "./screen1-studio-types";
+import type { Screen1CardOverride, Screen1StudioConfig } from "./screen1-studio-types";
 
 /** Minimal display item shape for pagination (matches InfoboardScreen1 DisplayItem). */
 export type PaginableDisplayItem =
@@ -23,29 +27,82 @@ export type PaginationOptions = {
   readonly studio?: Screen1StudioConfig | null;
 };
 
-/** Minimum preceding cards required before a soft defer can apply. */
-export const SCREEN1_SOFT_DEFER_MIN_PRECEDING_CARDS = 3;
+type DisplayItemLike = Parameters<typeof resolveDisplayItemKey>[0];
+
+function resolveItemKey(item: PaginableDisplayItem): string {
+  return resolveDisplayItemKey(item as DisplayItemLike);
+}
+
+/** Resolves stable keys for all items preceding `index` in the active list. */
+export function resolvePredecessorKeys(
+  items: readonly PaginableDisplayItem[],
+  index: number,
+): string[] {
+  return items.slice(0, index).map(resolveItemKey);
+}
+
+function keysEqual(left: readonly string[], right: readonly string[]): boolean {
+  if (left.length !== right.length) return false;
+  return left.every((key, index) => key === right[index]);
+}
+
+/**
+ * Returns true when a card override's captured predecessor context still matches
+ * the current active list at `index`.
+ */
+export function softBreakContextMatches(
+  override: Screen1CardOverride | undefined,
+  predecessorKeys: readonly string[],
+): boolean {
+  if (override?.preferNextPage !== true) return false;
+  const captured = override.softBreakAfterKeys;
+  if (captured == null || captured.length === 0) return false;
+  return keysEqual(captured, predecessorKeys);
+}
+
+function getCardOverride(
+  item: PaginableDisplayItem,
+  studio: Screen1StudioConfig | null | undefined,
+): Screen1CardOverride | undefined {
+  if (studio == null) return undefined;
+  return studio.cardOverrides[resolveItemKey(item)];
+}
+
+/**
+ * Returns true when the card should start on the next page because its captured
+ * soft-break context still matches the current active predecessors.
+ */
+export function shouldSoftDeferCard(
+  item: PaginableDisplayItem,
+  index: number,
+  items: readonly PaginableDisplayItem[],
+  studio: Screen1StudioConfig | null | undefined,
+): boolean {
+  const predecessorKeys = resolvePredecessorKeys(items, index);
+  return softBreakContextMatches(getCardOverride(item, studio), predecessorKeys);
+}
 
 function prefersNextPage(
   item: PaginableDisplayItem,
+  index: number,
+  items: readonly PaginableDisplayItem[],
   studio: Screen1StudioConfig | null | undefined,
 ): boolean {
-  if (studio == null) return false;
-  const key = resolveDisplayItemKey(item as Parameters<typeof resolveDisplayItemKey>[0]);
-  return studio.cardOverrides[key]?.preferNextPage === true;
+  return shouldSoftDeferCard(item, index, items, studio);
 }
 
 /**
  * Pulls cards from the start of page N+1 onto page N when capacity allows.
  * Preserves chronological order. Capacity always wins.
  *
- * Cards with `preferNextPage` are not pulled forward — they only move when
- * the active list is recomputed without preceding cards (auto-compaction).
+ * Cards with an active soft-break context are not pulled forward — they only
+ * move when the predecessor context no longer matches (auto-compaction).
  */
 export function compactPagesForward<T extends PaginableDisplayItem>(
   pages: T[][],
   getDemand: (item: T) => number,
   maxDemand: number,
+  allItems: readonly T[],
   studio?: Screen1StudioConfig | null,
 ): T[][] {
   if (pages.length <= 1) return pages;
@@ -56,10 +113,18 @@ export function compactPagesForward<T extends PaginableDisplayItem>(
     return page.reduce((sum, item) => sum + getDemand(item), 0);
   }
 
+  function globalIndex(item: T): number {
+    return allItems.indexOf(item);
+  }
+
   for (let pageIdx = 0; pageIdx < result.length - 1; pageIdx++) {
     while (result[pageIdx + 1]?.length) {
       const nextItem = result[pageIdx + 1]![0]!;
-      if (prefersNextPage(nextItem, studio)) {
+      const nextIndex = globalIndex(nextItem);
+      if (
+        nextIndex >= 0 &&
+        prefersNextPage(nextItem, nextIndex, allItems, studio)
+      ) {
         break;
       }
       const nextDemand = getDemand(nextItem);
@@ -102,8 +167,7 @@ export function paginateExpandedDisplayListWithPreferences<T extends PaginableDi
     const mustBreak = currentPage.length > 0 && currentDemand + d > maxDemand;
     const softDefer =
       !mustBreak &&
-      currentPage.length >= SCREEN1_SOFT_DEFER_MIN_PRECEDING_CARDS &&
-      prefersNextPage(item, studio) &&
+      shouldSoftDeferCard(item, i, expandedItems, studio) &&
       currentDemand + d <= maxDemand;
 
     if (mustBreak || softDefer) {
@@ -125,6 +189,7 @@ export function paginateExpandedDisplayListWithPreferences<T extends PaginableDi
       return expandedDemands[idx] ?? 1;
     },
     maxDemand,
+    expandedItems,
     studio,
   );
 }
@@ -137,15 +202,13 @@ export function validatePaginationIntegrity(
   pages: readonly (readonly PaginableDisplayItem[])[],
 ): { ok: boolean; duplicates: number; missing: number; orderValid: boolean } {
   const inputKeys = inputItems.map(
-    (item) => resolveDisplayItemKey(item as Parameters<typeof resolveDisplayItemKey>[0]),
+    (item) => resolveDisplayItemKey(item as DisplayItemLike),
   );
   const outputKeys: string[] = [];
 
   for (const page of pages) {
     for (const item of page) {
-      outputKeys.push(
-        resolveDisplayItemKey(item as Parameters<typeof resolveDisplayItemKey>[0]),
-      );
+      outputKeys.push(resolveDisplayItemKey(item as DisplayItemLike));
     }
   }
 

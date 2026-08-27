@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FONT_SIZE_LABELS,
   INFOBOARD_FONT_SIZES,
   type InfoboardFontSize,
 } from "@/lib/infoboard/screen1-logo-settings";
+import { captureSoftBreakAfterKeys } from "@/lib/infoboard/screen1-studio-keys";
 import {
+  clearSoftPaginationOverride,
   isEmptyCardOverride,
   serializeScreen1StudioConfig,
   type Screen1CardOverride,
@@ -17,6 +19,7 @@ export type Screen1StudioCardRef = {
   readonly key: string;
   readonly label: string;
   readonly kind: "training-group" | "event";
+  readonly eventType?: string;
 };
 
 type SizeControlProps = {
@@ -70,6 +73,16 @@ function SizeControl({ label, value, onChange, testId }: SizeControlProps) {
   );
 }
 
+function cardShowsKabinePlatz(card: Screen1StudioCardRef): boolean {
+  if (card.kind === "training-group") return true;
+  return card.eventType === "MATCH" || card.eventType === "TOURNAMENT";
+}
+
+function cardShowsLogo(card: Screen1StudioCardRef): boolean {
+  if (card.kind === "training-group") return true;
+  return card.eventType === "MATCH" || card.eventType === "TOURNAMENT";
+}
+
 type Screen1StudioProps = {
   boardId: string;
   initialStudio: Screen1StudioConfig;
@@ -96,12 +109,17 @@ export function Screen1Studio({
     setStudio(initialStudio);
   }, [initialStudio]);
 
+  const orderedCards = useMemo(() => pages.flat(), [pages]);
+
   const selectedOverride = selectedKey != null ? studio.cardOverrides[selectedKey] : undefined;
   const selectedCard =
     selectedKey != null
-      ? pages.flat().find((card) => card.key === selectedKey) ?? null
+      ? orderedCards.find((card) => card.key === selectedKey) ?? null
       : null;
-  const isTraining = selectedCard?.kind === "training-group";
+  const showsKabinePlatz =
+    selectedCard != null ? cardShowsKabinePlatz(selectedCard) : false;
+  const showsLogo = selectedCard != null ? cardShowsLogo(selectedCard) : false;
+  const hasSoftPagination = selectedOverride?.preferNextPage === true;
 
   const updateOverride = useCallback(
     (key: string, patch: Partial<Screen1CardOverride>) => {
@@ -128,6 +146,37 @@ export function Screen1Studio({
       setStudio((current) => {
         const nextOverrides = { ...current.cardOverrides };
         delete nextOverrides[key];
+        const next = { cardOverrides: nextOverrides };
+        onStudioChange(next);
+        return next;
+      });
+      setSaved(false);
+    },
+    [onStudioChange],
+  );
+
+  const enableSoftPagination = useCallback(
+    (key: string) => {
+      const softBreakAfterKeys = captureSoftBreakAfterKeys(orderedCards, key);
+      updateOverride(key, {
+        preferNextPage: true,
+        softBreakAfterKeys,
+      });
+    },
+    [orderedCards, updateOverride],
+  );
+
+  const resetSoftPagination = useCallback(
+    (key: string) => {
+      setStudio((current) => {
+        const existing = current.cardOverrides[key];
+        const cleared = clearSoftPaginationOverride(existing);
+        const nextOverrides = { ...current.cardOverrides };
+        if (cleared == null) {
+          delete nextOverrides[key];
+        } else {
+          nextOverrides[key] = cleared;
+        }
         const next = { cardOverrides: nextOverrides };
         onStudioChange(next);
         return next;
@@ -233,61 +282,79 @@ export function Screen1Studio({
               </button>
             </div>
 
-            <SizeControl
-              label="Team / Event"
-              value={selectedOverride?.teamFontSize}
-              onChange={(value) =>
-                updateOverride(selectedKey, { teamFontSize: value })
-              }
-              testId="studio-team-font"
-            />
+            <div className="space-y-3" data-testid="studio-darstellung">
+              <h4 className="text-[10px] font-bold uppercase tracking-wide text-[var(--muted)]">
+                Darstellung
+              </h4>
 
-            {isTraining && (
-              <>
-                <SizeControl
-                  label="Kabine"
-                  value={selectedOverride?.kabineFontSize}
-                  onChange={(value) =>
-                    updateOverride(selectedKey, { kabineFontSize: value })
-                  }
-                  testId="studio-kabine-font"
-                />
-                <SizeControl
-                  label="Platz"
-                  value={selectedOverride?.platzFontSize}
-                  onChange={(value) =>
-                    updateOverride(selectedKey, { platzFontSize: value })
-                  }
-                  testId="studio-platz-font"
-                />
-              </>
-            )}
-
-            <SizeControl
-              label="Logo"
-              value={selectedOverride?.logoSize}
-              onChange={(value) =>
-                updateOverride(selectedKey, { logoSize: value })
-              }
-              testId="studio-logo-size"
-            />
-
-            <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-[var(--border)] px-3 py-2">
-              <input
-                type="checkbox"
-                checked={selectedOverride?.preferNextPage === true}
-                onChange={(event) =>
-                  updateOverride(selectedKey, {
-                    preferNextPage: event.target.checked ? true : undefined,
-                  })
+              <SizeControl
+                label="Team / Veranstaltung"
+                value={selectedOverride?.teamFontSize}
+                onChange={(value) =>
+                  updateOverride(selectedKey, { teamFontSize: value })
                 }
-                className="h-4 w-4 accent-[var(--sce-primary)]"
-                data-testid="studio-prefer-next-page"
+                testId="studio-team-font"
               />
-              <span className="text-sm font-medium text-[var(--foreground)]">
-                Bevorzugt nächste Seite
-              </span>
-            </label>
+
+              {showsKabinePlatz && (
+                <>
+                  <SizeControl
+                    label="Kabine"
+                    value={selectedOverride?.kabineFontSize}
+                    onChange={(value) =>
+                      updateOverride(selectedKey, { kabineFontSize: value })
+                    }
+                    testId="studio-kabine-font"
+                  />
+                  <SizeControl
+                    label="Platz"
+                    value={selectedOverride?.platzFontSize}
+                    onChange={(value) =>
+                      updateOverride(selectedKey, { platzFontSize: value })
+                    }
+                    testId="studio-platz-font"
+                  />
+                </>
+              )}
+
+              {showsLogo && (
+                <SizeControl
+                  label="Logo"
+                  value={selectedOverride?.logoSize}
+                  onChange={(value) =>
+                    updateOverride(selectedKey, { logoSize: value })
+                  }
+                  testId="studio-logo-size"
+                />
+              )}
+            </div>
+
+            <div className="space-y-2" data-testid="studio-seitenlayout">
+              <h4 className="text-[10px] font-bold uppercase tracking-wide text-[var(--muted)]">
+                Seitenlayout
+              </h4>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => enableSoftPagination(selectedKey)}
+                  disabled={hasSoftPagination}
+                  className="rounded-lg border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:cursor-default disabled:opacity-60"
+                  data-testid="studio-prefer-next-page"
+                >
+                  Auf nächste Seite verschieben
+                </button>
+                {hasSoftPagination && (
+                  <button
+                    type="button"
+                    onClick={() => resetSoftPagination(selectedKey)}
+                    className="rounded-lg border border-[var(--border)] px-3 py-2 text-left text-sm font-medium text-[var(--sce-primary)] hover:bg-[var(--surface-2)]"
+                    data-testid="studio-reset-page-layout"
+                  >
+                    Zurück auf Automatisch
+                  </button>
+                )}
+              </div>
+            </div>
           </section>
         )}
       </div>

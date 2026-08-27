@@ -17,18 +17,24 @@ export type Screen1OverrideSize = InfoboardFontSize | null;
 export type Screen1CardOverride = {
   /** Team / event name typography. */
   readonly teamFontSize?: Screen1OverrideSize;
-  /** Training KABINE column typography (training cohorts only). */
+  /** KABINE column typography where the card renders dressing-room information. */
   readonly kabineFontSize?: Screen1OverrideSize;
-  /** Training PLATZ column typography (training cohorts only). */
+  /** PLATZ column typography where the card renders pitch information. */
   readonly platzFontSize?: Screen1OverrideSize;
   /** Logo size where the card renders logos. */
   readonly logoSize?: Screen1OverrideSize;
   /**
    * Soft pagination preference — prefer starting this card on the next page
-   * when capacity-safe and preceding active content exists. Never an absolute
-   * page assignment; recomputed on every active-list change.
+   * when capacity-safe and the captured predecessor context still matches.
+   * Never an absolute page assignment; recomputed on every active-list change.
    */
   readonly preferNextPage?: boolean;
+  /**
+   * Stable keys of active predecessors at the time `preferNextPage` was set.
+   * Keys follow `resolveDisplayItemKey()` — training cohorts remain date/time
+   * scoped; event cards use canonical event ids. No page numbers or indices.
+   */
+  readonly softBreakAfterKeys?: readonly string[];
 };
 
 export type Screen1StudioConfig = {
@@ -60,6 +66,7 @@ function normalizeCardOverride(raw: unknown): Screen1CardOverride | null {
     platzFontSize?: Screen1OverrideSize;
     logoSize?: Screen1OverrideSize;
     preferNextPage?: boolean;
+    softBreakAfterKeys?: readonly string[];
   } = {};
 
   const teamFontSize = normalizeOverrideSize(input.teamFontSize);
@@ -76,6 +83,18 @@ function normalizeCardOverride(raw: unknown): Screen1CardOverride | null {
 
   if (typeof input.preferNextPage === "boolean") {
     override.preferNextPage = input.preferNextPage;
+  }
+
+  const rawSoftBreak = input.softBreakAfterKeys;
+  if (Array.isArray(rawSoftBreak)) {
+    const keys = rawSoftBreak.filter(
+      (key): key is string => typeof key === "string" && key.trim() !== "",
+    );
+    if (keys.length > 0) {
+      override.softBreakAfterKeys = keys;
+    } else if (rawSoftBreak.length === 0) {
+      override.softBreakAfterKeys = [];
+    }
   }
 
   return Object.keys(override).length > 0 ? override : null;
@@ -124,6 +143,18 @@ export function isEmptyCardOverride(override: Screen1CardOverride | undefined): 
     override.kabineFontSize === undefined &&
     override.platzFontSize === undefined &&
     override.logoSize === undefined &&
-    override.preferNextPage !== true
+    override.preferNextPage !== true &&
+    (override.softBreakAfterKeys == null || override.softBreakAfterKeys.length === 0)
   );
+}
+
+/** Removes soft pagination fields while preserving typography overrides. */
+export function clearSoftPaginationOverride(
+  override: Screen1CardOverride | undefined,
+): Screen1CardOverride | undefined {
+  if (override == null) return undefined;
+  const next: Screen1CardOverride = { ...override };
+  delete next.preferNextPage;
+  delete next.softBreakAfterKeys;
+  return Object.keys(next).length > 0 ? next : undefined;
 }

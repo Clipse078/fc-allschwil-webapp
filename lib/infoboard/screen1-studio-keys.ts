@@ -37,6 +37,22 @@ export function resolveDisplayItemKey(item: DisplayItem): string {
 }
 
 /**
+ * Captures stable predecessor keys for a soft page break at preference time.
+ *
+ * Keys use the same `resolveDisplayItemKey()` contract as card overrides:
+ * tenant-safe, board-safe, date/event-scoped (training cohorts by startAt ISO).
+ * No array-index or page-number identity is stored.
+ */
+export function captureSoftBreakAfterKeys(
+  orderedCards: readonly { readonly key: string }[],
+  selectedKey: string,
+): string[] {
+  const index = orderedCards.findIndex((card) => card.key === selectedKey);
+  if (index <= 0) return [];
+  return orderedCards.slice(0, index).map((card) => card.key);
+}
+
+/**
  * Human-readable label for Studio UI card list entries.
  */
 export function resolveDisplayItemLabel(item: DisplayItem): string {

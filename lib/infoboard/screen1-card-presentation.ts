@@ -29,12 +29,16 @@ export type ResolvedTrainingCardPresentation = {
 
 export type ResolvedMatchCardPresentation = {
   readonly teamFontSize: InfoboardFontSize;
+  readonly kabineFontSize: InfoboardFontSize;
+  readonly platzFontSize: InfoboardFontSize;
   readonly logoSize: InfoboardLogoSize;
   readonly showLogos: boolean;
 };
 
 export type ResolvedTournamentCardPresentation = {
   readonly teamFontSize: InfoboardFontSize;
+  readonly kabineFontSize: InfoboardFontSize;
+  readonly platzFontSize: InfoboardFontSize;
   readonly logoSize: InfoboardLogoSize;
   readonly showLogos: boolean;
 };
@@ -79,6 +83,8 @@ export function resolveMatchCardPresentation(
 ): ResolvedMatchCardPresentation {
   return {
     teamFontSize: resolveSize(override?.teamFontSize, global.matchFontSize),
+    kabineFontSize: resolveSize(override?.kabineFontSize, global.matchFontSize),
+    platzFontSize: resolveSize(override?.platzFontSize, global.matchFontSize),
     logoSize: resolveSize(override?.logoSize, global.matchLogoSize),
     showLogos: global.matchShowLogos,
   };
@@ -90,6 +96,11 @@ export function resolveTournamentCardPresentation(
 ): ResolvedTournamentCardPresentation {
   return {
     teamFontSize: resolveSize(override?.teamFontSize, global.tournamentFontSize),
+    kabineFontSize: resolveSize(
+      override?.kabineFontSize,
+      global.tournamentFontSize,
+    ),
+    platzFontSize: resolveSize(override?.platzFontSize, global.tournamentFontSize),
     logoSize: resolveSize(override?.logoSize, global.tournamentLogoSize),
     showLogos: global.tournamentShowLogos,
   };
@@ -150,6 +161,8 @@ export function resolveCardDemandScale(
   if (resolved.kind === "match" || resolved.kind === "other") {
     const p = resolved.presentation;
     scales.push(FONT_SIZE_CAPACITY_SCALE[p.teamFontSize]);
+    scales.push(FONT_SIZE_CAPACITY_SCALE[p.kabineFontSize]);
+    scales.push(FONT_SIZE_CAPACITY_SCALE[p.platzFontSize]);
     if (p.showLogos) scales.push(LOGO_SIZE_CAPACITY_SCALE[p.logoSize]);
     return Math.max(...scales);
   }
@@ -157,6 +170,8 @@ export function resolveCardDemandScale(
   if (resolved.kind === "tournament") {
     const p = resolved.presentation;
     scales.push(FONT_SIZE_CAPACITY_SCALE[p.teamFontSize]);
+    scales.push(FONT_SIZE_CAPACITY_SCALE[p.kabineFontSize]);
+    scales.push(FONT_SIZE_CAPACITY_SCALE[p.platzFontSize]);
     if (p.showLogos) scales.push(LOGO_SIZE_CAPACITY_SCALE[p.logoSize]);
     return Math.max(...scales);
   }

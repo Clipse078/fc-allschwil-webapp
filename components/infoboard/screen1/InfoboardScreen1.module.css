@@ -716,7 +716,7 @@
 }
 
 .cardPitchZone .destPitchValue {
-  font-size: clamp(1.8rem, 3vw, var(--ib-fs-dest-pitch));
+  font-size: var(--ib-match-platz-font-size, var(--ib-tournament-platz-font-size, clamp(1.8rem, 3vw, var(--ib-fs-dest-pitch))));
   line-height: 0.95;
   white-space: normal;
   /* Break only at word boundaries (spaces) — never split mid-word.
@@ -834,7 +834,7 @@
 
 .matchAllocRoom {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-dest-room);
+  font-size: var(--ib-match-kabine-font-size, var(--ib-fs-dest-room));
   font-weight: 700;
   text-transform: uppercase;
   color: var(--ib-text);
@@ -902,7 +902,7 @@
 
 .participantRoomValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(1.2rem, 1.6vw, 1.9rem);
+  font-size: var(--ib-tournament-kabine-font-size, clamp(1.2rem, 1.6vw, 1.9rem));
   font-weight: 700;
   text-transform: uppercase;
   color: var(--ib-text);

@@ -59,7 +59,9 @@ import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-fee
 import {
   DEFAULT_SCREEN1_PRESENTATION,
   MATCH_FONT_SIZE_CSS,
+  MATCH_KABINE_FONT_SIZE_CSS,
   MATCH_LOGO_SIZE_CSS,
+  MATCH_PLATZ_FONT_SIZE_CSS,
   resolveScreen1PageDemandMax,
   SCREEN1_PAGE_DEMAND_MAX,
   TRAINING_FONT_SIZE_CSS,
@@ -67,7 +69,9 @@ import {
   TRAINING_LOGO_SIZE_CSS,
   TRAINING_PLATZ_FONT_SIZE_CSS,
   TOURNAMENT_FONT_SIZE_CSS,
+  TOURNAMENT_KABINE_FONT_SIZE_CSS,
   TOURNAMENT_LOGO_SIZE_CSS,
+  TOURNAMENT_PLATZ_FONT_SIZE_CSS,
   type Screen1PresentationConfig,
 } from "@/lib/infoboard/screen1-logo-settings";
 import {
@@ -150,6 +154,7 @@ export type InfoboardScreen1Props = {
         readonly key: string;
         readonly label: string;
         readonly kind: "training-group" | "event";
+        readonly eventType?: string;
       }[][],
     ) => void;
   };
@@ -1252,6 +1257,8 @@ function resolveEventCardStyle(
     return {
       "--ib-match-font-size": MATCH_FONT_SIZE_CSS[p.teamFontSize].primary,
       "--ib-match-opponent-font-size": MATCH_FONT_SIZE_CSS[p.teamFontSize].opponent,
+      "--ib-match-kabine-font-size": MATCH_KABINE_FONT_SIZE_CSS[p.kabineFontSize],
+      "--ib-match-platz-font-size": MATCH_PLATZ_FONT_SIZE_CSS[p.platzFontSize],
       "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[p.logoSize],
     } as CSSProperties;
   }
@@ -1259,6 +1266,10 @@ function resolveEventCardStyle(
     const p = resolved.presentation;
     return {
       "--ib-tournament-font-size": TOURNAMENT_FONT_SIZE_CSS[p.teamFontSize],
+      "--ib-tournament-kabine-font-size":
+        TOURNAMENT_KABINE_FONT_SIZE_CSS[p.kabineFontSize],
+      "--ib-tournament-platz-font-size":
+        TOURNAMENT_PLATZ_FONT_SIZE_CSS[p.platzFontSize],
       "--ib-tournament-logo-size": TOURNAMENT_LOGO_SIZE_CSS[p.logoSize],
     } as CSSProperties;
   }
@@ -1557,21 +1568,19 @@ export function InfoboardScreen1({
     )
     .join("|");
 
-  const paginationStructure = useMemo(
-    () =>
+  useEffect(() => {
+    previewPagination?.onPaginationStructureChange?.(
       pages.map((page) =>
         page.map((item) => ({
           key: resolveDisplayItemKey(item),
           label: resolveDisplayItemLabel(item),
           kind: item.kind,
+          eventType:
+            item.kind === "event" ? item.item.event.type : undefined,
         })),
       ),
-    [pages],
-  );
-
-  useEffect(() => {
-    previewPagination?.onPaginationStructureChange?.(paginationStructure);
-  }, [paginationStructure, previewPagination]);
+    );
+  }, [paginationContentKey, previewPagination]);
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;

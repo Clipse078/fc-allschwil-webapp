@@ -105,6 +105,22 @@ export const TRAINING_PLATZ_FONT_SIZE_CSS: Record<InfoboardFontSize, string> = {
   XLARGE: "clamp(1.7rem, 2.35vw, 3.2rem)",
 };
 
+/** Match KABINE column clamps — independent from team-name typography. */
+export const MATCH_KABINE_FONT_SIZE_CSS: Record<InfoboardFontSize, string> =
+  TRAINING_KABINE_FONT_SIZE_CSS;
+
+/** Match PLATZ column clamps — independent from team-name typography. */
+export const MATCH_PLATZ_FONT_SIZE_CSS: Record<InfoboardFontSize, string> =
+  TRAINING_PLATZ_FONT_SIZE_CSS;
+
+/** Tournament KABINE column clamps — independent from team-name typography. */
+export const TOURNAMENT_KABINE_FONT_SIZE_CSS: Record<InfoboardFontSize, string> =
+  TRAINING_KABINE_FONT_SIZE_CSS;
+
+/** Tournament PLATZ column clamps — independent from team-name typography. */
+export const TOURNAMENT_PLATZ_FONT_SIZE_CSS: Record<InfoboardFontSize, string> =
+  TRAINING_PLATZ_FONT_SIZE_CSS;
+
 /**
  * Match logo CSS clamp values per preset.
  * MEDIUM reproduces the accepted baseline (--ib-match-logo-size).

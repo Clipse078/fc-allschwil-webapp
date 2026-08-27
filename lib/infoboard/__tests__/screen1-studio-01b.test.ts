@@ -128,7 +128,14 @@ describe("INFOBOARD-SCREEN1-STUDIO-01B pagination", () => {
     );
     const studio: Screen1StudioConfig = {
       cardOverrides: {
-        [eventCardKey("D")]: { preferNextPage: true },
+        [eventCardKey("D")]: {
+          preferNextPage: true,
+          softBreakAfterKeys: [
+            eventCardKey("A"),
+            eventCardKey("B"),
+            eventCardKey("C"),
+          ],
+        },
       },
     };
 
@@ -170,7 +177,14 @@ describe("INFOBOARD-SCREEN1-STUDIO-01B pagination", () => {
     );
     const studio: Screen1StudioConfig = {
       cardOverrides: {
-        [eventCardKey("D")]: { preferNextPage: true },
+        [eventCardKey("D")]: {
+          preferNextPage: true,
+          softBreakAfterKeys: [
+            eventCardKey("A"),
+            eventCardKey("B"),
+            eventCardKey("C"),
+          ],
+        },
       },
     };
 
@@ -203,8 +217,19 @@ describe("INFOBOARD-SCREEN1-STUDIO-01B pagination", () => {
     );
     const studio: Screen1StudioConfig = {
       cardOverrides: {
-        [eventCardKey("C")]: { preferNextPage: true },
-        [eventCardKey("E")]: { preferNextPage: true },
+        [eventCardKey("C")]: {
+          preferNextPage: true,
+          softBreakAfterKeys: [eventCardKey("A"), eventCardKey("B")],
+        },
+        [eventCardKey("E")]: {
+          preferNextPage: true,
+          softBreakAfterKeys: [
+            eventCardKey("A"),
+            eventCardKey("B"),
+            eventCardKey("C"),
+            eventCardKey("D"),
+          ],
+        },
       },
     };
     const pages = paginateCards(cards, MATCH_DEMAND * 3, studio);
@@ -224,6 +249,7 @@ describe("INFOBOARD-SCREEN1-STUDIO-01B pagination", () => {
       [cards.slice(0, 2), cards.slice(2)],
       (item) => demands[cards.indexOf(item)] ?? 2,
       7,
+      cards,
       EMPTY_SCREEN1_STUDIO_CONFIG,
     );
     expect(pages).toHaveLength(2);
@@ -321,7 +347,11 @@ describe("INFOBOARD-SCREEN1-STUDIO-01B persistence", () => {
   it("parses and serializes studio JSON safely", () => {
     const json = serializeScreen1StudioConfig({
       cardOverrides: {
-        "match:abc": { teamFontSize: "LARGE", preferNextPage: true },
+        "match:abc": {
+          teamFontSize: "LARGE",
+          preferNextPage: true,
+          softBreakAfterKeys: ["match:a", "match:b"],
+        },
         [trainingCohortKey("2026-08-27T18:45:00.000Z")]: {
           kabineFontSize: "SMALL",
         },
