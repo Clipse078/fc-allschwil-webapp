@@ -7,6 +7,7 @@
  *   - Active-season trainer staff (isWebsiteVisible = true, status = ACTIVE)
  *   - Upcoming training sessions (next 28 days, websiteVisible = true)
  *   - Upcoming match fixtures (next 5, websiteVisible = true)
+ *   - Recent completed match results (last 5, websiteVisible = true)
  *
  * Tenant isolation: Team.tenantId is enforced at the DB level.
  * Privacy: personId, email, phone, dateOfBirth, remarks are never returned.

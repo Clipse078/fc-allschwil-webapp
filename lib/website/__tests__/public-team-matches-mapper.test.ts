@@ -3,10 +3,15 @@ import { describe, expect, it } from "vitest";
 import type { TeamSeasonMatchItem } from "@/lib/teams/team-match-query-service";
 import {
   filterPublicTeamNextMatches,
+  filterPublicTeamResults,
   isPublicTeamNextMatch,
+  isPublicTeamResult,
   mapPublicTeamMatch,
   mapPublicTeamMatches,
+  mapPublicTeamResults,
   PUBLIC_TEAM_NEXT_MATCHES_DEFAULT_LIMIT,
+  PUBLIC_TEAM_RESULTS_DEFAULT_LIMIT,
+  resolvePublicTeamResultPerspective,
   type PublicTeamMatchIdentityContext,
 } from "../public-team-matches-mapper";
 
@@ -313,6 +318,8 @@ describe("public-team-matches-mapper", () => {
       });
       expect(mapped.competition).toEqual({ name: "Junioren E" });
       expect(mapped.id).toBe("event-1");
+      expect(mapped.score).toBeNull();
+      expect(mapped.resultPerspective).toBeNull();
     });
 
     it("does not expose provider metadata in the public DTO", () => {
@@ -325,6 +332,287 @@ describe("public-team-matches-mapper", () => {
       expect(mapped).not.toHaveProperty("provider");
       expect(mapped).not.toHaveProperty("lifecycle");
       expect(mapped.home).not.toHaveProperty("canonicalExternalTeamId");
+    });
+  });
+
+  describe("isPublicTeamResult", () => {
+    function createCompletedItem(
+      overrides: Partial<TeamSeasonMatchItem> = {},
+    ): TeamSeasonMatchItem {
+      return createMatchItem({
+        status: "COMPLETED",
+        lifecycle: "COMPLETED",
+        lifecycleStage: "COMPLETED",
+        startAt: new Date("2026-07-01T18:00:00.000Z"),
+        scoreHome: 3,
+        scoreAway: 1,
+        ...overrides,
+      });
+    }
+
+    it("H. includes COMPLETED fixtures", () => {
+      expect(isPublicTeamResult(createCompletedItem())).toBe(true);
+    });
+
+    it("G. excludes SCHEDULED fixtures", () => {
+      expect(isPublicTeamResult(createMatchItem())).toBe(false);
+    });
+
+    it("G. excludes LIVE fixtures", () => {
+      expect(
+        isPublicTeamResult(
+          createCompletedItem({ lifecycle: "LIVE", status: "LIVE" }),
+        ),
+      ).toBe(false);
+    });
+
+    it("G. excludes POSTPONED fixtures", () => {
+      expect(
+        isPublicTeamResult(
+          createCompletedItem({ lifecycle: "POSTPONED", status: "POSTPONED" }),
+        ),
+      ).toBe(false);
+    });
+
+    it("G. excludes CANCELLED fixtures", () => {
+      expect(
+        isPublicTeamResult(
+          createCompletedItem({ lifecycle: "CANCELLED", status: "CANCELLED" }),
+        ),
+      ).toBe(false);
+    });
+
+    it("G. excludes DRAFT and ARCHIVED statuses", () => {
+      expect(
+        isPublicTeamResult(createCompletedItem({ status: "DRAFT" })),
+      ).toBe(false);
+      expect(
+        isPublicTeamResult(createCompletedItem({ status: "ARCHIVED" })),
+      ).toBe(false);
+    });
+
+    it("G. excludes NEEDS_RECONCILIATION fixtures", () => {
+      expect(
+        isPublicTeamResult(
+          createCompletedItem({ lifecycle: "NEEDS_RECONCILIATION" }),
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("filterPublicTeamResults", () => {
+    function createCompletedItem(
+      overrides: Partial<TeamSeasonMatchItem> = {},
+    ): TeamSeasonMatchItem {
+      return createMatchItem({
+        status: "COMPLETED",
+        lifecycle: "COMPLETED",
+        lifecycleStage: "COMPLETED",
+        scoreHome: 2,
+        scoreAway: 1,
+        ...overrides,
+      });
+    }
+
+    it("I. returns completed fixtures descending by startAt", () => {
+      const items = [
+        createCompletedItem({
+          eventId: "event-older",
+          startAt: new Date("2026-06-01T18:00:00.000Z"),
+        }),
+        createCompletedItem({
+          eventId: "event-newer",
+          startAt: new Date("2026-08-01T18:00:00.000Z"),
+        }),
+        createCompletedItem({
+          eventId: "event-middle",
+          startAt: new Date("2026-07-01T18:00:00.000Z"),
+        }),
+      ];
+
+      const filtered = filterPublicTeamResults(items, 10);
+
+      expect(filtered.map((item) => item.eventId)).toEqual([
+        "event-newer",
+        "event-middle",
+        "event-older",
+      ]);
+    });
+
+    it("J. limits to the five most recent results", () => {
+      const items = Array.from({ length: 7 }, (_, index) =>
+        createCompletedItem({
+          eventId: `event-${index + 1}`,
+          startAt: new Date(`2026-0${index + 1}-01T18:00:00.000Z`),
+        }),
+      );
+
+      const filtered = filterPublicTeamResults(items);
+
+      expect(filtered).toHaveLength(PUBLIC_TEAM_RESULTS_DEFAULT_LIMIT);
+      expect(filtered.map((item) => item.eventId)).toEqual([
+        "event-7",
+        "event-6",
+        "event-5",
+        "event-4",
+        "event-3",
+      ]);
+    });
+
+    it("G. excludes non-completed fixtures from results", () => {
+      const items = [
+        createCompletedItem({ eventId: "event-completed" }),
+        createMatchItem({ eventId: "event-scheduled" }),
+      ];
+
+      const filtered = filterPublicTeamResults(items, 10);
+
+      expect(filtered.map((item) => item.eventId)).toEqual(["event-completed"]);
+    });
+  });
+
+  describe("resolvePublicTeamResultPerspective", () => {
+    function createCompletedItem(
+      overrides: Partial<TeamSeasonMatchItem> = {},
+    ): TeamSeasonMatchItem {
+      return createMatchItem({
+        status: "COMPLETED",
+        lifecycle: "COMPLETED",
+        lifecycleStage: "COMPLETED",
+        ...overrides,
+      });
+    }
+
+    it("A. HOME win 3-1 => WON", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "HOME", scoreHome: 3, scoreAway: 1 }),
+        ),
+      ).toBe("WON");
+    });
+
+    it("B. HOME loss 0-2 => LOST", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "HOME", scoreHome: 0, scoreAway: 2 }),
+        ),
+      ).toBe("LOST");
+    });
+
+    it("C. AWAY win (home 1, away 2) => WON", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "AWAY", scoreHome: 1, scoreAway: 2 }),
+        ),
+      ).toBe("WON");
+    });
+
+    it("D. AWAY loss (home 4, away 1) => LOST", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "AWAY", scoreHome: 4, scoreAway: 1 }),
+        ),
+      ).toBe("LOST");
+    });
+
+    it("E. DRAW 2-2 => DRAW", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "HOME", scoreHome: 2, scoreAway: 2 }),
+        ),
+      ).toBe("DRAW");
+    });
+
+    it("F. missing score => UNKNOWN", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ scoreHome: null, scoreAway: null }),
+        ),
+      ).toBe("UNKNOWN");
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ scoreHome: 1, scoreAway: null }),
+        ),
+      ).toBe("UNKNOWN");
+    });
+  });
+
+  describe("mapPublicTeamResults", () => {
+    function createCompletedItem(
+      overrides: Partial<TeamSeasonMatchItem> = {},
+    ): TeamSeasonMatchItem {
+      return createMatchItem({
+        status: "COMPLETED",
+        lifecycle: "COMPLETED",
+        lifecycleStage: "COMPLETED",
+        startAt: new Date("2026-07-01T18:00:00.000Z"),
+        scoreHome: 3,
+        scoreAway: 1,
+        ...overrides,
+      });
+    }
+
+    it("maps score and resultPerspective for completed fixtures", () => {
+      const mapped = mapPublicTeamResults(
+        [createCompletedItem()],
+        identityContext,
+      )[0];
+
+      expect(mapped?.score).toEqual({ home: 3, away: 1 });
+      expect(mapped?.resultPerspective).toBe("WON");
+      expect(mapped?.status).toBe("COMPLETED");
+    });
+
+    it("K. includes away completed fixtures", () => {
+      const mapped = mapPublicTeamResults(
+        [
+          createCompletedItem({
+            side: "AWAY",
+            scoreHome: 1,
+            scoreAway: 2,
+            home: createSide({
+              canonicalTeamId: null,
+              canonicalExternalTeamId: "ext-home-1",
+              displayName: "Host FC",
+            }),
+            away: createSide(),
+            opponent: {
+              displayName: "Host FC",
+              canonicalTeamId: null,
+              canonicalExternalTeamId: "ext-home-1",
+              providerTeamId: 100,
+              providerTeamName: "Provider Home",
+            },
+          }),
+        ],
+        identityContext,
+      )[0];
+
+      expect(mapped?.isAwayTeam).toBe(true);
+      expect(mapped?.resultPerspective).toBe("WON");
+      expect(mapped?.opponent.name).toBe("Host FC");
+    });
+
+    it("M. maps logos same as nextMatches", () => {
+      const mapped = mapPublicTeamResults(
+        [createCompletedItem()],
+        identityContext,
+      )[0];
+
+      expect(mapped?.home.logoUrl).toBe(TENANT_LOGO);
+      expect(mapped?.away.logoUrl).toBe(OPPONENT_LOGO);
+      expect(mapped?.opponent.logoUrl).toBe(OPPONENT_LOGO);
+    });
+
+    it("does not expose provider metadata in result DTO", () => {
+      const mapped = mapPublicTeamResults(
+        [createCompletedItem()],
+        identityContext,
+      )[0];
+
+      expect(mapped).not.toHaveProperty("provider");
+      expect(mapped).not.toHaveProperty("lifecycle");
+      expect(mapped?.home).not.toHaveProperty("canonicalExternalTeamId");
     });
   });
 });

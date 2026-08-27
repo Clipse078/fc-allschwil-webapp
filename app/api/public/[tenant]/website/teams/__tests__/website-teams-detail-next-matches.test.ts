@@ -82,6 +82,46 @@ describe("GET /api/public/[tenant]/website/teams/[slug] — nextMatches", () => 
             clubName: "Opponent Club",
             logoUrl: "https://cdn.example.com/opponent.png",
           },
+          score: null,
+          resultPerspective: null,
+          venue: {
+            name: "Sportanlage Brüel",
+            address: "Im Brüel",
+          },
+          competition: {
+            name: "Junioren E",
+          },
+        },
+      ],
+      results: [
+        {
+          id: "event-completed",
+          startAt: new Date("2026-07-01T18:00:00.000Z"),
+          status: "COMPLETED",
+          home: {
+            teamId: "team-e1",
+            name: "FC Example E1",
+            shortName: "E1",
+            clubName: "FC Allschwil",
+            logoUrl: "https://cdn.example.com/tenant.png",
+          },
+          away: {
+            teamId: null,
+            name: "Opponent FC",
+            shortName: "Opp",
+            clubName: "Opponent Club",
+            logoUrl: "https://cdn.example.com/opponent.png",
+          },
+          isHomeTeam: true,
+          isAwayTeam: false,
+          opponent: {
+            name: "Opponent FC",
+            shortName: "Opp",
+            clubName: "Opponent Club",
+            logoUrl: "https://cdn.example.com/opponent.png",
+          },
+          score: { home: 3, away: 1 },
+          resultPerspective: "WON",
           venue: {
             name: "Sportanlage Brüel",
             address: "Im Brüel",
@@ -94,12 +134,14 @@ describe("GET /api/public/[tenant]/website/teams/[slug] — nextMatches", () => 
     });
   });
 
-  it("N. returns existing team detail fields plus nextMatches", async () => {
+  it("N. returns existing team detail fields plus nextMatches and results", async () => {
     const response = await GET(makeRequest(), makeParams());
     const body = await response.json();
 
     expect(response.status).toBe(200);
     expect(body.data.team.nextMatches).toHaveLength(1);
+    expect(body.data.team.results).toHaveLength(1);
+    expect(body.data.team.results[0].resultPerspective).toBe("WON");
     expect(body.data.team.name).toBe("FC Example E1");
     expect(body.data.team.squad).toEqual([]);
     expect(body.data.team.training).toEqual([]);

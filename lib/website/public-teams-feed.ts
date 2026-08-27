@@ -27,6 +27,7 @@ import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import {
   mapPublicTeamMatches,
+  mapPublicTeamResults,
   type PublicTeamMatchExternalTeamRecord,
   type PublicTeamMatchIdentityContext,
   type PublicTeamMatchTeamRecord,
@@ -243,6 +244,12 @@ export type GetPublicTeamDetailInput = {
  *              Public upcoming semantics and a 5-fixture limit are applied in
  *              lib/website/public-team-matches-mapper.ts.
  *
+ *   Phase 5  — Recent completed MATCH results for the current team season.
+ *              Uses the same listTeamSeasonMatches() canonical query as Phase 4.
+ *              Publication gate: websiteVisible = true only.
+ *              Public completed-result semantics and a 5-result limit are applied
+ *              in lib/website/public-team-matches-mapper.ts.
+ *
  * Privacy guarantees:
  * - personId, email, phone, dateOfBirth, remarks: never selected.
  * - pitchCode: selected internally for name resolution, never returned.
@@ -439,24 +446,25 @@ export async function getPublicTeamDetail(
     pitchName: e.pitchCode ? (pitchNameMap.get(e.pitchCode) ?? null) : null,
   }));
 
-  // ── Phase 4: Upcoming matches ("Nächste Spiele") ─────────────────────────
+  // ── Phase 4+5: Upcoming matches + recent results ───────────────────────
   let nextMatches: PublicTeamMatch[] = [];
+  let results: PublicTeamMatch[] = [];
 
   if (teamSeason) {
-    const { upcoming } = await listTeamSeasonMatches(
+    const { upcoming, completed } = await listTeamSeasonMatches(
       prisma as unknown as TeamMatchQueryDatabase,
       {
-      tenantId: input.tenantId,
-      teamSeasonId: teamSeason.id,
-      now,
-      websiteVisibleOnly: true,
+        tenantId: input.tenantId,
+        teamSeasonId: teamSeason.id,
+        now,
+        websiteVisibleOnly: true,
       },
     );
 
     const teamIds = new Set<string>();
     const externalTeamIds = new Set<string>();
 
-    for (const item of upcoming) {
+    for (const item of [...upcoming, ...completed]) {
       for (const side of [item.home, item.away]) {
         if (side.canonicalTeamId) {
           teamIds.add(side.canonicalTeamId);
@@ -533,6 +541,7 @@ export async function getPublicTeamDetail(
     };
 
     nextMatches = mapPublicTeamMatches(upcoming, identityContext, now);
+    results = mapPublicTeamResults(completed, identityContext);
   }
 
   return {
@@ -550,5 +559,6 @@ export async function getPublicTeamDetail(
     trainers,
     training,
     nextMatches,
+    results,
   };
 }
