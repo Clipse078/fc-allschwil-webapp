@@ -25,6 +25,11 @@ import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/team-match-query-service";
 import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { fetchTeamStandingsForMapping } from "@/lib/integrations/sfv/standings-provider";
+import {
+  getSeasonKeyLookupCandidatesFromSfvExternalSeasonId,
+  SFV_PROVIDER,
+} from "@/lib/integrations/sfv/season-bridge";
 import {
   mapPublicTeamMatches,
   mapPublicTeamResults,
@@ -32,6 +37,11 @@ import {
   type PublicTeamMatchIdentityContext,
   type PublicTeamMatchTeamRecord,
 } from "@/lib/website/public-team-matches-mapper";
+import {
+  mapPublicTeamStandings,
+  type PublicTeamStandingsExternalTeamRecord,
+  type PublicTeamStandingsIdentityContext,
+} from "@/lib/website/public-team-standings-mapper";
 import type {
   PublicTeamListItem,
   PublicTeamOrgUnit,
@@ -40,6 +50,7 @@ import type {
   PublicTrainerMember,
   PublicTeamTrainingSession,
   PublicTeamMatch,
+  PublicTeamStandings,
 } from "@/lib/website/types";
 
 // ---------------------------------------------------------------------------
@@ -250,6 +261,10 @@ export type GetPublicTeamDetailInput = {
  *              Public completed-result semantics and a 5-result limit are applied
  *              in lib/website/public-team-matches-mapper.ts.
  *
+ *   Phase 6  — Current-season league standings (best-effort).
+ *              Requires an SFV TeamExternalMapping for the resolved TeamSeason.
+ *              Provider failures return standings: null without failing the endpoint.
+ *
  * Privacy guarantees:
  * - personId, email, phone, dateOfBirth, remarks: never selected.
  * - pitchCode: selected internally for name resolution, never returned.
@@ -446,11 +461,17 @@ export async function getPublicTeamDetail(
     pitchName: e.pitchCode ? (pitchNameMap.get(e.pitchCode) ?? null) : null,
   }));
 
-  // ── Phase 4+5: Upcoming matches + recent results ───────────────────────
+  // ── Phase 4+5+6: Upcoming matches, recent results, standings ───────────
   let nextMatches: PublicTeamMatch[] = [];
   let results: PublicTeamMatch[] = [];
+  let standings: PublicTeamStandings | null = null;
 
   if (teamSeason) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: input.tenantId },
+      select: { name: true, logoUrl: true },
+    });
+
     const { upcoming, completed } = await listTeamSeasonMatches(
       prisma as unknown as TeamMatchQueryDatabase,
       {
@@ -476,11 +497,7 @@ export async function getPublicTeamDetail(
       }
     }
 
-    const [tenant, teams, externalTeams] = await Promise.all([
-      prisma.tenant.findUnique({
-        where: { id: input.tenantId },
-        select: { name: true, logoUrl: true },
-      }),
+    const [teams, externalTeams] = await Promise.all([
       teamIds.size > 0
         ? prisma.team.findMany({
             where: {
@@ -542,6 +559,105 @@ export async function getPublicTeamDetail(
 
     nextMatches = mapPublicTeamMatches(upcoming, identityContext, now);
     results = mapPublicTeamResults(completed, identityContext);
+
+    // ── Phase 6: Standings (best-effort) ─────────────────────────────────
+    const mapping = await prisma.teamExternalMapping.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        teamSeasonId: teamSeason.id,
+        provider: SFV_PROVIDER,
+        providerIsActive: true,
+      },
+      select: {
+        externalTeamId: true,
+        externalSeasonId: true,
+        providerLeagueId: true,
+      },
+    });
+
+    if (mapping) {
+      const seasonCandidates = getSeasonKeyLookupCandidatesFromSfvExternalSeasonId(
+        mapping.externalSeasonId,
+      );
+      const seasonAligned = seasonCandidates.includes(teamSeason.season.key);
+
+      if (seasonAligned) {
+        const standingsTable = await fetchTeamStandingsForMapping({
+          tenantId: input.tenantId,
+          externalTeamId: mapping.externalTeamId,
+          externalSeasonId: mapping.externalSeasonId,
+          providerLeagueId: mapping.providerLeagueId,
+        });
+
+        if (standingsTable) {
+          const opponentProviderTeamIds = [
+            ...new Set(
+              standingsTable.rows
+                .map((row) => row.externalTeamId)
+                .filter((providerTeamId) => providerTeamId !== mapping.externalTeamId),
+            ),
+          ];
+
+          const standingsExternalTeams =
+            opponentProviderTeamIds.length > 0
+              ? await prisma.externalTeam.findMany({
+                  where: {
+                    tenantId: input.tenantId,
+                    providerMappings: {
+                      some: {
+                        provider: SFV_PROVIDER,
+                        providerTeamId: { in: opponentProviderTeamIds },
+                      },
+                    },
+                  },
+                  select: {
+                    shortName: true,
+                    logoUrl: true,
+                    providerMappings: {
+                      where: { provider: SFV_PROVIDER },
+                      select: { providerTeamId: true },
+                    },
+                    externalClub: {
+                      select: { logoUrl: true },
+                    },
+                  },
+                })
+              : [];
+
+          const externalTeamByProviderId = new Map<
+            number,
+            PublicTeamStandingsExternalTeamRecord
+          >();
+
+          for (const externalTeam of standingsExternalTeams) {
+            const logoUrl = resolveExternalTeamLogoUrl(
+              externalTeam,
+              externalTeam.externalClub,
+            );
+
+            for (const providerMapping of externalTeam.providerMappings) {
+              externalTeamByProviderId.set(providerMapping.providerTeamId, {
+                shortName: externalTeam.shortName,
+                logoUrl,
+              });
+            }
+          }
+
+          const standingsIdentityContext: PublicTeamStandingsIdentityContext = {
+            currentExternalTeamId: mapping.externalTeamId,
+            currentTeamName: teamSeason.displayName,
+            currentTeamShortName: teamSeason.shortName,
+            tenantLogoUrl: tenant?.logoUrl ?? null,
+            externalTeamByProviderId,
+          };
+
+          standings = mapPublicTeamStandings(
+            standingsTable,
+            standingsIdentityContext,
+          );
+        }
+      }
+    }
   }
 
   return {
@@ -560,5 +676,6 @@ export async function getPublicTeamDetail(
     training,
     nextMatches,
     results,
+    standings,
   };
 }

@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   externalTeamFindMany: vi.fn(),
   teamSeasonFindFirst: vi.fn(),
   matchEventFindMany: vi.fn(),
+  teamExternalMappingFindFirst: vi.fn(),
+  fetchTeamStandingsForMapping: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -42,7 +44,14 @@ vi.mock("@/lib/db/prisma", () => ({
     teamSeason: {
       findFirst: mocks.teamSeasonFindFirst,
     },
+    teamExternalMapping: {
+      findFirst: mocks.teamExternalMappingFindFirst,
+    },
   },
+}));
+
+vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
+  fetchTeamStandingsForMapping: mocks.fetchTeamStandingsForMapping,
 }));
 
 const TENANT_ID = "tenant-fca";
@@ -195,6 +204,8 @@ describe("getPublicTeamDetail — results", () => {
     ]);
     mocks.teamSeasonFindFirst.mockImplementation(async () => createTeamSeasonContext());
     mocks.matchEventFindMany.mockResolvedValue([createCompletedMatchEvent()]);
+    mocks.teamExternalMappingFindFirst.mockResolvedValue(null);
+    mocks.fetchTeamStandingsForMapping.mockResolvedValue(null);
     mocks.eventFindMany.mockImplementation(async (args: { where?: { type?: string } }) => {
       if (args.where?.type === "MATCH") {
         return mocks.matchEventFindMany();
