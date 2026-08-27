@@ -202,6 +202,9 @@ export async function updateInfoboard(
       ...(input.screen1TournamentFontSize !== undefined && {
         screen1TournamentFontSize: input.screen1TournamentFontSize,
       }),
+      ...(input.screen1StudioJson !== undefined && {
+        screen1StudioJson: input.screen1StudioJson,
+      }),
     },
   }) as unknown as Promise<InboardRow>;
 }

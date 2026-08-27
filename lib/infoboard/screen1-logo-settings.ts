@@ -89,6 +89,22 @@ export const TOURNAMENT_FONT_SIZE_CSS: Record<InfoboardFontSize, string> = {
   XLARGE: "clamp(1.288rem, 1.736vw, 2.912rem)",
 };
 
+/** Training KABINE column clamps — independent from team-name typography. */
+export const TRAINING_KABINE_FONT_SIZE_CSS: Record<InfoboardFontSize, string> = {
+  SMALL: "clamp(0.85rem, 1.1vw, 1.45rem)",
+  MEDIUM: "clamp(1rem, 1.35vw, 1.8rem)",
+  LARGE: "clamp(1.2rem, 1.6vw, 2.1rem)",
+  XLARGE: "clamp(1.35rem, 1.8vw, 2.4rem)",
+};
+
+/** Training PLATZ column clamps — independent from team-name typography. */
+export const TRAINING_PLATZ_FONT_SIZE_CSS: Record<InfoboardFontSize, string> = {
+  SMALL: "clamp(1.1rem, 1.45vw, 1.9rem)",
+  MEDIUM: "clamp(1.3rem, 1.75vw, 2.4rem)",
+  LARGE: "clamp(1.5rem, 2.1vw, 2.8rem)",
+  XLARGE: "clamp(1.7rem, 2.35vw, 3.2rem)",
+};
+
 /**
  * Match logo CSS clamp values per preset.
  * MEDIUM reproduces the accepted baseline (--ib-match-logo-size).
@@ -172,14 +188,14 @@ export function resolveInfoboardFontSize(
 export const SCREEN1_PAGE_DEMAND_MAX = 8.5;
 
 /** LARGE matches accepted Screen 1 baseline typography (DEFAULT_* constants). */
-const FONT_SIZE_CAPACITY_SCALE: Record<InfoboardFontSize, number> = {
+export const FONT_SIZE_CAPACITY_SCALE: Record<InfoboardFontSize, number> = {
   SMALL: 0.92,
   MEDIUM: 0.96,
   LARGE: 1.0,
   XLARGE: 1.12,
 };
 
-const LOGO_SIZE_CAPACITY_SCALE: Record<InfoboardLogoSize, number> = {
+export const LOGO_SIZE_CAPACITY_SCALE: Record<InfoboardLogoSize, number> = {
   SMALL: 0.96,
   MEDIUM: 1.0,
   LARGE: 1.05,

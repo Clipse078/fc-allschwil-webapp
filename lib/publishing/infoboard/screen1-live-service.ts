@@ -50,6 +50,7 @@ import {
   type Screen1TournamentPresentationDatabase,
 } from "./screen1-tournament-presentation";
 import type { Screen1PresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
+import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -110,6 +111,8 @@ export type InfoboardBoardConfig = {
   readonly headerShowWeather?: boolean;
   /** Screen 1 Training/Match/Tournament presentation (per-board). */
   readonly presentation?: Screen1PresentationConfig;
+  /** Screen-1 Studio per-card overrides and soft pagination preferences. */
+  readonly studio?: Screen1StudioConfig;
 };
 
 /**
@@ -151,6 +154,8 @@ export type InfoboardScreen1LivePayload = {
   } | null;
   /** Per-board Screen 1 presentation settings. */
   readonly presentation: Screen1PresentationConfig | null;
+  /** Per-board Screen-1 Studio card overrides and pagination preferences. */
+  readonly studio: Screen1StudioConfig | null;
 };
 
 // ── Branding resolver ─────────────────────────────────────────────────────────
@@ -287,5 +292,6 @@ export async function buildScreen1LivePayload(params: {
     theme,
     headerConfig,
     presentation: boardConfig?.presentation ?? null,
+    studio: boardConfig?.studio ?? null,
   };
 }

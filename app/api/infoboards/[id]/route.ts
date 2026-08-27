@@ -25,6 +25,7 @@ import {
   INFOBOARD_FONT_SIZES,
   INFOBOARD_LOGO_SIZES,
 } from "@/lib/infoboard/screen1-logo-settings";
+import { parseScreen1StudioJson } from "@/lib/infoboard/screen1-studio-types";
 import {
   parseAnlageplanJson,
   isResourceZone,
@@ -320,6 +321,27 @@ export async function PATCH(
       );
     }
     input.screen1TournamentFontSize = size;
+  }
+  if ("screen1StudioJson" in body) {
+    if (body.screen1StudioJson !== null && typeof body.screen1StudioJson !== "string") {
+      return NextResponse.json(
+        { error: "screen1StudioJson muss ein String oder null sein." },
+        { status: 422 },
+      );
+    }
+    if (
+      typeof body.screen1StudioJson === "string" &&
+      body.screen1StudioJson.length > 524_288
+    ) {
+      return NextResponse.json(
+        { error: "screen1StudioJson ist zu groß (max. 512 KB)." },
+        { status: 422 },
+      );
+    }
+    if (typeof body.screen1StudioJson === "string") {
+      parseScreen1StudioJson(body.screen1StudioJson);
+    }
+    input.screen1StudioJson = body.screen1StudioJson as string | null;
   }
 
   // Validate: announcement requires text when enabled
