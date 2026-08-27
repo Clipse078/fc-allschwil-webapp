@@ -12,6 +12,7 @@ import {
   Screen1Studio,
   type Screen1StudioCardRef,
 } from "@/components/infoboard/studio/Screen1Studio";
+import { resolveStudioPageIndex } from "@/lib/infoboard/screen1-studio-page-retention";
 import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
 
 type PreviewStudioProps = {
@@ -47,9 +48,19 @@ export function PreviewStudio({
     readonly (readonly Screen1StudioCardRef[])[]
   >([]);
   const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
+  const selectedCardKeyRef = useRef<string | null>(null);
   const [studio, setStudio] = useState<Screen1StudioConfig>(
     initialStudio ?? { cardOverrides: {} },
   );
+
+  const updateSelectedCardKey = (key: string | null) => {
+    selectedCardKeyRef.current = key;
+    setSelectedCardKey(key);
+    frameRef.current?.contentWindow?.postMessage(
+      { source: STUDIO_SOURCE, type: "SET_SELECTED_KEY", selectedKey: key },
+      window.location.origin,
+    );
+  };
 
   useEffect(() => {
     if (initialStudio != null) setStudio(initialStudio);
@@ -82,10 +93,17 @@ export function PreviewStudio({
       }
       const nextCount = Math.max(1, data.pageCount ?? 1);
       setPageCount(nextCount);
-      setPage(Math.min(Math.max(0, data.page ?? 0), nextCount - 1));
+      const nextPages = Array.isArray(data.pages) ? data.pages : studioPages;
       if (Array.isArray(data.pages)) {
         setStudioPages(data.pages);
       }
+      setPage(
+        resolveStudioPageIndex({
+          pages: nextPages,
+          selectedKey: selectedCardKeyRef.current,
+          previousPageIndex: data.page ?? 0,
+        }),
+      );
     }
     window.addEventListener("message", receiveFrameState);
     return () => window.removeEventListener("message", receiveFrameState);
@@ -93,7 +111,12 @@ export function PreviewStudio({
 
   function pushStudioToFrame(nextStudio: Screen1StudioConfig) {
     frameRef.current?.contentWindow?.postMessage(
-      { source: STUDIO_SOURCE, type: "SET_STUDIO", studio: nextStudio },
+      {
+        source: STUDIO_SOURCE,
+        type: "SET_STUDIO",
+        studio: nextStudio,
+        selectedKey: selectedCardKeyRef.current,
+      },
       window.location.origin,
     );
   }
@@ -126,6 +149,7 @@ export function PreviewStudio({
     setPage(0);
     setPageCount(1);
     setSelectedCardKey(null);
+    selectedCardKeyRef.current = null;
     updateUrl(screen, nextDate, nextTime);
   }
 
@@ -149,6 +173,7 @@ export function PreviewStudio({
     setPage(0);
     setPageCount(1);
     setSelectedCardKey(null);
+    selectedCardKeyRef.current = null;
     updateUrl(nextScreen, date, time);
   }
 
@@ -263,7 +288,7 @@ export function PreviewStudio({
             initialStudio={studio}
             pages={studioPages}
             selectedKey={selectedCardKey}
-            onSelectKey={setSelectedCardKey}
+            onSelectKey={updateSelectedCardKey}
             onStudioChange={handleStudioChange}
           />
         )}
