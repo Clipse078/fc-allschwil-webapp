@@ -192,7 +192,9 @@ describe("Match font presets and responsive ceiling", () => {
         "[data-match-team-label]",
       ),
     ).toHaveAttribute("data-match-name-size", "medium");
-    expect(CSS).toContain("--ib-match-team-name-base: min(");
+    expect(CSS).toMatch(
+      /\.eventCard\[data-type="MATCH"\] \.eventTeamMain[\s\S]*--ib-match-team-name-base:\s*var\(--ib-match-font-size\)/,
+    );
     expect(CSS).toContain("text-overflow: clip");
   });
 

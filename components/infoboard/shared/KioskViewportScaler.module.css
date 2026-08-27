@@ -1,0 +1,20 @@
+.kioskViewportHost {
+  width: 100vw;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #07111e;
+}
+
+.kioskViewportCanvas {
+  flex-shrink: 0;
+  transform-origin: center center;
+  overflow: hidden;
+}
+
+:global([data-kiosk-viewport-canvas="true"]) :global([data-testid="infoboard-anlageplan-root"]) {
+  height: 100% !important;
+  min-height: 0 !important;
+}

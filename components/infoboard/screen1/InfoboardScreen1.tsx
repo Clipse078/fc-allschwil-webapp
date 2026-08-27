@@ -60,6 +60,8 @@ import {
   DEFAULT_SCREEN1_PRESENTATION,
   MATCH_FONT_SIZE_CSS,
   MATCH_LOGO_SIZE_CSS,
+  resolveScreen1PageDemandMax,
+  SCREEN1_PAGE_DEMAND_MAX,
   TRAINING_FONT_SIZE_CSS,
   TRAINING_LOGO_SIZE_CSS,
   TOURNAMENT_FONT_SIZE_CSS,
@@ -174,7 +176,8 @@ export const TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS = 2;
  * semantic demand weights remain unchanged, so approved training-row spacing
  * is preserved; oversized consecutive cohorts move to another page instead.
  */
-export const CARD_DEMAND_PAGE_MAX = 8.5;
+/** @deprecated Import SCREEN1_PAGE_DEMAND_MAX from screen1-logo-settings. */
+export const CARD_DEMAND_PAGE_MAX = SCREEN1_PAGE_DEMAND_MAX;
 
 /**
  * Demand for a training-group card with `rowCount` simultaneous training rows.
@@ -1374,8 +1377,10 @@ export function InfoboardScreen1({
   const staticDateLine =
     currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
 
+  const pageDemandMax = resolveScreen1PageDemandMax(presentation);
+
   // Split into pages based on demand. Normal days: single page (no rotation).
-  const pages = paginateDisplayList(displayList, rawItemDemands);
+  const pages = paginateDisplayList(displayList, rawItemDemands, pageDemandMax);
   const paginationContentKey = pages
     .map((page) =>
       page
@@ -1494,7 +1499,7 @@ export function InfoboardScreen1({
       <main
         className={styles.main}
         data-testid="infoboard-content-region"
-        data-safe-page-capacity={CARD_DEMAND_PAGE_MAX}
+        data-safe-page-capacity={pageDemandMax.toFixed(2)}
       >
         {visibleFeed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">
