@@ -205,6 +205,27 @@ describe("listTeamSeasonMatches", () => {
     );
   });
 
+  it("PUB. websiteVisibleOnly restricts the canonical event query to websiteVisible=true", async () => {
+    const database = createDatabase({
+      events: [createEvent()],
+    });
+
+    await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+      websiteVisibleOnly: true,
+    });
+
+    expect(database.event.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          websiteVisible: true,
+        }),
+      }),
+    );
+  });
+
   it("A. exposes HOME perspective for mapped home fixtures", async () => {
     const database = createDatabase({
       events: [createEvent()],
