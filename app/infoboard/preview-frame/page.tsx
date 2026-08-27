@@ -65,6 +65,7 @@ export default async function InfoboardPreviewFramePage({
         theme={payload.theme}
         headerConfig={payload.headerConfig ?? undefined}
         presentation={payload.presentation ?? undefined}
+        studio={payload.studio ?? undefined}
         autoRotate={first(params.auto) === "1"}
       />
     );

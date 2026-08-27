@@ -1462,7 +1462,7 @@
    * For standard pitch designations (STADION, KR 1, KUNSTRASEN 2) this
    * produces legible two-line wrapping when the column is narrow.
    */
-  font-size: clamp(1.1rem, 1.6vw, var(--ib-fs-dest-pitch));
+  font-size: var(--ib-training-platz-font-size, clamp(1.1rem, 1.6vw, var(--ib-fs-dest-pitch)));
   font-weight: 700;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -1476,7 +1476,7 @@
 
 .trainingGroupRoomValue {
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: var(--ib-fs-dest-room);
+  font-size: var(--ib-training-kabine-font-size, var(--ib-fs-dest-room));
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
