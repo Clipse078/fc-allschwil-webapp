@@ -9,6 +9,7 @@ import {
   resolveTrainingDayWindow,
   resolveTrainingMonthWindow,
   resolveTrainingWeekWindow,
+  listTrainingSessionDateBounds,
 } from "../date-range";
 
 describe("parseMonthParam", () => {
@@ -274,6 +275,19 @@ describe("TRAININGCENTER-01B — default-date + per-view param isolation", () =>
     const window = resolveTrainingDayWindow({ dayParam: undefined, now: NOW, timeZone: TZ });
     expect(window.previousParam).toBe("2026-08-07");
     expect(window.nextParam).toBe("2026-08-09");
+  });
+});
+
+describe("listTrainingSessionDateBounds", () => {
+  it("maps a Europe/Zurich day window to a single UTC-midnight calendar key", () => {
+    const dayWindow = resolveTrainingDayWindow({ dayParam: "2026-08-28", timeZone: "Europe/Zurich" });
+    const bounds = listTrainingSessionDateBounds("DAY", {
+      month: resolveTrainingMonthWindow({ monthParam: "2026-08", timeZone: "Europe/Zurich" }),
+      week: resolveTrainingWeekWindow({ weekParam: "2026-08-25", timeZone: "Europe/Zurich" }),
+      day: dayWindow,
+    });
+    expect(bounds.dateFrom.toISOString()).toBe("2026-08-28T00:00:00.000Z");
+    expect(bounds.dateTo.toISOString()).toBe("2026-08-28T00:00:00.000Z");
   });
 });
 

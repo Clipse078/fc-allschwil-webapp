@@ -902,6 +902,23 @@ describe("C. listTrainingSessions / getTrainingSession", () => {
     });
   });
 
+  it("C11b: listTrainingSessions must receive UTC-midnight calendar bounds, not zoned window instants", async () => {
+    vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
+
+    const zonedDayStart = new Date("2026-08-27T22:00:00.000Z");
+    await listTrainingSessions(TENANT_A, {
+      dateFrom: zonedDayStart,
+      dateTo: new Date("2026-08-28T00:00:00.000Z"),
+    });
+
+    const call = vi.mocked(prisma.trainingSession.findMany).mock.calls[0][0] as {
+      where: { OR: Array<{ overrideDate?: { gte?: Date }; date?: { gte?: Date } }> };
+    };
+    const canonicalBranch = call.where.OR[1];
+    expect(canonicalBranch.date?.gte?.toISOString()).toBe("2026-08-27T00:00:00.000Z");
+    expect(canonicalBranch.date?.gte?.toISOString()).not.toBe("2026-08-28T00:00:00.000Z");
+  });
+
   it("C12: listTrainingSessions issues no date OR-filter when neither dateFrom nor dateTo is supplied", async () => {
     vi.mocked(prisma.trainingSession.findMany).mockResolvedValue([] as never);
 
