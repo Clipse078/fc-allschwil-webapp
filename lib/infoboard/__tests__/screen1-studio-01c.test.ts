@@ -237,18 +237,39 @@ describe("INFOBOARD-SCREEN1-STUDIO-01C soft pagination", () => {
     ]);
   });
 
-  it("G: reset removes soft-break context", () => {
+  it("G: reset removes soft-break context without mutating the original override", () => {
     const override: Screen1CardOverride = {
       teamFontSize: "LARGE",
+      kabineFontSize: "SMALL",
+      platzFontSize: "MEDIUM",
+      logoSize: "XLARGE",
       preferNextPage: true,
-      softBreakAfterKeys: [eventCardKey("A"), eventCardKey("B")],
+      softBreakAfterKeys: ["A", "B"],
     };
     const cleared = clearSoftPaginationOverride(override);
-    expect(cleared?.preferNextPage).toBeUndefined();
-    expect(cleared?.softBreakAfterKeys).toBeUndefined();
-    expect(cleared?.teamFontSize).toBe("LARGE");
+    expect(cleared).toEqual({
+      teamFontSize: "LARGE",
+      kabineFontSize: "SMALL",
+      platzFontSize: "MEDIUM",
+      logoSize: "XLARGE",
+    });
+    expect(override).toEqual({
+      teamFontSize: "LARGE",
+      kabineFontSize: "SMALL",
+      platzFontSize: "MEDIUM",
+      logoSize: "XLARGE",
+      preferNextPage: true,
+      softBreakAfterKeys: ["A", "B"],
+    });
     expect(isEmptyCardOverride(cleared)).toBe(false);
     expect(isEmptyCardOverride({})).toBe(true);
+    expect(clearSoftPaginationOverride(undefined)).toBeUndefined();
+    expect(
+      clearSoftPaginationOverride({
+        preferNextPage: true,
+        softBreakAfterKeys: ["A"],
+      }),
+    ).toBeUndefined();
   });
 
   it("legacy preferNextPage without softBreakAfterKeys is ignored", () => {

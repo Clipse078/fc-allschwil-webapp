@@ -153,8 +153,10 @@ export function clearSoftPaginationOverride(
   override: Screen1CardOverride | undefined,
 ): Screen1CardOverride | undefined {
   if (override == null) return undefined;
-  const next: Screen1CardOverride = { ...override };
-  delete next.preferNextPage;
-  delete next.softBreakAfterKeys;
-  return Object.keys(next).length > 0 ? next : undefined;
+  const {
+    preferNextPage: _preferNextPage,
+    softBreakAfterKeys: _softBreakAfterKeys,
+    ...rest
+  } = override;
+  return Object.keys(rest).length > 0 ? rest : undefined;
 }
