@@ -105,24 +105,20 @@ function rootFor(
 
 describe("Training font presets", () => {
   it.each(INFOBOARD_FONT_SIZES)(
-    "maps %s to its normal, compact, and dense CSS values",
+    "maps %s to one density-independent CSS value",
     (size: InfoboardFontSize) => {
       const root = rootFor([event("training", "TRAINING")], {
         trainingFontSize: size,
       });
-      expect(root.style.getPropertyValue("--ib-training-font-size")).toBe(
-        TRAINING_FONT_SIZE_CSS[size].normal,
+      expect(root.style.getPropertyValue("--ib-training-team-font-size")).toBe(
+        TRAINING_FONT_SIZE_CSS[size],
       );
-      expect(
-        root.style.getPropertyValue("--ib-training-font-size-compact"),
-      ).toBe(TRAINING_FONT_SIZE_CSS[size].compact);
-      expect(root.style.getPropertyValue("--ib-training-font-size-dense")).toBe(
-        TRAINING_FONT_SIZE_CSS[size].dense,
-      );
+      expect(root.style.getPropertyValue("--ib-training-font-size-compact")).toBe("");
+      expect(root.style.getPropertyValue("--ib-training-font-size-dense")).toBe("");
     },
   );
 
-  it("keeps six-row density authoritative over XLARGE", () => {
+  it("keeps the six-row density tier geometric only", () => {
     const trainings = Array.from({ length: 6 }, (_, index) =>
       event(`training-${index}`, "TRAINING", {
         teamDisplayName: `FC Allschwil Team ${index + 1}`,
@@ -133,11 +129,11 @@ describe("Training font presets", () => {
       "data-group-density",
       "dense",
     );
-    expect(root.style.getPropertyValue("--ib-training-font-size-dense")).toBe(
-      TRAINING_FONT_SIZE_CSS.XLARGE.dense,
+    expect(root.style.getPropertyValue("--ib-training-team-font-size")).toBe(
+      TRAINING_FONT_SIZE_CSS.XLARGE,
     );
-    expect(TRAINING_FONT_SIZE_CSS.XLARGE.dense).toBe(
-      TRAINING_FONT_SIZE_CSS.LARGE.dense,
+    expect(TRAINING_FONT_SIZE_CSS.XLARGE).toBe(
+      TRAINING_FONT_SIZE_CSS.LARGE,
     );
   });
 });
@@ -233,8 +229,8 @@ describe("Tournament font presets and card-type isolation", () => {
       ],
       { trainingFontSize: "SMALL" },
     );
-    expect(root.style.getPropertyValue("--ib-training-font-size")).toBe(
-      TRAINING_FONT_SIZE_CSS.SMALL.normal,
+    expect(root.style.getPropertyValue("--ib-training-team-font-size")).toBe(
+      TRAINING_FONT_SIZE_CSS.SMALL,
     );
     expect(root.style.getPropertyValue("--ib-match-font-size")).toBe(
       MATCH_FONT_SIZE_CSS.MEDIUM.primary,

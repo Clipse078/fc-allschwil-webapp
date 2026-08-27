@@ -188,7 +188,8 @@ export function computeTrainingGroupDemand(rowCount: number): number {
 
 /**
  * Per-card density for grouped training rows.
- * Sparse groups (1–3 rows) keep normal typography; 4+ rows tighten spacing.
+ * Sparse groups (1–3 rows) keep normal geometry; 4+ rows tighten spacing.
+ * Team-name typography is intentionally independent of this tier.
  *
  * Exported for regression testing.
  */
@@ -1460,12 +1461,8 @@ export function InfoboardScreen1({
           "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[presentation.matchLogoSize],
           "--ib-tournament-logo-size":
             TOURNAMENT_LOGO_SIZE_CSS[presentation.tournamentLogoSize],
-          "--ib-training-font-size":
-            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].normal,
-          "--ib-training-font-size-compact":
-            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].compact,
-          "--ib-training-font-size-dense":
-            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize].dense,
+          "--ib-training-team-font-size":
+            TRAINING_FONT_SIZE_CSS[presentation.trainingFontSize],
           "--ib-match-font-size":
             MATCH_FONT_SIZE_CSS[presentation.matchFontSize].primary,
           "--ib-match-opponent-font-size":
