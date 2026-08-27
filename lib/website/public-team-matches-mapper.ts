@@ -1,7 +1,9 @@
 /**
  * lib/website/public-team-matches-mapper.ts
  *
- * Maps canonical team-season match rows to public website "Nächste Spiele" DTOs.
+ * Maps canonical team-season match rows to public website match DTOs:
+ * - "Nächste Spiele" (nextMatches)
+ * - "Resultate" (results)
  *
  * Publication contract:
  * - Callers must query canonical matches with websiteVisible=true.
@@ -22,11 +24,14 @@ import type {
   PublicTeamMatch,
   PublicTeamMatchCompetition,
   PublicTeamMatchOpponent,
+  PublicTeamMatchResultPerspective,
+  PublicTeamMatchScore,
   PublicTeamMatchSide,
   PublicTeamMatchVenue,
 } from "@/lib/website/types";
 
 export const PUBLIC_TEAM_NEXT_MATCHES_DEFAULT_LIMIT = 5;
+export const PUBLIC_TEAM_RESULTS_DEFAULT_LIMIT = 5;
 
 export type PublicTeamMatchTeamRecord = {
   id: string;
@@ -123,6 +128,98 @@ export function filterPublicTeamNextMatches(
   }
 
   return filtered;
+}
+
+/**
+ * Public team-page completed-result filter layered over canonical lifecycle buckets.
+ * Requires lifecycleStage=COMPLETED and excludes non-result statuses.
+ */
+export function isPublicTeamResult(item: TeamSeasonMatchItem): boolean {
+  if (item.lifecycleStage !== "COMPLETED") {
+    return false;
+  }
+
+  if (item.lifecycle === "NEEDS_RECONCILIATION") {
+    return false;
+  }
+
+  const normalizedStatus = item.status.trim().toUpperCase();
+
+  if (
+    normalizedStatus === "DRAFT" ||
+    normalizedStatus === "SCHEDULED" ||
+    normalizedStatus === "LIVE" ||
+    normalizedStatus === "POSTPONED" ||
+    normalizedStatus === "CANCELLED" ||
+    normalizedStatus === "CANCELED" ||
+    normalizedStatus === "ARCHIVED"
+  ) {
+    return false;
+  }
+
+  return normalizedStatus === "COMPLETED";
+}
+
+export function filterPublicTeamResults(
+  items: TeamSeasonMatchItem[],
+  limit = PUBLIC_TEAM_RESULTS_DEFAULT_LIMIT,
+): TeamSeasonMatchItem[] {
+  const sorted = [...items].sort((left, right) => {
+    const startDiff = right.startAt.getTime() - left.startAt.getTime();
+
+    if (startDiff !== 0) {
+      return startDiff;
+    }
+
+    return right.eventId.localeCompare(left.eventId);
+  });
+  const filtered: TeamSeasonMatchItem[] = [];
+
+  for (const item of sorted) {
+    if (!isPublicTeamResult(item)) {
+      continue;
+    }
+
+    filtered.push(item);
+
+    if (filtered.length >= limit) {
+      break;
+    }
+  }
+
+  return filtered;
+}
+
+function resolvePublicTeamMatchScore(
+  item: TeamSeasonMatchItem,
+): PublicTeamMatchScore {
+  return {
+    home: item.scoreHome,
+    away: item.scoreAway,
+  };
+}
+
+export function resolvePublicTeamResultPerspective(
+  item: TeamSeasonMatchItem,
+): PublicTeamMatchResultPerspective {
+  const { scoreHome, scoreAway } = item;
+
+  if (scoreHome === null || scoreAway === null) {
+    return "UNKNOWN";
+  }
+
+  const teamScore = item.side === "HOME" ? scoreHome : scoreAway;
+  const opponentScore = item.side === "HOME" ? scoreAway : scoreHome;
+
+  if (teamScore > opponentScore) {
+    return "WON";
+  }
+
+  if (teamScore < opponentScore) {
+    return "LOST";
+  }
+
+  return "DRAW";
 }
 
 function resolveCompetitionLabel(
@@ -229,11 +326,13 @@ function mapPublicTeamMatchOpponent(
 export function mapPublicTeamMatch(
   item: TeamSeasonMatchItem,
   context: PublicTeamMatchIdentityContext,
+  options?: { includeResult?: boolean },
 ): PublicTeamMatch {
   const isHomeTeam = item.side === "HOME";
   const competition: PublicTeamMatchCompetition = {
     name: resolveCompetitionLabel(item.competition),
   };
+  const includeResult = options?.includeResult === true;
 
   return {
     id: item.eventId,
@@ -244,6 +343,10 @@ export function mapPublicTeamMatch(
     isHomeTeam,
     isAwayTeam: !isHomeTeam,
     opponent: mapPublicTeamMatchOpponent(item, context),
+    score: includeResult ? resolvePublicTeamMatchScore(item) : null,
+    resultPerspective: includeResult
+      ? resolvePublicTeamResultPerspective(item)
+      : null,
     venue: resolveVenue(item),
     competition,
   };
@@ -257,5 +360,15 @@ export function mapPublicTeamMatches(
 ): PublicTeamMatch[] {
   return filterPublicTeamNextMatches(items, now, limit).map((item) =>
     mapPublicTeamMatch(item, context),
+  );
+}
+
+export function mapPublicTeamResults(
+  items: TeamSeasonMatchItem[],
+  context: PublicTeamMatchIdentityContext,
+  limit = PUBLIC_TEAM_RESULTS_DEFAULT_LIMIT,
+): PublicTeamMatch[] {
+  return filterPublicTeamResults(items, limit).map((item) =>
+    mapPublicTeamMatch(item, context, { includeResult: true }),
   );
 }

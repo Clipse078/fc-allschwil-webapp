@@ -333,6 +333,17 @@ export type PublicTeamMatchCompetition = {
   name: string | null;
 };
 
+export type PublicTeamMatchScore = {
+  home: number | null;
+  away: number | null;
+};
+
+export type PublicTeamMatchResultPerspective =
+  | "WON"
+  | "DRAW"
+  | "LOST"
+  | "UNKNOWN";
+
 export type PublicTeamMatch = {
   id: string;
   startAt: Date;
@@ -342,6 +353,16 @@ export type PublicTeamMatch = {
   isHomeTeam: boolean;
   isAwayTeam: boolean;
   opponent: PublicTeamMatchOpponent;
+  /**
+   * Canonical persisted score from MatchExternalMapping.scoreHome/scoreAway.
+   * Null for upcoming fixtures (nextMatches).
+   */
+  score: PublicTeamMatchScore | null;
+  /**
+   * Win/draw/loss from the current team's perspective.
+   * Null for upcoming fixtures (nextMatches).
+   */
+  resultPerspective: PublicTeamMatchResultPerspective | null;
   venue: PublicTeamMatchVenue;
   competition: PublicTeamMatchCompetition;
 };
@@ -394,6 +415,11 @@ export type PublicTeamDetail = {
    * Includes home and away fixtures, ordered by startAt ascending (max 5).
    */
   nextMatches: PublicTeamMatch[];
+  /**
+   * Recent completed website-visible MATCH results for the current team season.
+   * Includes home and away fixtures, ordered by startAt descending (max 5).
+   */
+  results: PublicTeamMatch[];
 };
 
 export type TeamDetailData = {
