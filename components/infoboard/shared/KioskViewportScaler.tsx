@@ -4,8 +4,8 @@
  * components/infoboard/shared/KioskViewportScaler.tsx
  *
  * Scales the fixed 1920×1080 infoboard design canvas to the visible kiosk
- * viewport. Used by app/infoboard/layout.tsx for every public infoboard route
- * (Screen 1, Screen 2, Anlageplan, preview-frame).
+ * viewport. Used only for Screen-1 rendering paths (production route layouts,
+ * slug-based TAGESUEBERSICHT boards, and Preview Studio Screen-1 frame).
  */
 
 import { useEffect, useState, type ReactNode } from "react";

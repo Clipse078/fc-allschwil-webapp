@@ -5,6 +5,7 @@ import {
   InfoboardScreen1,
   type InfoboardScreen1Props,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
 
 const FRAME_SOURCE = "infoboard-preview-frame";
 const STUDIO_SOURCE = "infoboard-preview-studio";
@@ -53,16 +54,18 @@ export function PreviewFrameScreen1({
   }, [pageCount]);
 
   return (
-    <InfoboardScreen1
-      {...screenProps}
-      liveClock={false}
-      previewPagination={{
-        activePage: page,
-        autoRotate,
-        onPageChange: setPage,
-        onPageCountChange: reconcilePageCount,
-      }}
-    />
+    <KioskViewportScaler>
+      <InfoboardScreen1
+        {...screenProps}
+        liveClock={false}
+        previewPagination={{
+          activePage: page,
+          autoRotate,
+          onPageChange: setPage,
+          onPageCountChange: reconcilePageCount,
+        }}
+      />
+    </KioskViewportScaler>
   );
 }
 

@@ -6,21 +6,11 @@
   justify-content: center;
   overflow: hidden;
   background: #07111e;
-}
-
-:global(html),
-:global(body) {
   margin: 0;
-  overflow: hidden;
 }
 
 .kioskViewportCanvas {
   flex-shrink: 0;
   transform-origin: center center;
   overflow: hidden;
-}
-
-:global([data-kiosk-viewport-canvas="true"]) :global([data-testid="infoboard-anlageplan-root"]) {
-  height: 100% !important;
-  min-height: 0 !important;
 }
