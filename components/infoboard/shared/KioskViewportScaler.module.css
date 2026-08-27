@@ -8,6 +8,12 @@
   background: #07111e;
 }
 
+:global(html),
+:global(body) {
+  margin: 0;
+  overflow: hidden;
+}
+
 .kioskViewportCanvas {
   flex-shrink: 0;
   transform-origin: center center;

@@ -16,7 +16,7 @@ import {
   KIOSK_LOGICAL_WIDTH,
   readViewportMetrics,
 } from "@/lib/infoboard/kiosk-viewport";
-import "./KioskViewportScaler.module.css";
+import styles from "./KioskViewportScaler.module.css";
 
 type KioskViewportScalerProps = {
   children: ReactNode;
@@ -60,12 +60,12 @@ export function KioskViewportScaler({ children }: KioskViewportScalerProps): Rea
 
   return (
     <div
-      className="kioskViewportHost"
+      className={styles.kioskViewportHost}
       data-testid="kiosk-viewport-scaler"
       data-kiosk-scale={scale.toFixed(4)}
     >
       <div
-        className="kioskViewportCanvas"
+        className={styles.kioskViewportCanvas}
         data-kiosk-viewport-canvas="true"
         data-testid="kiosk-viewport-canvas"
         style={{

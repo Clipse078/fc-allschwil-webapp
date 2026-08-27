@@ -24,5 +24,9 @@ describe("KioskViewportScaler", () => {
     expect(canvas.style.height).toBe("1080px");
     expect(canvas.style.transform).toMatch(/^scale\(/);
     expect(screen.getByTestId("child")).toBeTruthy();
+
+    const host = screen.getByTestId("kiosk-viewport-scaler");
+    expect(host.className).toMatch(/kioskViewportHost/);
+    expect(canvas.className).toMatch(/kioskViewportCanvas/);
   });
 });
