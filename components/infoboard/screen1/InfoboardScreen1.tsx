@@ -34,7 +34,7 @@
  *   - No countdown text (IN X MIN.); temporal labels are JETZT or ALS NÄCHSTES.
  */
 
-import { useMemo, type ReactElement, type CSSProperties } from "react";
+import { useMemo, useEffect, type ReactElement, type CSSProperties } from "react";
 import type {
   InfoboardScreen1Feed,
   InfoboardScreen1Event,
@@ -59,15 +59,37 @@ import { filterExpiredScreen1Feed } from "@/lib/publishing/infoboard/screen1-fee
 import {
   DEFAULT_SCREEN1_PRESENTATION,
   MATCH_FONT_SIZE_CSS,
+  MATCH_KABINE_FONT_SIZE_CSS,
   MATCH_LOGO_SIZE_CSS,
+  MATCH_PLATZ_FONT_SIZE_CSS,
   resolveScreen1PageDemandMax,
   SCREEN1_PAGE_DEMAND_MAX,
   TRAINING_FONT_SIZE_CSS,
+  TRAINING_KABINE_FONT_SIZE_CSS,
   TRAINING_LOGO_SIZE_CSS,
+  TRAINING_PLATZ_FONT_SIZE_CSS,
   TOURNAMENT_FONT_SIZE_CSS,
+  TOURNAMENT_KABINE_FONT_SIZE_CSS,
   TOURNAMENT_LOGO_SIZE_CSS,
+  TOURNAMENT_PLATZ_FONT_SIZE_CSS,
   type Screen1PresentationConfig,
 } from "@/lib/infoboard/screen1-logo-settings";
+import {
+  resolveCardDemandScale,
+  resolveCardPresentation,
+  resolveTrainingCardPresentation,
+  type ResolvedCardPresentation,
+  type ResolvedTrainingCardPresentation,
+} from "@/lib/infoboard/screen1-card-presentation";
+import { paginateExpandedDisplayListWithPreferences } from "@/lib/infoboard/screen1-pagination";
+import {
+  resolveDisplayItemKey,
+  resolveDisplayItemLabel,
+} from "@/lib/infoboard/screen1-studio-keys";
+import {
+  EMPTY_SCREEN1_STUDIO_CONFIG,
+  type Screen1StudioConfig,
+} from "@/lib/infoboard/screen1-studio-types";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -117,6 +139,8 @@ export type InfoboardScreen1Props = {
   };
   /** Per-board Training/Match/Tournament presentation settings. */
   presentation?: Screen1PresentationConfig;
+  /** Per-board Screen-1 Studio card overrides and soft pagination preferences. */
+  studio?: Screen1StudioConfig | null;
   /** @deprecated Compatibility for callers predating generalized presentation. */
   logoPresentation?: Screen1PresentationConfig;
   /** Preview-only controls around production pagination. Omit on kiosk routes. */
@@ -125,6 +149,14 @@ export type InfoboardScreen1Props = {
     readonly autoRotate: boolean;
     readonly onPageChange: (page: number) => void;
     readonly onPageCountChange: (pageCount: number) => void;
+    readonly onPaginationStructureChange?: (
+      structure: readonly {
+        readonly key: string;
+        readonly label: string;
+        readonly kind: "training-group" | "event";
+        readonly eventType?: string;
+      }[][],
+    ) => void;
   };
   /** Preview-only: keep the supplied simulated moment fixed. */
   liveClock?: boolean;
@@ -1021,6 +1053,8 @@ type TrainingGroupCardProps = {
   clubLogoSrc: string | null;
   showLogos: boolean;
   cohortContinuation?: boolean;
+  /** Resolved per-card typography and logo sizes. */
+  cardPresentation: ResolvedTrainingCardPresentation;
 };
 
 /**
@@ -1046,6 +1080,7 @@ function TrainingGroupCard({
   clubLogoSrc,
   showLogos,
   cohortContinuation = false,
+  cardPresentation,
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
@@ -1066,7 +1101,19 @@ function TrainingGroupCard({
       data-group-density={groupDensity}
       data-cohort-continuation={cohortContinuation ? "true" : "false"}
       data-card-demand={demand.toFixed(2)}
-      style={{ "--ib-card-demand": demand } as CSSProperties}
+      style={
+        {
+          "--ib-card-demand": demand,
+          "--ib-training-font-size":
+            TRAINING_FONT_SIZE_CSS[cardPresentation.teamFontSize].normal,
+          "--ib-training-kabine-font-size":
+            TRAINING_KABINE_FONT_SIZE_CSS[cardPresentation.kabineFontSize],
+          "--ib-training-platz-font-size":
+            TRAINING_PLATZ_FONT_SIZE_CSS[cardPresentation.platzFontSize],
+          "--ib-training-logo-size":
+            TRAINING_LOGO_SIZE_CSS[cardPresentation.logoSize],
+        } as CSSProperties
+      }
     >
       {/* TIME — shared start + majority end once in the left card */}
       <div className={styles.cardTimeZone} data-testid="training-group-time-zone">
@@ -1202,6 +1249,33 @@ function TrainingGroupCard({
 }
 // ── Event card ────────────────────────────────────────────────────────────────
 
+function resolveEventCardStyle(
+  resolved: ResolvedCardPresentation,
+): CSSProperties {
+  if (resolved.kind === "match" || resolved.kind === "other") {
+    const p = resolved.presentation;
+    return {
+      "--ib-match-font-size": MATCH_FONT_SIZE_CSS[p.teamFontSize].primary,
+      "--ib-match-opponent-font-size": MATCH_FONT_SIZE_CSS[p.teamFontSize].opponent,
+      "--ib-match-kabine-font-size": MATCH_KABINE_FONT_SIZE_CSS[p.kabineFontSize],
+      "--ib-match-platz-font-size": MATCH_PLATZ_FONT_SIZE_CSS[p.platzFontSize],
+      "--ib-match-logo-size": MATCH_LOGO_SIZE_CSS[p.logoSize],
+    } as CSSProperties;
+  }
+  if (resolved.kind === "tournament") {
+    const p = resolved.presentation;
+    return {
+      "--ib-tournament-font-size": TOURNAMENT_FONT_SIZE_CSS[p.teamFontSize],
+      "--ib-tournament-kabine-font-size":
+        TOURNAMENT_KABINE_FONT_SIZE_CSS[p.kabineFontSize],
+      "--ib-tournament-platz-font-size":
+        TOURNAMENT_PLATZ_FONT_SIZE_CSS[p.platzFontSize],
+      "--ib-tournament-logo-size": TOURNAMENT_LOGO_SIZE_CSS[p.logoSize],
+    } as CSSProperties;
+  }
+  return {} as CSSProperties;
+}
+
 type EventCardProps = {
   item: FlatEvent;
   timeZone: string;
@@ -1209,6 +1283,8 @@ type EventCardProps = {
   /** Content-demand value driving flex-grow on this card. */
   demand: number;
   presentation?: Screen1PresentationConfig;
+  cardStyle?: CSSProperties;
+  resolvedPresentation?: ResolvedCardPresentation;
 };
 
 function EventCard({
@@ -1217,6 +1293,8 @@ function EventCard({
   participantAllocations,
   demand,
   presentation = DEFAULT_SCREEN1_PRESENTATION,
+  cardStyle,
+  resolvedPresentation,
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
@@ -1227,6 +1305,14 @@ function EventCard({
   const endTime = rawEndTime !== null && rawEndTime !== startTime ? rawEndTime : null;
   const isMatch = event.type === "MATCH";
   const isTournament = event.type === "TOURNAMENT";
+  const matchShowLogos =
+    resolvedPresentation?.kind === "match" || resolvedPresentation?.kind === "other"
+      ? resolvedPresentation.presentation.showLogos
+      : presentation.matchShowLogos;
+  const tournamentShowLogos =
+    resolvedPresentation?.kind === "tournament"
+      ? resolvedPresentation.presentation.showLogos
+      : presentation.tournamentShowLogos;
 
   const label = statusLabel(temporal);
   const stripe = stripeKey(event.type);
@@ -1243,7 +1329,7 @@ function EventCard({
       data-temporal={temporal}
       data-stripe={stripe}
       data-card-demand={demand.toFixed(2)}
-      style={{ "--ib-card-demand": demand } as CSSProperties}
+      style={{ "--ib-card-demand": demand, ...cardStyle } as CSSProperties}
     >
       {/* ── LEFT ZONE: Status + Time ─────────────────────────────────── */}
       <div className={styles.cardTimeZone}>
@@ -1284,7 +1370,7 @@ function EventCard({
                   rowTestId="match-home-team-row"
                   logoTestId="home-team-logo"
                   primaryClassName={styles.eventTeamMain}
-                  showLogos={presentation.matchShowLogos}
+                  showLogos={matchShowLogos}
                 />
                 <span className={styles.vsLabel} aria-hidden="true">vs.</span>
                 {event.matchPresentation.away !== null && (
@@ -1293,7 +1379,7 @@ function EventCard({
                     rowTestId="match-away-team-row"
                     logoTestId="away-team-logo"
                     primaryClassName={styles.eventTeamOpponent}
-                    showLogos={presentation.matchShowLogos}
+                    showLogos={matchShowLogos}
                   />
                 )}
               </>
@@ -1339,7 +1425,7 @@ function EventCard({
                     clubName={participant.teamDisplayName}
                     testId={`tournament-participant-logo-${participant.id}`}
                     presentation="tournament"
-                    showLogos={presentation.tournamentShowLogos}
+                    showLogos={tournamentShowLogos}
                   />
                 ))}
               </div>
@@ -1391,11 +1477,13 @@ export function InfoboardScreen1({
   headerConfig,
   presentation: presentationProp,
   logoPresentation: legacyLogoPresentation,
+  studio: studioProp,
   previewPagination,
   liveClock = true,
 }: InfoboardScreen1Props): ReactElement {
   const presentation =
     presentationProp ?? legacyLogoPresentation ?? DEFAULT_SCREEN1_PRESENTATION;
+  const studio = studioProp ?? EMPTY_SCREEN1_STUDIO_CONFIG;
   const { tenant } = feed;
   const timeZone = tenant.timezone;
   const themeAttr = theme.toLowerCase();
@@ -1420,41 +1508,54 @@ export function InfoboardScreen1({
   const flatList = buildFlatList(visibleFeed);
   const rawDisplayList = buildDisplayList(flatList);
 
-  // Pre-compute demands for capacity admission (tournament extensions resolved once).
+  // Pre-compute demands with per-card presentation scaling.
   const rawItemDemands: number[] = rawDisplayList.map((item) => {
+    const scale = resolveCardDemandScale(item, presentation, studio);
+    let baseDemand: number;
     if (item.kind === "training-group") {
-      return computeTrainingGroupDemand(item.items.length);
+      baseDemand = computeTrainingGroupDemand(item.items.length);
+    } else {
+      const event = item.item.event;
+      if (event.type === "MATCH") {
+        baseDemand = computeMatchDemand(event);
+      } else if (event.type === "TOURNAMENT") {
+        const ext = findEventExtension(event.id, eventPresentation);
+        baseDemand = computeTournamentDemand(ext?.participantAllocations);
+      } else {
+        baseDemand = computeEventDemand(event.type);
+      }
     }
-    const event = item.item.event;
-    if (event.type === "MATCH") {
-      return computeMatchDemand(event);
-    }
-    if (event.type === "TOURNAMENT") {
-      const ext = findEventExtension(event.id, eventPresentation);
-      return computeTournamentDemand(ext?.participantAllocations);
-    }
-    return computeEventDemand(event.type);
+    return baseDemand * scale;
   });
 
   const pageDemandMax = resolveScreen1PageDemandMax(presentation);
 
+  const { items: expandedItems, demands: expandedDemands } =
+    expandOversizedTrainingGroups(rawDisplayList, rawItemDemands, pageDemandMax);
+
   function demandForDisplayItem(item: DisplayItem): number {
+    const idx = expandedItems.indexOf(item);
+    if (idx >= 0) return expandedDemands[idx] ?? 1;
+    const scale = resolveCardDemandScale(item, presentation, studio);
     if (item.kind === "training-group") {
-      return computeTrainingGroupDemand(item.items.length);
+      return computeTrainingGroupDemand(item.items.length) * scale;
     }
     const event = item.item.event;
     if (event.type === "MATCH") {
-      return computeMatchDemand(event);
+      return computeMatchDemand(event) * scale;
     }
     if (event.type === "TOURNAMENT") {
       const ext = findEventExtension(event.id, eventPresentation);
-      return computeTournamentDemand(ext?.participantAllocations);
+      return computeTournamentDemand(ext?.participantAllocations) * scale;
     }
-    return computeEventDemand(event.type);
+    return computeEventDemand(event.type) * scale;
   }
 
-  // Split into pages based on demand. Normal days: single page (no rotation).
-  const pages = paginateDisplayList(rawDisplayList, rawItemDemands, pageDemandMax);
+  const pages = paginateExpandedDisplayListWithPreferences(
+    expandedItems,
+    expandedDemands,
+    { maxDemand: pageDemandMax, studio },
+  );
   const paginationContentKey = pages
     .map((page) =>
       page
@@ -1466,6 +1567,20 @@ export function InfoboardScreen1({
         .join(":"),
     )
     .join("|");
+
+  useEffect(() => {
+    previewPagination?.onPaginationStructureChange?.(
+      pages.map((page) =>
+        page.map((item) => ({
+          key: resolveDisplayItemKey(item),
+          label: resolveDisplayItemLabel(item),
+          kind: item.kind,
+          eventType:
+            item.kind === "event" ? item.item.event.type : undefined,
+        })),
+      ),
+    );
+  }, [paginationContentKey, previewPagination]);
 
   const clubLogoSrc = branding?.clubLogoSrc ?? null;
   const productLogoSrc = branding?.productLogoSrc ?? null;
@@ -1499,7 +1614,13 @@ export function InfoboardScreen1({
       >
         {pageItems.map((displayItem, j) => {
           const demand = pageDemands[j];
+          const resolved = resolveCardPresentation(displayItem, presentation, studio);
           if (displayItem.kind === "training-group") {
+            const trainingResolved = resolveCardPresentation(
+              displayItem,
+              presentation,
+              studio,
+            );
             return (
               <TrainingGroupCard
                 key={displayItem.items.map((it) => it.event.id).join(":")}
@@ -1508,8 +1629,17 @@ export function InfoboardScreen1({
                 demand={demand}
                 clubName={clubNameUpper}
                 clubLogoSrc={clubLogoSrc}
-                showLogos={presentation.trainingShowLogos}
+                showLogos={
+                  trainingResolved.kind === "training"
+                    ? trainingResolved.presentation.showLogos
+                    : presentation.trainingShowLogos
+                }
                 cohortContinuation={displayItem.cohortContinuation === true}
+                cardPresentation={
+                  trainingResolved.kind === "training"
+                    ? trainingResolved.presentation
+                    : resolveTrainingCardPresentation(presentation, undefined)
+                }
               />
             );
           }
@@ -1518,6 +1648,7 @@ export function InfoboardScreen1({
           const allocs = extension?.participantAllocations;
           const participantAllocations =
             allocs !== undefined && allocs.length > 0 ? allocs : undefined;
+          const cardStyle = resolveEventCardStyle(resolved);
           return (
             <EventCard
               key={item.event.id}
@@ -1526,6 +1657,8 @@ export function InfoboardScreen1({
               participantAllocations={participantAllocations}
               demand={demand}
               presentation={presentation}
+              cardStyle={cardStyle}
+              resolvedPresentation={resolved}
             />
           );
         })}

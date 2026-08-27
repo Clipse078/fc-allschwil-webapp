@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import { PreviewStudio } from "@/components/infoboard/preview/PreviewStudio";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
+import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { parseInfoboardPreviewMoment } from "@/lib/infoboard/preview-time";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -21,6 +23,9 @@ export default async function InfoboardPreviewPage({ searchParams }: PageProps) 
   ]);
   const tenant = await getActiveTenant();
   if (!tenant?.timezone) notFound();
+
+  const board = await getInfoboardBySlug("screen-1", tenant.id);
+  const boardConfig = board ? buildBoardConfig(board) : null;
 
   const params = await searchParams;
   const preview = parseInfoboardPreviewMoment(
@@ -45,6 +50,8 @@ export default async function InfoboardPreviewPage({ searchParams }: PageProps) 
         initialDate={preview.date}
         initialTime={preview.time}
         timeZone={tenant.timezone}
+        screen1BoardId={board?.id ?? null}
+        initialStudio={boardConfig?.studio}
       />
     </div>
   );

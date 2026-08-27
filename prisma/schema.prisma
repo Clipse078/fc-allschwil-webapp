@@ -5224,6 +5224,10 @@ model Infoboard {
   /// Tournament title font preset. LARGE preserves the accepted baseline.
   screen1TournamentFontSize  String  @default("LARGE")
 
+  /// Screen-1 Studio per-card overrides and soft pagination preferences (JSON).
+  /// See lib/infoboard/screen1-studio-types.ts. null = no overrides.
+  screen1StudioJson String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

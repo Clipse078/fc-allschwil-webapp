@@ -139,6 +139,7 @@ export default async function InfoboardScreen1Page() {
       theme={payload.theme}
       headerConfig={payload.headerConfig ?? undefined}
       presentation={payload.presentation ?? undefined}
+      studio={payload.studio ?? undefined}
     />
   );
 }

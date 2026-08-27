@@ -200,6 +200,7 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
         theme={payload.theme}
         headerConfig={payload.headerConfig ?? undefined}
         presentation={payload.presentation ?? undefined}
+        studio={payload.studio ?? undefined}
       />
     </KioskViewportScaler>
   );

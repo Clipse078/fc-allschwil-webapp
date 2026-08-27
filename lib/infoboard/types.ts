@@ -53,6 +53,8 @@ export type InboardRow = {
   screen1MatchFontSize?: string;
   /** Screen 1 Tournament title font size preset. */
   screen1TournamentFontSize?: string;
+  /** Screen-1 Studio per-card overrides JSON. */
+  screen1StudioJson?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -124,6 +126,7 @@ export type UpdateInfoboardInput = {
   screen1TrainingFontSize?: string;
   screen1MatchFontSize?: string;
   screen1TournamentFontSize?: string;
+  screen1StudioJson?: string | null;
 };
 
 /**

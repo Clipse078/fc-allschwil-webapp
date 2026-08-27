@@ -8,12 +8,19 @@ import {
   parseInfoboardPreviewMoment,
   type InfoboardPreviewScreen,
 } from "@/lib/infoboard/preview-time";
+import {
+  Screen1Studio,
+  type Screen1StudioCardRef,
+} from "@/components/infoboard/studio/Screen1Studio";
+import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
 
 type PreviewStudioProps = {
   initialScreen: InfoboardPreviewScreen;
   initialDate: string;
   initialTime: string;
   timeZone: string;
+  screen1BoardId?: string | null;
+  initialStudio?: Screen1StudioConfig;
 };
 
 const STUDIO_SOURCE = "infoboard-preview-studio";
@@ -24,6 +31,8 @@ export function PreviewStudio({
   initialDate,
   initialTime,
   timeZone,
+  screen1BoardId = null,
+  initialStudio,
 }: PreviewStudioProps) {
   const router = useRouter();
   const frameRef = useRef<HTMLIFrameElement>(null);
@@ -34,6 +43,17 @@ export function PreviewStudio({
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [autoRotate, setAutoRotate] = useState(false);
+  const [studioPages, setStudioPages] = useState<
+    readonly (readonly Screen1StudioCardRef[])[]
+  >([]);
+  const [selectedCardKey, setSelectedCardKey] = useState<string | null>(null);
+  const [studio, setStudio] = useState<Screen1StudioConfig>(
+    initialStudio ?? { cardOverrides: {} },
+  );
+
+  useEffect(() => {
+    if (initialStudio != null) setStudio(initialStudio);
+  }, [initialStudio]);
 
   useEffect(() => {
     function receiveFrameState(event: MessageEvent) {
@@ -49,6 +69,7 @@ export function PreviewStudio({
             type?: string;
             page?: number;
             pageCount?: number;
+            pages?: readonly (readonly Screen1StudioCardRef[])[];
           }
         | undefined;
       if (
@@ -62,10 +83,25 @@ export function PreviewStudio({
       const nextCount = Math.max(1, data.pageCount ?? 1);
       setPageCount(nextCount);
       setPage(Math.min(Math.max(0, data.page ?? 0), nextCount - 1));
+      if (Array.isArray(data.pages)) {
+        setStudioPages(data.pages);
+      }
     }
     window.addEventListener("message", receiveFrameState);
     return () => window.removeEventListener("message", receiveFrameState);
   }, []);
+
+  function pushStudioToFrame(nextStudio: Screen1StudioConfig) {
+    frameRef.current?.contentWindow?.postMessage(
+      { source: STUDIO_SOURCE, type: "SET_STUDIO", studio: nextStudio },
+      window.location.origin,
+    );
+  }
+
+  function handleStudioChange(nextStudio: Screen1StudioConfig) {
+    setStudio(nextStudio);
+    pushStudioToFrame(nextStudio);
+  }
 
   function updateUrl(
     nextScreen: InfoboardPreviewScreen,
@@ -89,6 +125,7 @@ export function PreviewStudio({
     setTime(nextTime);
     setPage(0);
     setPageCount(1);
+    setSelectedCardKey(null);
     updateUrl(screen, nextDate, nextTime);
   }
 
@@ -111,6 +148,7 @@ export function PreviewStudio({
     setScreen(nextScreen);
     setPage(0);
     setPageCount(1);
+    setSelectedCardKey(null);
     updateUrl(nextScreen, date, time);
   }
 
@@ -130,10 +168,7 @@ export function PreviewStudio({
   });
 
   return (
-    <section
-      className="space-y-4"
-      aria-busy={isPending}
-    >
+    <section className="space-y-4" aria-busy={isPending}>
       <div className="flex flex-wrap items-end gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 shadow-sm">
         <label className="grid gap-1 text-xs font-medium text-[var(--muted)]">
           Screen
@@ -204,20 +239,34 @@ export function PreviewStudio({
         </span>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-xl">
-        <div className="aspect-video w-full">
-          <iframe
-            ref={frameRef}
-            key={frameQuery.toString()}
-            src={`/infoboard/preview-frame?${frameQuery.toString()}`}
-            title={`Infoboard Vorschau Screen ${screen}`}
-            className="h-full w-full border-0"
-            onLoad={() => {
-              setPage(0);
-              setPageCount(1);
-            }}
-          />
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-xl">
+          <div className="aspect-video w-full">
+            <iframe
+              ref={frameRef}
+              key={frameQuery.toString()}
+              src={`/infoboard/preview-frame?${frameQuery.toString()}`}
+              title={`Infoboard Vorschau Screen ${screen}`}
+              className="h-full w-full border-0"
+              onLoad={() => {
+                setPage(0);
+                setPageCount(1);
+                pushStudioToFrame(studio);
+              }}
+            />
+          </div>
         </div>
+
+        {screen === "1" && screen1BoardId != null && (
+          <Screen1Studio
+            boardId={screen1BoardId}
+            initialStudio={studio}
+            pages={studioPages}
+            selectedKey={selectedCardKey}
+            onSelectKey={setSelectedCardKey}
+            onStudioChange={handleStudioChange}
+          />
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">

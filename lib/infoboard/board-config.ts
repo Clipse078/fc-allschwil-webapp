@@ -15,6 +15,10 @@ import {
   resolveInfoboardFontSize,
   resolveInfoboardLogoSize,
 } from "./screen1-logo-settings";
+import {
+  parseScreen1StudioJson,
+  type Screen1StudioConfig,
+} from "./screen1-studio-types";
 
 /** Default announcement header subtitle text. */
 export const DEFAULT_HEADER_SUBTITLE = "Heute auf der Sportanlage";
@@ -70,5 +74,8 @@ export function buildBoardConfig(board: InboardRow): InfoboardBoardConfig {
         DEFAULT_TOURNAMENT_FONT_SIZE,
       ),
     },
+    studio: parseScreen1StudioJson(board.screen1StudioJson),
   };
 }
+
+export type { Screen1StudioConfig };
