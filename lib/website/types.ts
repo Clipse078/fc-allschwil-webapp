@@ -301,6 +301,52 @@ export type PublicTeamTrainingSession = {
 };
 
 // ---------------------------------------------------------------------------
+// Public team detail — upcoming match ("Nächste Spiele")
+//
+// Mapped from canonical team-season match rows. Intentionally omits provider
+// metadata, reconciliation fields, and internal visibility flags.
+// ---------------------------------------------------------------------------
+
+export type PublicTeamMatchSide = {
+  /** Canonical tenant Team id when resolved; null for external-only sides. */
+  teamId: string | null;
+  name: string;
+  shortName: string | null;
+  clubName: string | null;
+  logoUrl: string | null;
+};
+
+export type PublicTeamMatchOpponent = {
+  name: string;
+  shortName: string | null;
+  clubName: string | null;
+  logoUrl: string | null;
+};
+
+export type PublicTeamMatchVenue = {
+  name: string | null;
+  /** Canonical free-form location/address when available. */
+  address: string | null;
+};
+
+export type PublicTeamMatchCompetition = {
+  name: string | null;
+};
+
+export type PublicTeamMatch = {
+  id: string;
+  startAt: Date;
+  status: string;
+  home: PublicTeamMatchSide;
+  away: PublicTeamMatchSide;
+  isHomeTeam: boolean;
+  isAwayTeam: boolean;
+  opponent: PublicTeamMatchOpponent;
+  venue: PublicTeamMatchVenue;
+  competition: PublicTeamMatchCompetition;
+};
+
+// ---------------------------------------------------------------------------
 // Public team detail — full team shape
 //
 // Privacy: description and heroImage are reserved for a future schema addition.
@@ -343,6 +389,11 @@ export type PublicTeamDetail = {
    * Ordered by startTime ascending.
    */
   training: PublicTeamTrainingSession[];
+  /**
+   * Next website-visible MATCH fixtures for the current team season.
+   * Includes home and away fixtures, ordered by startAt ascending (max 5).
+   */
+  nextMatches: PublicTeamMatch[];
 };
 
 export type TeamDetailData = {

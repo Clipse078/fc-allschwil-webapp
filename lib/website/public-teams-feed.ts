@@ -23,6 +23,14 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
+import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/team-match-query-service";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import {
+  mapPublicTeamMatches,
+  type PublicTeamMatchExternalTeamRecord,
+  type PublicTeamMatchIdentityContext,
+  type PublicTeamMatchTeamRecord,
+} from "@/lib/website/public-team-matches-mapper";
 import type {
   PublicTeamListItem,
   PublicTeamOrgUnit,
@@ -30,6 +38,7 @@ import type {
   PublicSquadMember,
   PublicTrainerMember,
   PublicTeamTrainingSession,
+  PublicTeamMatch,
 } from "@/lib/website/types";
 
 // ---------------------------------------------------------------------------
@@ -227,6 +236,13 @@ export type GetPublicTeamDetailInput = {
  *              Filters: teamId, tenantId, type = TRAINING, websiteVisible = true,
  *                       status not CANCELLED/ARCHIVED, startAt in window.
  *
+ *   Phase 4  — Upcoming MATCH fixtures for the current team season.
+ *              Uses listTeamSeasonMatches() for canonical home/away participation.
+ *              Publication gate: websiteVisible = true only (NOT teamPageVisible,
+ *              which defaults false for SFV imports and has no active workflow).
+ *              Public upcoming semantics and a 5-fixture limit are applied in
+ *              lib/website/public-team-matches-mapper.ts.
+ *
  * Privacy guarantees:
  * - personId, email, phone, dateOfBirth, remarks: never selected.
  * - pitchCode: selected internally for name resolution, never returned.
@@ -423,6 +439,102 @@ export async function getPublicTeamDetail(
     pitchName: e.pitchCode ? (pitchNameMap.get(e.pitchCode) ?? null) : null,
   }));
 
+  // ── Phase 4: Upcoming matches ("Nächste Spiele") ─────────────────────────
+  let nextMatches: PublicTeamMatch[] = [];
+
+  if (teamSeason) {
+    const { upcoming } = await listTeamSeasonMatches(
+      prisma as unknown as TeamMatchQueryDatabase,
+      {
+      tenantId: input.tenantId,
+      teamSeasonId: teamSeason.id,
+      now,
+      websiteVisibleOnly: true,
+      },
+    );
+
+    const teamIds = new Set<string>();
+    const externalTeamIds = new Set<string>();
+
+    for (const item of upcoming) {
+      for (const side of [item.home, item.away]) {
+        if (side.canonicalTeamId) {
+          teamIds.add(side.canonicalTeamId);
+        }
+
+        if (side.canonicalExternalTeamId) {
+          externalTeamIds.add(side.canonicalExternalTeamId);
+        }
+      }
+    }
+
+    const [tenant, teams, externalTeams] = await Promise.all([
+      prisma.tenant.findUnique({
+        where: { id: input.tenantId },
+        select: { name: true, logoUrl: true },
+      }),
+      teamIds.size > 0
+        ? prisma.team.findMany({
+            where: {
+              id: { in: [...teamIds] },
+              tenantId: input.tenantId,
+            },
+            select: {
+              id: true,
+              shortName: true,
+            },
+          })
+        : Promise.resolve([]),
+      externalTeamIds.size > 0
+        ? prisma.externalTeam.findMany({
+            where: {
+              id: { in: [...externalTeamIds] },
+              tenantId: input.tenantId,
+            },
+            select: {
+              id: true,
+              shortName: true,
+              logoUrl: true,
+              externalClub: {
+                select: {
+                  name: true,
+                  logoUrl: true,
+                },
+              },
+            },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const teamById = new Map<string, PublicTeamMatchTeamRecord>(
+      teams.map((team) => [team.id, team]),
+    );
+    const externalTeamById = new Map<string, PublicTeamMatchExternalTeamRecord>(
+      externalTeams.map((externalTeam) => [
+        externalTeam.id,
+        {
+          id: externalTeam.id,
+          shortName: externalTeam.shortName,
+          logoUrl: resolveExternalTeamLogoUrl(
+            externalTeam,
+            externalTeam.externalClub,
+          ),
+          clubName: externalTeam.externalClub.name,
+        },
+      ]),
+    );
+
+    const identityContext: PublicTeamMatchIdentityContext = {
+      currentTeamId: team.id,
+      tenantLogoUrl: tenant?.logoUrl ?? null,
+      tenantClubName: tenant?.name ?? team.name,
+      teamById,
+      externalTeamById,
+    };
+
+    nextMatches = mapPublicTeamMatches(upcoming, identityContext, now);
+  }
+
   return {
     name: team.name,
     displayName: teamSeason?.displayName ?? team.name,
@@ -437,5 +549,6 @@ export async function getPublicTeamDetail(
     squad,
     trainers,
     training,
+    nextMatches,
   };
 }

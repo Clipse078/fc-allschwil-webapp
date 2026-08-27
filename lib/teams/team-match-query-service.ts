@@ -83,6 +83,13 @@ export interface ListTeamSeasonMatchesInput {
   tenantId: string;
   teamSeasonId: string;
   now?: Date;
+  /**
+   * When true, restricts the canonical event query to websiteVisible=true.
+   * Used by the public team-page feed. Does not require teamPageVisible=true
+   * because SFV-imported fixtures default teamPageVisible=false with no active
+   * publishing workflow.
+   */
+  websiteVisibleOnly?: boolean;
 }
 
 interface TeamMatchTeamRecord {
@@ -591,6 +598,7 @@ export async function listTeamSeasonMatches(
       tenantId,
       type: "MATCH",
       seasonId: teamSeason.seasonId,
+      ...(input.websiteVisibleOnly === true ? { websiteVisible: true } : {}),
       OR: [
         {
           matchExternalMapping: {
