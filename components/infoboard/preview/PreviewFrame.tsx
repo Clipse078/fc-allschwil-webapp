@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   InfoboardScreen1,
   type InfoboardScreen1Props,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
 import type { Screen1StudioCardRef } from "@/components/infoboard/studio/Screen1Studio";
+import { resolveStudioPageIndex } from "@/lib/infoboard/screen1-studio-page-retention";
 import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
 
 const FRAME_SOURCE = "infoboard-preview-frame";
@@ -34,19 +35,36 @@ export function PreviewFrameScreen1({
   const [page, setPage] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [pages, setPages] = useState<readonly (readonly Screen1StudioCardRef[])[]>([]);
+  const selectedKeyRef = useRef<string | null>(null);
   const [studio, setStudio] = useState<Screen1StudioConfig | null>(
     initialStudio ?? null,
   );
+
+  const updateSelectedKey = useCallback((key: string | null) => {
+    selectedKeyRef.current = key;
+  }, []);
 
   useEffect(() => {
     setStudio(initialStudio ?? null);
   }, [initialStudio]);
 
   const reconcilePageCount = useCallback((nextCount: number) => {
-    const safeCount = Math.max(1, nextCount);
-    setPageCount(safeCount);
-    setPage((current) => Math.min(current, safeCount - 1));
+    setPageCount(Math.max(1, nextCount));
   }, []);
+
+  const applyPageRetention = useCallback(
+    (nextPages: readonly (readonly Screen1StudioCardRef[])[]) => {
+      setPages(nextPages);
+      setPage((current) =>
+        resolveStudioPageIndex({
+          pages: nextPages,
+          selectedKey: selectedKeyRef.current,
+          previousPageIndex: current,
+        }),
+      );
+    },
+    [],
+  );
 
   useEffect(() => {
     notifyParent(page, pageCount, pages);
@@ -61,6 +79,7 @@ export function PreviewFrameScreen1({
             type?: string;
             page?: number;
             studio?: Screen1StudioConfig | null;
+            selectedKey?: string | null;
           }
         | undefined;
       if (data?.source !== STUDIO_SOURCE) return;
@@ -70,7 +89,12 @@ export function PreviewFrameScreen1({
       }
       if (data.type === "SET_STUDIO" && data.studio !== undefined) {
         setStudio(data.studio);
-        setPage(0);
+        if (data.selectedKey !== undefined) {
+          updateSelectedKey(data.selectedKey);
+        }
+      }
+      if (data.type === "SET_SELECTED_KEY") {
+        updateSelectedKey(data.selectedKey ?? null);
       }
     }
     window.addEventListener("message", receiveCommand);
@@ -88,7 +112,7 @@ export function PreviewFrameScreen1({
           autoRotate,
           onPageChange: setPage,
           onPageCountChange: reconcilePageCount,
-          onPaginationStructureChange: setPages,
+          onPaginationStructureChange: applyPageRetention,
         }}
       />
     </KioskViewportScaler>
