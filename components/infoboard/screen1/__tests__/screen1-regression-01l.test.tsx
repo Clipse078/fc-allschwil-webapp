@@ -248,9 +248,9 @@ describe("INFOBOARD-ROLLING-01L — normal two-row matrix", () => {
   });
 
   it.each([
-    ["15:45", "4", "compact"],
-    ["17:15", "5", "compact"],
-    ["18:45", "6", "dense"],
+    ["15:45", "4", "normal"],
+    ["17:15", "5", "normal"],
+    ["18:45", "6", "normal"],
   ] as const)("TEST E — %s cohort (%s rows) preserves accepted %s density", (at, count, density) => {
     const nowIso = resolveWednesdayPreviewCurrentTimeIso(at);
     render(
@@ -294,6 +294,7 @@ describe("INFOBOARD-ROLLING-01L — normal two-row matrix", () => {
         feed={buildWednesday20260826Feed(nowIso)}
         branding={BRANDING}
         currentTimeIso={nowIso}
+        liveClock={false}
         announcement={{ enabled: true, text: "Footer safe" }}
       />,
     );

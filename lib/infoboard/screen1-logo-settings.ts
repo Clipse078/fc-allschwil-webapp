@@ -31,7 +31,7 @@ export const LOGO_SIZE_LABELS: Record<InfoboardLogoSize, string> = {
 /** German labels shared by the independent font-size selects. */
 export const FONT_SIZE_LABELS: Record<InfoboardFontSize, string> = LOGO_SIZE_LABELS;
 
-/** Training team-name clamps, including safe caps for grouped-card density. */
+/** Training team-name clamps — one resolved size per admin preset (pagination owns density). */
 export const TRAINING_FONT_SIZE_CSS: Record<
   InfoboardFontSize,
   { normal: string; compact: string; dense: string }
@@ -166,4 +166,53 @@ export function resolveInfoboardFontSize(
   fallback: InfoboardFontSize,
 ): InfoboardFontSize {
   return isInfoboardLogoSize(value) ? value : fallback;
+}
+
+/** Footer-safe single-page demand ceiling at default presentation settings. */
+export const SCREEN1_PAGE_DEMAND_MAX = 8.5;
+
+/** LARGE matches accepted Screen 1 baseline typography (DEFAULT_* constants). */
+const FONT_SIZE_CAPACITY_SCALE: Record<InfoboardFontSize, number> = {
+  SMALL: 0.92,
+  MEDIUM: 0.96,
+  LARGE: 1.0,
+  XLARGE: 1.12,
+};
+
+const LOGO_SIZE_CAPACITY_SCALE: Record<InfoboardLogoSize, number> = {
+  SMALL: 0.96,
+  MEDIUM: 1.0,
+  LARGE: 1.05,
+  XLARGE: 1.1,
+};
+
+/**
+ * Scales Screen 1 pagination capacity inversely with presentation density.
+ * Larger admin-selected fonts/logos reduce the per-page demand budget so
+ * automatic pagination splits earlier instead of clipping on physical TVs.
+ */
+export function resolvePresentationCapacityScale(
+  presentation: Screen1PresentationConfig = DEFAULT_SCREEN1_PRESENTATION,
+): number {
+  const scales = [
+    FONT_SIZE_CAPACITY_SCALE[presentation.trainingFontSize],
+    FONT_SIZE_CAPACITY_SCALE[presentation.matchFontSize],
+    FONT_SIZE_CAPACITY_SCALE[presentation.tournamentFontSize],
+  ];
+  if (presentation.trainingShowLogos) {
+    scales.push(LOGO_SIZE_CAPACITY_SCALE[presentation.trainingLogoSize]);
+  }
+  if (presentation.matchShowLogos) {
+    scales.push(LOGO_SIZE_CAPACITY_SCALE[presentation.matchLogoSize]);
+  }
+  if (presentation.tournamentShowLogos) {
+    scales.push(LOGO_SIZE_CAPACITY_SCALE[presentation.tournamentLogoSize]);
+  }
+  return Math.max(...scales);
+}
+
+export function resolveScreen1PageDemandMax(
+  presentation: Screen1PresentationConfig = DEFAULT_SCREEN1_PRESENTATION,
+): number {
+  return SCREEN1_PAGE_DEMAND_MAX / resolvePresentationCapacityScale(presentation);
 }

@@ -130,7 +130,7 @@ describe("INFOBOARD-ROLLING-01K — footer-safe pagination", () => {
     const footer = screen.getByTestId("announcement-bar");
     expect(main.nextElementSibling).toBe(footer);
     expect(root.lastElementChild).toBe(footer);
-    expect(main.getAttribute("data-safe-page-capacity")).toBe("8.5");
+    expect(main.getAttribute("data-safe-page-capacity")).toBe("8.50");
 
     const rootCss = cssBlock(".root {\n  display: grid");
     const mainCss = cssBlock(".main {");
@@ -197,7 +197,12 @@ describe("INFOBOARD-ROLLING-01K — footer-safe pagination", () => {
     const nowIso = resolveWednesdayPreviewCurrentTimeIso("11:00");
     const feed = buildWednesday20260826Feed(nowIso);
     const view = render(
-      <InfoboardScreen1 feed={feed} branding={BRANDING} currentTimeIso={nowIso} />,
+      <InfoboardScreen1
+        feed={feed}
+        branding={BRANDING}
+        currentTimeIso={nowIso}
+        liveClock={false}
+      />,
     );
 
     await act(async () => vi.advanceTimersByTime(12_000));
@@ -214,11 +219,12 @@ describe("INFOBOARD-ROLLING-01K — footer-safe pagination", () => {
         feed={without1545}
         branding={BRANDING}
         currentTimeIso={nowIso}
+        liveClock={false}
       />,
     );
     await act(async () => {});
 
-    expect(activePageTimes()).toEqual(["17:15"]);
+    expect(activePageTimes()).toEqual(["17:15", "18:45"]);
   });
 
   it("TEST G — converges to one page and removes the rotator when late content fits", () => {

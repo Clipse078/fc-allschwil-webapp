@@ -60,6 +60,8 @@ import {
   DEFAULT_SCREEN1_PRESENTATION,
   MATCH_FONT_SIZE_CSS,
   MATCH_LOGO_SIZE_CSS,
+  resolveScreen1PageDemandMax,
+  SCREEN1_PAGE_DEMAND_MAX,
   TRAINING_FONT_SIZE_CSS,
   TRAINING_LOGO_SIZE_CSS,
   TOURNAMENT_FONT_SIZE_CSS,
@@ -174,7 +176,8 @@ export const TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS = 2;
  * semantic demand weights remain unchanged, so approved training-row spacing
  * is preserved; oversized consecutive cohorts move to another page instead.
  */
-export const CARD_DEMAND_PAGE_MAX = 8.5;
+/** @deprecated Import SCREEN1_PAGE_DEMAND_MAX from screen1-logo-settings. */
+export const CARD_DEMAND_PAGE_MAX = SCREEN1_PAGE_DEMAND_MAX;
 
 /**
  * Demand for a training-group card with `rowCount` simultaneous training rows.
@@ -182,21 +185,76 @@ export const CARD_DEMAND_PAGE_MAX = 8.5;
  */
 export function computeTrainingGroupDemand(rowCount: number): number {
   const rows = Math.max(1, rowCount);
-  const rowWeight = rows >= 4 ? 0.65 : CARD_DEMAND_TRAINING_ROW;
-  return CARD_DEMAND_TRAINING_BASE + rows * rowWeight;
+  return CARD_DEMAND_TRAINING_BASE + rows * CARD_DEMAND_TRAINING_ROW;
+}
+
+/**
+ * Maximum training rows that fit in one footer-safe page at the given demand ceiling.
+ * Exported for regression testing.
+ */
+export function maxTrainingRowsForPageCapacity(maxDemand: number): number {
+  const available = maxDemand - CARD_DEMAND_TRAINING_BASE;
+  if (available <= 0) return 1;
+  return Math.max(1, Math.floor(available / CARD_DEMAND_TRAINING_ROW));
+}
+
+/**
+ * Splits training cohorts whose semantic demand exceeds `maxDemand` into
+ * deterministic continuation chunks. Each chunk keeps the same start time,
+ * typography contract, and row order. Normal cohorts that fit remain atomic.
+ *
+ * Exported for regression testing.
+ */
+export function expandOversizedTrainingGroups(
+  items: readonly DisplayItem[],
+  demands: readonly number[],
+  maxDemand: number,
+): { items: DisplayItem[]; demands: number[] } {
+  const expandedItems: DisplayItem[] = [];
+  const expandedDemands: number[] = [];
+  const maxRows = maxTrainingRowsForPageCapacity(maxDemand);
+
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]!;
+    const demand = demands[i] ?? 1.0;
+
+    if (item.kind !== "training-group") {
+      expandedItems.push(item);
+      expandedDemands.push(demand);
+      continue;
+    }
+
+    const cohortDemand = computeTrainingGroupDemand(item.items.length);
+    if (cohortDemand <= maxDemand) {
+      expandedItems.push(item);
+      expandedDemands.push(cohortDemand);
+      continue;
+    }
+
+    for (let start = 0; start < item.items.length; start += maxRows) {
+      const chunk = item.items.slice(start, start + maxRows);
+      expandedItems.push({
+        kind: "training-group",
+        items: chunk,
+        temporal: item.temporal,
+        cohortContinuation: start > 0,
+      });
+      expandedDemands.push(computeTrainingGroupDemand(chunk.length));
+    }
+  }
+
+  return { items: expandedItems, demands: expandedDemands };
 }
 
 /**
  * Per-card density for grouped training rows.
- * Sparse groups (1–3 rows) keep normal typography; 4+ rows tighten spacing.
+ * Typography and spacing are presentation-controlled; pagination owns density.
  *
  * Exported for regression testing.
  */
 export function trainingGroupDensityTier(
-  rowCount: number,
+  _rowCount: number,
 ): "normal" | "compact" | "dense" {
-  if (rowCount >= 6) return "dense";
-  if (rowCount >= 4) return "compact";
   return "normal";
 }
 
@@ -354,7 +412,13 @@ export type FlatEvent = {
  */
 export type DisplayItem =
   | { kind: "event"; item: FlatEvent }
-  | { kind: "training-group"; items: FlatEvent[]; temporal: TemporalBucket };
+  | {
+      kind: "training-group";
+      items: FlatEvent[];
+      temporal: TemporalBucket;
+      /** True when this card continues an oversized same-start cohort. */
+      cohortContinuation?: boolean;
+    };
 
 /**
  * Splits a display list into pages whose total content demand does not exceed
@@ -371,18 +435,22 @@ export function paginateDisplayList(
   demands: readonly number[],
   maxDemand: number = CARD_DEMAND_PAGE_MAX,
 ): DisplayItem[][] {
-  if (items.length === 0) return [];
+  const { items: expandedItems, demands: expandedDemands } =
+    expandOversizedTrainingGroups(items, demands, maxDemand);
+
+  if (expandedItems.length === 0) return [];
   const pages: DisplayItem[][] = [];
   let currentPage: DisplayItem[] = [];
   let currentDemand = 0;
-  for (let i = 0; i < items.length; i++) {
-    const d = demands[i] ?? 1.0;
+  for (let i = 0; i < expandedItems.length; i++) {
+    const d = expandedDemands[i] ?? 1.0;
+    const item = expandedItems[i]!;
     if (currentPage.length > 0 && currentDemand + d > maxDemand) {
       pages.push(currentPage);
-      currentPage = [items[i]];
+      currentPage = [item];
       currentDemand = d;
     } else {
-      currentPage.push(items[i]);
+      currentPage.push(item);
       currentDemand += d;
     }
   }
@@ -952,6 +1020,7 @@ type TrainingGroupCardProps = {
   /** Existing tenant club logo used for Training team identity. */
   clubLogoSrc: string | null;
   showLogos: boolean;
+  cohortContinuation?: boolean;
 };
 
 /**
@@ -976,6 +1045,7 @@ function TrainingGroupCard({
   clubName,
   clubLogoSrc,
   showLogos,
+  cohortContinuation = false,
 }: TrainingGroupCardProps): ReactElement {
   const first = items[0];
   const temporal = first.temporal;
@@ -994,6 +1064,7 @@ function TrainingGroupCard({
       data-stripe={stripe}
       data-training-count={items.length}
       data-group-density={groupDensity}
+      data-cohort-continuation={cohortContinuation ? "true" : "false"}
       data-card-demand={demand.toFixed(2)}
       style={{ "--ib-card-demand": demand } as CSSProperties}
     >
@@ -1365,17 +1436,25 @@ export function InfoboardScreen1({
     return computeEventDemand(event.type);
   });
 
-  const displayList = rawDisplayList;
+  const pageDemandMax = resolveScreen1PageDemandMax(presentation);
 
-  const clubLogoSrc = branding?.clubLogoSrc ?? null;
-  const productLogoSrc = branding?.productLogoSrc ?? null;
-
-  // Static date fallback used only when currentTimeIso is absent.
-  const staticDateLine =
-    currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
+  function demandForDisplayItem(item: DisplayItem): number {
+    if (item.kind === "training-group") {
+      return computeTrainingGroupDemand(item.items.length);
+    }
+    const event = item.item.event;
+    if (event.type === "MATCH") {
+      return computeMatchDemand(event);
+    }
+    if (event.type === "TOURNAMENT") {
+      const ext = findEventExtension(event.id, eventPresentation);
+      return computeTournamentDemand(ext?.participantAllocations);
+    }
+    return computeEventDemand(event.type);
+  }
 
   // Split into pages based on demand. Normal days: single page (no rotation).
-  const pages = paginateDisplayList(displayList, rawItemDemands);
+  const pages = paginateDisplayList(rawDisplayList, rawItemDemands, pageDemandMax);
   const paginationContentKey = pages
     .map((page) =>
       page
@@ -1388,11 +1467,16 @@ export function InfoboardScreen1({
     )
     .join("|");
 
+  const clubLogoSrc = branding?.clubLogoSrc ?? null;
+  const productLogoSrc = branding?.productLogoSrc ?? null;
+
+  // Static date fallback used only when currentTimeIso is absent.
+  const staticDateLine =
+    currentTimeIso == null ? formatDisplayDate(feed.displayDate) : null;
+
   // ── Page renderer (used for each page in the rotator) ────────────────────
   function renderPage(pageItems: DisplayItem[], pageIndex: number): ReactElement {
-    // Collect per-item demands for this page's subset
-    const pageStartIndex = displayList.indexOf(pageItems[0]);
-    const pageDemands = pageItems.map((_, j) => rawItemDemands[pageStartIndex + j] ?? 1.0);
+    const pageDemands = pageItems.map(demandForDisplayItem);
     const pageTotalDemand = pageDemands.reduce((sum, d) => sum + d, 0);
     const pageDensity = densityTier(pageTotalDemand);
     const pageLayoutMode = layoutModeTier(pageTotalDemand);
@@ -1425,6 +1509,7 @@ export function InfoboardScreen1({
                 clubName={clubNameUpper}
                 clubLogoSrc={clubLogoSrc}
                 showLogos={presentation.trainingShowLogos}
+                cohortContinuation={displayItem.cohortContinuation === true}
               />
             );
           }
@@ -1494,7 +1579,7 @@ export function InfoboardScreen1({
       <main
         className={styles.main}
         data-testid="infoboard-content-region"
-        data-safe-page-capacity={CARD_DEMAND_PAGE_MAX}
+        data-safe-page-capacity={pageDemandMax.toFixed(2)}
       >
         {visibleFeed.isEmpty ? (
           <div className={styles.emptyFull} data-testid="empty-state-full">

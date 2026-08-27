@@ -122,7 +122,7 @@ describe("Training font presets", () => {
     },
   );
 
-  it("keeps six-row density authoritative over XLARGE", () => {
+  it("keeps six-row typography on the saved preset instead of density overrides", () => {
     const trainings = Array.from({ length: 6 }, (_, index) =>
       event(`training-${index}`, "TRAINING", {
         teamDisplayName: `FC Allschwil Team ${index + 1}`,
@@ -131,13 +131,10 @@ describe("Training font presets", () => {
     const root = rootFor(trainings, { trainingFontSize: "XLARGE" });
     expect(screen.getByTestId("training-group").closest("li")).toHaveAttribute(
       "data-group-density",
-      "dense",
+      "normal",
     );
-    expect(root.style.getPropertyValue("--ib-training-font-size-dense")).toBe(
-      TRAINING_FONT_SIZE_CSS.XLARGE.dense,
-    );
-    expect(TRAINING_FONT_SIZE_CSS.XLARGE.dense).toBe(
-      TRAINING_FONT_SIZE_CSS.LARGE.dense,
+    expect(root.style.getPropertyValue("--ib-training-font-size")).toBe(
+      TRAINING_FONT_SIZE_CSS.XLARGE.normal,
     );
   });
 });
@@ -192,7 +189,9 @@ describe("Match font presets and responsive ceiling", () => {
         "[data-match-team-label]",
       ),
     ).toHaveAttribute("data-match-name-size", "medium");
-    expect(CSS).toContain("--ib-match-team-name-base: min(");
+    expect(CSS).toMatch(
+      /\.eventCard\[data-type="MATCH"\] \.eventTeamMain[\s\S]*--ib-match-team-name-base:\s*var\(--ib-match-font-size\)/,
+    );
     expect(CSS).toContain("text-overflow: clip");
   });
 

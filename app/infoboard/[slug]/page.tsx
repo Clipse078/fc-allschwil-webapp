@@ -29,6 +29,7 @@ import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
 import { InfoboardAnlageplan, type InfoboardAnlageplanShellConfig } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   createCanonicalInfoboardSourceLoader,
@@ -189,15 +190,17 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
   });
 
   return (
-    <InfoboardScreen1
-      feed={payload.feed}
-      branding={payload.branding}
-      currentTimeIso={payload.currentTimeIso}
-      announcement={payload.announcement ?? undefined}
-      eventPresentation={payload.eventPresentation}
-      theme={payload.theme}
-      headerConfig={payload.headerConfig ?? undefined}
-      presentation={payload.presentation ?? undefined}
-    />
+    <KioskViewportScaler>
+      <InfoboardScreen1
+        feed={payload.feed}
+        branding={payload.branding}
+        currentTimeIso={payload.currentTimeIso}
+        announcement={payload.announcement ?? undefined}
+        eventPresentation={payload.eventPresentation}
+        theme={payload.theme}
+        headerConfig={payload.headerConfig ?? undefined}
+        presentation={payload.presentation ?? undefined}
+      />
+    </KioskViewportScaler>
   );
 }

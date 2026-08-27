@@ -1,0 +1,16 @@
+.kioskViewportHost {
+  width: 100vw;
+  height: 100svh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #07111e;
+  margin: 0;
+}
+
+.kioskViewportCanvas {
+  flex-shrink: 0;
+  transform-origin: center center;
+  overflow: hidden;
+}

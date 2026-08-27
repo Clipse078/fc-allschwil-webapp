@@ -65,11 +65,11 @@ describe("Wednesday 2026-08-26 golden fixture", () => {
     }
   });
 
-  it("17:15 — five-row cohort uses compact group density", () => {
+  it("17:15 — five-row cohort keeps normal group density", () => {
     renderWednesdayAt("17:15");
 
     const compactCard = findTrainingGroupCard("5");
-    expect(compactCard.getAttribute("data-group-density")).toBe("compact");
+    expect(compactCard.getAttribute("data-group-density")).toBe("normal");
 
     for (const teamName of WEDNESDAY_COHORT_TEAM_NAMES.at1715) {
       expect(within(compactCard).getByText(teamName)).toBeTruthy();
@@ -82,7 +82,7 @@ describe("Wednesday 2026-08-26 golden fixture", () => {
     renderWednesdayAt("18:45");
 
     const denseCard = findTrainingGroupCard("6");
-    expect(denseCard.getAttribute("data-group-density")).toBe("dense");
+    expect(denseCard.getAttribute("data-group-density")).toBe("normal");
 
     for (const teamName of WEDNESDAY_COHORT_TEAM_NAMES.at1845) {
       expect(within(denseCard).getByText(teamName)).toBeTruthy();
@@ -124,7 +124,7 @@ describe("Wednesday 2026-08-26 golden fixture", () => {
 
     const groupCard = findTrainingGroupCard("4");
 
-    expect(groupCard.getAttribute("data-group-density")).toBe("compact");
+    expect(groupCard.getAttribute("data-group-density")).toBe("normal");
     expect(window.getComputedStyle(groupCard).flexGrow).toBe("0");
     expect(window.getComputedStyle(groupCard).flexBasis).toBe("auto");
   });
