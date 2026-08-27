@@ -368,6 +368,43 @@ export type PublicTeamMatch = {
 };
 
 // ---------------------------------------------------------------------------
+// Public team detail — standings ("Rangliste")
+//
+// Provider-neutral league table for the current team season. Intentionally
+// omits provider identifiers and raw upstream fields.
+// ---------------------------------------------------------------------------
+
+export type PublicTeamStandingsCompetition = {
+  name: string;
+  divisionName: string | null;
+  groupName: string | null;
+};
+
+export type PublicTeamStandingRow = {
+  position: number;
+  team: {
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+    isCurrentTeam: boolean;
+  };
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
+  penaltyPoints: number | null;
+};
+
+export type PublicTeamStandings = {
+  competition: PublicTeamStandingsCompetition;
+  rows: PublicTeamStandingRow[];
+};
+
+// ---------------------------------------------------------------------------
 // Public team detail — full team shape
 //
 // Privacy: description and heroImage are reserved for a future schema addition.
@@ -420,6 +457,11 @@ export type PublicTeamDetail = {
    * Includes home and away fixtures, ordered by startAt descending (max 5).
    */
   results: PublicTeamMatch[];
+  /**
+   * Current-season league standings for the mapped team.
+   * Null when no SFV mapping exists, SFV is disabled, or provider data is unavailable.
+   */
+  standings: PublicTeamStandings | null;
 };
 
 export type TeamDetailData = {
