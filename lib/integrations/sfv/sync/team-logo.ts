@@ -2,73 +2,29 @@
  * lib/integrations/sfv/sync/team-logo.ts
  *
  * CLUB-DIRECTORY-02B — SFV logo discovery & enrichment.
+ * MEDIA-LOGO-01B — provider logo normalization to canonical PNG assets.
  *
- * ─── Investigation result (documented here, not guessed) ──────────────────────
+ * SFV exposes team-keyed base64 crest bytes (see fetchTeamPicture). This
+ * adapter fetches those bytes, normalizes them through the provider-neutral
+ * pipeline in lib/assets/provider-logo-normalization.ts, and returns either a
+ * Vercel Blob HTTPS URL (when persistence context + token are available) or a
+ * self-contained normalized `data:image/png` URI as a safe fallback.
  *
- * SFV exposes exactly one logo-bearing endpoint in the ClubCorner API:
- *
- *   GET /api/team/picture/{teamId}   (see lib/integrations/sfv/client.ts
- *                                     #fetchTeamPicture, already implemented
- *                                     and live-validated in a prior slice)
- *
- * There is:
- *   - NO separate club-level picture/logo endpoint (only team-keyed).
- *   - NO stable, unauthenticated, browser-fetchable image URL — the response
- *     is a JSON-quoted base64 string behind an authenticated, token-gated
- *     request (production observation: content-type is application/json,
- *     not image/*; no cache-control/etag/last-modified/content-length
- *     headers at all — see fetchTeamPicture's doc comment).
- *   - Own teams and opponent teams behave identically; teamId alone is
- *     sufficient (no clubId/seasonId/organisationId required).
- *
- * lib/club-directory/logo.ts already documents (from this same investigation)
- * that the "team picture" is actually the *club* crest, keyed by an
- * arbitrary team id belonging to that club — so it is persisted once at
- * ExternalClub.logoUrl and reused by every ExternalTeam under that club
- * (see resolveExternalTeamLogoUrl / mergeProviderLogoUrl).
- *
- * ─── Why a data: URI, not a new storage subsystem ──────────────────────────────
- *
- * Because there is no stable provider URL to store verbatim, and the task's
- * IMAGE STORAGE constraint forbids adding image downloading/caching/storage
- * unless justified by existing patterns, this module converts the
- * already-fetched base64 payload into a self-contained `data:` URI. That URI
- * is persisted directly into the existing
- * ExternalClub.logoUrl / ExternalTeam.logoUrl / *ProviderMapping.providerLogoUrl
- * string columns (see prisma/schema.prisma) — the very same field the
- * CLUB-DIRECTORY-01 architecture already reserved for "a persisted crest/logo
- * URL". No new column, no new model, no new network round-trip to render it.
- *
- * The existing tenant-upload pipeline (lib/assets/storage.ts, via Vercel
- * Blob) was deliberately considered and rejected for provider-sourced
- * crests: ALLOWED_LOGO_UPLOAD_MIME_TYPES (lib/assets/validation.ts)
- * intentionally excludes GIF for tenant uploads, while SFV crests decode to
- * GIF in every production observation — pushing them through that pipeline
- * would require loosening a deliberate tenant-upload security/format
- * constraint just to accommodate a provider sync path. A `data:` URI needs
- * no such change, no Vercel Blob token, and no extra storage/caching layer.
- *
- * ─── Safety ─────────────────────────────────────────────────────────────────
- *
- *   - Never throws: any SFV error (auth/timeout/404-no-picture/network) or
- *     malformed payload resolves to `null` — a logo enrichment failure must
- *     never block schedule/match synchronization (see
- *     external-team-discovery.ts, the sole caller).
- *   - The decoded byte type is verified via magic-byte sniffing
- *     (`file-type`, already a project dependency — see lib/assets/storage.ts)
- *     rather than trusting the documented-but-unverified "always a GIF"
- *     claim, so a malformed or unexpected payload never produces a broken
- *     `<img>` (see components/admin/club-directory/ClubLogo.tsx).
- *   - Decoded byte size is capped at the same MAX_LOGO_FILE_SIZE_BYTES limit
- *     already enforced for tenant-managed logo uploads (lib/assets/validation.ts)
- *     — a defensive bound against an oversized/corrupted provider payload
- *     bloating the database column, not a new policy.
+ * Club-level crest semantics and tenant-managed field ownership are unchanged
+ * (see lib/club-directory/logo.ts / provider-sync.ts).
  */
 
 import { fileTypeFromBuffer } from "file-type";
 
-import { fetchTeamPicture } from "../client";
+import {
+  computeProviderLogoSourceFingerprint,
+  normalizeProviderLogoBytes,
+  NORMALIZED_PROVIDER_LOGO_MIME,
+  persistNormalizedProviderClubLogo,
+  type NormalizeProviderLogoResult,
+} from "@/lib/assets/provider-logo-normalization";
 import { MAX_LOGO_FILE_SIZE_BYTES } from "@/lib/assets/validation";
+import { fetchTeamPicture } from "../client";
 
 /** Image formats accepted from a decoded SFV team-picture payload. */
 const ALLOWED_PROVIDER_LOGO_MIME_TYPES = new Set([
@@ -78,88 +34,140 @@ const ALLOWED_PROVIDER_LOGO_MIME_TYPES = new Set([
   "image/webp",
 ]);
 
-/**
- * Fetches the SFV team picture for `sfvTeamId` and, when a well-formed image
- * is returned, encodes it as a `data:` URI suitable for
- * ExternalClub/ExternalTeam.logoUrl (see lib/club-directory/logo.ts).
- *
- * Returns `null` when:
- *   - the SFV request fails for any reason (auth, timeout, network, 404/no
- *     picture, unexpected server error) — never throws;
- *   - the endpoint reports no picture (204/empty body);
- *   - the decoded bytes are empty, exceed MAX_LOGO_FILE_SIZE_BYTES, or do not
- *     sniff as one of ALLOWED_PROVIDER_LOGO_MIME_TYPES.
- *
- * Never persists anything itself — the caller (external-team-discovery.ts)
- * decides whether/where to store the result, via the same tenant-managed
- * field-ownership rules already used for every other provider-sourced field
- * (lib/club-directory/provider-sync.ts / mutation-service.ts).
- */
-/**
- * ─── CLUB-DIRECTORY-02C — LOGO COMPLETENESS: multi-candidate resolution ────────
- *
- * A canonical ExternalClub now legitimately has several linked SFV teamIds
- * (CLUB-DIRECTORY-02C consolidation). SFV's team-picture endpoint sometimes
- * has no picture on file for one specific teamId (204/404) even though the
- * SAME real club has a picture on file for a sibling team. A failure for one
- * linked teamId must therefore never be treated as "this club has no crest"
- * — every other already-linked teamId is tried, in order, before giving up.
- *
- * Stops at the first non-null result and never calls `resolveProviderLogoDataUri`
- * for any later candidate — "successful logo is stored once at club level,
- * do not repeatedly fetch."
- */
+export type ProviderLogoPersistContext = {
+  tenantKey: string;
+  provider: string;
+  providerClubId: number | null;
+  /** Reuse an existing normalized blob when the source fingerprint is unchanged. */
+  existingNormalizedLogoUrl?: string | null;
+  existingSourceFingerprint?: string | null;
+};
+
 export type ClubLogoCandidateResolution = {
-  /** The resolved `data:` URI, or null when every candidate yielded nothing. */
   logoUrl: string | null;
-  /** Every candidate teamId actually tried, in order (for diagnostics). */
   attemptedTeamIds: number[];
+  /** Present when normalization succeeded — for downstream idempotency hints. */
+  sourceFingerprint?: string | null;
 };
 
 export async function resolveClubLogoFromCandidateTeamIds(
   candidateTeamIds: readonly number[],
+  persistContext?: ProviderLogoPersistContext,
 ): Promise<ClubLogoCandidateResolution> {
   const attemptedTeamIds: number[] = [];
 
   for (const teamId of candidateTeamIds) {
     attemptedTeamIds.push(teamId);
-    const logoUrl = await resolveProviderLogoDataUri(teamId);
-    if (logoUrl !== null) {
-      return { logoUrl, attemptedTeamIds };
+    const resolved = await resolveProviderLogoAsset(teamId, persistContext);
+    if (resolved !== null) {
+      return {
+        logoUrl: resolved.logoUrl,
+        attemptedTeamIds,
+        sourceFingerprint: resolved.sourceFingerprint,
+      };
     }
   }
 
   return { logoUrl: null, attemptedTeamIds };
 }
 
-export async function resolveProviderLogoDataUri(sfvTeamId: number): Promise<string | null> {
+export type ResolvedProviderLogoAsset = {
+  logoUrl: string;
+  sourceFingerprint: string;
+};
+
+/**
+ * Fetches SFV team-picture bytes, normalizes to PNG, and returns a canonical
+ * URL string suitable for ExternalClub/ExternalTeam.logoUrl.
+ */
+export async function resolveProviderLogoAsset(
+  sfvTeamId: number,
+  persistContext?: ProviderLogoPersistContext,
+): Promise<ResolvedProviderLogoAsset | null> {
   try {
-    const picture = await fetchTeamPicture(sfvTeamId);
-    if (picture === null) {
+    const sourceBuffer = await fetchProviderTeamPictureBytes(sfvTeamId);
+    if (sourceBuffer === null) {
       return null;
     }
 
-    const base64 = picture.base64.trim();
-    if (base64.length === 0) {
+    const normalized = await normalizeProviderLogoBytes(sourceBuffer);
+    if (normalized === null) {
       return null;
     }
 
-    const buffer = Buffer.from(base64, "base64");
-    if (buffer.length === 0 || buffer.length > MAX_LOGO_FILE_SIZE_BYTES) {
-      return null;
-    }
-
-    const detected = await fileTypeFromBuffer(buffer);
-    if (!detected || !ALLOWED_PROVIDER_LOGO_MIME_TYPES.has(detected.mime)) {
-      return null;
-    }
-
-    return `data:${detected.mime};base64,${base64}`;
+    return await materializeNormalizedProviderLogo(normalized, persistContext);
   } catch {
-    // Best-effort by design — see module doc comment. Any SFV client error
-    // (SfvAuthError, SfvNetworkError, SFV_NOT_FOUND, timeout, …) is swallowed
-    // here so a logo lookup can never break external-team discovery or the
-    // schedule/match sync that depends on it.
     return null;
   }
+}
+
+/**
+ * Backward-compatible alias used by existing wiring tests and callers.
+ * Returns a normalized PNG URL (blob HTTPS or data: URI), never the raw GIF.
+ */
+export async function resolveProviderLogoDataUri(
+  sfvTeamId: number,
+  persistContext?: ProviderLogoPersistContext,
+): Promise<string | null> {
+  const resolved = await resolveProviderLogoAsset(sfvTeamId, persistContext);
+  return resolved?.logoUrl ?? null;
+}
+
+async function fetchProviderTeamPictureBytes(sfvTeamId: number): Promise<Buffer | null> {
+  const picture = await fetchTeamPicture(sfvTeamId);
+  if (picture === null) {
+    return null;
+  }
+
+  const base64 = picture.base64.trim();
+  if (base64.length === 0) {
+    return null;
+  }
+
+  const buffer = Buffer.from(base64, "base64");
+  if (buffer.length === 0 || buffer.length > MAX_LOGO_FILE_SIZE_BYTES) {
+    return null;
+  }
+
+  const detected = await fileTypeFromBuffer(buffer);
+  if (!detected || !ALLOWED_PROVIDER_LOGO_MIME_TYPES.has(detected.mime)) {
+    return null;
+  }
+
+  return buffer;
+}
+
+async function materializeNormalizedProviderLogo(
+  normalized: NormalizeProviderLogoResult,
+  persistContext?: ProviderLogoPersistContext,
+): Promise<ResolvedProviderLogoAsset | null> {
+  if (
+    persistContext &&
+    persistContext.providerClubId !== null &&
+    persistContext.tenantKey.trim().length > 0
+  ) {
+    const upload = await persistNormalizedProviderClubLogo({
+      tenantKey: persistContext.tenantKey,
+      scope: {
+        provider: persistContext.provider,
+        providerClubId: persistContext.providerClubId,
+      },
+      normalizedBuffer: normalized.buffer,
+      sourceFingerprint: normalized.sourceFingerprint,
+      existingPublicUrl: persistContext.existingNormalizedLogoUrl,
+      existingSourceFingerprint: persistContext.existingSourceFingerprint,
+    });
+
+    if (upload.ok) {
+      return {
+        logoUrl: upload.publicUrl,
+        sourceFingerprint: normalized.sourceFingerprint,
+      };
+    }
+  }
+
+  return {
+    logoUrl: `data:${NORMALIZED_PROVIDER_LOGO_MIME};base64,${normalized.buffer.toString("base64")}`,
+    sourceFingerprint: normalized.sourceFingerprint,
+  };
 }

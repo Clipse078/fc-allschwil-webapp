@@ -1,40 +1,54 @@
 /**
  * lib/integrations/sfv/sync/__tests__/team-logo.test.ts
  *
- * CLUB-DIRECTORY-02B — unit tests for resolveProviderLogoDataUri(), the
- * SFV-specific adapter that turns a fetchTeamPicture() response into a
- * data: URI (see module doc comment in ../team-logo.ts for the
- * investigation result: SFV has no stable logo URL, only an authenticated
- * base64 team-picture endpoint).
- *
- * fetchTeamPicture itself (client.ts) already has exhaustive live-contract
- * coverage in lib/integrations/sfv/__tests__/team-picture.test.ts — this
- * file mocks it and focuses purely on the conversion/guard logic added here.
+ * CLUB-DIRECTORY-02B + MEDIA-LOGO-01B — SFV adapter + normalization tests.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFetchTeamPicture = vi.fn();
+const putMock = vi.fn();
+
 vi.mock("../../client", () => ({
   fetchTeamPicture: (...args: unknown[]) => mockFetchTeamPicture(...args),
 }));
 
-import { resolveClubLogoFromCandidateTeamIds, resolveProviderLogoDataUri } from "../team-logo";
-import { SfvAuthError, SfvNetworkError } from "../../errors";
+vi.mock("@vercel/blob", () => ({
+  put: (...args: unknown[]) => putMock(...args),
+  del: vi.fn(),
+}));
 
-/** Minimal valid 1x1 transparent GIF — same fixture used by team-picture.test.ts. */
+import {
+  resolveClubLogoFromCandidateTeamIds,
+  resolveProviderLogoAsset,
+  resolveProviderLogoDataUri,
+} from "../team-logo";
+import { SfvAuthError, SfvNetworkError } from "../../errors";
+import { NORMALIZED_PROVIDER_LOGO_MIME } from "@/lib/assets/provider-logo-normalization";
+
+/** Minimal valid 1x1 transparent GIF. */
 const GIF_BASE64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 
 /** Minimal valid 1x1 PNG. */
 const PNG_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
+const PERSIST_CONTEXT = {
+  tenantKey: "fc-allschwil",
+  provider: "SFV",
+  providerClubId: 483,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.BLOB_READ_WRITE_TOKEN = "test-token";
+  putMock.mockResolvedValue({
+    url: "https://abc.public.blob.vercel-storage.com/clubs/fc-allschwil/provider/sfv/483.png",
+  });
 });
 
-describe("resolveProviderLogoDataUri — happy path", () => {
-  it("returns a data: URI built from the fetched base64 payload for a GIF crest", async () => {
+describe("resolveProviderLogoDataUri — normalized output", () => {
+  it("returns a normalized PNG data URI for a GIF crest (not raw GIF)", async () => {
     mockFetchTeamPicture.mockResolvedValueOnce({
       base64: GIF_BASE64,
       contentType: "application/json",
@@ -46,11 +60,34 @@ describe("resolveProviderLogoDataUri — happy path", () => {
 
     const result = await resolveProviderLogoDataUri(31927);
 
-    expect(result).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result).toMatch(/^data:image\/png;base64,/);
+    expect(result).not.toContain(GIF_BASE64);
     expect(mockFetchTeamPicture).toHaveBeenCalledWith(31927);
   });
 
-  it("accepts other sniffed image formats too (not hard-coded to GIF)", async () => {
+  it("uploads to blob when persistence context is provided", async () => {
+    mockFetchTeamPicture.mockResolvedValueOnce({
+      base64: GIF_BASE64,
+      contentType: "application/json",
+      contentLength: null,
+      etag: null,
+      lastModified: null,
+      cacheControl: null,
+    });
+
+    const result = await resolveProviderLogoDataUri(31927, PERSIST_CONTEXT);
+
+    expect(result).toBe(
+      "https://abc.public.blob.vercel-storage.com/clubs/fc-allschwil/provider/sfv/483.png",
+    );
+    expect(putMock).toHaveBeenCalledWith(
+      "clubs/fc-allschwil/provider/sfv/483.png",
+      expect.any(Buffer),
+      expect.objectContaining({ contentType: NORMALIZED_PROVIDER_LOGO_MIME }),
+    );
+  });
+
+  it("accepts other sniffed raster formats and normalizes to PNG", async () => {
     mockFetchTeamPicture.mockResolvedValueOnce({
       base64: PNG_BASE64,
       contentType: "application/json",
@@ -62,7 +99,7 @@ describe("resolveProviderLogoDataUri — happy path", () => {
 
     const result = await resolveProviderLogoDataUri(31927);
 
-    expect(result).toBe(`data:image/png;base64,${PNG_BASE64}`);
+    expect(result).toMatch(/^data:image\/png;base64,/);
   });
 });
 
@@ -124,7 +161,6 @@ describe("resolveProviderLogoDataUri — malformed/unexpected payload guard", ()
 
   it("returns null when the decoded payload exceeds the max logo size guard", async () => {
     const oversized = Buffer.alloc(3 * 1024 * 1024, 0);
-    // GIF magic header so it would otherwise pass the format sniff.
     oversized.write("GIF89a", 0, "ascii");
 
     mockFetchTeamPicture.mockResolvedValueOnce({
@@ -172,8 +208,6 @@ describe("resolveProviderLogoDataUri — best-effort: never throws", () => {
   });
 });
 
-// ── CLUB-DIRECTORY-02C — multi-candidate club logo resolution ────────────────
-
 describe("resolveClubLogoFromCandidateTeamIds — first candidate succeeds", () => {
   it("returns the first successful crest and never tries a second candidate", async () => {
     mockFetchTeamPicture.mockResolvedValueOnce({
@@ -187,7 +221,7 @@ describe("resolveClubLogoFromCandidateTeamIds — first candidate succeeds", () 
 
     const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928, 31929]);
 
-    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.logoUrl).toMatch(/^data:image\/png;base64,/);
     expect(result.attemptedTeamIds).toEqual([31927]);
     expect(mockFetchTeamPicture).toHaveBeenCalledTimes(1);
     expect(mockFetchTeamPicture).toHaveBeenCalledWith(31927);
@@ -209,7 +243,7 @@ describe("resolveClubLogoFromCandidateTeamIds — first candidate fails, sibling
 
     const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928]);
 
-    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.logoUrl).toMatch(/^data:image\/png;base64,/);
     expect(result.attemptedTeamIds).toEqual([31927, 31928]);
     expect(mockFetchTeamPicture).toHaveBeenNthCalledWith(1, 31927);
     expect(mockFetchTeamPicture).toHaveBeenNthCalledWith(2, 31928);
@@ -236,7 +270,7 @@ describe("resolveClubLogoFromCandidateTeamIds — first candidate fails, sibling
 
     const result = await resolveClubLogoFromCandidateTeamIds([31927, 31928]);
 
-    expect(result.logoUrl).toBe(`data:image/gif;base64,${GIF_BASE64}`);
+    expect(result.logoUrl).toMatch(/^data:image\/png;base64,/);
     expect(result.attemptedTeamIds).toEqual([31927, 31928]);
   });
 });
@@ -261,5 +295,23 @@ describe("resolveClubLogoFromCandidateTeamIds — every candidate fails", () => 
     expect(result.logoUrl).toBeNull();
     expect(result.attemptedTeamIds).toEqual([]);
     expect(mockFetchTeamPicture).not.toHaveBeenCalled();
+  });
+});
+
+describe("resolveProviderLogoAsset — source fingerprint", () => {
+  it("returns a stable fingerprint for repeated unchanged fetches", async () => {
+    mockFetchTeamPicture.mockResolvedValue({
+      base64: GIF_BASE64,
+      contentType: "application/json",
+      contentLength: null,
+      etag: null,
+      lastModified: null,
+      cacheControl: null,
+    });
+
+    const first = await resolveProviderLogoAsset(31927);
+    const second = await resolveProviderLogoAsset(31927);
+
+    expect(first?.sourceFingerprint).toBe(second?.sourceFingerprint);
   });
 });

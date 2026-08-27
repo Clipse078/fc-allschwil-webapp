@@ -119,10 +119,13 @@ function dedupeCandidateTeamIds(teamIds: readonly number[]): number[] {
 async function resolveOpponentLogoIfNeeded(
   queryDatabase: ReturnType<typeof createClubDirectoryQueryDatabase>,
   tenantId: string,
+  tenantKey: string | null,
   sfvTeamId: number,
   providerClubId: number | null,
 ): Promise<string | null> {
   let candidateTeamIds: number[] = [sfvTeamId];
+  let existingNormalizedLogoUrl: string | null = null;
+  let existingSourceFingerprint: string | null = null;
 
   try {
     const existingTeam = await findExternalTeamByProviderIdentity(queryDatabase, {
@@ -149,6 +152,7 @@ async function resolveOpponentLogoIfNeeded(
           // mapping row exists yet.
           return null;
         }
+        existingNormalizedLogoUrl = club.logoUrl;
         candidateTeamIds = dedupeCandidateTeamIds([sfvTeamId, ...club.linkedProviderTeamIds]);
       }
     }
@@ -156,7 +160,21 @@ async function resolveOpponentLogoIfNeeded(
     return null;
   }
 
-  const { logoUrl, attemptedTeamIds } = await resolveClubLogoFromCandidateTeamIds(candidateTeamIds);
+  const persistContext =
+    tenantKey !== null
+      ? {
+          tenantKey,
+          provider: PROVIDER,
+          providerClubId,
+          existingNormalizedLogoUrl,
+          existingSourceFingerprint,
+        }
+      : undefined;
+
+  const { logoUrl, attemptedTeamIds } = await resolveClubLogoFromCandidateTeamIds(
+    candidateTeamIds,
+    persistContext,
+  );
 
   if (logoUrl === null && providerClubId !== null) {
     logClubLogoEnrichmentExhausted(tenantId, providerClubId, attemptedTeamIds);
@@ -193,10 +211,12 @@ export function createExternalOpponentResolver(
   syncedAt: Date,
   providerClubIdIndex?: ReadonlyMap<number, number>,
   providerCompetitionContextIndex?: ReadonlyMap<number, ProviderCompetitionContext>,
+  tenantKey?: string | null,
 ): ExternalOpponentResolver {
   const database = createClubDirectoryMutationDatabase(prisma);
   const queryDatabase = createClubDirectoryQueryDatabase(prisma);
   const cache = new Map<number, Promise<string | null>>();
+  let resolvedTenantKey: string | null = tenantKey?.trim() || null;
 
   return (sfvTeamId: number, sfvTeamName: string | null): Promise<string | null> => {
     const cached = cache.get(sfvTeamId);
@@ -205,6 +225,18 @@ export function createExternalOpponentResolver(
     }
 
     const pending = (async () => {
+      if (resolvedTenantKey === null) {
+        try {
+          const tenant = await prisma.tenant.findUnique({
+            where: { id: tenantId },
+            select: { key: true },
+          });
+          resolvedTenantKey = tenant?.key?.trim() || null;
+        } catch {
+          resolvedTenantKey = null;
+        }
+      }
+
       const providerClubId = resolveProviderClubId(providerClubIdIndex, sfvTeamId);
       const competitionContext = resolveProviderCompetitionContext(
         providerCompetitionContextIndex,
@@ -214,6 +246,7 @@ export function createExternalOpponentResolver(
       const providerLogoUrl = await resolveOpponentLogoIfNeeded(
         queryDatabase,
         tenantId,
+        resolvedTenantKey,
         sfvTeamId,
         providerClubId,
       );

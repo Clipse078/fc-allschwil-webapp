@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   getExternalClubLogoKey,
   getExternalTeamLogoKey,
+  getNormalizedProviderClubLogoKey,
   getTenantLogoKey,
 } from "../tenant-paths";
 
@@ -35,5 +36,19 @@ describe("CLUB-DIRECTORY-01 crest key builders", () => {
     const keyA = getExternalClubLogoKey("fc-allschwil", "club-1", "png");
     const keyB = getExternalClubLogoKey("sv-muttenz", "club-1", "png");
     expect(keyA).not.toBe(keyB);
+  });
+});
+
+describe("MEDIA-LOGO-01B normalized provider crest keys", () => {
+  it("builds a provider-club-scoped normalized PNG key", () => {
+    expect(
+      getNormalizedProviderClubLogoKey("fc-allschwil", { provider: "SFV", providerClubId: 483 }),
+    ).toBe("clubs/fc-allschwil/provider/sfv/483.png");
+  });
+
+  it("builds an external-club-scoped normalized PNG key", () => {
+    expect(getNormalizedProviderClubLogoKey("fc-allschwil", { externalClubId: "club-1" })).toBe(
+      "clubs/fc-allschwil/club-1.png",
+    );
   });
 });
