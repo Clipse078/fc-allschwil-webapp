@@ -211,33 +211,19 @@ describe("INFOBOARD-ROLLING-01H — shared row alignment", () => {
 });
 
 describe("INFOBOARD-ROLLING-01H — row spacing tokens", () => {
-  it("TEST D — row-spacing tokens preserve normal > compact > dense hierarchy", () => {
+  it("TEST D — row-spacing tokens stay on the normal tier for all cohort sizes", () => {
     renderWednesdayAt("20:15");
-    const normalTokens = readTrainingMatrixTokens(trainingCard("2"));
+    const twoRowTokens = readTrainingMatrixTokens(trainingCard("2"));
 
     renderWednesdayAt("15:45");
-    const compactTokens = readTrainingMatrixTokens(trainingCard("4"));
+    const fourRowTokens = readTrainingMatrixTokens(trainingCard("4"));
 
     renderWednesdayAt("18:45");
-    const denseTokens = readTrainingMatrixTokens(trainingCard("6"));
+    const sixRowTokens = readTrainingMatrixTokens(trainingCard("6"));
 
-    const normalSpacing =
-      clampMax(normalTokens.rowHeight)
-      + clampMax(normalTokens.rowGap)
-      + clampMax(normalTokens.cellPaddingY) * 2;
-    const compactSpacing =
-      clampMax(compactTokens.rowHeight)
-      + clampMax(compactTokens.rowGap)
-      + clampMax(compactTokens.cellPaddingY) * 2;
-    const denseSpacing =
-      clampMax(denseTokens.rowHeight)
-      + clampMax(denseTokens.rowGap)
-      + clampMax(denseTokens.cellPaddingY) * 2;
-
-    expect(normalSpacing).toBeGreaterThan(compactSpacing);
-    expect(compactSpacing).toBeGreaterThan(denseSpacing);
-    expect(clampMax(compactTokens.rowGap)).toBeGreaterThan(0);
-    expect(clampMax(denseTokens.rowGap)).toBeGreaterThan(0);
+    expect(fourRowTokens.rowHeight).toBe(twoRowTokens.rowHeight);
+    expect(sixRowTokens.rowHeight).toBe(twoRowTokens.rowHeight);
+    expect(clampMax(twoRowTokens.rowGap)).toBeGreaterThan(0);
   });
 
   it("compact and dense tiers expose non-zero row gap on the shared matrix", () => {
@@ -260,7 +246,7 @@ describe("INFOBOARD-ROLLING-01H — clip-safe dense cohort", () => {
 
     expect(within(denseCard).getAllByTestId("training-group-row")).toHaveLength(6);
     expect(denseCard.querySelectorAll('[data-testid="training-matrix-row"]')).toHaveLength(6);
-    expect(denseCard.getAttribute("data-group-density")).toBe("dense");
+    expect(denseCard.getAttribute("data-group-density")).toBe("normal");
   });
 });
 

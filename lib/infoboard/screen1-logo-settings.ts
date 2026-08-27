@@ -31,7 +31,7 @@ export const LOGO_SIZE_LABELS: Record<InfoboardLogoSize, string> = {
 /** German labels shared by the independent font-size selects. */
 export const FONT_SIZE_LABELS: Record<InfoboardFontSize, string> = LOGO_SIZE_LABELS;
 
-/** Training team-name clamps, including safe caps for grouped-card density. */
+/** Training team-name clamps — one resolved size per admin preset (pagination owns density). */
 export const TRAINING_FONT_SIZE_CSS: Record<
   InfoboardFontSize,
   { normal: string; compact: string; dense: string }

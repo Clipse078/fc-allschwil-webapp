@@ -121,9 +121,9 @@ describe("INFOBOARD-REGRESSION-01F — shared training row matrix", () => {
   });
 
   it.each([
-    ["4", "compact", "15:45"],
-    ["5", "compact", "17:15"],
-    ["6", "dense", "18:45"],
+    ["4", "normal", "15:45"],
+    ["5", "normal", "17:15"],
+    ["6", "normal", "18:45"],
   ] as const)("assigns %s-row cohort to %s group density at %s", (rows, density, at) => {
     renderWednesdayAt(at);
     expect(trainingCard(rows).getAttribute("data-group-density")).toBe(density);

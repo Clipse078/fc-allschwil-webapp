@@ -1497,14 +1497,10 @@
   border-top-color: rgba(60, 48, 32, 0.06);
 }
 
-/* ─── Grouped-training row density (per-card, 4+ rows) ─────────────────────
+/* ─── Grouped-training row spacing (legacy selectors; density tier is normal) ─
  *
- * Page-level data-density tightens all cards on busy pages. Per-group density
- * targets multi-row training blocks only so sparse 1–3 row groups stay unchanged.
- *
- * Root cause fix: minmax(0, 1fr) allowed the value grid to shrink below its
- * intrinsic row height; combined with overflow:hidden on .eventCard this clipped
- * the final team entries on 1080p TVs.
+ * Typography is presentation-controlled. Pagination splits oversized cohorts
+ * instead of shrinking team-name font sizes by row count.
  */
 .eventCard[data-type="TRAINING"][data-group-density="normal"] {
   /* Normal labels can resolve to a ~63px line box at 1080p. Keep the shared
@@ -1525,11 +1521,6 @@
   --ib-training-cell-padding-y: clamp(2px, 0.28vh, 5px);
 }
 
-.eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupTeamName {
-  font-size: var(--ib-training-font-size-compact);
-  line-height: 1.05;
-}
-
 .eventCard[data-type="TRAINING"][data-group-density="compact"] .trainingGroupPitchValue {
   font-size: clamp(1rem, 1.35vw, 1.75rem);
   line-height: 1.05;
@@ -1548,11 +1539,6 @@
   --ib-training-row-height: clamp(24px, 2.8vh, 34px);
   --ib-training-row-gap: clamp(2px, 0.28vh, 4px);
   --ib-training-cell-padding-y: clamp(1px, 0.2vh, 3px);
-}
-
-.eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupTeamName {
-  font-size: var(--ib-training-font-size-dense);
-  line-height: 1.02;
 }
 
 .eventCard[data-type="TRAINING"][data-group-density="dense"] .trainingGroupPitchValue {

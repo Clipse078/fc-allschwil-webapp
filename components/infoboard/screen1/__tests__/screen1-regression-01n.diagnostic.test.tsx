@@ -138,7 +138,9 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
       ...visibleFeed.later,
     ].map((event) => event.id)).not.toContain("wed-s30");
     expect(items.map(itemTime)).toEqual(["15:45", "17:15", "18:45"]);
-    expect(demands).toEqual([3.6, 4.25, 4.9]);
+    expect(demands[0]).toBeCloseTo(3.2);
+    expect(demands[1]).toBeCloseTo(3.75);
+    expect(demands[2]).toBeCloseTo(4.3);
     expect(pages.map((page) => page.map(itemTime))).toEqual([
       ["15:45", "17:15"],
       ["18:45"],
@@ -179,7 +181,7 @@ describe("INFOBOARD-ROLLING-01N diagnostic pipeline", () => {
 
     expect(items.map(itemTime)).toEqual(["15:45", "17:15", "18:45", "19:45", "20:15"]);
     expect(demands).toHaveLength(5);
-    [3.6, 4.25, 4.9, 2.32, 2.1].forEach((expected, index) => {
+    [3.2, 3.75, 4.3, 2.32, 2.1].forEach((expected, index) => {
       expect(demands[index]).toBeCloseTo(expected);
     });
     expect(pages.map((page) => page.map(itemTime))).toEqual([

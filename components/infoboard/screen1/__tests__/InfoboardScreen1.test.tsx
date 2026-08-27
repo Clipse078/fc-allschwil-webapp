@@ -542,7 +542,7 @@ describe("Temporal status â€” next label (no countdown)", () => {
       />,
     );
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toBe("ALS NÃ„CHSTES");
+    expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
   it("next event shows ALS NÃ„CHSTES when currentTimeIso is not provided", () => {
@@ -552,7 +552,7 @@ describe("Temporal status â€” next label (no countdown)", () => {
     });
     render(<InfoboardScreen1 feed={feed} />);
     const label = screen.getByTestId("status-label-next");
-    expect(label.textContent).toBe("ALS NÃ„CHSTES");
+    expect(label.textContent).toBe("ALS NÄCHSTES");
   });
 
   it("next label has next status data attribute", () => {
@@ -1674,10 +1674,10 @@ describe("Footer â€” product branding", () => {
     const img = branding.querySelector("img");
     expect(img).not.toBeNull();
     expect(img?.getAttribute("alt")).toBe("SportClubEvo");
-    expect(img?.getAttribute("src")).toBe("/images/branding/sportclubevo_logo.png");
+    expect(img?.getAttribute("src")).toBe("/images/branding/sportclubevo_logo_alt.png");
   });
 
-  it("renders SportClubEvo text fallback when productLogoSrc is null", () => {
+  it("renders SportClubEvo product logo even when productLogoSrc is null", () => {
     render(
       <InfoboardScreen1
         feed={makeFeed()}
@@ -1685,7 +1685,10 @@ describe("Footer â€” product branding", () => {
       />,
     );
     const branding = screen.getByTestId("product-branding");
-    expect(branding.textContent).toContain("SportClubEvo");
+    expect(branding.querySelector('img[alt="SportClubEvo"]')).toHaveAttribute(
+      "src",
+      "/images/branding/sportclubevo_logo_alt.png",
+    );
   });
 
   it("product branding is NOT inside the header", () => {
@@ -2936,16 +2939,16 @@ describe("Content-demand â€” computeTrainingGroupDemand", () => {
     expect(computeTrainingGroupDemand(2)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 2 * CARD_DEMAND_TRAINING_ROW);
   });
 
-  it("4-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * 0.65);
+  it("4-row training demand uses the universal row weight", () => {
+    expect(computeTrainingGroupDemand(4)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 4 * CARD_DEMAND_TRAINING_ROW);
   });
 
-  it("5-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * 0.65);
+  it("5-row training demand uses the universal row weight", () => {
+    expect(computeTrainingGroupDemand(5)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 5 * CARD_DEMAND_TRAINING_ROW);
   });
 
-  it("6-row training demand uses compact row weight", () => {
-    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * 0.65);
+  it("6-row training demand uses the universal row weight", () => {
+    expect(computeTrainingGroupDemand(6)).toBeCloseTo(CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW);
   });
 
   it("demand grows monotonically with row count", () => {
@@ -3277,9 +3280,9 @@ describe("Content-demand â€” training regression (unchanged)", () => {
     );
   });
 
-  it("6-row training demand uses compact row weight", () => {
+  it("6-row training demand uses the universal row weight", () => {
     expect(computeTrainingGroupDemand(6)).toBeCloseTo(
-      CARD_DEMAND_TRAINING_BASE + 6 * 0.65,
+      CARD_DEMAND_TRAINING_BASE + 6 * CARD_DEMAND_TRAINING_ROW,
     );
   });
 });
@@ -4115,7 +4118,7 @@ describe("FC Allschwil regression â€” Fixture B dense 17:15â€“18:45 gr
 
     const groupCard = screen.getByTestId("event-row");
     expect(groupCard.getAttribute("data-training-count")).toBe("4");
-    expect(groupCard.getAttribute("data-group-density")).toBe("compact");
+    expect(groupCard.getAttribute("data-group-density")).toBe("normal");
 
     const rows = screen.getAllByTestId("training-group-row");
     expect(rows).toHaveLength(4);
@@ -4203,12 +4206,12 @@ describe("trainingGroupDensityTier â€” sparse groups unchanged", () => {
   });
 
   it("4â€“5 rows use compact density", () => {
-    expect(trainingGroupDensityTier(4)).toBe("compact");
-    expect(trainingGroupDensityTier(5)).toBe("compact");
+    expect(trainingGroupDensityTier(4)).toBe("normal");
+    expect(trainingGroupDensityTier(5)).toBe("normal");
   });
 
   it("6+ rows use dense density", () => {
-    expect(trainingGroupDensityTier(6)).toBe("dense");
+    expect(trainingGroupDensityTier(6)).toBe("normal");
   });
 });
 
@@ -4244,15 +4247,10 @@ describe("INFOBOARD-REGRESSION-01E — card geometry invariants", () => {
     return card;
   }
 
-  it("assigns expected group-density tiers for 1/4/5/6 row cards", () => {
-    for (const [rows, density] of [
-      ["1", "normal"],
-      ["4", "compact"],
-      ["5", "compact"],
-      ["6", "dense"],
-    ] as const) {
+  it("assigns normal group-density for all cohort sizes", () => {
+    for (const rows of ["1", "4", "5", "6"] as const) {
       renderTrainingGroup(Number(rows));
-      expect(trainingCard(rows).getAttribute("data-group-density")).toBe(density);
+      expect(trainingCard(rows).getAttribute("data-group-density")).toBe("normal");
     }
   });
 
@@ -4477,23 +4475,26 @@ describe("INFOBOARD-ROLLING-01D — chronological rolling pagination", () => {
     }
   });
 
-  it("TEST D — oversized single card appears alone and is not discarded", () => {
-    const oversizedDemand = CARD_DEMAND_PAGE_MAX + 2;
-    const oversizedCohort = makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 6);
+  it("TEST D — oversized training cohort splits into continuation pages without dropping rows", () => {
+    const maxDemand = 4.5;
+    const oversizedCohort = makeCohortDisplayItem("2026-08-26T16:45:00.000Z", 10);
     const followUp = makeMatchDisplayItem("match-follow", "2026-08-26T17:45:00.000Z");
     const pages = paginateDisplayList(
       [oversizedCohort, followUp],
-      [oversizedDemand, computeMatchDemand(followUp.item.event)],
-      CARD_DEMAND_PAGE_MAX,
+      [computeTrainingGroupDemand(10), computeMatchDemand(followUp.item.event)],
+      maxDemand,
     );
 
-    expect(pages).toHaveLength(2);
-    expect(pages[0]).toHaveLength(1);
-    expect(pages[1]).toHaveLength(1);
-    expect(flattenPaginatedItems(pages).map(displayItemKey)).toEqual([
-      displayItemKey(oversizedCohort),
-      displayItemKey(followUp),
-    ]);
+    const cohortChunks = pages
+      .flat()
+      .filter((item) => item.kind === "training-group");
+    expect(cohortChunks.length).toBeGreaterThan(1);
+    expect(
+      cohortChunks.flatMap((item) =>
+        item.kind === "training-group" ? item.items.map(({ event }) => event.id) : [],
+      ),
+    ).toHaveLength(10);
+    expect(flattenPaginatedItems(pages).some((item) => item.kind === "event")).toBe(true);
   });
 
   it("TEST E — current and next items remain first across rolling pages", () => {
