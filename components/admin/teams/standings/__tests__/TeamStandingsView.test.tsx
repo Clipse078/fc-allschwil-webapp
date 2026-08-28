@@ -151,13 +151,13 @@ describe("TEAM-COCKPIT-PREMIUM-01H — TeamStandingsView", () => {
     expect(screen.getByTestId("team-standings-points-2")).toHaveTextContent("20");
   });
 
-  it("keeps points values rendered while the visible Pkt. heading is absent", () => {
+  it("renders the visible Pkt. heading while keeping points values rendered", () => {
     render(<TeamStandingsView standings={createStandings()} hasProviderMapping />);
 
-    expect(screen.queryByText(/^Pkt\.$/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/^Pkt\.$/i)).toBeInTheDocument();
     expect(screen.getByTestId("team-standings-points-1")).toHaveTextContent("25");
     expect(screen.getByTestId("team-standings-points-2")).toHaveTextContent("20");
-    expect(screen.getByTitle("Punkte")).toHaveTextContent("Punkte");
+    expect(screen.getByTitle("Punkte")).toHaveTextContent("Pkt.");
   });
 
   it("L. highlights current team via isCurrentTeam", () => {
