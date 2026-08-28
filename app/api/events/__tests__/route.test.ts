@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   canCreateForTeam: vi.fn(),
   seasonFindUnique: vi.fn(),
   teamFindUnique: vi.fn(),
+  externalClubFindFirst: vi.fn(),
   eventCreate: vi.fn(),
   auditLogCreate: vi.fn(),
 }));
@@ -52,6 +53,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     season: { findUnique: mocks.seasonFindUnique },
     team: { findUnique: mocks.teamFindUnique },
+    externalClub: { findFirst: mocks.externalClubFindFirst },
     event: { create: mocks.eventCreate },
     auditLog: { create: mocks.auditLogCreate },
     $transaction: (fn: (tx: unknown) => unknown) =>
@@ -88,6 +90,16 @@ const VALID_BODY = {
   title: "E1 Hallenturnier",
   startAt: "2026-09-05T10:00:00.000Z",
   organizerName: "FC Aesch",
+};
+
+const MATCH_BODY = {
+  type: "MATCH",
+  source: "MANUAL",
+  seasonId: "season-1",
+  teamId: "team-1",
+  title: "1. Mannschaft vs. FC Telegraph",
+  startAt: "2026-09-05T10:00:00.000Z",
+  homeAway: "HOME",
 };
 
 describe("POST /api/events", () => {
@@ -160,6 +172,130 @@ describe("POST /api/events", () => {
 
     const res = await POST(makeRequest(VALID_BODY));
     expect(res.status).toBe(403);
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/events — MATCHCENTER-CANONICAL-OPPONENT-01B", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.auth.mockResolvedValue(VALID_AUTH_SESSION);
+    mocks.canCreateForTeam.mockResolvedValue({
+      allowed: true,
+      isCoordinator: true,
+      isScoped: false,
+    });
+    mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
+    mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
+    mocks.eventCreate.mockResolvedValue({
+      id: "event-match-1",
+      title: "Match",
+      type: "MATCH",
+      source: "MANUAL",
+      status: "SCHEDULED",
+      reviewStage: "APPROVED",
+      reviewRequestedAt: null,
+      reviewedAt: new Date(),
+      seasonId: "season-1",
+      teamId: "team-1",
+      startAt: new Date("2026-09-05T10:00:00.000Z"),
+      endAt: null,
+      meetingTime: null,
+    });
+  });
+
+  it("creates a canonical club match with empty opponentName and derives the display name from the club", async () => {
+    mocks.externalClubFindFirst.mockResolvedValue({
+      id: "club-telegraph",
+      name: "FC Telegraph",
+      archivedAt: null,
+    });
+
+    const res = await POST(
+      makeRequest({
+        ...MATCH_BODY,
+        opponentExternalClubId: "club-telegraph",
+        opponentName: null,
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(call.data.opponentExternalClubId).toBe("club-telegraph");
+    expect(call.data.opponentName).toBe("FC Telegraph");
+  });
+
+  it("persists an optional Anzeigename override without changing the canonical club id", async () => {
+    mocks.externalClubFindFirst.mockResolvedValue({
+      id: "club-telegraph",
+      name: "FC Telegraph",
+      archivedAt: null,
+    });
+
+    const res = await POST(
+      makeRequest({
+        ...MATCH_BODY,
+        opponentExternalClubId: "club-telegraph",
+        opponentName: "FC Telegraph E1",
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(call.data.opponentExternalClubId).toBe("club-telegraph");
+    expect(call.data.opponentName).toBe("FC Telegraph E1");
+  });
+
+  it("still allows manual opponentName-only creation", async () => {
+    const res = await POST(
+      makeRequest({
+        ...MATCH_BODY,
+        opponentName: "Freundschaftsgast FC",
+      }),
+    );
+
+    expect(res.status).toBe(201);
+    const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect(call.data.opponentExternalClubId).toBeNull();
+    expect(call.data.opponentName).toBe("Freundschaftsgast FC");
+    expect(mocks.externalClubFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("rejects when neither canonical club nor manual name is provided", async () => {
+    const res = await POST(makeRequest({ ...MATCH_BODY }));
+    expect(res.status).toBe(400);
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cross-tenant opponentExternalClubId without leaking tenant ownership", async () => {
+    mocks.externalClubFindFirst.mockResolvedValue(null);
+
+    const res = await POST(
+      makeRequest({
+        ...MATCH_BODY,
+        opponentExternalClubId: "club-other-tenant",
+      }),
+    );
+
+    expect(res.status).toBe(404);
+    expect(mocks.externalClubFindFirst).toHaveBeenCalledWith({
+      where: { id: "club-other-tenant", tenantId: "tenant-1" },
+      select: { id: true, name: true, archivedAt: true },
+    });
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a nonexistent opponentExternalClubId", async () => {
+    mocks.externalClubFindFirst.mockResolvedValue(null);
+
+    const res = await POST(
+      makeRequest({
+        ...MATCH_BODY,
+        opponentExternalClubId: "club-missing",
+      }),
+    );
+
+    expect(res.status).toBe(404);
     expect(mocks.eventCreate).not.toHaveBeenCalled();
   });
 });

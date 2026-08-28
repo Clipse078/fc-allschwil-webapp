@@ -1898,6 +1898,12 @@ model Event {
   lastSyncedAt     DateTime?
 
   opponentName            String?
+  /// MATCHCENTER-CANONICAL-OPPONENT-01B: canonical Club-Directory guest-club
+  /// identity for manually created matches. Mutually exclusive with
+  /// MatchExternalMapping provider identity — SFV-synced matches keep using
+  /// homeExternalTeam/awayExternalTeam. When set, opponentName is an optional
+  /// display override (falls back to opponentExternalClub.name).
+  opponentExternalClubId  String?
   organizerName           String?
   competitionLabel        String?
   homeAway                String?
@@ -1932,6 +1938,7 @@ model Event {
 
   season               Season?               @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  opponentExternalClub ExternalClub?         @relation("EventOpponentExternalClub", fields: [opponentExternalClubId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   matchExternalMapping MatchExternalMapping?
 
   // TOURNAMENTCENTER-01B: canonical multi-team participation and
@@ -1962,6 +1969,7 @@ model Event {
   @@index([tenantId])
   @@index([importBatchKey])
   @@index([pitchCode])
+  @@index([opponentExternalClubId])
 }
 
 model EventImportRun {
@@ -3956,6 +3964,11 @@ model ExternalClub {
   // TournamentParticipant.externalClubId above), independent of whether it
   // has any ExternalTeam rows.
   tournamentParticipations TournamentParticipant[]
+
+  // MATCHCENTER-CANONICAL-OPPONENT-01B: manually created matches may
+  // reference a canonical guest club directly (see Event.opponentExternalClubId
+  // above), independent of MatchExternalMapping / ExternalTeam rows.
+  opponentEvents Event[] @relation("EventOpponentExternalClub")
 
   @@index([tenantId])
   @@index([tenantId, archivedAt])

@@ -48,13 +48,15 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Building2, Loader2, Search, X } from "lucide-react";
+import { Loader2, Search, X } from "lucide-react";
 import { CLUB_DIRECTORY_MAX_LIMIT } from "@/lib/club-directory/query-service";
+import SportingTeamLogo from "@/components/shared/SportingTeamLogo";
 
 export type ExternalClubPickerResult = {
   id: string;
   name: string;
   shortName: string | null;
+  logoUrl?: string | null;
 };
 
 export type ExternalClubPickerProps = {
@@ -142,14 +144,13 @@ function getClubLabel(club: ExternalClubPickerResult): string {
   return club.name;
 }
 
-function ClubAvatar() {
+function ClubAvatar({ logoUrl }: { logoUrl?: string | null }) {
   return (
-    <div
-      aria-hidden
-      className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-100 text-[var(--sce-info)]"
-    >
-      <Building2 className="h-4 w-4" />
-    </div>
+    <SportingTeamLogo
+      logoUrl={logoUrl}
+      size="md"
+      className="rounded-full border border-slate-200 bg-gradient-to-br from-white to-slate-100"
+    />
   );
 }
 
@@ -275,7 +276,7 @@ export function ExternalClubPicker({
     <div ref={containerRef} className="relative w-full" data-testid={testId}>
       {selected ? (
         <div className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-[var(--border-strong)] bg-[var(--surface-2)] px-3 py-2.5">
-          <ClubAvatar />
+          <ClubAvatar logoUrl={selected.logoUrl} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold text-[var(--foreground)]">
               {getClubLabel(selected)}
@@ -384,7 +385,7 @@ export function ExternalClubPicker({
                     isFocused ? " bg-[var(--surface-2)]" : " hover:bg-[var(--surface-2)]"
                   }`}
                 >
-                  <Building2 className="h-4 w-4 flex-shrink-0 text-[var(--sce-info)]" aria-hidden />
+                  <ClubAvatar logoUrl={club.logoUrl} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-[var(--foreground)]">{club.name}</p>
                     {club.shortName ? (

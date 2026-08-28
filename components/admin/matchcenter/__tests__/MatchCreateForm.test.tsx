@@ -47,8 +47,8 @@ const DRESSING_ROOM_GROUPS: FacilityGroup[] = [
 ];
 
 /** Club beyond the old teams-endpoint default cap (50) — generic fixture, not hardcoded production data. */
-const CLUB_BEYOND_OLD_CAP = { id: "club-telegraph", name: "FC Telegraph", shortName: null };
-const CLUB_CONCORDIA = { id: "club-1", name: "FC Concordia Basel", shortName: null };
+const CLUB_BEYOND_OLD_CAP = { id: "club-telegraph", name: "FC Telegraph", shortName: null, logoUrl: "https://cdn.example.com/telegraph.png" };
+const CLUB_CONCORDIA = { id: "club-1", name: "FC Concordia Basel", shortName: null, logoUrl: null };
 
 function jsonResponse(data: unknown, status = 200): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => data } as Response;
@@ -58,6 +58,7 @@ function installFetchMock() {
   const availabilityCalls: string[] = [];
   const patchCalls: { url: string; body: unknown }[] = [];
   const clubSearchCalls: string[] = [];
+  const postBodies: unknown[] = [];
 
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === "/api/seasons") {
@@ -98,6 +99,7 @@ function installFetchMock() {
       });
     }
     if (url === "/api/events" && init?.method === "POST") {
+      postBodies.push(init.body ? JSON.parse(String(init.body)) : null);
       return jsonResponse({ eventIds: ["event-1"], reviewStage: "APPROVED", allowsDirectExecution: true }, 201);
     }
     if (url === "/api/matchcenter/event-1" && init?.method === "PATCH") {
@@ -109,7 +111,7 @@ function installFetchMock() {
   });
 
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, availabilityCalls, patchCalls, clubSearchCalls };
+  return { fetchMock, availabilityCalls, patchCalls, clubSearchCalls, postBodies };
 }
 
 beforeEach(() => {
@@ -199,7 +201,7 @@ describe("MatchCreateForm — Gegner (Club Directory search)", () => {
     expect(await screen.findByText("FC Telegraph")).toBeInTheDocument();
   });
 
-  it("prefills the editable opponent display name and preserves the canonical club id on selection", async () => {
+  it("keeps Anzeigename empty on selection and preserves the canonical club chip", async () => {
     installFetchMock();
     render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
 
@@ -210,12 +212,67 @@ describe("MatchCreateForm — Gegner (Club Directory search)", () => {
     fireEvent.mouseDown(screen.getByTestId("match-create-opponent-club-search-option-club-1"));
 
     const nameInput = screen.getByTestId("match-create-opponent-name") as HTMLInputElement;
-    expect(nameInput.value).toBe("FC Concordia Basel");
+    expect(nameInput.value).toBe("");
     expect(screen.getByTestId("match-create-opponent-club-search")).toHaveTextContent("FC Concordia Basel");
 
     fireEvent.change(nameInput, { target: { value: "FCC Basel (Freundschaftsspiel)" } });
     expect(nameInput.value).toBe("FCC Basel (Freundschaftsspiel)");
     expect(screen.getByTestId("match-create-opponent-club-search")).toHaveTextContent("FC Concordia Basel");
+  });
+
+  it("allows submitting with a canonical club selected and empty Anzeigename", async () => {
+    const { postBodies } = installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    await waitFor(() => expect(screen.getByTestId("match-create-team-select")).not.toBeDisabled());
+    fireEvent.change(screen.getByTestId("match-create-team-select"), { target: { value: "team-1" } });
+
+    fireEvent.change(screen.getByTestId("match-create-opponent-club-search-input"), {
+      target: { value: "tele" },
+    });
+    await screen.findByTestId("match-create-opponent-club-search-option-club-telegraph");
+    fireEvent.mouseDown(screen.getByTestId("match-create-opponent-club-search-option-club-telegraph"));
+
+    fireEvent.change(screen.getByTestId("match-create-start-at"), { target: { value: "2026-09-20T10:00" } });
+    fireEvent.click(screen.getByTestId("match-create-home-away-away"));
+    fireEvent.click(screen.getByTestId("match-create-submit"));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/dashboard/matchcenter?submitted=1"));
+    expect(postBodies[0]).toEqual(
+      expect.objectContaining({
+        opponentExternalClubId: "club-telegraph",
+        opponentName: null,
+        title: "1. Mannschaft vs. FC Telegraph",
+      }),
+    );
+  });
+
+  it("submits opponentExternalClubId together with an optional Anzeigename override", async () => {
+    const { postBodies } = installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    await waitFor(() => expect(screen.getByTestId("match-create-team-select")).not.toBeDisabled());
+    fireEvent.change(screen.getByTestId("match-create-team-select"), { target: { value: "team-1" } });
+
+    fireEvent.change(screen.getByTestId("match-create-opponent-club-search-input"), {
+      target: { value: "tele" },
+    });
+    await screen.findByTestId("match-create-opponent-club-search-option-club-telegraph");
+    fireEvent.mouseDown(screen.getByTestId("match-create-opponent-club-search-option-club-telegraph"));
+    fireEvent.change(screen.getByTestId("match-create-opponent-name"), {
+      target: { value: "FC Telegraph E1" },
+    });
+    fireEvent.change(screen.getByTestId("match-create-start-at"), { target: { value: "2026-09-20T10:00" } });
+    fireEvent.click(screen.getByTestId("match-create-home-away-away"));
+    fireEvent.click(screen.getByTestId("match-create-submit"));
+
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/dashboard/matchcenter?submitted=1"));
+    expect(postBodies[0]).toEqual(
+      expect.objectContaining({
+        opponentExternalClubId: "club-telegraph",
+        opponentName: "FC Telegraph E1",
+      }),
+    );
   });
 
   it("allows manual opponent-name entry without a directory selection", async () => {

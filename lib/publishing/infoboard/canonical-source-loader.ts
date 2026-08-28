@@ -96,7 +96,7 @@ import { WEEKPLANNER_DEFAULT_TIMEZONE, zonedDateKey, parseDayKey } from "@/lib/w
 import { resolveTrainingDayWindow, resolveTrainingWeekWindow } from "@/lib/training/date-range";
 import { getWeekplannerDay } from "@/lib/weekplanner/queries";
 import { getOperationalWeekplannerPlan } from "@/lib/weekplanner/plan-service";
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveExternalClubLogoUrl, resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import type { InfoboardMatchIdentity } from "../presentation/infoboard-match-presentation";
 import type {
   WeekplannerItem,
@@ -129,6 +129,12 @@ export type CanonicalEventPolicyRow = {
   // onDelete: SetNull — permanently deleting a Season sets Event.seasonId to null).
   readonly season: { readonly key: string } | null;
   readonly team?: CanonicalInfoboardTeamDisplayNameRow | null;
+  readonly opponentExternalClub?: {
+    readonly name: string;
+    readonly shortName: string | null;
+    readonly alternativeName: string | null;
+    readonly logoUrl: string | null;
+  } | null;
   readonly matchExternalMapping?: {
     readonly homeTeam: CanonicalInfoboardTeamDisplayNameRow | null;
     readonly awayTeam: CanonicalInfoboardTeamDisplayNameRow | null;
@@ -226,6 +232,14 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
   season: { select: { key: true } },
   team: {
     select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,
+  },
+  opponentExternalClub: {
+    select: {
+      name: true,
+      shortName: true,
+      alternativeName: true,
+      logoUrl: true,
+    },
   },
   matchExternalMapping: {
     select: {
@@ -448,6 +462,25 @@ type ExternalTeamPolicyRow = NonNullable<
   NonNullable<CanonicalEventPolicyRow["matchExternalMapping"]>["awayExternalTeam"]
 >;
 
+type ExternalClubPolicyRow = NonNullable<CanonicalEventPolicyRow["opponentExternalClub"]>;
+
+function buildExternalClubSideIdentity(
+  externalClub: ExternalClubPolicyRow,
+  fallbackDisplayName: string | null,
+): InfoboardMatchIdentity["home"] {
+  return {
+    isOwnTeam: false,
+    clubName: externalClub.name,
+    clubLogoUrl: resolveExternalClubLogoUrl(externalClub),
+    teamName: null,
+    teamShortName: null,
+    teamAlternativeName: null,
+    teamInfoboardDisplayName: null,
+    teamInfoboardMatchDisplayName: null,
+    fallbackDisplayName,
+  };
+}
+
 function buildExternalSideIdentity(
   externalTeam: ExternalTeamPolicyRow | null,
   fallbackDisplayName: string | null,
@@ -550,15 +583,22 @@ function buildMatchIdentity(
     };
   }
 
+  const opponentClub = policy?.opponentExternalClub ?? null;
+
+  if (ownTeamIsAway) {
+    return {
+      home: opponentClub
+        ? buildExternalClubSideIdentity(opponentClub, item.opponentName)
+        : buildExternalSideIdentity(null, item.opponentName),
+      away: buildOwnTeamSideIdentity(eventTeam, item.teamNames[0] ?? null),
+    };
+  }
+
   return {
-    home: buildOwnTeamSideIdentity(
-      eventTeam,
-      ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
-    ),
-    away: buildExternalSideIdentity(
-      null,
-      ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
-    ),
+    home: buildOwnTeamSideIdentity(eventTeam, item.teamNames[0] ?? null),
+    away: opponentClub
+      ? buildExternalClubSideIdentity(opponentClub, item.opponentName)
+      : buildExternalSideIdentity(null, item.opponentName),
   };
 }
 
@@ -611,10 +651,22 @@ function mapMatchItem(
   item: WeekplannerMatchItem,
   policy: CanonicalEventPolicyRow | undefined,
 ): Screen1SourceEvent {
+  const homeAway = (policy?.homeAway ?? "HOME").trim().toUpperCase();
+  const ownTeamIsAway = homeAway === "AWAY";
   const awayExternalTeam = policy?.matchExternalMapping?.awayExternalTeam ?? null;
-  const opponentLogoUrl = awayExternalTeam
-    ? resolveExternalTeamLogoUrl(awayExternalTeam, awayExternalTeam.externalClub)
-    : null;
+  const homeExternalTeam = policy?.matchExternalMapping?.homeExternalTeam ?? null;
+  const opponentExternalClub = policy?.opponentExternalClub ?? null;
+  const opponentLogoUrl = ownTeamIsAway
+    ? homeExternalTeam
+      ? resolveExternalTeamLogoUrl(homeExternalTeam, homeExternalTeam.externalClub)
+      : opponentExternalClub
+        ? resolveExternalClubLogoUrl(opponentExternalClub)
+        : null
+    : awayExternalTeam
+      ? resolveExternalTeamLogoUrl(awayExternalTeam, awayExternalTeam.externalClub)
+      : opponentExternalClub
+        ? resolveExternalClubLogoUrl(opponentExternalClub)
+        : null;
   const eventTeam = policy?.team ?? null;
 
   return {

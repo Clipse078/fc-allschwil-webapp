@@ -154,6 +154,13 @@ export async function POST(request: NextRequest) {
         ? null
         : String(body.opponentName).trim() || null;
 
+    const opponentExternalClubId =
+      body.opponentExternalClubId === null ||
+      body.opponentExternalClubId === undefined ||
+      body.opponentExternalClubId === ""
+        ? null
+        : String(body.opponentExternalClubId).trim() || null;
+
     const competitionLabel =
       body.competitionLabel === null || body.competitionLabel === undefined
         ? null
@@ -352,6 +359,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let resolvedOpponentName = opponentName;
+    let resolvedOpponentExternalClubId: string | null = null;
+
+    if (type === "MATCH") {
+      if (!opponentExternalClubId && !opponentName) {
+        return NextResponse.json(
+          { error: "Gegner ist erforderlich (Verein auswählen oder Anzeigename eingeben)." },
+          { status: 400 },
+        );
+      }
+
+      if (opponentExternalClubId) {
+        const externalClub = await prisma.externalClub.findFirst({
+          where: { id: opponentExternalClubId, tenantId: actorTenantId },
+          select: { id: true, name: true, archivedAt: true },
+        });
+
+        if (!externalClub || externalClub.archivedAt) {
+          return NextResponse.json({ error: "Gegner-Verein nicht gefunden." }, { status: 404 });
+        }
+
+        resolvedOpponentExternalClubId = externalClub.id;
+        resolvedOpponentName = opponentName ?? externalClub.name;
+      }
+    }
+
     // TOURNAMENTCENTER-01: tenantId comes from the authenticated session, never from input.
     const hasLeadingEventCapability =
       hasPermission(session, PERMISSIONS.EVENTS_PUBLISH_WEBSITE) ||
@@ -437,7 +470,8 @@ export async function POST(request: NextRequest) {
             startAt: occurrenceStart,
             endAt: occurrenceEnd,
             organizerName,
-            opponentName,
+            opponentName: resolvedOpponentName,
+            opponentExternalClubId: resolvedOpponentExternalClubId,
             competitionLabel,
             homeAway,
             resultLabel,
@@ -500,7 +534,8 @@ export async function POST(request: NextRequest) {
           startAt: created.startAt.toISOString(),
           endAt: created.endAt ? created.endAt.toISOString() : null,
           organizerName,
-          opponentName,
+          opponentName: resolvedOpponentName,
+          opponentExternalClubId: resolvedOpponentExternalClubId,
           competitionLabel,
           homeAway,
           resultLabel,
