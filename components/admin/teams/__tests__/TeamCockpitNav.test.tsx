@@ -57,6 +57,7 @@ describe("TEAM-COCKPIT-PREMIUM-01D — TeamCockpitNav active state", () => {
       { key: "resultate", path: "/resultate", label: "Resultate" },
       { key: "rangliste", path: "/rangliste", label: "Rangliste" },
       { key: "trainerteam", path: "/trainerteam", label: "Trainerteam" },
+      { key: "dokumente", path: "/dokumente", label: "Dokumente" },
       { key: "administration", path: "/administration", label: "Administration" },
     ];
 
@@ -97,6 +98,29 @@ describe("TEAM-COCKPIT-PREMIUM-01D — TeamCockpitNav active state", () => {
     );
     expect(screen.getByTestId("team-cockpit-nav-teilnahmen")).toHaveTextContent(
       "Teilnahmen",
+    );
+  });
+
+  it("V. exposes Dokumente in primary navigation", () => {
+    mockedUsePathname.mockReturnValue(BASE_PATH);
+    render(<TeamCockpitNav teamId={TEAM_ID} canManage canDelete />);
+
+    expect(screen.getByTestId("team-cockpit-nav-dokumente")).toHaveTextContent(
+      "Dokumente",
+    );
+  });
+
+  it("W. marks Dokumente active on its own path", () => {
+    mockedUsePathname.mockReturnValue(`${BASE_PATH}/dokumente`);
+    render(<TeamCockpitNav teamId={TEAM_ID} canManage canDelete />);
+
+    expect(screen.getByTestId("team-cockpit-nav-dokumente")).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByTestId("team-cockpit-nav-uebersicht")).toHaveAttribute(
+      "aria-selected",
+      "false",
     );
   });
 });

@@ -19,6 +19,7 @@ const PRIMARY_TABS: TabDef[] = [
   { key: "rangliste", label: "Rangliste", href: "/rangliste" },
   { key: "kader", label: "Kader", href: "/kader" },
   { key: "trainerteam", label: "Trainerteam", href: "/trainerteam" },
+  { key: "dokumente", label: "Dokumente", href: "/dokumente" },
   { key: "administration", label: "Administration", href: "/administration" },
 ];
 
