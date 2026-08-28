@@ -1,5 +1,5 @@
 import { resolveLongTeamName } from "@/lib/teams/team-naming";
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveExternalClubLogoUrl, resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 import type {
   MatchcenterDetailInput,
   MatchcenterListInput,
@@ -75,6 +75,14 @@ interface MatchcenterMappingRecord {
   awayExternalTeam?: MatchcenterExternalTeamRecord | null;
 }
 
+interface MatchcenterExternalClubRecord {
+  id: string;
+  name: string;
+  shortName: string | null;
+  alternativeName: string | null;
+  logoUrl: string | null;
+}
+
 interface MatchcenterEventRecord {
   id: string;
   tenantId: string | null;
@@ -97,6 +105,7 @@ interface MatchcenterEventRecord {
   externalSourceId: string | null;
   lastSyncedAt: Date | null;
   opponentName: string | null;
+  opponentExternalClubId: string | null;
   organizerName: string | null;
   competitionLabel: string | null;
   homeAway: string | null;
@@ -114,6 +123,7 @@ interface MatchcenterEventRecord {
   homeDressingRoomCode: string | null;
   awayDressingRoomCode: string | null;
   team: MatchcenterTeamRecord | null;
+  opponentExternalClub: MatchcenterExternalClubRecord | null;
   matchExternalMapping: MatchcenterMappingRecord | null;
 }
 
@@ -174,6 +184,15 @@ const matchcenterRelations = {
           externalClub: { select: { id: true, logoUrl: true } },
         },
       },
+    },
+  },
+  opponentExternalClub: {
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      alternativeName: true,
+      logoUrl: true,
     },
   },
 } as const;
@@ -297,6 +316,30 @@ function toExternalTeamReference(
   };
 }
 
+type MatchcenterExternalClubReference = {
+  id: string;
+  name: string;
+  shortName: string | null;
+  alternativeName: string | null;
+  logoUrl: string | null;
+};
+
+function toExternalClubReference(
+  club: MatchcenterExternalClubRecord | null | undefined,
+): MatchcenterExternalClubReference | null {
+  if (club === null || club === undefined) {
+    return null;
+  }
+
+  return {
+    id: club.id,
+    name: club.name,
+    shortName: club.shortName,
+    alternativeName: club.alternativeName,
+    logoUrl: resolveExternalClubLogoUrl(club),
+  };
+}
+
 function createSide(input: {
   providerTeamId: number | null;
   providerTeamName: string | null;
@@ -308,29 +351,27 @@ function createSide(input: {
    * tenant's own team or a Club Directory opponent, never both.
    */
   canonicalExternalTeam: MatchcenterExternalTeamReference | null;
+  /**
+   * MATCHCENTER-CANONICAL-OPPONENT-01B: canonical Club Directory guest-club
+   * identity for manually created matches without MatchExternalMapping.
+   * Never set alongside canonicalExternalTeam.
+   */
+  canonicalExternalClub: MatchcenterExternalClubReference | null;
   fallbackName: string;
   isOwnTeam: boolean;
 }): MatchcenterSide {
   const fallbackName = input.fallbackName.trim();
 
-  // TEAM-IDENTITY-01 long-name resolver: TeamSeason.displayName is not in
-  // scope here (no TeamSeason is loaded by this query), so the chain starts
-  // at Team.name. When no tenant Team is resolved, the CLUB-DIRECTORY-02
-  // canonical ExternalTeam's tenant-managed name/alternativeName is used
-  // next — this is the "Matchcenter consumes canonical identity" wiring; it
-  // reuses the same tested naming contract, never a second naming scheme.
-  // Falls back to the manually-derived fallbackName (e.g. event.title /
-  // opponentName) only when every naming source is absent — this preserves
-  // behaviour for matches with no external mapping and no discovered
-  // ExternalTeam at all.
-  const resolvedName = resolveLongTeamName({
-    teamName: input.canonicalTeam?.name ?? input.canonicalExternalTeam?.name ?? null,
-    teamAlternativeName:
-      input.canonicalTeam?.alternativeName ??
-      input.canonicalExternalTeam?.alternativeName ??
-      null,
-    providerTeamName: input.providerTeamName,
-  });
+  const resolvedName = input.canonicalExternalClub && input.canonicalExternalTeam === null
+    ? fallbackName
+    : resolveLongTeamName({
+        teamName: input.canonicalTeam?.name ?? input.canonicalExternalTeam?.name ?? null,
+        teamAlternativeName:
+          input.canonicalTeam?.alternativeName ??
+          input.canonicalExternalTeam?.alternativeName ??
+          null,
+        providerTeamName: input.providerTeamName,
+      });
 
   return {
     providerTeamId: input.providerTeamId,
@@ -341,12 +382,14 @@ function createSide(input: {
     canonicalTeamAlternativeName:
       input.canonicalTeam?.alternativeName ?? null,
     canonicalExternalTeamId: input.canonicalExternalTeam?.id ?? null,
-    canonicalExternalClubId: input.canonicalExternalTeam?.clubId ?? null,
+    canonicalExternalClubId:
+      input.canonicalExternalTeam?.clubId ?? input.canonicalExternalClub?.id ?? null,
     canonicalExternalTeamName: input.canonicalExternalTeam?.name ?? null,
     canonicalExternalTeamShortName: input.canonicalExternalTeam?.shortName ?? null,
     canonicalExternalTeamAlternativeName:
       input.canonicalExternalTeam?.alternativeName ?? null,
-    externalLogoUrl: input.canonicalExternalTeam?.logoUrl ?? null,
+    externalLogoUrl:
+      input.canonicalExternalTeam?.logoUrl ?? input.canonicalExternalClub?.logoUrl ?? null,
     displayName: resolvedName || fallbackName || "Unknown team",
     resolution:
       input.canonicalTeam === null
@@ -374,6 +417,7 @@ function resolveSides(event: MatchcenterEventRecord): {
         providerTeamName: mapping.providerHomeTeamName,
         canonicalTeam: homeTeam,
         canonicalExternalTeam: homeExternalTeam,
+        canonicalExternalClub: null,
         fallbackName:
           normalizeHomeAway(event.homeAway) === "AWAY"
             ? event.opponentName ?? "Home team"
@@ -385,6 +429,7 @@ function resolveSides(event: MatchcenterEventRecord): {
         providerTeamName: mapping.providerAwayTeamName,
         canonicalTeam: awayTeam,
         canonicalExternalTeam: awayExternalTeam,
+        canonicalExternalClub: null,
         fallbackName:
           normalizeHomeAway(event.homeAway) === "HOME"
             ? event.opponentName ?? "Away team"
@@ -397,6 +442,8 @@ function resolveSides(event: MatchcenterEventRecord): {
   const eventTeam = toTeamReference(event.team);
   const homeAway = normalizeHomeAway(event.homeAway);
   const ownTeamIsAway = homeAway === "AWAY";
+  const opponentExternalClub = toExternalClubReference(event.opponentExternalClub);
+  const opponentFallbackName = event.opponentName ?? opponentExternalClub?.name ?? (ownTeamIsAway ? "Home team" : "Away team");
 
   return {
     home: createSide({
@@ -404,8 +451,9 @@ function resolveSides(event: MatchcenterEventRecord): {
       providerTeamName: null,
       canonicalTeam: ownTeamIsAway ? null : eventTeam,
       canonicalExternalTeam: null,
+      canonicalExternalClub: ownTeamIsAway ? opponentExternalClub : null,
       fallbackName: ownTeamIsAway
-        ? event.opponentName ?? "Home team"
+        ? opponentFallbackName
         : event.team?.name ?? event.title,
       isOwnTeam: !ownTeamIsAway && eventTeam !== null,
     }),
@@ -414,9 +462,10 @@ function resolveSides(event: MatchcenterEventRecord): {
       providerTeamName: null,
       canonicalTeam: ownTeamIsAway ? eventTeam : null,
       canonicalExternalTeam: null,
+      canonicalExternalClub: ownTeamIsAway ? null : opponentExternalClub,
       fallbackName: ownTeamIsAway
         ? event.team?.name ?? event.title
-        : event.opponentName ?? "Away team",
+        : opponentFallbackName,
       isOwnTeam: ownTeamIsAway && eventTeam !== null,
     }),
   };

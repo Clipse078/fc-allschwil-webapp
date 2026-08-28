@@ -274,6 +274,51 @@ describe("ExternalClubPicker — pagination (MASTERDATA-SELECTOR-CONSISTENCY-03-
   });
 });
 
+describe("ExternalClubPicker — logos (MATCHCENTER-CANONICAL-OPPONENT-01B)", () => {
+  it("renders a club logo in search results when logoUrl exists", async () => {
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        clubs: [{ id: "club-1", name: "FC Crest", shortName: null, logoUrl: "https://cdn.example.com/crest.png" }],
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<ExternalClubPicker selected={null} onSelect={vi.fn()} testId="club-picker" />);
+    fireEvent.change(screen.getByTestId("club-picker-input"), { target: { value: "cr" } });
+
+    const logo = await screen.findByAltText("");
+    expect(logo).toHaveAttribute("src", "https://cdn.example.com/crest.png");
+  });
+
+  it("renders the selected club logo in the chip state", () => {
+    render(
+      <ExternalClubPicker
+        selected={{ id: "club-1", name: "FC Crest", shortName: null, logoUrl: "https://cdn.example.com/crest.png" }}
+        onSelect={vi.fn()}
+        testId="club-picker"
+      />,
+    );
+
+    expect(screen.getByAltText("")).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/crest.png",
+    );
+  });
+
+  it("falls back to a neutral shield when logoUrl is missing", () => {
+    const { container } = render(
+      <ExternalClubPicker
+        selected={{ id: "club-1", name: "FC Crest", shortName: null, logoUrl: null }}
+        onSelect={vi.fn()}
+        testId="club-picker"
+      />,
+    );
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+});
+
 describe("ExternalClubPicker — selected chip", () => {
   it("renders a chip for the selected club instead of the search input, and clears back to search on demand", () => {
     const onClearSelected = vi.fn();

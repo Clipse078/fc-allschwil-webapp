@@ -573,6 +573,107 @@ describe("INFOBOARD-C1 — Event with season=null does not crash the loader", ()
   });
 });
 
+describe("MATCHCENTER-CANONICAL-OPPONENT-01B — match identity propagation", () => {
+  it("propagates a manually-created canonical opponent club logo to Infoboard identity", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([matchItem()], "2026-08-15"));
+    const database = makeDatabase([
+      eventPolicyRow({
+        id: "event-1",
+        homeAway: "HOME",
+        opponentExternalClub: {
+          name: "FC Telegraph",
+          shortName: null,
+          alternativeName: null,
+          logoUrl: "https://cdn.example.com/telegraph.png",
+        },
+      }),
+    ]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.opponentLogoUrl).toBe("https://cdn.example.com/telegraph.png");
+    expect(event.matchIdentity?.away.clubName).toBe("FC Telegraph");
+    expect(event.matchIdentity?.away.clubLogoUrl).toBe("https://cdn.example.com/telegraph.png");
+  });
+
+  it("keeps display override text-only while logo remains canonical club identity", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(
+      makeDay([matchItem({ opponentName: "FC Telegraph E1" })], "2026-08-15"),
+    );
+    const database = makeDatabase([
+      eventPolicyRow({
+        id: "event-1",
+        homeAway: "HOME",
+        opponentExternalClub: {
+          name: "FC Telegraph",
+          shortName: null,
+          alternativeName: null,
+          logoUrl: "https://cdn.example.com/telegraph.png",
+        },
+      }),
+    ]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.matchIdentity?.away.fallbackDisplayName).toBe("FC Telegraph E1");
+    expect(event.matchIdentity?.away.clubName).toBe("FC Telegraph");
+    expect(event.matchIdentity?.away.clubLogoUrl).toBe("https://cdn.example.com/telegraph.png");
+  });
+
+  it("keeps legacy free-text matches safe without fabricating club identity", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([matchItem()], "2026-08-15"));
+    const database = makeDatabase([eventPolicyRow({ id: "event-1", homeAway: "HOME" })]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.opponentLogoUrl).toBeNull();
+    expect(event.matchIdentity?.away.clubName).toBeNull();
+    expect(event.matchIdentity?.away.fallbackDisplayName).toBe("Gegner FC");
+  });
+
+  it("still prefers provider ExternalTeam mapping over Event.opponentExternalClub", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(makeDay([matchItem()], "2026-08-15"));
+    const database = makeDatabase([
+      eventPolicyRow({
+        id: "event-1",
+        homeAway: "HOME",
+        opponentExternalClub: {
+          name: "FC Telegraph",
+          shortName: null,
+          alternativeName: null,
+          logoUrl: "https://cdn.example.com/telegraph.png",
+        },
+        matchExternalMapping: {
+          homeTeam: null,
+          awayTeam: null,
+          homeExternalTeam: null,
+          awayExternalTeam: {
+            name: "SV Muttenz Erste Mannschaft",
+            shortName: "1M",
+            alternativeName: null,
+            logoUrl: null,
+            externalClub: {
+              name: "SV Muttenz",
+              shortName: null,
+              logoUrl: "https://cdn.example.com/muttenz.png",
+            },
+          },
+        },
+      }),
+    ]);
+    const loader = createCanonicalInfoboardSourceLoader(database);
+
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.opponentLogoUrl).toBe("https://cdn.example.com/muttenz.png");
+    expect(event.matchIdentity?.away.clubName).toBe("SV Muttenz");
+    expect(event.matchIdentity?.away.teamName).toBe("SV Muttenz Erste Mannschaft");
+  });
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ── Europe/Zurich day enumeration ─────────────────────────────────────────────
 // ─────────────────────────────────────────────────────────────────────────────

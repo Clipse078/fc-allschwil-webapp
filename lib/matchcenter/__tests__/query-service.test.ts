@@ -555,4 +555,143 @@ describe("Matchcenter query service", () => {
       expect(result[0].home.displayName).toBe("FC Allschwil E1");
     });
   });
+
+  describe("MATCHCENTER-CANONICAL-OPPONENT-01B", () => {
+    it("resolves a manually-created canonical opponent club logo on the away side", async () => {
+      const database = createDatabase({
+        list: [
+          createEvent({
+            matchExternalMapping: null,
+            opponentExternalClubId: "club-telegraph",
+            opponentExternalClub: {
+              id: "club-telegraph",
+              name: "FC Telegraph",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: "https://cdn.example.com/telegraph.png",
+            },
+            opponentName: "FC Telegraph",
+          }),
+        ],
+      });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].away).toEqual(
+        expect.objectContaining({
+          canonicalExternalClubId: "club-telegraph",
+          externalLogoUrl: "https://cdn.example.com/telegraph.png",
+          displayName: "FC Telegraph",
+        }),
+      );
+    });
+
+    it("keeps the canonical club logo when Anzeigename overrides display text only", async () => {
+      const database = createDatabase({
+        list: [
+          createEvent({
+            matchExternalMapping: null,
+            opponentExternalClubId: "club-telegraph",
+            opponentExternalClub: {
+              id: "club-telegraph",
+              name: "FC Telegraph",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: "https://cdn.example.com/telegraph.png",
+            },
+            opponentName: "FC Telegraph E1",
+          }),
+        ],
+      });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].away).toEqual(
+        expect.objectContaining({
+          canonicalExternalClubId: "club-telegraph",
+          externalLogoUrl: "https://cdn.example.com/telegraph.png",
+          displayName: "FC Telegraph E1",
+        }),
+      );
+    });
+
+    it("keeps legacy opponentName-only matches safe without fabricating club identity", async () => {
+      const database = createDatabase({
+        list: [
+          createEvent({
+            matchExternalMapping: null,
+            opponentExternalClubId: null,
+            opponentExternalClub: null,
+            opponentName: "Freundschaftsgast FC",
+          }),
+        ],
+      });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].away).toEqual(
+        expect.objectContaining({
+          canonicalExternalClubId: null,
+          externalLogoUrl: null,
+          displayName: "Freundschaftsgast FC",
+        }),
+      );
+    });
+
+    it("still prefers provider ExternalTeam mapping over Event.opponentExternalClub", async () => {
+      const database = createDatabase({
+        list: [
+          createEvent({
+            opponentExternalClubId: "club-telegraph",
+            opponentExternalClub: {
+              id: "club-telegraph",
+              name: "FC Telegraph",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: "https://cdn.example.com/telegraph.png",
+            },
+            matchExternalMapping: {
+              ...createEvent().matchExternalMapping,
+              awayTeam: null,
+              awayExternalTeam: {
+                id: "ext-team-1",
+                name: "SV Muttenz Erste Mannschaft",
+                shortName: "1M",
+                alternativeName: null,
+                logoUrl: null,
+                externalClub: { id: "ext-club-1", logoUrl: "https://cdn.example.com/muttenz.png" },
+              },
+            },
+          }),
+        ],
+      });
+
+      const result = await listMatchcenterMatches(database, {
+        tenantId: "tenant-1",
+        from: new Date("2026-08-01T00:00:00.000Z"),
+        to: new Date("2026-09-01T00:00:00.000Z"),
+      });
+
+      expect(result[0].away).toEqual(
+        expect.objectContaining({
+          canonicalExternalTeamId: "ext-team-1",
+          canonicalExternalClubId: "ext-club-1",
+          externalLogoUrl: "https://cdn.example.com/muttenz.png",
+          displayName: "SV Muttenz Erste Mannschaft",
+        }),
+      );
+    });
+  });
 });

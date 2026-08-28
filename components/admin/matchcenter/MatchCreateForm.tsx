@@ -282,7 +282,14 @@ export default function MatchCreateForm({
 
   function handleSelectExternalClub(club: ExternalClubPickerResult) {
     setSelectedExternalClub(club);
-    setOpponentName(club.name);
+  }
+
+  function getEffectiveOpponentDisplayName(): string {
+    const override = opponentName.trim();
+    if (selectedExternalClub) {
+      return override || selectedExternalClub.name;
+    }
+    return override;
   }
 
   // Quick-pick facility names for "Ort" — reuses the same tenant facility
@@ -354,13 +361,13 @@ export default function MatchCreateForm({
   // ── Guided-progress nudge (compact, never blocks submission) ───────────
   const teamStepComplete = !!teamId;
   const homeAwayStepComplete = true; // always has a default
-  const opponentStepComplete = !!opponentName.trim();
+  const opponentStepComplete = !!selectedExternalClub || !!opponentName.trim();
   const terminStepComplete = !!startAt;
 
   const missingItems = useMemo(() => {
     const items: string[] = [];
     if (!teamId) items.push("Team auswählen");
-    if (!opponentName.trim()) items.push("Gegner angeben");
+    if (!selectedExternalClub && !opponentName.trim()) items.push("Gegner angeben");
     if (!startAt) items.push("Termin angeben");
     if (homeAway === "HOME" && startAt) {
       if (!pitchSlot) items.push("Spielfeld / Halle zuweisen");
@@ -368,9 +375,10 @@ export default function MatchCreateForm({
       if (!awayDressingRoomSlot) items.push("Garderobe Gastteam zuweisen");
     }
     return items;
-  }, [teamId, opponentName, startAt, homeAway, pitchSlot, homeDressingRoomSlot, awayDressingRoomSlot]);
+  }, [teamId, selectedExternalClub, opponentName, startAt, homeAway, pitchSlot, homeDressingRoomSlot, awayDressingRoomSlot]);
 
-  const hasRequiredFields = !!seasonId && !!teamId && !!opponentName.trim() && !!startAt;
+  const hasRequiredFields =
+    !!seasonId && !!teamId && (!!selectedExternalClub || !!opponentName.trim()) && !!startAt;
   const hasUnresolvedPartialFailure = !!result && !!partialError;
   const canSubmit = !submitting && !hasUnresolvedPartialFailure && hasRequiredFields;
 
@@ -397,7 +405,10 @@ export default function MatchCreateForm({
       awayDressingRoomCode: isHome ? awayDressingRoomSlot?.code ?? null : null,
     };
 
-    const title = selectedTeam ? `${selectedTeam.name} vs. ${opponentName.trim()}` : `Match vs. ${opponentName.trim()}`;
+    const effectiveOpponentName = getEffectiveOpponentDisplayName();
+    const title = selectedTeam
+      ? `${selectedTeam.name} vs. ${effectiveOpponentName}`
+      : `Match vs. ${effectiveOpponentName}`;
 
     try {
       const orchestration = await orchestrateMatchCreation(plan, {
@@ -414,7 +425,8 @@ export default function MatchCreateForm({
               location: location.trim() || null,
               startAt,
               endAt: endAt || null,
-              opponentName: opponentName.trim(),
+              opponentName: opponentName.trim() || null,
+              opponentExternalClubId: selectedExternalClub?.id ?? null,
               homeAway,
               websiteVisible: true,
               infoboardVisible: true,
@@ -587,7 +599,7 @@ export default function MatchCreateForm({
           hint="Aus dem Vereinsverzeichnis auswählen oder frei erfassen — Anzeigename bleibt editierbar."
           complete={opponentStepComplete}
           collapsed={opponentCollapsed}
-          summary={opponentName || undefined}
+          summary={getEffectiveOpponentDisplayName() || undefined}
           onExpand={() => setOpponentCollapsed(false)}
           onBlurCapture={(e) => handleStepBlur(e, opponentStepComplete, () => setOpponentCollapsed(true))}
         >
@@ -604,14 +616,20 @@ export default function MatchCreateForm({
             </div>
 
             <label className="block space-y-1">
-              <span className="fca-label">Anzeigename</span>
+              <span className="fca-label">
+                Anzeigename{selectedExternalClub ? " (optional)" : ""}
+              </span>
               <input
                 type="text"
                 value={opponentName}
                 onChange={(e) => setOpponentName(e.target.value)}
                 className="fca-input"
-                placeholder="z. B. FC Concordia Basel"
-                required
+                placeholder={
+                  selectedExternalClub
+                    ? `Leer lassen für «${selectedExternalClub.name}»`
+                    : "z. B. FC Concordia Basel"
+                }
+                required={!selectedExternalClub}
                 data-testid="match-create-opponent-name"
               />
             </label>
@@ -711,7 +729,7 @@ export default function MatchCreateForm({
                   onSelect={addAwayDressingRoomSlot}
                   onDeselect={() => setAwayDressingRoomSlot(null)}
                   availabilityByResourceId={dressingRoomAvailability}
-                  label={`Gastkabine${opponentName ? ` (${opponentName})` : ""}`}
+                  label={`Gastkabine${getEffectiveOpponentDisplayName() ? ` (${getEffectiveOpponentDisplayName()})` : ""}`}
                   singleSelect
                   testId="match-create-away-dressing-room"
                 />
@@ -745,7 +763,7 @@ export default function MatchCreateForm({
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Gegner</dt>
-              <dd className="text-[var(--foreground)]">{opponentName || "—"}</dd>
+              <dd className="text-[var(--foreground)]">{getEffectiveOpponentDisplayName() || "—"}</dd>
             </div>
             <div>
               <dt className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Termin</dt>
