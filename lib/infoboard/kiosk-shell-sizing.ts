@@ -27,7 +27,7 @@ export const KIOSK_SHELL_HEADER_BORDER_PX = 3;
 export const KIOSK_SHELL_SUBTITLE_HEIGHT_PX = 41;
 
 /** Footer bar height (announcement ticker / branding). */
-export const KIOSK_SHELL_FOOTER_HEIGHT_PX = 49;
+export const KIOSK_SHELL_FOOTER_HEIGHT_PX = 60;
 
 /** Tenant crest height in the header. */
 export const KIOSK_SHELL_CREST_HEIGHT_PX = 59;
@@ -66,10 +66,16 @@ export const KIOSK_SHELL_ALEXA_SAFE_ZONE_WIDTH_PX = 192;
 export const KIOSK_SHELL_SUBTITLE_FONT_PX = 19;
 
 /** Footer ticker / left-label typography. */
-export const KIOSK_SHELL_FOOTER_TICKER_FONT_PX = 16;
+export const KIOSK_SHELL_FOOTER_TICKER_FONT_PX = 26;
+
+/** Announcement speaker icon in the footer. */
+export const KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX = 24;
+
+/** Gap between footer left and right zones. */
+export const KIOSK_SHELL_FOOTER_GAP_PX = 18;
 
 /** SportClubEvo branding max height in the footer. */
-export const KIOSK_SHELL_BRANDING_HEIGHT_PX = 29;
+export const KIOSK_SHELL_BRANDING_HEIGHT_PX = 34;
 
 /** SportClubEvo branding max width in the footer. */
 export const KIOSK_SHELL_BRANDING_WIDTH_PX = 220;
@@ -98,6 +104,8 @@ export const KIOSK_SHELL_CSS_VARS = {
   "--kiosk-shell-weather-condition-font": `${KIOSK_SHELL_WEATHER_CONDITION_FONT_PX}px`,
   "--kiosk-shell-subtitle-font": `${KIOSK_SHELL_SUBTITLE_FONT_PX}px`,
   "--kiosk-shell-footer-ticker-font": `${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}px`,
+  "--kiosk-shell-footer-announcement-icon": `${KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX}px`,
+  "--kiosk-shell-footer-gap": `${KIOSK_SHELL_FOOTER_GAP_PX}px`,
   "--kiosk-shell-branding-height": `${KIOSK_SHELL_BRANDING_HEIGHT_PX}px`,
   "--kiosk-shell-branding-width": `${KIOSK_SHELL_BRANDING_WIDTH_PX}px`,
   "--kiosk-shell-padding-x": `${KIOSK_SHELL_PADDING_X_PX}px`,
@@ -116,6 +124,7 @@ export type KioskShellMeasurementContract = {
   readonly weekdayFontPx: number;
   readonly dateFontPx: number;
   readonly footerTickerFontPx: number;
+  readonly footerAnnouncementIconPx: number;
   readonly brandingHeightPx: number;
 };
 
@@ -132,5 +141,6 @@ export const KIOSK_SHELL_MEASUREMENT_CONTRACT: KioskShellMeasurementContract = {
   weekdayFontPx: KIOSK_SHELL_WEEKDAY_FONT_PX,
   dateFontPx: KIOSK_SHELL_DATE_FONT_PX,
   footerTickerFontPx: KIOSK_SHELL_FOOTER_TICKER_FONT_PX,
+  footerAnnouncementIconPx: KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX,
   brandingHeightPx: KIOSK_SHELL_BRANDING_HEIGHT_PX,
 };

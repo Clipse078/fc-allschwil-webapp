@@ -1057,7 +1057,7 @@
   white-space: nowrap;
   align-items: center;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.8rem, 1vw, 1.15rem);
+  font-size: var(--kiosk-shell-footer-ticker-font, 26px);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1093,7 +1093,7 @@
   white-space: normal;
   word-break: break-word;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.8rem, 1vw, 1.15rem);
+  font-size: var(--kiosk-shell-footer-ticker-font, 26px);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;

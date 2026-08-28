@@ -19,7 +19,9 @@
 
 import { render, screen, act } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach, type Mock } from "vitest";
+import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { AnnouncementTicker } from "@/components/infoboard/screen1/AnnouncementTicker";
+import { KIOSK_SHELL_FOOTER_TICKER_FONT_PX } from "@/lib/infoboard/kiosk-shell-sizing";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import type { InfoboardScreen1Feed } from "@/lib/publishing/event-types";
 import type { InfoboardAnnouncementPresentation } from "@/components/infoboard/screen1/screen1-presentation-types";
@@ -100,6 +102,22 @@ function mockBoundingRects({
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
+
+describe("AnnouncementTicker — canonical footer font contract", () => {
+  it("inherits the shared footer ticker font size from KioskShellFooter", () => {
+    mockMatchMedia(false);
+    render(
+      <KioskShellFooter
+        announcement={{ enabled: true, text: "Lesbare Meldung" }}
+      />,
+    );
+    const footer = screen.getByTestId("announcement-bar");
+    expect(footer.style.getPropertyValue("--kiosk-shell-footer-ticker-font")).toBe(
+      `${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}px`,
+    );
+    expect(screen.getByTestId("announcement-ticker-viewport")).toBeTruthy();
+  });
+});
 
 describe("AnnouncementTicker — short message (fits)", () => {
   beforeEach(() => {
@@ -276,7 +294,7 @@ describe("AnnouncementTicker — ResizeObserver", () => {
 
     // Dynamic widths updated by reference for resize simulation
     let currentViewportWidth = 800;
-    let currentTextWidth = 200;
+    const currentTextWidth = 200;
 
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
       function (this: HTMLElement) {
@@ -320,7 +338,7 @@ describe("AnnouncementTicker — ResizeObserver", () => {
     const { triggerResize } = mockResizeObserver();
 
     let currentViewportWidth = 50;
-    let currentTextWidth = 900;
+    const currentTextWidth = 900;
 
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(
       function (this: HTMLElement) {

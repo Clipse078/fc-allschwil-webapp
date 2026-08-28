@@ -12,6 +12,15 @@ import {
   KIOSK_LOGICAL_WIDTH,
 } from "@/lib/infoboard/kiosk-viewport";
 import { KIOSK_SHELL_MEASUREMENT_CONTRACT } from "@/lib/infoboard/kiosk-shell-sizing";
+import {
+  KIOSK_SHELL_FOOTER_HEIGHT_PX,
+  KIOSK_SHELL_FOOTER_TICKER_FONT_PX,
+  KIOSK_SHELL_HEADER_HEIGHT_PX,
+  KIOSK_SHELL_SUBTITLE_HEIGHT_PX,
+  KIOSK_SHELL_WEATHER_CONDITION_FONT_PX,
+  KIOSK_SHELL_WEATHER_ICON_PX,
+  KIOSK_SHELL_WEATHER_TEMP_FONT_PX,
+} from "@/lib/infoboard/kiosk-shell-sizing";
 
 const REPO_ROOT = process.cwd();
 
@@ -92,5 +101,69 @@ describe("INFOBOARD-RENDER-PARITY-01B — canonical physical-TV surface", () => 
     const kioskPage = readRepoFile("app/infoboard/screen-1/page.tsx");
     expect(previewData).toContain("buildScreen1KioskPresentation");
     expect(kioskPage).toContain("buildScreen1KioskPresentation");
+  });
+});
+
+describe("INFOBOARD-FOOTER-READABILITY-01 — shared footer contract", () => {
+  it("defines the canonical footer height and ticker font in one module", () => {
+    const sizing = readRepoFile("lib/infoboard/kiosk-shell-sizing.ts");
+    expect(sizing).toContain(`KIOSK_SHELL_FOOTER_HEIGHT_PX = ${KIOSK_SHELL_FOOTER_HEIGHT_PX}`);
+    expect(sizing).toContain(
+      `KIOSK_SHELL_FOOTER_TICKER_FONT_PX = ${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}`,
+    );
+    expect(KIOSK_SHELL_MEASUREMENT_CONTRACT.footerHeightPx).toBe(KIOSK_SHELL_FOOTER_HEIGHT_PX);
+    expect(KIOSK_SHELL_MEASUREMENT_CONTRACT.footerTickerFontPx).toBe(
+      KIOSK_SHELL_FOOTER_TICKER_FONT_PX,
+    );
+  });
+
+  it("keeps header, subtitle, and weather tokens unchanged", () => {
+    expect(KIOSK_SHELL_MEASUREMENT_CONTRACT.headerHeightPx).toBe(KIOSK_SHELL_HEADER_HEIGHT_PX);
+    expect(KIOSK_SHELL_MEASUREMENT_CONTRACT.subtitleHeightPx).toBe(KIOSK_SHELL_SUBTITLE_HEIGHT_PX);
+    const sizing = readRepoFile("lib/infoboard/kiosk-shell-sizing.ts");
+    expect(sizing).toContain(`KIOSK_SHELL_WEATHER_ICON_PX = ${KIOSK_SHELL_WEATHER_ICON_PX}`);
+    expect(sizing).toContain(
+      `KIOSK_SHELL_WEATHER_TEMP_FONT_PX = ${KIOSK_SHELL_WEATHER_TEMP_FONT_PX}`,
+    );
+    expect(sizing).toContain(
+      `KIOSK_SHELL_WEATHER_CONDITION_FONT_PX = ${KIOSK_SHELL_WEATHER_CONDITION_FONT_PX}`,
+    );
+  });
+
+  it("routes Screen 1, Screen 2, and preview through KioskShellFooter only", () => {
+    const screen1 = readRepoFile("components/infoboard/screen1/InfoboardScreen1.tsx");
+    const screen2 = readRepoFile("components/infoboard/screen2/InfoboardScreen2.tsx");
+    const anlageplan = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.tsx");
+    const previewFrame = readRepoFile("components/infoboard/preview/PreviewFrame.tsx");
+
+    expect(screen1).toContain("KioskShellFooter");
+    expect(screen2).toContain("KioskShellFooter");
+    expect(anlageplan).toContain("KioskShellFooter");
+    expect(previewFrame).toContain("InfoboardScreen1");
+    expect(previewFrame).toContain("InfoboardScreen2");
+    expect(previewFrame).toContain("InfoboardAnlageplan");
+  });
+
+  it("does not define Screen 1 or Screen 2 scoped footer sizing overrides", () => {
+    const screen1Css = readRepoFile("components/infoboard/screen1/InfoboardScreen1.module.css");
+    const screen2Css = readRepoFile("components/infoboard/screen2/InfoboardScreen2.module.css");
+    const screen1Tsx = readRepoFile("components/infoboard/screen1/InfoboardScreen1.tsx");
+    const screen2Tsx = readRepoFile("components/infoboard/screen2/InfoboardScreen2.tsx");
+
+    expect(screen1Tsx).not.toMatch(/footerHeightPx\s*[:=]/);
+    expect(screen2Tsx).not.toMatch(/footerHeightPx\s*[:=]/);
+    expect(screen1Tsx).not.toMatch(/FOOTER_TICKER_FONT/);
+    expect(screen2Tsx).not.toMatch(/FOOTER_TICKER_FONT/);
+    expect(screen2Css).not.toContain("kiosk-shell-footer");
+    expect(screen1Css).toContain("var(--kiosk-shell-footer-ticker-font");
+    expect(screen1Css).not.toMatch(/font-size:\s*16px/);
+  });
+
+  it("AnnouncementTicker consumes the shared footer ticker font token", () => {
+    const tickerCss = readRepoFile("components/infoboard/screen1/InfoboardScreen1.module.css");
+    expect(tickerCss).toContain("var(--kiosk-shell-footer-ticker-font");
+    const footer = readRepoFile("components/infoboard/shared/KioskShellFooter.tsx");
+    expect(footer).toContain("kiosk-shell-sizing");
+    expect(footer).toContain("--kiosk-shell-footer-ticker-font");
   });
 });

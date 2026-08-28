@@ -22,7 +22,11 @@ import {
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import {
   KIOSK_SHELL_ALEXA_SAFE_ZONE_WIDTH_PX,
+  KIOSK_SHELL_BRANDING_HEIGHT_PX,
   KIOSK_SHELL_CSS_VARS,
+  KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX,
+  KIOSK_SHELL_FOOTER_HEIGHT_PX,
+  KIOSK_SHELL_FOOTER_TICKER_FONT_PX,
   KIOSK_SHELL_HEADER_HEIGHT_PX,
   KIOSK_SHELL_MEASUREMENT_CONTRACT,
   KIOSK_SHELL_WEATHER_ZONE_MAX_WIDTH_PX,
@@ -99,14 +103,15 @@ describe("kiosk shell measurement contract", () => {
       canvasHeight: 1080,
       headerHeightPx: 81,
       subtitleHeightPx: 41,
-      footerHeightPx: 49,
+      footerHeightPx: 60,
       crestHeightPx: 59,
       clubNameFontPx: 38,
       clockFontPx: 65,
       weekdayFontPx: 18,
       dateFontPx: 17,
-      footerTickerFontPx: 16,
-      brandingHeightPx: 29,
+      footerTickerFontPx: 26,
+      footerAnnouncementIconPx: 24,
+      brandingHeightPx: 34,
     });
   });
 });
@@ -139,6 +144,38 @@ describe("KioskShellFooter — canonical sizing", () => {
     render(<KioskShellFooter />);
     expect(shellFooter().style.minHeight).toBe(
       KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-height"],
+    );
+    expect(shellFooter().style.minHeight).toBe(`${KIOSK_SHELL_FOOTER_HEIGHT_PX}px`);
+  });
+
+  it("exposes the canonical ticker font size on the footer contract", () => {
+    render(<KioskShellFooter />);
+    expect(shellFooter().style.getPropertyValue("--kiosk-shell-footer-ticker-font")).toBe(
+      `${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}px`,
+    );
+  });
+
+  it("renders SportClubEvo branding with the shared sizing contract", () => {
+    render(<KioskShellFooter />);
+    const branding = screen.getByAltText("SportClubEvo");
+    expect(branding.style.maxHeight).toBe(
+      KIOSK_SHELL_CSS_VARS["--kiosk-shell-branding-height"],
+    );
+    expect(branding.style.maxHeight).toBe(`${KIOSK_SHELL_BRANDING_HEIGHT_PX}px`);
+  });
+
+  it("renders the announcement icon at the canonical size when active", () => {
+    render(
+      <KioskShellFooter
+        announcement={{ enabled: true, text: "Test announcement" }}
+      />,
+    );
+    const icon = screen.getByTestId("announcement-icon").querySelector("svg");
+    expect(icon?.getAttribute("width")).toBe(
+      `${KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX}px`,
+    );
+    expect(icon?.getAttribute("height")).toBe(
+      `${KIOSK_SHELL_FOOTER_ANNOUNCEMENT_ICON_PX}px`,
     );
   });
 });
@@ -185,13 +222,21 @@ describe("Screen 1 and Screen 2 shell parity inside kiosk canvas", () => {
   it("uses the same footer height on both screens", () => {
     renderScreen1();
     const screen1Footer = shellFooter().style.minHeight;
+    const screen1TickerFont = shellFooter().style.getPropertyValue(
+      "--kiosk-shell-footer-ticker-font",
+    );
     cleanup();
 
     renderScreen2();
     const screen2Footer = shellFooter().style.minHeight;
+    const screen2TickerFont = shellFooter().style.getPropertyValue(
+      "--kiosk-shell-footer-ticker-font",
+    );
 
     expect(screen1Footer).toBe(screen2Footer);
     expect(screen1Footer).toBe(KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-height"]);
+    expect(screen1TickerFont).toBe(screen2TickerFont);
+    expect(screen1TickerFont).toBe(`${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}px`);
   });
 
   it("uses the same subtitle strip height on both screens", () => {

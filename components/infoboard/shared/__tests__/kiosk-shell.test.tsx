@@ -24,6 +24,11 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
+import {
+  KIOSK_SHELL_BRANDING_HEIGHT_PX,
+  KIOSK_SHELL_FOOTER_HEIGHT_PX,
+  KIOSK_SHELL_FOOTER_TICKER_FONT_PX,
+} from "@/lib/infoboard/kiosk-shell-sizing";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import {
   PREVIEW_FIXTURE,
@@ -193,6 +198,21 @@ describe("KioskShellFooter", () => {
     );
     expect(screen.queryByTestId("announcement-bar")).toBeNull();
     expect(screen.getByTestId("kiosk-shell-footer")).toBeTruthy();
+  });
+
+  it("applies the canonical footer height and ticker font tokens", () => {
+    render(<KioskShellFooter />);
+    const footer = screen.getByTestId("kiosk-shell-footer");
+    expect(footer.style.minHeight).toBe(`${KIOSK_SHELL_FOOTER_HEIGHT_PX}px`);
+    expect(footer.style.getPropertyValue("--kiosk-shell-footer-ticker-font")).toBe(
+      `${KIOSK_SHELL_FOOTER_TICKER_FONT_PX}px`,
+    );
+  });
+
+  it("renders SportClubEvo branding at the canonical size", () => {
+    render(<KioskShellFooter />);
+    const branding = screen.getByAltText("SportClubEvo");
+    expect(branding.style.maxHeight).toBe(`${KIOSK_SHELL_BRANDING_HEIGHT_PX}px`);
   });
 });
 
