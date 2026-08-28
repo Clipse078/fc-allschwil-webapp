@@ -15,11 +15,11 @@ function readRepoFile(path: string): string {
 }
 
 describe("physical-TV preview architecture", () => {
-  it("Screen 1 kiosk route uses KioskViewportScaler via shared layout", () => {
+  it("Screen 1 kiosk route uses PhysicalInfoboardViewport via shared layout", () => {
     const layout = readRepoFile("app/infoboard/screen-1/layout.tsx");
     expect(layout).toContain("Screen1KioskViewportLayout");
     expect(readRepoFile("components/infoboard/shared/KioskViewportLayout.tsx")).toContain(
-      "KioskViewportScaler",
+      "PhysicalInfoboardViewport",
     );
   });
 
@@ -31,10 +31,11 @@ describe("physical-TV preview architecture", () => {
     );
   });
 
-  it("dashboard PreviewFrame uses real renderers inside KioskViewportScaler for both screens", () => {
+  it("dashboard PreviewFrame uses real renderers inside PhysicalInfoboardViewport for both screens", () => {
     const previewFrame = readRepoFile("components/infoboard/preview/PreviewFrame.tsx");
-    expect(previewFrame).toMatch(/PreviewFrameScreen1[\s\S]*KioskViewportScaler[\s\S]*InfoboardScreen1/);
-    expect(previewFrame).toMatch(/PreviewFrameScreen2[\s\S]*KioskViewportScaler[\s\S]*InfoboardScreen2/);
+    expect(previewFrame).toMatch(/PreviewFrameScreen1[\s\S]*PhysicalInfoboardViewport[\s\S]*InfoboardScreen1/);
+    expect(previewFrame).toMatch(/PreviewFrameScreen2[\s\S]*PhysicalInfoboardViewport[\s\S]*InfoboardScreen2/);
+    expect(previewFrame).toMatch(/PreviewFrameAnlageplan[\s\S]*PhysicalInfoboardViewport[\s\S]*InfoboardAnlageplan/);
   });
 
   it("Screen2PhysicalTvPreview remains unused — no duplicate preview renderer", () => {

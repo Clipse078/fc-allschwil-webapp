@@ -568,7 +568,7 @@ describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
     expect(canvas.style.aspectRatio).toBe("16/9");
   });
 
-  it("anlageplan-map-canvas has height: 100% to fill available space", () => {
+  it("anlageplan-map-canvas fills the available main region inside the canvas", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
@@ -576,7 +576,10 @@ describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
       />,
     );
     const canvas = screen.getByTestId("anlageplan-map-canvas");
+    expect(canvas.style.width).toBe("100%");
     expect(canvas.style.height).toBe("100%");
+    expect(canvas.style.maxWidth).toBe("100%");
+    expect(canvas.style.maxHeight).toBe("100%");
   });
 
   it("anlageplan-map-scene is rendered inside the canvas", () => {

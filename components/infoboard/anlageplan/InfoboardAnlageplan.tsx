@@ -23,7 +23,7 @@
  *   - No Prisma imports, no DB access
  *   - No new Date() without argument
  *   - No null/undefined rendered as strings
- *   - 100dvh, no scroll
+ *   - 100% canvas height inside PhysicalInfoboardViewport, no scroll
  *   - DARK theme only
  *   - Uses KioskShellHeader + KioskShellFooter (shared with Screen 1)
  *   - NO editor geometry: no selection outlines, no bounding boxes, no drag handles
@@ -34,6 +34,7 @@ import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlagepla
 import { groupFacilityPitches } from "@/lib/publishing/infoboard/facility-group";
 import { resolveBackgroundTransform } from "@/lib/infoboard/anlageplan-types";
 import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader";
+import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
@@ -112,25 +113,13 @@ export function InfoboardAnlageplan({
         display: "flex",
         flexDirection: "column",
         width: "100%",
-        height: "100dvh",
+        height: "100%",
+        minHeight: 0,
         overflow: "hidden",
         background: "#060B12",
         color: "#ffffff",
-        // Inter as the canonical body typeface — matches Screen 1 + Screen 2
-        // root. KioskShellHeader inherits this, ensuring FC ALLSCHWIL, date,
-        // and subtitle render with the same typography as Screen 1.
         fontFamily: "var(--font-inter, Inter, system-ui, -apple-system, sans-serif)",
-        // ── Design token parity with Screen 1 ──────────────────────────────
-        // LiveClockScreen1 uses CSS module classes from InfoboardScreen1.module.css
-        // that reference --ib-* custom properties. Those variables are defined on
-        // the Screen 1 .root selector and are NOT automatically inherited here.
-        // Setting the same token values on this root ensures the shared header clock
-        // renders at identical physical size on both screens.
-        "--ib-fs-header-time": "clamp(2.6rem, 3.4vw, 4rem)",
-        "--ib-fs-header-date": "clamp(0.7rem, 0.9vw, 1rem)",
-        "--ib-text": "#E8EEF4",
-        "--ib-text-muted": "#6E87A0",
-        "--ib-border-strong": "rgba(99, 135, 175, 0.32)",
+        ...KIOSK_SHELL_CSS_VARS,
       } as CSSProperties}
     >
       {/* ── SHARED HEADER ─────────────────────────────────────────────── */}
@@ -148,37 +137,26 @@ export function InfoboardAnlageplan({
       />
 
       {/* ── BODY: map canvas ───────────────────────────────────────────── */}
-      {/*
-       * FRAMING INVARIANT: the map canvas is constrained to 16:9 to match
-       * the designer canvas aspect ratio (AnlageplanDesignerClient also uses
-       * aspectRatio: 16/9). This ensures that the persisted BackgroundTransform
-       * and normalized zone coordinates produce identical visual framing in
-       * both the designer and the live kiosk — including the tree line at the
-       * top of the source image. Without this constraint the live canvas is
-       * wider than 16:9 (header + footer reduce the available height while
-       * the full viewport width remains), causing object-fit: cover to crop
-       * more from the top/bottom than the designer preview shows.
-       *
-       * Side effect: narrow dark gutters (≈ 110 px at 1920 × 1080) appear on
-       * each side of the canvas. These are filled by the page background
-       * (#060B12) and are intentional — they are not accidental gaps within
-       * the map content.
-       */}
       <div
+        data-testid="anlageplan-main-region"
         style={{
           flex: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           minHeight: 0,
-          padding: "0.6vh 0.9vw",
+          width: "100%",
+          padding: "8px 16px",
+          boxSizing: "border-box",
         }}
       >
-        {/* ── MAP CANVAS — 16:9 to match designer coordinate system ─── */}
         <div
           data-testid="anlageplan-map-canvas"
           style={{
+            width: "100%",
             height: "100%",
+            maxWidth: "100%",
+            maxHeight: "100%",
             aspectRatio: "16/9",
             position: "relative",
             borderRadius: "clamp(6px, 0.8vh, 14px)",

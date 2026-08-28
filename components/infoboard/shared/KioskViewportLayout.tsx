@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
+import { PhysicalInfoboardViewport } from "@/components/infoboard/shared/PhysicalInfoboardViewport";
 
 /**
  * Shared kiosk viewport contract (1920×1080 logical canvas).
@@ -10,5 +10,5 @@ export default function KioskViewportLayout({
 }: {
   children: ReactNode;
 }) {
-  return <KioskViewportScaler>{children}</KioskViewportScaler>;
+  return <PhysicalInfoboardViewport>{children}</PhysicalInfoboardViewport>;
 }

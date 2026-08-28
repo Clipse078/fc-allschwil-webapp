@@ -40,8 +40,8 @@ vi.mock("@/components/infoboard/screen1/InfoboardScreen1", () => ({
   },
 }));
 
-vi.mock("@/components/infoboard/shared/KioskViewportScaler", () => ({
-  KioskViewportScaler: ({ children }: { children: React.ReactNode }) => children,
+vi.mock("@/components/infoboard/shared/PhysicalInfoboardViewport", () => ({
+  PhysicalInfoboardViewport: ({ children }: { children: React.ReactNode }) => children,
 }));
 
 const pageOne: Screen1StudioCardRef[] = [

@@ -30,19 +30,15 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
-import { buildBoardConfig } from "@/lib/infoboard/board-config";
+import { buildScreen1KioskPresentation } from "@/lib/infoboard/screen1-kiosk-presentation";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
-import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
-import {
-  buildScreen1LivePayload,
-  type Screen1TenantContext,
-} from "@/lib/publishing/infoboard/screen1-live-service";
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 
 export const metadata: Metadata = {
@@ -114,32 +110,16 @@ export default async function InfoboardScreen1Page() {
   // ── Build live payload ─────────────────────────────────────────────────────
   // Load per-board config from DB (slug "screen-1") when available.
   const board = await getInfoboardBySlug("screen-1", tenant.id);
-  const boardConfig = board ? buildBoardConfig(board) : null;
 
   const db = createPrismaDb();
-  const loader = createCanonicalInfoboardSourceLoader(db);
-  const payload = await buildScreen1LivePayload({
+  const presentation = await buildScreen1KioskPresentation({
     tenant,
     now,
-    loader,
-    boardConfig,
+    loader: createCanonicalInfoboardSourceLoader(db),
+    board,
     tournamentPresentationDatabase: createTournamentPresentationDb(),
   });
-  const weather = await fetchCurrentWeather();
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  return (
-    <InfoboardScreen1
-      feed={payload.feed}
-      branding={payload.branding}
-      currentTimeIso={payload.currentTimeIso}
-      weather={weather}
-      announcement={payload.announcement ?? undefined}
-      eventPresentation={payload.eventPresentation}
-      theme={payload.theme}
-      headerConfig={payload.headerConfig ?? undefined}
-      presentation={payload.presentation ?? undefined}
-      studio={payload.studio ?? undefined}
-    />
-  );
+  return <InfoboardScreen1 {...presentation.infoboardScreen1Props} />;
 }
