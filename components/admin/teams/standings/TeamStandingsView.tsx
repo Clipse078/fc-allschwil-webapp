@@ -114,7 +114,7 @@ export default function TeamStandingsView({ standings, hasProviderMapping }: Pro
                     className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-[0.04em] text-[var(--muted)]"
                     title="Punkte"
                   >
-                    Pkt.
+                    <span className="sr-only">Punkte</span>
                   </th>
                 </tr>
               </thead>
