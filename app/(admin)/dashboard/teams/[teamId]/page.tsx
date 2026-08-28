@@ -9,7 +9,6 @@ import { getTeamCockpitSportingData } from "@/lib/teams/team-cockpit-sporting-da
 import { getTeamTrainingSchedule } from "@/lib/teams/team-training-schedule";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
-import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { auth } from "@/auth";
 import { resolveTeamDocumentAccess } from "@/lib/teams/team-document-auth";
 
@@ -21,7 +20,8 @@ type Props = {
 
 export default async function TeamOverviewPage({ params }: Props) {
   const { teamId } = await params;
-  const { tenantId, tenantKey, team, canManage } = await requireTeamCockpitAccess(teamId);
+  const { tenantId, tenantKey, tenant, team, canManage } =
+    await requireTeamCockpitAccess(teamId);
 
   const session = await auth();
   const photoAccess =
@@ -38,7 +38,7 @@ export default async function TeamOverviewPage({ params }: Props) {
   const activeSeason =
     team.teamSeasons.find((entry) => entry.id === team.currentTeamSeasonId) ?? null;
 
-  const [availableOrgUnits, availableCompetitions, trainingSchedule, sportingData, tenant] =
+  const [availableOrgUnits, availableCompetitions, trainingSchedule, sportingData] =
     await Promise.all([
       getOrgUnits(tenantId),
       getEligibleCompetitions(tenantId),
@@ -48,6 +48,8 @@ export default async function TeamOverviewPage({ params }: Props) {
       team.currentTeamSeasonId && activeSeason
         ? getTeamCockpitSportingData({
             tenantId,
+            tenantClubName: tenant.name,
+            tenantLogoUrl: tenant.logoUrl,
             teamId: team.id,
             teamSeasonId: team.currentTeamSeasonId,
             seasonKey: activeSeason.season.key,
@@ -63,7 +65,6 @@ export default async function TeamOverviewPage({ params }: Props) {
             limits: { nextMatches: 1, results: 1 },
           })
         : Promise.resolve(null),
-      getActiveTenant(),
     ]);
 
   const cockpitMetrics = buildTeamCockpitMetrics({

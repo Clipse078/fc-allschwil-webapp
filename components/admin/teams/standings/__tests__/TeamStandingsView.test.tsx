@@ -24,6 +24,7 @@ function createStandings(overrides: Partial<TeamCockpitStandings> = {}): TeamCoc
         teamName: "FC Leader",
         shortName: null,
         isCurrentTeam: false,
+        logoUrl: "/leader-crest.svg",
         played: 10,
         won: 8,
         drawn: 1,
@@ -39,6 +40,7 @@ function createStandings(overrides: Partial<TeamCockpitStandings> = {}): TeamCoc
         teamName: "FC Allschwil Junioren A",
         shortName: "Junioren A",
         isCurrentTeam: true,
+        logoUrl: "/tenant-crest.svg",
         played: 10,
         won: 6,
         drawn: 2,
@@ -54,6 +56,7 @@ function createStandings(overrides: Partial<TeamCockpitStandings> = {}): TeamCoc
         teamName: "FC Third",
         shortName: null,
         isCurrentTeam: false,
+        logoUrl: "/third-crest.svg",
         played: 10,
         won: 4,
         drawn: 3,
@@ -69,6 +72,7 @@ function createStandings(overrides: Partial<TeamCockpitStandings> = {}): TeamCoc
         teamName: "FC Bottom",
         shortName: null,
         isCurrentTeam: false,
+        logoUrl: null,
         played: 10,
         won: 1,
         drawn: 1,
@@ -157,6 +161,29 @@ describe("TEAM-COCKPIT-PREMIUM-01H — TeamStandingsView", () => {
     render(<TeamStandingsView standings={createStandings()} hasProviderMapping />);
     const rows = screen.getAllByTestId(/^team-standings-row-/);
     expect(rows[1]).toHaveAttribute("data-current-team", "true");
+  });
+
+  it("renders canonical crests in their team rows, including the tenant crest", () => {
+    render(<TeamStandingsView standings={createStandings()} hasProviderMapping />);
+
+    expect(
+      screen.getByTestId("team-standings-row-1").querySelector("img"),
+    ).toHaveAttribute("src", "/leader-crest.svg");
+    expect(
+      screen.getByTestId("team-standings-row-2").querySelector("img"),
+    ).toHaveAttribute("src", "/tenant-crest.svg");
+  });
+
+  it("renders a stable fallback in the team cell without adding a logo column", () => {
+    render(<TeamStandingsView standings={createStandings()} hasProviderMapping />);
+
+    const table = screen.getByTestId("team-standings-table");
+    const missingLogoRow = screen.getByTestId("team-standings-row-4");
+    expect(missingLogoRow.querySelector("svg")).toBeInTheDocument();
+    expect(within(table).queryByText("Logo")).not.toBeInTheDocument();
+    expect(missingLogoRow.querySelectorAll("td")).toHaveLength(
+      table.querySelectorAll("thead th").length,
+    );
   });
 
   it("N. renders competition header", () => {
@@ -258,6 +285,7 @@ describe("TEAM-COCKPIT-PREMIUM-01H — TeamStandingsView", () => {
           teamName: "Tenant A Team",
           shortName: null,
           isCurrentTeam: true,
+          logoUrl: "/tenant-a-crest.svg",
           played: 1,
           won: 1,
           drawn: 0,
@@ -287,6 +315,7 @@ describe("TEAM-COCKPIT-PREMIUM-01H — TeamStandingsView", () => {
           teamName: "Season Scoped Team",
           shortName: null,
           isCurrentTeam: true,
+          logoUrl: "/season-crest.svg",
           played: 8,
           won: 3,
           drawn: 2,

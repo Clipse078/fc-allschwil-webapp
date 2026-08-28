@@ -4,6 +4,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
+import type { TenantContext } from "@/lib/tenants/context";
 import { getTeamDetailData } from "@/lib/teams/queries";
 import { formatTeamCompetitionDisplayLabel } from "@/lib/teams/team-competition-display";
 
@@ -33,6 +34,7 @@ export type TeamCockpitTeam = NonNullable<
 export type TeamCockpitAccess = {
   tenantId: string;
   tenantKey: string;
+  tenant: TenantContext;
   team: TeamCockpitTeam;
   canManage: boolean;
   canDelete: boolean;
@@ -64,6 +66,7 @@ export async function requireTeamCockpitAccess(
   return {
     tenantId: tenant.id,
     tenantKey: tenant.key,
+    tenant,
     team,
     canManage: hasPermission(session, PERMISSIONS.TEAMS_MANAGE),
     canDelete: hasPermission(session, PERMISSIONS.TEAMS_DELETE),

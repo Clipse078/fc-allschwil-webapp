@@ -1,5 +1,6 @@
 import type { TeamCockpitResult } from "@/lib/teams/team-cockpit-sporting-data";
 import type { TenantFormatConfig } from "@/lib/tenant-runtime/formatters";
+import SportingTeamLogo from "@/components/shared/SportingTeamLogo";
 import {
   formatFixtureDateLine,
   formatFixtureTime,
@@ -42,9 +43,15 @@ export default function TeamResultRow({ result, formatConfig }: Props) {
       </div>
 
       <div className="min-w-0 space-y-1">
-        <p className={teamNameClassName(result.home.isOwnTeam)} data-testid="team-result-home">
-          {result.home.displayName}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <SportingTeamLogo logoUrl={result.home.logoUrl} />
+          <p
+            className={teamNameClassName(result.home.isOwnTeam)}
+            data-testid="team-result-home"
+          >
+            {result.home.displayName}
+          </p>
+        </div>
 
         <p
           className="text-xl font-semibold tracking-tight text-[var(--foreground)]"
@@ -54,9 +61,15 @@ export default function TeamResultRow({ result, formatConfig }: Props) {
           {formatResultScore(result)}
         </p>
 
-        <p className={teamNameClassName(result.away.isOwnTeam)} data-testid="team-result-away">
-          {result.away.displayName}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <SportingTeamLogo logoUrl={result.away.logoUrl} />
+          <p
+            className={teamNameClassName(result.away.isOwnTeam)}
+            data-testid="team-result-away"
+          >
+            {result.away.displayName}
+          </p>
+        </div>
 
         <p
           className="pt-1 text-xs font-medium text-[var(--text-2)]"

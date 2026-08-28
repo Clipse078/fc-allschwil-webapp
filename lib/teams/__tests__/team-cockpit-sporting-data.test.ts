@@ -64,6 +64,8 @@ function createUpcomingMatch(overrides: Record<string, unknown> = {}) {
       canonicalTeamId: TEAM_ID,
       canonicalExternalTeamId: null,
       displayName: "FC Test",
+      clubName: null,
+      externalLogoUrl: null,
       providerTeamId: null,
       providerTeamName: null,
     },
@@ -71,6 +73,8 @@ function createUpcomingMatch(overrides: Record<string, unknown> = {}) {
       canonicalTeamId: null,
       canonicalExternalTeamId: "ext-1",
       displayName: "Opponent FC",
+      clubName: "Opponent FC",
+      externalLogoUrl: "https://blob.vercel-storage.com/opponent.png",
       providerTeamId: 200,
       providerTeamName: "Opponent",
     },
@@ -156,6 +160,113 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(data.nextMatches[0]?.status).toBe("SCHEDULED");
     expect(data.nextMatches[0]?.lifecycle).toBe("UPCOMING");
     expect(data.nextMatches[0]?.competitionName).toBeNull();
+  });
+
+  it("maps tenant and external identity onto HOME and AWAY fixture sides", async () => {
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantClubName: "FC Test Club",
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "1. Mannschaft",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches[0]?.home).toEqual({
+      displayName: "FC Test",
+      isOwnTeam: true,
+      clubName: "FC Test Club",
+      logoUrl: "/tenant-crest.svg",
+    });
+    expect(data.nextMatches[0]?.away).toEqual({
+      displayName: "Opponent FC",
+      isOwnTeam: false,
+      clubName: "Opponent FC",
+      logoUrl: "https://blob.vercel-storage.com/opponent.png",
+    });
+    expect(JSON.stringify(data.nextMatches[0])).not.toMatch(
+      /providerTeamId|providerTeamName|sfv/i,
+    );
+  });
+
+  it("uses the tenant crest when the internal team is AWAY", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          side: "AWAY",
+          home: {
+            canonicalTeamId: null,
+            canonicalExternalTeamId: "ext-home",
+            displayName: "Host FC",
+            clubName: "Host Club",
+            externalLogoUrl: "/host-crest.svg",
+            providerTeamId: 300,
+            providerTeamName: "Host FC",
+          },
+          away: {
+            canonicalTeamId: TEAM_ID,
+            canonicalExternalTeamId: null,
+            displayName: "1. Mannschaft",
+            clubName: null,
+            externalLogoUrl: null,
+            providerTeamId: 123,
+            providerTeamName: "FC Test",
+          },
+        }),
+      ],
+      completed: [],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantClubName: "FC Test Club",
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "1. Mannschaft",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches[0]?.home.logoUrl).toBe("/host-crest.svg");
+    expect(data.nextMatches[0]?.away.logoUrl).toBe("/tenant-crest.svg");
+    expect(data.nextMatches[0]?.away.displayName).toBe("1. Mannschaft");
+  });
+
+  it("preserves null when an external fixture side has no canonical crest", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          away: {
+            canonicalTeamId: null,
+            canonicalExternalTeamId: "ext-no-logo",
+            displayName: "No Crest FC",
+            clubName: "No Crest FC",
+            externalLogoUrl: null,
+            providerTeamId: 400,
+            providerTeamName: "No Crest FC",
+          },
+        }),
+      ],
+      completed: [],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches[0]?.away.logoUrl).toBeNull();
   });
 
   it("returns away results with WON/DRAW/LOST perspective and scores", async () => {
@@ -528,6 +639,138 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(data.standings?.rows[0]?.position).toBe(1);
     expect(data.standings?.rows[0]?.goalDifference).toBe(2);
     expect(data.standings?.rows[0]?.penaltyPoints).toBeNull();
+  });
+
+  it("batch-enriches standings by stable provider team ID with canonical crests", async () => {
+    mockFetchStandings.mockResolvedValue({
+      competition: {
+        name: "2. Liga interregional",
+        divisionName: "Gruppe 3",
+        groupName: null,
+      },
+      rows: [
+        {
+          position: 1,
+          externalTeamId: 200,
+          teamName: "External Team Override",
+          shortName: null,
+          played: 1,
+          won: 1,
+          drawn: 0,
+          lost: 0,
+          goalsFor: 2,
+          goalsAgainst: 0,
+          points: 3,
+          penaltyPoints: null,
+        },
+        {
+          position: 2,
+          externalTeamId: 123,
+          teamName: "FC Test Provider Name",
+          shortName: "Provider Short",
+          played: 1,
+          won: 0,
+          drawn: 0,
+          lost: 1,
+          goalsFor: 0,
+          goalsAgainst: 2,
+          points: 0,
+          penaltyPoints: null,
+        },
+        {
+          position: 3,
+          externalTeamId: 300,
+          teamName: "External Club Fallback",
+          shortName: null,
+          played: 1,
+          won: 0,
+          drawn: 0,
+          lost: 1,
+          goalsFor: 0,
+          goalsAgainst: 1,
+          points: 0,
+          penaltyPoints: null,
+        },
+        {
+          position: 4,
+          externalTeamId: 400,
+          teamName: "External Missing",
+          shortName: null,
+          played: 1,
+          won: 0,
+          drawn: 0,
+          lost: 1,
+          goalsFor: 0,
+          goalsAgainst: 1,
+          points: 0,
+          penaltyPoints: null,
+        },
+      ],
+    });
+    const findMany = vi.fn().mockResolvedValue([
+      {
+        shortName: "Override",
+        logoUrl: "/team-override.svg",
+        providerMappings: [{ providerTeamId: 200 }],
+        externalClub: { logoUrl: "/club-ignored.svg" },
+      },
+      {
+        shortName: "Fallback",
+        logoUrl: null,
+        providerMappings: [{ providerTeamId: 300 }],
+        externalClub: { logoUrl: "/club-fallback.svg" },
+      },
+      {
+        shortName: null,
+        logoUrl: null,
+        providerMappings: [{ providerTeamId: 400 }],
+        externalClub: { logoUrl: null },
+      },
+    ]);
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "1. Mannschaft",
+      teamShortName: "1. Mannschaft",
+      sfvMapping: {
+        externalTeamId: 123,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+        providerLeagueName: "2. Liga interregional",
+      },
+      database: {} as TeamMatchQueryDatabase,
+      identityDatabase: { externalTeam: { findMany } },
+      now: NOW,
+    });
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          tenantId: TENANT_ID,
+          providerMappings: {
+            some: {
+              provider: "SFV",
+              providerTeamId: { in: [200, 300, 400] },
+            },
+          },
+        },
+      }),
+    );
+    expect(data.standings?.rows.map((row) => row.logoUrl)).toEqual([
+      "/team-override.svg",
+      "/tenant-crest.svg",
+      "/club-fallback.svg",
+      null,
+    ]);
+    expect(data.standings?.rows[1]).toMatchObject({
+      isCurrentTeam: true,
+      shortName: "1. Mannschaft",
+    });
   });
 
   it("falls back to providerLeagueName when standings fail", async () => {

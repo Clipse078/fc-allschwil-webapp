@@ -8,7 +8,7 @@ type Props = {
 
 export default async function TeamRanglistePage({ params }: Props) {
   const { teamId } = await params;
-  const { tenantId, team } = await requireTeamCockpitAccess(teamId);
+  const { tenantId, team, tenant } = await requireTeamCockpitAccess(teamId);
 
   const activeSeason =
     team.teamSeasons.find((entry) => entry.id === team.currentTeamSeasonId) ?? null;
@@ -18,6 +18,8 @@ export default async function TeamRanglistePage({ params }: Props) {
     team.currentTeamSeasonId && activeSeason
       ? await getTeamCockpitSportingData({
           tenantId,
+          tenantClubName: tenant.name,
+          tenantLogoUrl: tenant.logoUrl,
           teamId: team.id,
           teamSeasonId: team.currentTeamSeasonId,
           seasonKey: activeSeason.season.key,

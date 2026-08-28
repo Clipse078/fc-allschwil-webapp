@@ -18,8 +18,18 @@ function createMatch(overrides: Partial<TeamCockpitMatch> = {}): TeamCockpitMatc
     status: "SCHEDULED",
     lifecycle: "UPCOMING",
     opponentName: "FC Example",
-    home: { displayName: "FC Allschwil", isOwnTeam: true },
-    away: { displayName: "FC Example", isOwnTeam: false },
+    home: {
+      displayName: "1. Mannschaft",
+      isOwnTeam: true,
+      clubName: "FC Allschwil",
+      logoUrl: "/tenant-crest.svg",
+    },
+    away: {
+      displayName: "FC Example",
+      isOwnTeam: false,
+      clubName: "FC Example",
+      logoUrl: "/example-crest.svg",
+    },
     venueName: "Im Brüel",
     location: "Im Brüel",
     competitionName: "Junioren A Promotion",
@@ -38,7 +48,12 @@ describe("TEAM-COCKPIT-PREMIUM-01F — TeamUpcomingMatchesView", () => {
         eventId: "event-later",
         startAt: new Date("2026-09-10T16:00:00.000Z"),
         opponentName: "FC Later",
-        away: { displayName: "FC Later", isOwnTeam: false },
+        away: {
+          displayName: "FC Later",
+          isOwnTeam: false,
+          clubName: "FC Later",
+          logoUrl: "/later-crest.svg",
+        },
       }),
     ];
 
@@ -67,7 +82,7 @@ describe("TEAM-COCKPIT-PREMIUM-01F — TeamUpcomingMatchesView", () => {
     );
 
     const row = screen.getByTestId("team-upcoming-match-event-1");
-    expect(within(row).getByTestId("team-upcoming-home")).toHaveTextContent("FC Allschwil");
+    expect(within(row).getByTestId("team-upcoming-home")).toHaveTextContent("1. Mannschaft");
     expect(within(row).getByTestId("team-upcoming-away")).toHaveTextContent("FC Example");
     expect(within(row).getByTestId("team-upcoming-homeaway-event-1")).toHaveTextContent(
       "Heimspiel",
@@ -78,8 +93,18 @@ describe("TEAM-COCKPIT-PREMIUM-01F — TeamUpcomingMatchesView", () => {
     const awayMatch = createMatch({
       eventId: "event-away",
       side: "AWAY",
-      home: { displayName: "FC Example", isOwnTeam: false },
-      away: { displayName: "FC Allschwil", isOwnTeam: true },
+      home: {
+        displayName: "FC Example",
+        isOwnTeam: false,
+        clubName: "FC Example",
+        logoUrl: "/example-crest.svg",
+      },
+      away: {
+        displayName: "1. Mannschaft",
+        isOwnTeam: true,
+        clubName: "FC Allschwil",
+        logoUrl: "/tenant-crest.svg",
+      },
     });
 
     render(
@@ -92,9 +117,55 @@ describe("TEAM-COCKPIT-PREMIUM-01F — TeamUpcomingMatchesView", () => {
 
     const row = screen.getByTestId("team-upcoming-match-event-away");
     expect(within(row).getByTestId("team-upcoming-home")).toHaveTextContent("FC Example");
-    expect(within(row).getByTestId("team-upcoming-away")).toHaveTextContent("FC Allschwil");
+    expect(within(row).getByTestId("team-upcoming-away")).toHaveTextContent("1. Mannschaft");
     expect(within(row).getByTestId("team-upcoming-homeaway-event-away")).toHaveTextContent(
       "Auswärtsspiel",
+    );
+  });
+
+  it("renders both crests in canonical home/away order without replacing display names", () => {
+    render(
+      <TeamUpcomingMatchesView
+        matches={[createMatch()]}
+        seasonName="2026/2027"
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    const row = screen.getByTestId("team-upcoming-match-event-1");
+    const logos = row.querySelectorAll("img");
+    expect(Array.from(logos, (logo) => logo.getAttribute("src"))).toEqual([
+      "/tenant-crest.svg",
+      "/example-crest.svg",
+    ]);
+    expect(within(row).getByTestId("team-upcoming-home")).toHaveTextContent(
+      "1. Mannschaft",
+    );
+  });
+
+  it("keeps the row intact when a crest is missing", () => {
+    render(
+      <TeamUpcomingMatchesView
+        matches={[
+          createMatch({
+            away: {
+              displayName: "No Crest FC",
+              isOwnTeam: false,
+              clubName: "No Crest FC",
+              logoUrl: null,
+            },
+          }),
+        ]}
+        seasonName="2026/2027"
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    const row = screen.getByTestId("team-upcoming-match-event-1");
+    expect(row.querySelectorAll("img")).toHaveLength(1);
+    expect(row.querySelector("svg")).toBeInTheDocument();
+    expect(within(row).getByTestId("team-upcoming-away")).toHaveTextContent(
+      "No Crest FC",
     );
   });
 

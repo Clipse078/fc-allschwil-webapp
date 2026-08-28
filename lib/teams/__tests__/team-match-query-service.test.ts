@@ -85,6 +85,11 @@ function createMapping(overrides: Record<string, unknown> = {}) {
       name: "Opponent FC",
       shortName: null,
       alternativeName: null,
+      logoUrl: "https://blob.vercel-storage.com/opponent-team.png",
+      externalClub: {
+        name: "Opponent FC",
+        logoUrl: "https://blob.vercel-storage.com/opponent-club.png",
+      },
     },
     ...overrides,
   };
@@ -241,6 +246,71 @@ describe("listTeamSeasonMatches", () => {
     expect(result.upcoming[0]?.side).toBe("HOME");
     expect(result.upcoming[0]?.home.canonicalTeamId).toBe(TEAM_ID);
     expect(result.upcoming[0]?.away.canonicalExternalTeamId).toBe("external-away-1");
+    expect(result.upcoming[0]?.away.clubName).toBe("Opponent FC");
+    expect(result.upcoming[0]?.away.externalLogoUrl).toBe(
+      "https://blob.vercel-storage.com/opponent-team.png",
+    );
+  });
+
+  it("falls back from ExternalTeam.logoUrl to ExternalClub.logoUrl", async () => {
+    const database = createDatabase({
+      events: [
+        createEvent({
+          matchExternalMapping: createMapping({
+            awayExternalTeam: {
+              id: "external-away-fallback",
+              name: "Fallback FC",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: null,
+              externalClub: {
+                name: "Fallback Club",
+                logoUrl: "/fallback-club.svg",
+              },
+            },
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+
+    expect(result.upcoming[0]?.away.externalLogoUrl).toBe("/fallback-club.svg");
+    expect(result.upcoming[0]?.away.clubName).toBe("Fallback Club");
+  });
+
+  it("exposes null when neither external identity level has a crest", async () => {
+    const database = createDatabase({
+      events: [
+        createEvent({
+          matchExternalMapping: createMapping({
+            awayExternalTeam: {
+              id: "external-away-missing",
+              name: "No Crest FC",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: null,
+              externalClub: {
+                name: "No Crest Club",
+                logoUrl: null,
+              },
+            },
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+
+    expect(result.upcoming[0]?.away.externalLogoUrl).toBeNull();
   });
 
   it("B. exposes AWAY perspective for mapped away fixtures", async () => {
@@ -265,6 +335,11 @@ describe("listTeamSeasonMatches", () => {
               name: "Host FC",
               shortName: null,
               alternativeName: null,
+              logoUrl: null,
+              externalClub: {
+                name: "Host FC",
+                logoUrl: "https://blob.vercel-storage.com/host-club.png",
+              },
             },
           }),
         }),
@@ -280,6 +355,10 @@ describe("listTeamSeasonMatches", () => {
     expect(result.upcoming).toHaveLength(1);
     expect(result.upcoming[0]?.side).toBe("AWAY");
     expect(result.upcoming[0]?.away.canonicalTeamId).toBe(TEAM_ID);
+    expect(result.upcoming[0]?.away.externalLogoUrl).toBeNull();
+    expect(result.upcoming[0]?.home.externalLogoUrl).toBe(
+      "https://blob.vercel-storage.com/host-club.png",
+    );
   });
 
   it("C. excludes unrelated team matches even when opponent labels match", async () => {
@@ -696,6 +775,11 @@ describe("listTeamSeasonMatches", () => {
               name: "Host FC",
               shortName: null,
               alternativeName: null,
+              logoUrl: null,
+              externalClub: {
+                name: "Host FC",
+                logoUrl: "https://blob.vercel-storage.com/host-club.png",
+              },
             },
             awayExternalTeam: null,
           }),

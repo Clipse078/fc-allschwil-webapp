@@ -26,6 +26,8 @@ import {
   filterPublicTeamResults,
   resolvePublicTeamResultPerspective,
 } from "@/lib/website/public-team-matches-mapper";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 
 export const TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT = 5;
 export const TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT = 10;
@@ -35,6 +37,8 @@ export const TEAM_COCKPIT_RESULTS_DETAIL_LIMIT = 10;
 export type TeamCockpitMatchSide = {
   displayName: string;
   isOwnTeam: boolean;
+  clubName: string | null;
+  logoUrl: string | null;
 };
 
 export type TeamCockpitMatch = {
@@ -66,6 +70,7 @@ export type TeamCockpitStandingsRow = {
   teamName: string;
   shortName: string | null;
   isCurrentTeam: boolean;
+  logoUrl: string | null;
   played: number;
   won: number;
   drawn: number;
@@ -91,6 +96,8 @@ export type TeamCockpitSportingData = {
 
 export type GetTeamCockpitSportingDataInput = {
   tenantId: string;
+  tenantClubName?: string | null;
+  tenantLogoUrl?: string | null;
   teamId: string;
   teamSeasonId: string;
   seasonKey: string;
@@ -109,7 +116,25 @@ export type GetTeamCockpitSportingDataInput = {
     results?: number;
   };
   database?: TeamMatchQueryDatabase;
+  identityDatabase?: TeamCockpitIdentityDatabase;
 };
+
+type TeamCockpitStandingExternalTeamRecord = {
+  shortName: string | null;
+  logoUrl: string | null;
+  providerMappings: Array<{
+    providerTeamId: number;
+  }>;
+  externalClub: {
+    logoUrl: string | null;
+  };
+};
+
+export interface TeamCockpitIdentityDatabase {
+  externalTeam: {
+    findMany(args: object): Promise<TeamCockpitStandingExternalTeamRecord[]>;
+  };
+}
 
 function meaningful(value: string | null | undefined): string | null {
   if (value == null) {
@@ -135,14 +160,32 @@ export function resolveCockpitMatchCompetitionName(
 function mapCockpitMatchSide(
   side: TeamSeasonMatchItem["home"],
   ownTeamId: string,
+  tenantClubName: string | null | undefined,
+  tenantLogoUrl: string | null | undefined,
 ): TeamCockpitMatchSide {
+  const isOwnTeam = side.canonicalTeamId === ownTeamId;
+
   return {
     displayName: side.displayName,
-    isOwnTeam: side.canonicalTeamId === ownTeamId,
+    isOwnTeam,
+    clubName: isOwnTeam ? meaningful(tenantClubName) : side.clubName,
+    logoUrl: resolveClubIdentityLogoUrl(
+      {
+        isOwnTeam,
+        externalLogoUrl: side.externalLogoUrl,
+      },
+      tenantLogoUrl,
+    ),
   };
 }
 
-function mapCockpitMatch(item: TeamSeasonMatchItem, ownTeamId: string): TeamCockpitMatch {
+function mapCockpitMatch(
+  item: TeamSeasonMatchItem,
+  input: Pick<
+    GetTeamCockpitSportingDataInput,
+    "teamId" | "tenantClubName" | "tenantLogoUrl"
+  >,
+): TeamCockpitMatch {
   return {
     eventId: item.eventId,
     startAt: item.startAt,
@@ -150,20 +193,36 @@ function mapCockpitMatch(item: TeamSeasonMatchItem, ownTeamId: string): TeamCock
     status: item.status,
     lifecycle: item.lifecycle,
     opponentName: item.opponent.displayName,
-    home: mapCockpitMatchSide(item.home, ownTeamId),
-    away: mapCockpitMatchSide(item.away, ownTeamId),
+    home: mapCockpitMatchSide(
+      item.home,
+      input.teamId,
+      input.tenantClubName,
+      input.tenantLogoUrl,
+    ),
+    away: mapCockpitMatchSide(
+      item.away,
+      input.teamId,
+      input.tenantClubName,
+      input.tenantLogoUrl,
+    ),
     venueName: item.venueName,
     location: item.location,
     competitionName: resolveCockpitMatchCompetitionName(item.competition),
   };
 }
 
-function mapCockpitResult(item: TeamSeasonMatchItem, ownTeamId: string): TeamCockpitResult {
+function mapCockpitResult(
+  item: TeamSeasonMatchItem,
+  input: Pick<
+    GetTeamCockpitSportingDataInput,
+    "teamId" | "tenantClubName" | "tenantLogoUrl"
+  >,
+): TeamCockpitResult {
   const teamScore = item.side === "HOME" ? item.scoreHome : item.scoreAway;
   const opponentScore = item.side === "HOME" ? item.scoreAway : item.scoreHome;
 
   return {
-    ...mapCockpitMatch(item, ownTeamId),
+    ...mapCockpitMatch(item, input),
     scoreHome: item.scoreHome,
     scoreAway: item.scoreAway,
     teamScore,
@@ -183,6 +242,8 @@ export async function getTeamCockpitSportingData(
   input: GetTeamCockpitSportingDataInput,
 ): Promise<TeamCockpitSportingData> {
   const database = input.database ?? (prisma as unknown as TeamMatchQueryDatabase);
+  const identityDatabase =
+    input.identityDatabase ?? (prisma as unknown as TeamCockpitIdentityDatabase);
   const now = input.now ?? new Date();
   const nextMatchesLimit =
     input.limits?.nextMatches ?? TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT;
@@ -195,10 +256,10 @@ export async function getTeamCockpitSportingData(
   });
 
   const nextMatches = filterPublicTeamNextMatches(upcoming, now, nextMatchesLimit).map((item) =>
-    mapCockpitMatch(item, input.teamId),
+    mapCockpitMatch(item, input),
   );
   const results = filterPublicTeamResults(completed, resultsLimit).map((item) =>
-    mapCockpitResult(item, input.teamId),
+    mapCockpitResult(item, input),
   );
 
   let standings: TeamCockpitStandings | null = null;
@@ -226,26 +287,97 @@ export async function getTeamCockpitSportingData(
       });
 
       if (standingsCompetitionDisplay) {
+        const opponentProviderTeamIds = [
+          ...new Set(
+            standingsTable.rows
+              .map((row) => row.externalTeamId)
+              .filter(
+                (providerTeamId) =>
+                  providerTeamId !== input.sfvMapping!.externalTeamId,
+              ),
+          ),
+        ];
+        const standingsExternalTeams =
+          opponentProviderTeamIds.length > 0
+            ? await identityDatabase.externalTeam.findMany({
+                where: {
+                  tenantId: input.tenantId,
+                  providerMappings: {
+                    some: {
+                      provider: SFV_PROVIDER,
+                      providerTeamId: { in: opponentProviderTeamIds },
+                    },
+                  },
+                },
+                select: {
+                  shortName: true,
+                  logoUrl: true,
+                  providerMappings: {
+                    where: {
+                      provider: SFV_PROVIDER,
+                      providerTeamId: { in: opponentProviderTeamIds },
+                    },
+                    select: { providerTeamId: true },
+                  },
+                  externalClub: {
+                    select: { logoUrl: true },
+                  },
+                },
+              })
+            : [];
+        const externalTeamByProviderId = new Map<
+          number,
+          { shortName: string | null; logoUrl: string | null }
+        >();
+
+        for (const externalTeam of standingsExternalTeams) {
+          const logoUrl = resolveExternalTeamLogoUrl(
+            externalTeam,
+            externalTeam.externalClub,
+          );
+
+          for (const providerMapping of externalTeam.providerMappings) {
+            externalTeamByProviderId.set(providerMapping.providerTeamId, {
+              shortName: externalTeam.shortName,
+              logoUrl,
+            });
+          }
+        }
+
         standings = {
           competition: standingsCompetitionDisplay,
-          rows: standingsTable.rows.map((row) => ({
-          position: row.position,
-          teamName: row.teamName,
-          shortName:
-            row.externalTeamId === input.sfvMapping!.externalTeamId
-              ? input.teamShortName ?? row.shortName
-              : row.shortName,
-          isCurrentTeam: row.externalTeamId === input.sfvMapping!.externalTeamId,
-          played: row.played,
-          won: row.won,
-          drawn: row.drawn,
-          lost: row.lost,
-          goalsFor: row.goalsFor,
-          goalsAgainst: row.goalsAgainst,
-          goalDifference: row.goalsFor - row.goalsAgainst,
-          points: row.points,
-          penaltyPoints: row.penaltyPoints,
-        })),
+          rows: standingsTable.rows.map((row) => {
+            const isCurrentTeam =
+              row.externalTeamId === input.sfvMapping!.externalTeamId;
+            const externalTeam = externalTeamByProviderId.get(
+              row.externalTeamId,
+            );
+
+            return {
+              position: row.position,
+              teamName: row.teamName,
+              shortName: isCurrentTeam
+                ? input.teamShortName ?? row.shortName
+                : externalTeam?.shortName ?? row.shortName,
+              isCurrentTeam,
+              logoUrl: resolveClubIdentityLogoUrl(
+                {
+                  isOwnTeam: isCurrentTeam,
+                  externalLogoUrl: externalTeam?.logoUrl ?? null,
+                },
+                input.tenantLogoUrl,
+              ),
+              played: row.played,
+              won: row.won,
+              drawn: row.drawn,
+              lost: row.lost,
+              goalsFor: row.goalsFor,
+              goalsAgainst: row.goalsAgainst,
+              goalDifference: row.goalsFor - row.goalsAgainst,
+              points: row.points,
+              penaltyPoints: row.penaltyPoints,
+            };
+          }),
         };
       }
     }
