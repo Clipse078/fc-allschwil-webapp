@@ -237,6 +237,44 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(data.nextMatches[0]?.away.displayName).toBe("1. Mannschaft");
   });
 
+  it("uses the tenant crest for another internal team side without marking it as own", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          away: {
+            canonicalTeamId: "team-internal-opponent",
+            canonicalExternalTeamId: null,
+            displayName: "2. Mannschaft",
+            clubName: null,
+            externalLogoUrl: null,
+            providerTeamId: 500,
+            providerTeamName: "FC Test 2",
+          },
+        }),
+      ],
+      completed: [],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantClubName: "FC Test Club",
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "1. Mannschaft",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches[0]?.away).toMatchObject({
+      displayName: "2. Mannschaft",
+      isOwnTeam: false,
+      clubName: "FC Test Club",
+      logoUrl: "/tenant-crest.svg",
+    });
+  });
+
   it("preserves null when an external fixture side has no canonical crest", async () => {
     mockListMatches.mockResolvedValue({
       upcoming: [

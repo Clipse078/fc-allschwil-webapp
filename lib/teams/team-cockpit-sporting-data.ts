@@ -164,14 +164,15 @@ function mapCockpitMatchSide(
   tenantLogoUrl: string | null | undefined,
 ): TeamCockpitMatchSide {
   const isOwnTeam = side.canonicalTeamId === ownTeamId;
+  const isInternalTeam = side.canonicalTeamId !== null;
 
   return {
     displayName: side.displayName,
     isOwnTeam,
-    clubName: isOwnTeam ? meaningful(tenantClubName) : side.clubName,
+    clubName: isInternalTeam ? meaningful(tenantClubName) : side.clubName,
     logoUrl: resolveClubIdentityLogoUrl(
       {
-        isOwnTeam,
+        isOwnTeam: isInternalTeam,
         externalLogoUrl: side.externalLogoUrl,
       },
       tenantLogoUrl,
