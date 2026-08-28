@@ -1,19 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Pencil, X } from "lucide-react";
 import TeamSettingsCard from "@/components/admin/teams/TeamSettingsCard";
-import TeamRosterOverviewCard from "@/components/admin/teams/TeamRosterOverviewCard";
-import TeamCockpitHeaderBar from "@/components/admin/teams/TeamCockpitHeaderBar";
 import TeamCockpitOverview from "@/components/admin/teams/TeamCockpitOverview";
 import TeamTrainingSchedule from "@/components/admin/teams/TeamTrainingSchedule";
-import TeamAdministrationSection from "@/components/admin/teams/TeamAdministrationSection";
-import TeamAttendanceSection from "@/components/admin/teams/TeamAttendanceSection";
-import TeamParticipationSection from "@/components/admin/teams/TeamParticipationSection";
 import type { TeamCockpitMetrics } from "@/lib/teams/team-cockpit-metrics";
 import type { TeamTrainingScheduleEntry } from "@/lib/teams/team-training-schedule";
-import type { TeamAttendanceOverview } from "@/lib/attendance/types";
-import type { TeamUpcomingParticipation } from "@/lib/participation/types";
 import { SectionCard } from "@/components/ui/page";
+import { Button } from "@/components/ui/Button";
 
 type TeamSeasonStatus = "ACTIVE" | "INACTIVE" | "ARCHIVED";
 
@@ -34,42 +29,6 @@ type TeamSeasonItem = {
     endDate: string;
     isActive: boolean;
   };
-  playerSquadMembers?: Array<{
-    id: string;
-    status: string;
-    shirtNumber: number | null;
-    positionLabel: string | null;
-    isCaptain: boolean;
-    isViceCaptain: boolean;
-    isWebsiteVisible: boolean;
-    sortOrder: number;
-    remarks: string | null;
-    person: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      displayName: string | null;
-      email: string | null;
-      phone: string | null;
-      dateOfBirth?: string | null;
-    };
-  }>;
-  trainerTeamMembers?: Array<{
-    id: string;
-    status: string;
-    roleLabel: string | null;
-    isWebsiteVisible: boolean;
-    sortOrder: number;
-    remarks: string | null;
-    person: {
-      id: string;
-      firstName: string;
-      lastName: string;
-      displayName: string | null;
-      email: string | null;
-      phone: string | null;
-    };
-  }>;
 };
 
 type OrgUnitOption = {
@@ -87,7 +46,7 @@ type ProviderMappingInfo = {
 } | null;
 
 type CompetitionInfo = {
-  id: string;
+  id: string | null;
   name: string | null;
   shortName: string | null;
 } | null;
@@ -129,8 +88,6 @@ type Props = {
   initialTeam: Team;
   cockpitMetrics: TeamCockpitMetrics;
   trainingSchedule: TeamTrainingScheduleEntry[];
-  attendanceOverview: TeamAttendanceOverview | null;
-  upcomingParticipation: TeamUpcomingParticipation | null;
   canManage: boolean;
   canDelete: boolean;
   availableOrgUnits: OrgUnitOption[];
@@ -142,13 +99,9 @@ export default function TeamCockpitShell({
   initialTeam,
   cockpitMetrics,
   trainingSchedule,
-  attendanceOverview,
-  upcomingParticipation,
   canManage,
-  canDelete,
   availableOrgUnits,
   availableCompetitions,
-  displayTitle,
 }: Props) {
   const [team, setTeam] = useState<Team>(initialTeam);
   const [isEditingSettings, setIsEditingSettings] = useState(false);
@@ -185,22 +138,30 @@ export default function TeamCockpitShell({
 
   return (
     <div className="space-y-6">
-      <TeamCockpitHeaderBar
-        teamId={team.id}
-        websiteVisible={team.websiteVisible}
-        infoboardVisible={team.infoboardVisible}
-        canManage={canManage}
-        isEditingSettings={isEditingSettings}
-        onEditSettings={() => setIsEditingSettings(true)}
-        onCancelEditSettings={() => setIsEditingSettings(false)}
-        onVisibilityChange={(values) =>
-          setTeam((current) => ({
-            ...current,
-            websiteVisible: values.websiteVisible,
-            infoboardVisible: values.infoboardVisible,
-          }))
-        }
-      />
+      {canManage ? (
+        <div className="flex justify-end">
+          {isEditingSettings ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<X className="h-3.5 w-3.5" />}
+              onClick={() => setIsEditingSettings(false)}
+            >
+              Bearbeiten beenden
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<Pencil className="h-3.5 w-3.5" />}
+              onClick={() => setIsEditingSettings(true)}
+              data-testid="team-settings-edit-button"
+            >
+              Bearbeiten
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <SectionCard title="Team-Übersicht" description="Operative Kennzahlen der aktuellen Saison.">
@@ -209,25 +170,6 @@ export default function TeamCockpitShell({
 
         <TeamTrainingSchedule entries={trainingSchedule} />
       </div>
-
-      {/* TEAM-COCKPIT-02B: canonical attendance overview for the current season. */}
-      {attendanceOverview ? (
-        <TeamAttendanceSection
-          teamId={team.id}
-          teamSeasonId={attendanceOverview.teamSeasonId}
-          initialOverview={attendanceOverview}
-          canManage={canManage}
-        />
-      ) : null}
-
-      {/* TEAM-COCKPIT-03A: upcoming participation responses for the current season. */}
-      {upcomingParticipation ? (
-        <TeamParticipationSection
-          teamId={team.id}
-          teamSeasonId={upcomingParticipation.teamSeasonId}
-          initialUpcoming={upcomingParticipation}
-        />
-      ) : null}
 
       {/* TEAM-COCKPIT-02: future sport-data slot (matches, results, standings). */}
       <div data-testid="team-cockpit-sport-slot" className="hidden" aria-hidden="true" />
@@ -267,27 +209,6 @@ export default function TeamCockpitShell({
           />
         </div>
       ) : null}
-
-      <TeamRosterOverviewCard
-        teamId={team.id}
-        teamAgeGroup={team.ageGroup}
-        canManage={canManage}
-        teamSeasons={team.teamSeasons}
-        currentTeamSeasonId={team.currentTeamSeasonId ?? null}
-      />
-
-      <TeamAdministrationSection
-        teamId={team.id}
-        teamName={displayTitle}
-        isActive={team.isActive}
-        canManage={canManage}
-        canDelete={canDelete}
-        teamSeasons={team.teamSeasons.map((teamSeason) => ({
-          id: teamSeason.id,
-          displayName: teamSeason.displayName,
-          season: { name: teamSeason.season.name },
-        }))}
-      />
     </div>
   );
 }

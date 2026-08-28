@@ -78,3 +78,18 @@ export function getAnlageplanBgKey(
 ): string {
   return `infoboards/${tenantKey}/${infoboardId}/anlageplan/${infoboardId}.${ext}`;
 }
+
+// ── TEAM-COCKPIT-PREMIUM-01K: team photo paths ───────────────────────────────
+//
+// Public visual identity asset, distinct from private TeamDocument storage.
+// One key per team per extension — re-upload overwrites the same key.
+//
+//   Key: team-photos/{tenantKey}/{teamId}.{ext}
+
+export function getTeamPhotoKey(
+  tenantKey: string,
+  teamId: string,
+  ext: string,
+): string {
+  return `team-photos/${tenantKey}/${teamId}.${ext}`;
+}

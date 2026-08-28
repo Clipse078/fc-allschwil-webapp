@@ -63,12 +63,15 @@ export type TeamRosterSeasonEntry = {
   trainerTeamMembers?: TrainerMember[];
 };
 
+type RosterMode = "all" | "squad" | "trainer";
+
 type Props = {
   teamId: string;
   teamAgeGroup: string | null;
   canManage: boolean;
   entry: TeamRosterSeasonEntry;
   anchorTargets?: boolean;
+  mode?: RosterMode;
 };
 
 export default function TeamRosterSeasonSection({
@@ -77,7 +80,11 @@ export default function TeamRosterSeasonSection({
   canManage,
   entry,
   anchorTargets = false,
+  mode = "all",
 }: Props) {
+  const showSquad = mode === "all" || mode === "squad";
+  const showTrainer = mode === "all" || mode === "trainer";
+
   return (
     <div className="space-y-6">
       <div className="border-b border-[var(--border)] pb-3">
@@ -85,35 +92,43 @@ export default function TeamRosterSeasonSection({
         <p className="mt-0.5 text-sm text-[var(--muted)]">{entry.displayName}</p>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-2">
-        <TeamSquadManagementCard
-          teamId={teamId}
-          canManage={canManage}
-          sectionId={anchorTargets ? "spielerkader" : undefined}
-          teamSeason={{
-            id: entry.id,
-            displayName: entry.displayName,
-            shortName: entry.shortName,
-            status: entry.status,
-            squadWebsiteVisible: entry.squadWebsiteVisible ?? true,
-            season: entry.season,
-            teamAgeGroup,
-            playerSquadMembers: entry.playerSquadMembers ?? [],
-          }}
-        />
+      <div
+        className={
+          showSquad && showTrainer ? "grid gap-8 xl:grid-cols-2" : "grid gap-8"
+        }
+      >
+        {showSquad ? (
+          <TeamSquadManagementCard
+            teamId={teamId}
+            canManage={canManage}
+            sectionId={anchorTargets ? "spielerkader" : undefined}
+            teamSeason={{
+              id: entry.id,
+              displayName: entry.displayName,
+              shortName: entry.shortName,
+              status: entry.status,
+              squadWebsiteVisible: entry.squadWebsiteVisible ?? true,
+              season: entry.season,
+              teamAgeGroup,
+              playerSquadMembers: entry.playerSquadMembers ?? [],
+            }}
+          />
+        ) : null}
 
-        <TeamTrainerManagementCard
-          teamId={teamId}
-          canManage={canManage}
-          sectionId={anchorTargets ? "trainerteam" : undefined}
-          teamSeason={{
-            id: entry.id,
-            displayName: entry.displayName,
-            trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible ?? true,
-            season: entry.season,
-            trainerTeamMembers: entry.trainerTeamMembers ?? [],
-          }}
-        />
+        {showTrainer ? (
+          <TeamTrainerManagementCard
+            teamId={teamId}
+            canManage={canManage}
+            sectionId={anchorTargets ? "trainerteam" : undefined}
+            teamSeason={{
+              id: entry.id,
+              displayName: entry.displayName,
+              trainerTeamWebsiteVisible: entry.trainerTeamWebsiteVisible ?? true,
+              season: entry.season,
+              trainerTeamMembers: entry.trainerTeamMembers ?? [],
+            }}
+          />
+        ) : null}
       </div>
     </div>
   );
@@ -124,6 +139,7 @@ type HistoricalSeasonsProps = {
   teamAgeGroup: string | null;
   canManage: boolean;
   seasons: TeamRosterSeasonEntry[];
+  mode?: RosterMode;
 };
 
 export function TeamHistoricalSeasonRosters({
@@ -131,6 +147,7 @@ export function TeamHistoricalSeasonRosters({
   teamAgeGroup,
   canManage,
   seasons,
+  mode = "all",
 }: HistoricalSeasonsProps) {
   const [open, setOpen] = useState(false);
 
@@ -155,6 +172,7 @@ export function TeamHistoricalSeasonRosters({
             teamAgeGroup={teamAgeGroup}
             canManage={canManage}
             entry={entry}
+            mode={mode}
           />
         ))}
       </div>
