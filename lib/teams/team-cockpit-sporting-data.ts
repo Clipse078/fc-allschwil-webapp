@@ -250,28 +250,30 @@ export type CurrentSeasonSfvMappingData = {
 /**
  * Tenant-safe loader for the current-season SFV mapping used by cockpit queries.
  */
-export async function loadCurrentSeasonSfvMapping(
-  input: LoadCurrentSeasonSfvMappingInput,
-): Promise<CurrentSeasonSfvMappingData | null> {
-  const mapping = await prisma.teamExternalMapping.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      teamSeasonId: input.teamSeasonId,
-      provider: SFV_PROVIDER,
-      providerIsActive: true,
-    },
-    select: {
-      externalTeamId: true,
-      externalSeasonId: true,
-      providerLeagueId: true,
-      providerLeagueName: true,
-      providerTeamName: true,
-      lastSyncedAt: true,
-      teamSeasonId: true,
-      provider: true,
-    },
-  });
+const currentSeasonSfvMappingSelect = {
+  externalTeamId: true,
+  externalSeasonId: true,
+  providerLeagueId: true,
+  providerLeagueName: true,
+  providerTeamName: true,
+  lastSyncedAt: true,
+  teamSeasonId: true,
+  provider: true,
+} as const;
 
+function mapCurrentSeasonSfvMapping(
+  mapping: {
+    externalTeamId: number;
+    externalSeasonId: number;
+    providerLeagueId: number | null;
+    providerLeagueName: string | null;
+    providerTeamName: string | null;
+    lastSyncedAt: Date;
+    teamSeasonId: string | null;
+    provider: string;
+  } | null,
+  input: LoadCurrentSeasonSfvMappingInput,
+): CurrentSeasonSfvMappingData | null {
   const seasonSafeMapping = resolveCurrentSeasonSfvMapping(mapping, {
     teamSeasonId: input.teamSeasonId,
     seasonKey: input.seasonKey,
@@ -289,4 +291,75 @@ export async function loadCurrentSeasonSfvMapping(
     providerTeamName: mapping?.providerTeamName ?? null,
     lastSyncedAt: mapping!.lastSyncedAt,
   };
+}
+
+export async function loadCurrentSeasonSfvMapping(
+  input: LoadCurrentSeasonSfvMappingInput,
+): Promise<CurrentSeasonSfvMappingData | null> {
+  const mapping = await prisma.teamExternalMapping.findFirst({
+    where: {
+      tenantId: input.tenantId,
+      teamSeasonId: input.teamSeasonId,
+      provider: SFV_PROVIDER,
+      providerIsActive: true,
+    },
+    select: currentSeasonSfvMappingSelect,
+  });
+
+  return mapCurrentSeasonSfvMapping(mapping, input);
+}
+
+export type LoadCurrentSeasonSfvMappingsForListInput = {
+  tenantId: string;
+  entries: Array<{
+    teamSeasonId: string;
+    seasonKey: string;
+  }>;
+};
+
+/**
+ * Batch loader for teams-list competition resolution. Avoids per-row DB calls
+ * while preserving the same season/tenant-safe mapping rules as the detail path.
+ */
+export async function loadCurrentSeasonSfvMappingsForList(
+  input: LoadCurrentSeasonSfvMappingsForListInput,
+): Promise<Map<string, Pick<CurrentSeasonSfvMappingData, "providerLeagueName">>> {
+  const teamSeasonIds = input.entries.map((entry) => entry.teamSeasonId);
+  const result = new Map<string, Pick<CurrentSeasonSfvMappingData, "providerLeagueName">>();
+
+  if (teamSeasonIds.length === 0) {
+    return result;
+  }
+
+  const mappings = await prisma.teamExternalMapping.findMany({
+    where: {
+      tenantId: input.tenantId,
+      teamSeasonId: { in: teamSeasonIds },
+      provider: SFV_PROVIDER,
+      providerIsActive: true,
+    },
+    select: currentSeasonSfvMappingSelect,
+  });
+
+  const mappingsByTeamSeasonId = new Map(
+    mappings
+      .filter((mapping): mapping is typeof mapping & { teamSeasonId: string } => mapping.teamSeasonId !== null)
+      .map((mapping) => [mapping.teamSeasonId, mapping]),
+  );
+
+  for (const entry of input.entries) {
+    const mapping = mapCurrentSeasonSfvMapping(mappingsByTeamSeasonId.get(entry.teamSeasonId) ?? null, {
+      tenantId: input.tenantId,
+      teamSeasonId: entry.teamSeasonId,
+      seasonKey: entry.seasonKey,
+    });
+
+    if (mapping) {
+      result.set(entry.teamSeasonId, {
+        providerLeagueName: mapping.providerLeagueName,
+      });
+    }
+  }
+
+  return result;
 }

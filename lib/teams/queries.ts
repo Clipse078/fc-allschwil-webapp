@@ -1,7 +1,10 @@
 ﻿import { prisma } from "@/lib/db/prisma";
 import { resolveLongTeamName, resolveCompactTeamName } from "@/lib/teams/team-naming";
 import { currentTeamSeasonWhere, pickCurrentTeamSeason } from "@/lib/teams/current-season";
-import { loadCurrentSeasonSfvMapping } from "@/lib/teams/team-cockpit-sporting-data";
+import {
+  loadCurrentSeasonSfvMapping,
+  loadCurrentSeasonSfvMappingsForList,
+} from "@/lib/teams/team-cockpit-sporting-data";
 import { resolveTeamCompetitionDisplay } from "@/lib/teams/team-competition-display";
 
 export async function getAvailableTeamSeasons() {
@@ -61,6 +64,7 @@ export async function getTeamsListData(tenantId: string, selectedSeasonKey?: str
         },
         take: 1,
         select: {
+          id: true,
           season: {
             select: {
               key: true,
@@ -108,10 +112,41 @@ export async function getTeamsListData(tenantId: string, selectedSeasonKey?: str
     },
   });
 
+  const currentSeasonMappingEntries = teams.flatMap((team) => {
+    const activeSeasonEntry = team.teamSeasons[0];
+    if (!activeSeasonEntry) {
+      return [];
+    }
+
+    return [
+      {
+        teamSeasonId: activeSeasonEntry.id,
+        seasonKey: activeSeasonEntry.season.key,
+      },
+    ];
+  });
+
+  const currentSeasonSfvMappingsByTeamSeasonId = await loadCurrentSeasonSfvMappingsForList({
+    tenantId,
+    entries: currentSeasonMappingEntries,
+  });
+
   return teams.map((team) => {
     const activeSeasonEntry = team.teamSeasons[0] ?? null;
     const primaryCompetition = activeSeasonEntry?.competitions[0]?.competition ?? null;
     const latestMapping = team.externalMappings[0] ?? null;
+    const currentSeasonSfvMapping = activeSeasonEntry
+      ? (currentSeasonSfvMappingsByTeamSeasonId.get(activeSeasonEntry.id) ?? null)
+      : null;
+    const resolvedCompetitionDisplay = resolveTeamCompetitionDisplay({
+      providerLeagueName: currentSeasonSfvMapping?.providerLeagueName,
+      canonicalCompetition: primaryCompetition
+        ? {
+            name: primaryCompetition.officialName,
+            shortName: primaryCompetition.shortName,
+          }
+        : null,
+    });
 
     // TEAM-IDENTITY-01: canonical naming contract — see lib/teams/team-naming.ts.
     const namingInput = {
@@ -150,10 +185,10 @@ export async function getTeamsListData(tenantId: string, selectedSeasonKey?: str
             status: activeSeasonEntry.status,
           }
         : null,
-      competition: primaryCompetition
+      competition: resolvedCompetitionDisplay
         ? {
-            name: primaryCompetition.officialName,
-            shortName: primaryCompetition.shortName,
+            name: resolvedCompetitionDisplay.name,
+            shortName: resolvedCompetitionDisplay.shortName ?? null,
           }
         : null,
       providerMapping: latestMapping

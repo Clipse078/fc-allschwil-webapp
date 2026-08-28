@@ -4,12 +4,14 @@ import type { TeamMatchQueryDatabase } from "../team-match-query-service";
 import {
   getTeamCockpitSportingData,
   loadCurrentSeasonSfvMapping,
+  loadCurrentSeasonSfvMappingsForList,
 } from "../team-cockpit-sporting-data";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     teamExternalMapping: {
       findFirst: vi.fn(),
+      findMany: vi.fn(),
     },
   },
 }));
@@ -38,7 +40,10 @@ const TEAM_SEASON_ID = "team-season-1";
 const NOW = new Date("2026-08-25T12:00:00.000Z");
 
 const mockPrisma = prisma as unknown as {
-  teamExternalMapping: { findFirst: ReturnType<typeof vi.fn> };
+  teamExternalMapping: {
+    findFirst: ReturnType<typeof vi.fn>;
+    findMany: ReturnType<typeof vi.fn>;
+  };
 };
 const mockFetchStandings = fetchTeamStandingsForMapping as ReturnType<typeof vi.fn>;
 const mockListMatches = listTeamSeasonMatches as ReturnType<typeof vi.fn>;
@@ -394,5 +399,48 @@ describe("TEAM-COCKPIT-PREMIUM-01C — loadCurrentSeasonSfvMapping", () => {
       },
       select: expect.any(Object),
     });
+  });
+});
+
+describe("TEAM-COCKPIT-PREMIUM-01E2 — loadCurrentSeasonSfvMappingsForList", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("batch-loads season-safe providerLeagueName for multiple TeamSeason rows", async () => {
+    mockPrisma.teamExternalMapping.findMany.mockResolvedValue([
+      {
+        externalTeamId: 123,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+        providerLeagueName: "2. Liga interregional",
+        providerTeamName: "FC Test",
+        lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+        teamSeasonId: "ts-a",
+        provider: "SFV",
+      },
+      {
+        externalTeamId: 456,
+        externalSeasonId: 2025,
+        providerLeagueId: 11,
+        providerLeagueName: "Old League",
+        providerTeamName: "Old Team",
+        lastSyncedAt: new Date("2024-01-01T00:00:00.000Z"),
+        teamSeasonId: "ts-b",
+        provider: "SFV",
+      },
+    ]);
+
+    const mappings = await loadCurrentSeasonSfvMappingsForList({
+      tenantId: TENANT_ID,
+      entries: [
+        { teamSeasonId: "ts-a", seasonKey: "2026-2027" },
+        { teamSeasonId: "ts-b", seasonKey: "2026-2027" },
+      ],
+    });
+
+    expect(mockPrisma.teamExternalMapping.findMany).toHaveBeenCalledTimes(1);
+    expect(mappings.get("ts-a")).toEqual({ providerLeagueName: "2. Liga interregional" });
+    expect(mappings.has("ts-b")).toBe(false);
   });
 });

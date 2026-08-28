@@ -19,16 +19,28 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockFindMany = vi.fn();
+const mockMappingFindMany = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     team: { findMany: (...args: unknown[]) => mockFindMany(...args) },
+    teamExternalMapping: {
+      findMany: (...args: unknown[]) => mockMappingFindMany(...args),
+    },
     season: { findMany: vi.fn() },
   },
 }));
 
-vi.mock("@/lib/seasons/season-logic", () => ({
-  getCurrentSwissFootballSeason: () => ({ key: "2027", name: "2027/28" }),
+vi.mock("@/lib/seasons/season-logic", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/seasons/season-logic")>();
+  return {
+    ...actual,
+    getCurrentSwissFootballSeason: () => ({ key: "2026/2027", name: "2026/27" }),
+  };
+});
+
+vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
+  fetchTeamStandingsForMapping: vi.fn(),
 }));
 
 const { getTeamsListData } = await import("../queries");
@@ -47,7 +59,8 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
     infoboardVisible: true,
     teamSeasons: [
       {
-        season: { key: "2027", name: "2027/28" },
+        id: "ts-current",
+        season: { key: "2026/2027", name: "2026/27" },
         displayName: "FC Allschwil C1",
         shortName: "C1",
         status: "ACTIVE",
@@ -59,8 +72,23 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeCurrentSeasonMapping(overrides: Record<string, unknown> = {}) {
+  return {
+    externalTeamId: 123,
+    externalSeasonId: 2027,
+    providerLeagueId: 10,
+    providerLeagueName: "2. Liga interregional",
+    providerTeamName: "FC Allschwil C1",
+    lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+    teamSeasonId: "ts-current",
+    provider: "SFV",
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mockMappingFindMany.mockResolvedValue([]);
 });
 
 describe("getTeamsListData — competition enrichment", () => {
@@ -77,7 +105,8 @@ describe("getTeamsListData — competition enrichment", () => {
       makeTeamRow({
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: "FC Allschwil C1",
             shortName: "C1",
             status: "ACTIVE",
@@ -158,7 +187,8 @@ describe("getTeamsListData — provider mapping enrichment", () => {
         externalMappings: [],
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: "Senioren 30+",
             shortName: null,
             status: "ACTIVE",
@@ -186,7 +216,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         name: "FC Allschwil Junioren B2",
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: "Junioren B2",
             shortName: "B2",
             status: "ACTIVE",
@@ -224,7 +255,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         shortName: "B2",
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: "FC Allschwil Junioren B2",
             shortName: null,
             status: "ACTIVE",
@@ -248,7 +280,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         externalMappings: [],
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: null,
             shortName: null,
             status: "ACTIVE",
@@ -272,7 +305,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         alternativeName: null,
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: null,
             shortName: null,
             status: "ACTIVE",
@@ -303,7 +337,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         shortName: "B2",
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: null,
             shortName: null,
             status: "ACTIVE",
@@ -337,7 +372,8 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
         shortName: "E3",
         teamSeasons: [
           {
-            season: { key: "2027", name: "2027/28" },
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
             displayName: "FC Allschwil Junioren E2",
             shortName: "E2",
             status: "ACTIVE",
@@ -397,5 +433,132 @@ describe("getTeamsListData — TEAM-IDENTITY-01 canonical naming", () => {
     expect(teams).toHaveLength(2);
     expect(teams.map((t) => t.id)).toEqual(["team-b1", "team-b2"]);
     expect(teams[0].id).not.toBe(teams[1].id);
+  });
+});
+
+describe("TEAM-COCKPIT-PREMIUM-01E2 — getTeamsListData competition resolution", () => {
+  it("A — SFV-mapped current-season team with providerLeagueName shows provider league", async () => {
+    mockFindMany.mockResolvedValueOnce([makeTeamRow()]);
+    mockMappingFindMany.mockResolvedValueOnce([makeCurrentSeasonMapping()]);
+
+    const [team] = await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(team.competition).toEqual({
+      name: "2. Liga interregional",
+      shortName: null,
+    });
+  });
+
+  it("B — canonical TeamSeasonCompetition wins when provider mapping is absent", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        teamSeasons: [
+          {
+            id: "ts-current",
+            season: { key: "2026/2027", name: "2026/27" },
+            displayName: "Senioren 30+",
+            shortName: null,
+            status: "ACTIVE",
+            competitions: [
+              { competition: { officialName: "Senioren 30+ Promotion", shortName: null } },
+            ],
+          },
+        ],
+      }),
+    ]);
+
+    const [team] = await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(team.competition).toEqual({
+      name: "Senioren 30+ Promotion",
+      shortName: null,
+    });
+  });
+
+  it("C — returns null competition when neither mapping nor canonical competition exist", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        name: "Trainingsgruppe",
+        category: "TRAININGSGRUPPE",
+      }),
+    ]);
+
+    const [team] = await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(team.competition).toBeNull();
+  });
+
+  it("D — old-season provider mapping does not leak into the current list", async () => {
+    mockFindMany.mockResolvedValueOnce([makeTeamRow()]);
+    mockMappingFindMany.mockResolvedValueOnce([
+      makeCurrentSeasonMapping({
+        externalSeasonId: 2025,
+        providerLeagueName: "Old League",
+      }),
+    ]);
+
+    const [team] = await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(team.competition).toBeNull();
+  });
+
+  it("E — cross-tenant mapping does not leak into the current list", async () => {
+    mockFindMany.mockResolvedValueOnce([makeTeamRow({ id: "team-a" })]);
+    mockMappingFindMany.mockResolvedValueOnce([]);
+
+    const [team] = await getTeamsListData("tenant-a", "2026/2027");
+
+    expect(mockMappingFindMany).toHaveBeenCalledWith({
+      where: {
+        tenantId: "tenant-a",
+        teamSeasonId: { in: ["ts-current"] },
+        provider: "SFV",
+        providerIsActive: true,
+      },
+      select: expect.any(Object),
+    });
+    expect(team.competition).toBeNull();
+  });
+
+  it("F — list resolves competition without live standings provider calls", async () => {
+    const { fetchTeamStandingsForMapping } = await import("@/lib/integrations/sfv/standings-provider");
+
+    mockFindMany.mockResolvedValueOnce([makeTeamRow()]);
+    mockMappingFindMany.mockResolvedValueOnce([makeCurrentSeasonMapping()]);
+
+    await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(fetchTeamStandingsForMapping).not.toHaveBeenCalled();
+    expect(mockMappingFindMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("G — existing provider mapping enrichment remains unchanged", async () => {
+    mockFindMany.mockResolvedValueOnce([
+      makeTeamRow({
+        externalMappings: [
+          {
+            provider: "SFV",
+            providerIsActive: true,
+            lastSyncedAt: new Date("2027-07-01T00:00:00.000Z"),
+            mappingSource: "SYNC",
+            providerTeamName: "FC Allschwil C1",
+          },
+        ],
+      }),
+    ]);
+    mockMappingFindMany.mockResolvedValueOnce([makeCurrentSeasonMapping()]);
+
+    const [team] = await getTeamsListData("tenant-1", "2026/2027");
+
+    expect(team.providerMapping).toEqual({
+      provider: "SFV",
+      isActive: true,
+      lastSyncedAt: "2027-07-01T00:00:00.000Z",
+      source: "SYNC",
+      teamName: "FC Allschwil C1",
+    });
+    expect(team.isActive).toBe(true);
+    expect(team.websiteVisible).toBe(true);
+    expect(team.infoboardVisible).toBe(true);
   });
 });
