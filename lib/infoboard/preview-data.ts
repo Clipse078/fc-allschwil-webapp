@@ -7,9 +7,9 @@ import {
   type CanonicalInfoboardPolicyDatabase,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
 import {
-  buildScreen1LivePayload,
-  type Screen1TenantContext,
-} from "@/lib/publishing/infoboard/screen1-live-service";
+  buildScreen1KioskPresentation,
+} from "@/lib/infoboard/screen1-kiosk-presentation";
+import type { Screen1TenantContext } from "@/lib/publishing/infoboard/screen1-live-service";
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 import {
   buildScreen2LivePayload,
@@ -74,15 +74,18 @@ function createTournamentDatabase(): Screen1TournamentPresentationDatabase {
 export async function buildScreen1PreviewData(tenant: PreviewTenant, now: Date) {
   const database = createPreviewDatabase();
   const board = await getInfoboardBySlug("screen-1", tenant.id);
-  const payload = await buildScreen1LivePayload({
+  const presentation = await buildScreen1KioskPresentation({
     tenant: tenant as Screen1TenantContext,
     now,
     loader: createCanonicalInfoboardSourceLoader(database),
-    boardConfig: board ? buildBoardConfig(board) : null,
+    board,
     tournamentPresentationDatabase: createTournamentDatabase(),
   });
-  const weather = await fetchCurrentWeather();
-  return { payload, weather };
+  return {
+    payload: presentation.payload,
+    weather: presentation.weather,
+    infoboardScreen1Props: presentation.infoboardScreen1Props,
+  };
 }
 
 export async function buildScreen2PreviewData(tenant: PreviewTenant, now: Date) {

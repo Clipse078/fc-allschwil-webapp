@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   PreviewFrameScreen1,
-  PreviewFrameStatic,
+  PreviewFrameScreen2,
+  PreviewFrameAnlageplan,
 } from "@/components/infoboard/preview/PreviewFrame";
-import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
 import {
   buildScreen1PreviewData,
   buildScreen2PreviewData,
@@ -74,28 +73,23 @@ export default async function InfoboardPreviewFramePage({
   const data = await buildScreen2PreviewData(previewTenant, preview.now);
   if (data.renderer === "anlageplan") {
     return (
-      <PreviewFrameStatic>
-        <InfoboardAnlageplan
-          payload={data.payload}
-          weather={data.weather}
-          shellConfig={data.shellConfig}
-          branding={data.branding}
-          liveClock={false}
-        />
-      </PreviewFrameStatic>
+      <PreviewFrameAnlageplan
+        payload={data.payload}
+        weather={data.weather}
+        shellConfig={data.shellConfig}
+        branding={data.branding}
+        liveClock={false}
+      />
     );
   }
 
   return (
-    <PreviewFrameStatic>
-      <InfoboardScreen2
-        feed={data.payload.feed}
-        branding={data.payload.branding}
-        currentTimeIso={data.payload.currentTimeIso}
-        weather={data.weather}
-        theme={data.payload.theme}
-        liveClock={false}
-      />
-    </PreviewFrameStatic>
+    <PreviewFrameScreen2
+      feed={data.payload.feed}
+      branding={data.payload.branding}
+      currentTimeIso={data.payload.currentTimeIso}
+      weather={data.weather}
+      theme={data.payload.theme}
+    />
   );
 }

@@ -117,6 +117,13 @@
   overflow: hidden;
 }
 
+:global([data-kiosk-viewport-canvas="true"]) .root {
+  height: 100%;
+  max-height: 100%;
+  width: 100%;
+  min-height: 0;
+}
+
 /* ─── Header ─────────────────────────────────────────────────────────────── */
 /* Header is now the canonical KioskShellHeader (inline styles). No
    Screen-2-specific header CSS remains. */

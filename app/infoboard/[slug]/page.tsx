@@ -29,20 +29,18 @@ import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
-import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
+import { PhysicalInfoboardViewport } from "@/components/infoboard/shared/PhysicalInfoboardViewport";
 import { InfoboardAnlageplan, type InfoboardAnlageplanShellConfig } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
-import {
-  buildScreen1LivePayload,
-  type Screen1TenantContext,
-} from "@/lib/publishing/infoboard/screen1-live-service";
+import { buildScreen1KioskPresentation } from "@/lib/infoboard/screen1-kiosk-presentation";
 import {
   buildAnlageplanLivePayload,
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
+import { fetchCurrentWeather } from "@/lib/weather/weather-service";
 import { prisma } from "@/lib/db/prisma";
 
 // ── FCA branding constants ─────────────────────────────────────────────────────
@@ -110,6 +108,7 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
 
   const now = new Date();
   const db = createPrismaDb();
+  const weather = await fetchCurrentWeather();
 
   // ── ANLAGENUEBERSICHT branch ───────────────────────────────────────────────
   if (board.templateType === "ANLAGENUEBERSICHT") {
@@ -153,24 +152,27 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
     };
 
     return (
-      <InfoboardAnlageplan
-        payload={payload}
-        shellConfig={shellConfig}
-        branding={{
-          clubLogoSrc,
-          productLogoSrc: PRODUCT_LOGO_SRC,
-          clubName: tenantRow.key === FC_ALLSCHWIL_TENANT_KEY ? "FC ALLSCHWIL" : tenantRow.name,
-          facilityName:
-            tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
-              ? "SPORTANLAGE IM BRÜEL"
-              : undefined,
-        }}
-      />
+      <PhysicalInfoboardViewport>
+        <InfoboardAnlageplan
+          payload={payload}
+          weather={weather}
+          shellConfig={shellConfig}
+          branding={{
+            clubLogoSrc,
+            productLogoSrc: PRODUCT_LOGO_SRC,
+            clubName: tenantRow.key === FC_ALLSCHWIL_TENANT_KEY ? "FC ALLSCHWIL" : tenantRow.name,
+            facilityName:
+              tenantRow.key === FC_ALLSCHWIL_TENANT_KEY
+                ? "SPORTANLAGE IM BRÜEL"
+                : undefined,
+          }}
+        />
+      </PhysicalInfoboardViewport>
     );
   }
 
   // ── TAGESUEBERSICHT branch (default) ──────────────────────────────────────
-  const tenant: Screen1TenantContext = {
+  const tenant: import("@/lib/publishing/infoboard/screen1-live-service").Screen1TenantContext = {
     id: tenantRow.id,
     key: tenantRow.key,
     name: tenantRow.name,
@@ -180,28 +182,17 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
   };
 
   const loader = createCanonicalInfoboardSourceLoader(db);
-  const boardConfig = buildBoardConfig(board);
-
-  const payload = await buildScreen1LivePayload({
+  const presentation = await buildScreen1KioskPresentation({
     tenant,
     now,
     loader,
-    boardConfig,
+    board,
+    weather,
   });
 
   return (
-    <KioskViewportScaler>
-      <InfoboardScreen1
-        feed={payload.feed}
-        branding={payload.branding}
-        currentTimeIso={payload.currentTimeIso}
-        announcement={payload.announcement ?? undefined}
-        eventPresentation={payload.eventPresentation}
-        theme={payload.theme}
-        headerConfig={payload.headerConfig ?? undefined}
-        presentation={payload.presentation ?? undefined}
-        studio={payload.studio ?? undefined}
-      />
-    </KioskViewportScaler>
+    <PhysicalInfoboardViewport>
+      <InfoboardScreen1 {...presentation.infoboardScreen1Props} />
+    </PhysicalInfoboardViewport>
   );
 }

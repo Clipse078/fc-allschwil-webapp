@@ -25,13 +25,8 @@ vi.mock("@/lib/infoboard/preview-data", () => ({
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/components/infoboard/preview/PreviewFrame", () => ({
   PreviewFrameScreen1: () => <div data-testid="screen-1-renderer" />,
-  PreviewFrameStatic: ({ children }: { children: React.ReactNode }) => children,
-}));
-vi.mock("@/components/infoboard/screen2/InfoboardScreen2", () => ({
-  InfoboardScreen2: () => <div data-testid="screen-2-renderer" />,
-}));
-vi.mock("@/components/infoboard/anlageplan/InfoboardAnlageplan", () => ({
-  InfoboardAnlageplan: () => <div data-testid="anlageplan-renderer" />,
+  PreviewFrameScreen2: () => <div data-testid="screen-2-renderer" />,
+  PreviewFrameAnlageplan: () => <div data-testid="anlageplan-renderer" />,
 }));
 
 const tenant = {

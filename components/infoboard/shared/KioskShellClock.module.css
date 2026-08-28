@@ -1,0 +1,55 @@
+/**
+ * Canonical kiosk shell clock typography — fixed px sizes for the 1920×1080
+ * design canvas (see lib/infoboard/kiosk-shell-sizing.ts).
+ */
+
+.headerTimeBlock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerCurrentTime {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: var(--kiosk-shell-clock-font, 65px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.headerTimeSeparator {
+  font-size: calc(var(--kiosk-shell-clock-font, 65px) * 0.55);
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.35);
+  line-height: 1;
+}
+
+.headerDateBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1;
+}
+
+.headerWeekday {
+  font-size: var(--kiosk-shell-weekday-font, 18px);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.headerDateLine {
+  font-size: var(--kiosk-shell-date-font, 17px);
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
+}
+
+.headerDateFallback {
+  font-size: var(--kiosk-shell-date-font, 17px);
+  letter-spacing: 0.06em;
+  color: rgba(255, 255, 255, 0.55);
+  white-space: nowrap;
+}
