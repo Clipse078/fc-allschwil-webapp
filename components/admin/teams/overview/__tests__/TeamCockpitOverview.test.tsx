@@ -76,6 +76,7 @@ const STANDINGS: TeamCockpitStandings = {
     teamName: `Team ${index + 1}`,
     shortName: null,
     isCurrentTeam: index === 2,
+    logoUrl: null,
     played: 10,
     won: 5,
     drawn: 2,
