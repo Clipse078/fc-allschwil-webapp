@@ -339,11 +339,11 @@ function toSideIdentity(input: {
     canonicalTeamId: input.canonicalTeam?.id ?? null,
     canonicalExternalTeamId: input.canonicalExternalTeam?.id ?? null,
     displayName: resolvedName || input.fallbackName.trim() || "Unknown team",
-    clubName: input.canonicalExternalTeam?.externalClub.name ?? null,
+    clubName: input.canonicalExternalTeam?.externalClub?.name ?? null,
     externalLogoUrl: input.canonicalExternalTeam
       ? resolveExternalTeamLogoUrl(
           input.canonicalExternalTeam,
-          input.canonicalExternalTeam.externalClub,
+          input.canonicalExternalTeam.externalClub ?? { logoUrl: null },
         )
       : null,
     providerTeamId: input.providerTeamId,
