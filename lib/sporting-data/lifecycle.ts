@@ -61,9 +61,9 @@ function isEventCompleted(status: string): boolean {
 /**
  * Canonical sporting lifecycle for one match.
  *
- * Provider disposition takes precedence for terminal states (cancelled,
- * postponed, live, completed). SCE Event.status participates in reconciliation
- * detection and fills gaps when provider data is absent.
+ * Meaningful provider disposition takes precedence over Event.status. An
+ * UNKNOWN disposition falls back to Event.status so manual matches and genuine
+ * persisted completions remain authoritative when provider evidence is absent.
  */
 export function classifySportingMatchLifecycle(
   input: SportingLifecycleInput,
@@ -75,37 +75,58 @@ export function classifySportingMatchLifecycle(
   );
   const past = isPastKickoff(input.startAt, now);
 
-  if (providerDisposition === "CANCELLED" || isEventCancelled(status)) {
+  if (providerDisposition === "CANCELLED") {
     return { lifecycle: "CANCELLED", reconciliationIssue: null };
   }
 
-  if (providerDisposition === "POSTPONED" || isEventPostponed(status)) {
+  if (providerDisposition === "POSTPONED") {
     return { lifecycle: "POSTPONED", reconciliationIssue: null };
   }
 
-  if (providerDisposition === "LIVE" || isEventLive(status)) {
+  if (providerDisposition === "LIVE") {
     const reconciliationIssue =
-      providerDisposition === "LIVE" && !isEventLive(status)
+      !isEventLive(status)
         ? "PROVIDER_LIVE_EVENT_NOT_LIVE"
         : null;
     return { lifecycle: "LIVE", reconciliationIssue };
   }
 
-  const providerSaysCompleted = providerDisposition === "COMPLETED";
-  const eventSaysCompleted = isEventCompleted(status);
-
-  if (providerSaysCompleted || eventSaysCompleted) {
+  if (providerDisposition === "COMPLETED") {
     const reconciliationIssue =
-      providerSaysCompleted && !eventSaysCompleted
+      !isEventCompleted(status)
         ? "PROVIDER_COMPLETED_EVENT_NOT_COMPLETED"
         : null;
     return { lifecycle: "COMPLETED", reconciliationIssue };
   }
 
-  if (
-    past &&
-    (providerDisposition === "NOT_PLAYED" || providerDisposition === "UNKNOWN")
-  ) {
+  if (providerDisposition === "NOT_PLAYED") {
+    if (!past) {
+      return { lifecycle: "UPCOMING", reconciliationIssue: null };
+    }
+
+    return {
+      lifecycle: "NEEDS_RECONCILIATION",
+      reconciliationIssue: "PAST_FIXTURE_PROVIDER_NOT_PLAYED",
+    };
+  }
+
+  if (isEventCancelled(status)) {
+    return { lifecycle: "CANCELLED", reconciliationIssue: null };
+  }
+
+  if (isEventPostponed(status)) {
+    return { lifecycle: "POSTPONED", reconciliationIssue: null };
+  }
+
+  if (isEventLive(status)) {
+    return { lifecycle: "LIVE", reconciliationIssue: null };
+  }
+
+  if (isEventCompleted(status)) {
+    return { lifecycle: "COMPLETED", reconciliationIssue: null };
+  }
+
+  if (past) {
     return {
       lifecycle: "NEEDS_RECONCILIATION",
       reconciliationIssue: "PAST_FIXTURE_PROVIDER_NOT_PLAYED",

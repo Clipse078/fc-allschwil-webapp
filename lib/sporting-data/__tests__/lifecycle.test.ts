@@ -62,6 +62,42 @@ describe("classifySportingMatchLifecycle", () => {
     ).toBe("NEEDS_RECONCILIATION");
   });
 
+  it("future provider NOT_PLAYED overrides a poisoned COMPLETED event", () => {
+    expect(
+      classifySportingMatchLifecycle({
+        status: "COMPLETED",
+        startAt: new Date("2026-09-05T16:00:00.000Z"),
+        providerMatchStateName: "noch nicht ausgetragen",
+        now: NOW,
+      }).lifecycle,
+    ).toBe("UPCOMING");
+  });
+
+  it("past provider NOT_PLAYED overrides a poisoned COMPLETED event", () => {
+    expect(
+      classifySportingMatchLifecycle({
+        status: "COMPLETED",
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        providerMatchStateName: "noch nicht ausgetragen",
+        now: NOW,
+      }),
+    ).toEqual({
+      lifecycle: "NEEDS_RECONCILIATION",
+      reconciliationIssue: "PAST_FIXTURE_PROVIDER_NOT_PLAYED",
+    });
+  });
+
+  it("UNKNOWN provider disposition preserves genuine persisted COMPLETED semantics", () => {
+    expect(
+      classifySportingMatchLifecycle({
+        status: "COMPLETED",
+        startAt: new Date("2026-08-02T16:00:00.000Z"),
+        providerMatchStateName: "unbekannt",
+        now: NOW,
+      }).lifecycle,
+    ).toBe("COMPLETED");
+  });
+
   it("6. postponed → POSTPONED", () => {
     expect(
       classifySportingMatchLifecycle({

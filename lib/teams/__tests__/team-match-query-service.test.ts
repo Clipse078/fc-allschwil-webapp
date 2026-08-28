@@ -544,6 +544,114 @@ describe("listTeamSeasonMatches", () => {
     expect(result.completed[0]?.scoreAway).toBe(1);
   });
 
+  it("partitions a Stage-shaped lifecycle dataset without bucket overlap", async () => {
+    const future = new Date("2026-09-01T18:00:00.000Z");
+    const past = new Date("2026-08-01T18:00:00.000Z");
+    const database = createDatabase({
+      events: [
+        createEvent({
+          id: "future-provider-not-played-0-0",
+          status: "COMPLETED",
+          startAt: future,
+          resultLabel: "0:0",
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "noch nicht ausgetragen",
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+        }),
+        createEvent({
+          id: "future-scheduled-null-score",
+          startAt: new Date("2026-09-02T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "angesetzt",
+            scoreHome: null,
+            scoreAway: null,
+          }),
+        }),
+        createEvent({
+          id: "completed-draw-0-0",
+          status: "COMPLETED",
+          startAt: past,
+          resultLabel: "0:0",
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "ausgetragen",
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+        }),
+        createEvent({
+          id: "completed-home-win",
+          status: "COMPLETED",
+          startAt: new Date("2026-07-01T18:00:00.000Z"),
+          resultLabel: "3:1",
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "ausgetragen",
+            scoreHome: 3,
+            scoreAway: 1,
+          }),
+        }),
+        createEvent({
+          id: "cancelled",
+          status: "CANCELLED",
+          startAt: new Date("2026-09-03T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "abgesagt",
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+        }),
+        createEvent({
+          id: "postponed",
+          status: "POSTPONED",
+          startAt: new Date("2026-09-04T18:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "verschoben",
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+    const upcomingIds = result.upcoming.map((match) => match.eventId);
+    const completedIds = result.completed.map((match) => match.eventId);
+
+    expect(upcomingIds).toEqual(
+      expect.arrayContaining([
+        "future-provider-not-played-0-0",
+        "future-scheduled-null-score",
+        "cancelled",
+        "postponed",
+      ]),
+    );
+    expect(completedIds).toEqual([
+      "completed-draw-0-0",
+      "completed-home-win",
+    ]);
+    expect(completedIds).not.toContain("future-provider-not-played-0-0");
+    expect(new Set([...upcomingIds, ...completedIds]).size).toBe(
+      upcomingIds.length + completedIds.length,
+    );
+    expect(
+      result.upcoming.find(
+        (match) => match.eventId === "future-provider-not-played-0-0",
+      ),
+    ).toEqual(
+      expect.objectContaining({
+        lifecycle: "UPCOMING",
+        resultLabel: null,
+        scoreHome: 0,
+        scoreAway: 0,
+      }),
+    );
+  });
+
   it("L. opponent resolves correctly for HOME perspective", async () => {
     const database = createDatabase({
       events: [createEvent()],
