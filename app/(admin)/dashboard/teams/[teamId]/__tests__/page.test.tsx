@@ -6,6 +6,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  auth: vi.fn(),
+  resolveTeamDocumentAccess: vi.fn(),
   requireTeamCockpitAccess: vi.fn(),
   getOrgUnits: vi.fn(),
   getEligibleCompetitions: vi.fn(),
@@ -13,6 +15,13 @@ const mocks = vi.hoisted(() => ({
   getTeamCockpitSportingData: vi.fn(),
   getActiveTenant: vi.fn(),
   buildTeamCockpitMetrics: vi.fn(),
+}));
+
+vi.mock("@/auth", () => ({
+  auth: mocks.auth,
+}));
+vi.mock("@/lib/teams/team-document-auth", () => ({
+  resolveTeamDocumentAccess: mocks.resolveTeamDocumentAccess,
 }));
 
 vi.mock("@/lib/teams/team-cockpit-layout", () => ({
@@ -118,6 +127,17 @@ async function renderPage() {
 beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
+  mocks.auth.mockResolvedValue({
+    user: { id: "user-manager" },
+  });
+  mocks.resolveTeamDocumentAccess.mockResolvedValue({
+    userId: "user-manager",
+    tenantId: TENANT_ID,
+    tenantKey: "tenant-a",
+    teamId: TEAM_ID,
+    canViewDocuments: true,
+    canManageDocuments: true,
+  });
   mocks.requireTeamCockpitAccess.mockResolvedValue({
     tenantId: TENANT_ID,
     tenantKey: "tenant-a",
