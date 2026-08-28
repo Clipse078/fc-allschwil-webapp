@@ -465,6 +465,7 @@ describe("listTeamSeasonMatches", () => {
         createEvent({
           status: "POSTPONED",
           matchExternalMapping: createMapping({
+            providerMatchStateName: "verschoben",
             scoreHome: 0,
             scoreAway: 0,
           }),
@@ -491,6 +492,7 @@ describe("listTeamSeasonMatches", () => {
           id: "event-canceled",
           status: "CANCELED",
           matchExternalMapping: createMapping({
+            providerMatchStateName: "abgesagt",
             scoreHome: 0,
             scoreAway: 0,
           }),
@@ -499,6 +501,7 @@ describe("listTeamSeasonMatches", () => {
           id: "event-cancelled",
           status: "CANCELLED",
           matchExternalMapping: createMapping({
+            providerMatchStateName: "abgesagt",
             scoreHome: 0,
             scoreAway: 0,
           }),
