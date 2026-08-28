@@ -30,6 +30,7 @@ import {
 export const TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT = 5;
 export const TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT = 10;
 export const TEAM_COCKPIT_RESULTS_DEFAULT_LIMIT = 5;
+export const TEAM_COCKPIT_RESULTS_DETAIL_LIMIT = 10;
 
 export type TeamCockpitMatchSide = {
   displayName: string;

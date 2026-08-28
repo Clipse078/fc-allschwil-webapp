@@ -340,6 +340,58 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(detailData.nextMatches[0]?.side).toBe(overviewData.nextMatches[0]?.side);
   });
 
+  it("Q. first detailed result matches overview latest-result semantics", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [],
+      completed: [
+        createCompletedMatch({
+          eventId: "newer",
+          startAt: new Date("2026-08-20T18:00:00.000Z"),
+          scoreHome: 1,
+          scoreAway: 2,
+        }),
+        createCompletedMatch({
+          eventId: "older",
+          startAt: new Date("2026-07-01T18:00:00.000Z"),
+          scoreHome: 3,
+          scoreAway: 0,
+        }),
+      ],
+    });
+
+    const overviewData = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+      limits: { nextMatches: 0, results: 1 },
+    });
+
+    const detailData = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+      limits: { nextMatches: 0, results: 10 },
+    });
+
+    const overviewResult = overviewData.results[0];
+    const detailResult = detailData.results[0];
+
+    expect(detailResult?.eventId).toBe(overviewResult?.eventId);
+    expect(detailResult?.startAt).toEqual(overviewResult?.startAt);
+    expect(detailResult?.scoreHome).toBe(overviewResult?.scoreHome);
+    expect(detailResult?.scoreAway).toBe(overviewResult?.scoreAway);
+    expect(detailResult?.resultPerspective).toBe(overviewResult?.resultPerspective);
+    expect(detailResult?.side).toBe(overviewResult?.side);
+  });
+
   it("M. scopes match query to tenant and current team season", async () => {
     await getTeamCockpitSportingData({
       tenantId: TENANT_ID,
@@ -371,6 +423,61 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
 
     const call = mockListMatches.mock.calls[0]?.[1];
     expect(call?.websiteVisibleOnly).toBeUndefined();
+  });
+
+  it("N. excludes non-completed fixtures from results", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [],
+      completed: [
+        createCompletedMatch({ eventId: "valid" }),
+        createCompletedMatch({
+          eventId: "scheduled-in-completed",
+          status: "SCHEDULED",
+          lifecycle: "UPCOMING",
+          lifecycleStage: "UPCOMING",
+        }),
+      ],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.results).toHaveLength(1);
+    expect(data.results[0]?.eventId).toBe("valid");
+  });
+
+  it("P. maps completed match with missing scores to UNKNOWN perspective", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [],
+      completed: [
+        createCompletedMatch({
+          eventId: "missing-score",
+          scoreHome: null,
+          scoreAway: null,
+        }),
+      ],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.results[0]?.scoreHome).toBeNull();
+    expect(data.results[0]?.scoreAway).toBeNull();
+    expect(data.results[0]?.resultPerspective).toBe("UNKNOWN");
   });
 
   it("uses standings competition when provider succeeds", async () => {
