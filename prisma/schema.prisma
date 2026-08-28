@@ -722,6 +722,8 @@ model Tenant {
   developmentAssessments          DevelopmentAssessment[]          @relation("TenantDevelopmentAssessments")
   // PERSON-UX-07: person-bound private documents
   personDocuments                 PersonDocument[]                 @relation("TenantPersonDocuments")
+  // TEAM-COCKPIT-PREMIUM-01J-A: team-bound private documents
+  teamDocuments                   TeamDocument[]                   @relation("TenantTeamDocuments")
   // PERSON-UX-10: canonical guardian relationships and emergency contacts
   guardianRelationships           GuardianRelationship[]           @relation("TenantGuardianRelationships")
   personEmergencyContacts         PersonEmergencyContact[]         @relation("TenantPersonEmergencyContacts")
@@ -793,6 +795,8 @@ model User {
   createdCommunicationAttachments  CommunicationAttachment[]  @relation("CommunicationAttachmentCreatedBy")
   // PERSON-UX-07: person-bound documents uploaded by this user
   uploadedPersonDocuments          PersonDocument[]           @relation("PersonDocumentUploadedBy")
+  // TEAM-COCKPIT-PREMIUM-01J-A: team-bound documents uploaded by this user
+  uploadedTeamDocuments            TeamDocument[]             @relation("TeamDocumentUploadedBy")
 
   /// ADMIN-MASTERDATA-UX-01 — opposite side of Person.userId (1:1). Null for
   /// every User that isn't the linked application account of a Person.
@@ -1514,6 +1518,34 @@ model PersonDocument {
   @@index([uploadedByUserId])
 }
 
+model TeamDocument {
+  id       String @id @default(cuid())
+  tenantId String
+  teamId   String
+
+  title String
+
+  /// Opaque storage key in the private Vercel Blob store.
+  /// Never expose this directly to clients.
+  storageKey       String
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+
+  uploadedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  team           Team   @relation("TeamDocuments", fields: [teamId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  tenant         Tenant @relation("TenantTeamDocuments", fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  uploadedByUser User?  @relation("TeamDocumentUploadedBy", fields: [uploadedByUserId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+
+  @@index([tenantId, teamId])
+  @@index([tenantId, teamId, createdAt])
+  @@index([uploadedByUserId])
+}
+
 model Team {
   id                             String       @id @default(cuid())
   // ── TEAM-IDENTITY-01: canonical tenant-owned naming ───────────────────────
@@ -1591,6 +1623,8 @@ model Team {
   tournamentParticipations TournamentParticipant[]
   // PERSONS-02: PersonAssignment back-relation — persons assigned to this team.
   personAssignments        PersonAssignment[]      @relation("TeamPersonAssignments")
+  // TEAM-COCKPIT-PREMIUM-01J-A: team-bound private documents
+  teamDocuments            TeamDocument[]          @relation("TeamDocuments")
 
   @@unique([tenantId, slug])
   @@index([category, sortOrder])
