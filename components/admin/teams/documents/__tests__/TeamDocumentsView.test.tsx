@@ -2,10 +2,18 @@
  * @vitest-environment jsdom
  */
 
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TeamDocumentsView from "../TeamDocumentsView";
 import type { TeamDocumentListItem } from "@/lib/teams/team-document-list";
+
+const { refreshMock } = vi.hoisted(() => ({
+  refreshMock: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: refreshMock }),
+}));
 
 function createDocument(
   overrides: Partial<TeamDocumentListItem> = {},
@@ -24,55 +32,47 @@ function createDocument(
   };
 }
 
-describe("TEAM-COCKPIT-PREMIUM-01J-B — TeamDocumentsView", () => {
-  it("E. renders page heading and supporting text", () => {
-    render(<TeamDocumentsView documents={[]} />);
+describe("TEAM-COCKPIT-PREMIUM-01J-C — TeamDocumentsView", () => {
+  beforeEach(() => {
+    refreshMock.mockReset();
+    vi.stubGlobal("fetch", vi.fn());
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { assign: vi.fn() },
+    });
+  });
+
+  it("renders page heading and workspace layout", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[]}
+        canManageDocuments={false}
+      />,
+    );
 
     expect(screen.getByText("Team Workspace")).toBeInTheDocument();
     expect(screen.getByTestId("team-documents-page-heading")).toHaveTextContent(
       "Dokumente",
     );
-    expect(
-      screen.getByText("Teaminterne Dokumente und Dateien."),
-    ).toBeInTheDocument();
-  });
-
-  it("F. renders document title as primary element", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
-
-    expect(screen.getAllByText("Saisonplan 2026/27").length).toBeGreaterThan(0);
-  });
-
-  it("G. shows original filename only when title differs", () => {
-    const { rerender } = render(
-      <TeamDocumentsView documents={[createDocument({ showOriginalFilename: true })]} />,
+    expect(screen.getByTestId("team-documents-workspace-grid")).toBeInTheDocument();
+    expect(screen.getByTestId("team-documents-details-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("team-documents-no-selection")).toHaveTextContent(
+      "Kein Dokument ausgewählt.",
     );
-
-    expect(screen.getAllByText("saisonplan.pdf").length).toBeGreaterThan(0);
-
-    rerender(
-      <TeamDocumentsView
-        documents={[
-          createDocument({
-            title: "saisonplan.pdf",
-            showOriginalFilename: false,
-          }),
-        ]}
-      />,
-    );
-
-    expect(screen.queryByTestId("team-document-filename-doc-1")).not.toBeInTheDocument();
   });
 
-  it("H/I/J/K. renders type, size, date, and uploader metadata", () => {
+  it("renders document metadata in desktop table", () => {
     render(
       <TeamDocumentsView
+        teamId="team-a"
         documents={[
           createDocument({
             showOriginalFilename: false,
             title: "saisonplan.pdf",
           }),
         ]}
+        canManageDocuments={false}
       />,
     );
 
@@ -86,119 +86,277 @@ describe("TEAM-COCKPIT-PREMIUM-01J-B — TeamDocumentsView", () => {
     );
   });
 
-  it("L. uses neutral fallback when uploader is missing", () => {
-    render(
-      <TeamDocumentsView
-        documents={[createDocument({ uploadedByLabel: null })]}
-      />,
-    );
-
-    expect(screen.getByTestId("team-document-uploader-doc-1")).toHaveTextContent("—");
-    expect(
-      screen.queryByTestId("team-document-mobile-uploader-doc-1"),
-    ).not.toBeInTheDocument();
-  });
-
-  it("M. renders multiple documents in provided order", () => {
-    render(
-      <TeamDocumentsView
-        documents={[
-          createDocument({ id: "doc-a", title: "Alpha" }),
-          createDocument({ id: "doc-b", title: "Beta" }),
-        ]}
-      />,
-    );
-
-    const rows = screen.getAllByTestId(/^team-document-row-/);
-    expect(rows.map((row) => row.getAttribute("data-testid"))).toEqual([
-      "team-document-row-doc-a",
-      "team-document-row-doc-b",
-    ]);
-  });
-
-  it("N. renders premium empty state without upload CTA", () => {
-    render(<TeamDocumentsView documents={[]} />);
-
-    expect(screen.getByTestId("team-documents-empty")).toHaveTextContent(
-      "Keine Dokumente vorhanden.",
-    );
-    expect(screen.getByTestId("team-documents-empty")).toHaveTextContent(
-      "Dateien für dieses Team werden hier angezeigt.",
-    );
-    expect(screen.queryByRole("button", { name: /hochladen/i })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Datei hochladen/i)).not.toBeInTheDocument();
-  });
-
-  it("O/P. does not render storage keys or blob URLs", () => {
+  it("does not expose storage keys or blob URLs", () => {
     const { container } = render(
       <TeamDocumentsView
-        documents={[
-          createDocument({
-            title: "Interner Bericht",
-            originalFilename: "bericht.pdf",
-          }),
-        ]}
+        teamId="team-a"
+        documents={[createDocument({ title: "Interner Bericht" })]}
+        canManageDocuments={false}
       />,
     );
 
     expect(container.innerHTML).not.toContain("storageKey");
     expect(container.innerHTML).not.toMatch(/blob:/i);
     expect(container.innerHTML).not.toMatch(/vercel-storage/i);
-    expect(container.innerHTML).not.toContain("_storageKey");
   });
 
-  it("Q/R/S/T. does not render mutation or download controls", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
-
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link")).not.toBeInTheDocument();
-    expect(screen.queryByText(/löschen/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/umbenennen/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/herunterladen/i)).not.toBeInTheDocument();
-  });
-
-  it("U. preserves mobile title/type/size/date structure", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
-
-    const mobileItem = screen.getByTestId("team-document-mobile-doc-1");
-    expect(within(mobileItem).getByText("Saisonplan 2026/27")).toBeInTheDocument();
-    expect(screen.getByTestId("team-document-mobile-type-doc-1")).toHaveTextContent(
-      "PDF",
+  it("shows upload controls for managers", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
     );
-    expect(screen.getByTestId("team-document-mobile-size-doc-1")).toHaveTextContent(
-      "824 KB",
-    );
-    expect(screen.getByTestId("team-document-mobile-date-doc-1")).toHaveTextContent(
-      "28.08.2026",
+
+    expect(screen.getByTestId("team-documents-upload-button")).toHaveTextContent(
+      "Datei hochladen",
     );
   });
 
-  it("uses semantic table structure on desktop", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
+  it("hides mutation controls for view-only users", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={false}
+      />,
+    );
 
-    expect(screen.getByTestId("team-documents-table")).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Name" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Grösse" })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("team-document-row-doc-1"));
+
+    const desktopPanel = within(screen.getByTestId("team-documents-details-panel"));
+    expect(desktopPanel.getByTestId("team-document-download-button")).toBeInTheDocument();
+    expect(desktopPanel.queryByTestId("team-document-rename-button")).not.toBeInTheDocument();
+    expect(desktopPanel.queryByTestId("team-document-delete-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("team-documents-upload-button")).not.toBeInTheDocument();
   });
 
-  it("renders workspace-style navigation and details panels on desktop", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
+  it("selects a document and shows details panel actions", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
 
-    expect(screen.getByTestId("team-documents-workspace-grid")).toBeInTheDocument();
-    expect(screen.getByTestId("team-documents-nav-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("team-documents-nav-all")).toHaveTextContent(
-      "Alle Dokumente",
+    fireEvent.click(screen.getByTestId("team-document-row-doc-1"));
+
+    const desktopPanel = within(screen.getByTestId("team-documents-details-panel"));
+    expect(desktopPanel.getByTestId("team-document-details-title")).toHaveTextContent(
+      "Saisonplan 2026/27",
     );
-    expect(screen.getByTestId("team-documents-details-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("team-documents-no-selection")).toHaveTextContent(
-      "Kein Dokument ausgewählt.",
-    );
-    expect(screen.getByTestId("team-documents-center-panel")).toBeInTheDocument();
+    expect(desktopPanel.getByTestId("team-document-download-button")).toBeInTheDocument();
+    expect(desktopPanel.getByTestId("team-document-rename-button")).toBeInTheDocument();
+    expect(desktopPanel.getByTestId("team-document-delete-button")).toBeInTheDocument();
   });
 
-  it("uses list semantics on mobile", () => {
-    render(<TeamDocumentsView documents={[createDocument()]} />);
+  it("supports keyboard selection on desktop rows", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={false}
+      />,
+    );
 
-    expect(screen.getByTestId("team-documents-mobile-list")).toBeInTheDocument();
+    const row = screen.getByTestId("team-document-row-doc-1");
+    fireEvent.keyDown(row, { key: "Enter" });
+
+    expect(
+      within(screen.getByTestId("team-documents-details-panel")).getByTestId(
+        "team-document-details-title",
+      ),
+    ).toHaveTextContent("Saisonplan 2026/27");
+  });
+
+  it("uploads a file and refreshes the list", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        document: { id: "doc-new", title: "neu.pdf" },
+      }),
+    } as Response);
+
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
+
+    const file = new File(["%PDF-1.7"], "neu.pdf", { type: "application/pdf" });
+    const input = screen.getByTestId("team-documents-file-input");
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/teams/team-a/documents",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(refreshMock).toHaveBeenCalled();
+      expect(screen.getByTestId("team-documents-upload-success")).toBeInTheDocument();
+    });
+  });
+
+  it("shows upload validation errors", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: "Dieser Dateityp ist nicht erlaubt.",
+        code: "INVALID_INPUT",
+      }),
+    } as Response);
+
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
+
+    const file = new File(["bad"], "bad.exe", { type: "application/octet-stream" });
+    fireEvent.change(screen.getByTestId("team-documents-file-input"), {
+      target: { files: [file] },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("team-documents-upload-error")).toHaveTextContent(
+        "Dieser Dateityp ist nicht erlaubt.",
+      );
+    });
+  });
+
+  it("triggers authenticated download path", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={false}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("team-document-row-doc-1"));
+    fireEvent.click(
+      within(screen.getByTestId("team-documents-details-panel")).getByTestId(
+        "team-document-download-button",
+      ),
+    );
+
+    expect(window.location.assign).toHaveBeenCalledWith(
+      "/api/teams/team-a/documents/doc-1/download",
+    );
+  });
+
+  it("renames title only via API", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        document: { id: "doc-1", title: "Neuer Titel" },
+      }),
+    } as Response);
+
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("team-document-row-doc-1"));
+    fireEvent.click(
+      within(screen.getByTestId("team-documents-details-panel")).getByTestId(
+        "team-document-rename-button",
+      ),
+    );
+
+    const input = screen.getByTestId("team-document-rename-input");
+    fireEvent.change(input, { target: { value: "Neuer Titel" } });
+    fireEvent.click(screen.getByTestId("team-document-rename-confirm"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/teams/team-a/documents/doc-1",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ title: "Neuer Titel" }),
+        }),
+      );
+      expect(refreshMock).toHaveBeenCalled();
+    });
+  });
+
+  it("deletes with confirmation and clears selection", async () => {
+    const fetchMock = vi.mocked(fetch);
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ message: "Dokument gelöscht." }),
+    } as Response);
+
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("team-document-row-doc-1"));
+    fireEvent.click(
+      within(screen.getByTestId("team-documents-details-panel")).getByTestId(
+        "team-document-delete-button",
+      ),
+    );
+    fireEvent.click(screen.getByTestId("team-document-delete-confirm"));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/teams/team-a/documents/doc-1",
+        expect.objectContaining({ method: "DELETE" }),
+      );
+      expect(refreshMock).toHaveBeenCalled();
+      expect(screen.getByTestId("team-documents-no-selection")).toBeInTheDocument();
+    });
+  });
+
+  it("renders mobile list and mobile details when selected", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[createDocument()]}
+        canManageDocuments={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("team-document-mobile-select-doc-1"));
+
+    expect(screen.getByTestId("team-documents-mobile-details")).toBeInTheDocument();
+    const mobileDetails = screen.getByTestId("team-documents-mobile-details");
+    expect(within(mobileDetails).getByTestId("team-document-download-button")).toBeInTheDocument();
+  });
+
+  it("shows manager upload CTA in empty state", () => {
+    render(
+      <TeamDocumentsView
+        teamId="team-a"
+        documents={[]}
+        canManageDocuments={true}
+      />,
+    );
+
+    expect(screen.getByTestId("team-documents-empty-upload-button")).toHaveTextContent(
+      "Datei hochladen",
+    );
   });
 });

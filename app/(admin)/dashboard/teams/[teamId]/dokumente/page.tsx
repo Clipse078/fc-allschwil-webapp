@@ -8,8 +8,14 @@ type Props = {
 
 export default async function TeamDokumentePage({ params }: Props) {
   const { teamId } = await params;
-  const { tenantId } = await requireTeamDocumentAccess(teamId);
-  const documents = await getTeamDocumentListItems(tenantId, teamId);
+  const access = await requireTeamDocumentAccess(teamId);
+  const documents = await getTeamDocumentListItems(access.tenantId, teamId);
 
-  return <TeamDocumentsView documents={documents} />;
+  return (
+    <TeamDocumentsView
+      teamId={teamId}
+      documents={documents}
+      canManageDocuments={access.canManageDocuments}
+    />
+  );
 }
