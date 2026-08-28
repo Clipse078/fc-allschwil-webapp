@@ -6,8 +6,11 @@
  * PLANNING-CREATION-UX-01C — focused tests for the guided MatchCenter
  * creation flow: guided-progress nudge, HOME live Spielfeld/Halle +
  * Garderobe availability, AWAY hides facility sections entirely, Gegner
- * directory selection prefills the editable opponent name, and submission
- * sequences Event creation + operational-fields PATCH.
+ * searchable Club Directory picker prefills the editable opponent name,
+ * and submission sequences Event creation + operational-fields PATCH.
+ *
+ * MATCHCENTER-VEREINPICKER-01B — regression coverage for the searchable
+ * canonical Verein picker (reuses TournamentCenter's ExternalClubPicker).
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -43,6 +46,10 @@ const DRESSING_ROOM_GROUPS: FacilityGroup[] = [
   },
 ];
 
+/** Club beyond the old teams-endpoint default cap (50) — generic fixture, not hardcoded production data. */
+const CLUB_BEYOND_OLD_CAP = { id: "club-telegraph", name: "FC Telegraph", shortName: null };
+const CLUB_CONCORDIA = { id: "club-1", name: "FC Concordia Basel", shortName: null };
+
 function jsonResponse(data: unknown, status = 200): Response {
   return { ok: status >= 200 && status < 300, status, json: async () => data } as Response;
 }
@@ -50,6 +57,7 @@ function jsonResponse(data: unknown, status = 200): Response {
 function installFetchMock() {
   const availabilityCalls: string[] = [];
   const patchCalls: { url: string; body: unknown }[] = [];
+  const clubSearchCalls: string[] = [];
 
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url === "/api/seasons") {
@@ -61,12 +69,13 @@ function installFetchMock() {
     if (url === "/api/planning/writable-teams?domain=match") {
       return jsonResponse({ teams: [{ id: "team-1", name: "1. Mannschaft", displayName: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }] });
     }
-    if (url === "/api/club-directory/teams") {
-      return jsonResponse({
-        teams: [
-          { id: "ext-1", name: "FC Concordia Basel", categoryLabel: null, externalClub: { id: "club-1", name: "FC Concordia Basel" } },
-        ],
-      });
+    if (url.startsWith("/api/club-directory/clubs")) {
+      clubSearchCalls.push(url);
+      const parsed = new URL(url, "http://localhost");
+      const search = (parsed.searchParams.get("search") ?? "").toLowerCase();
+      const all = [CLUB_BEYOND_OLD_CAP, CLUB_CONCORDIA];
+      const matches = all.filter((c) => c.name.toLowerCase().includes(search));
+      return jsonResponse({ clubs: matches });
     }
     if (url.startsWith("/api/facilities/availability")) {
       availabilityCalls.push(url);
@@ -100,7 +109,7 @@ function installFetchMock() {
   });
 
   vi.stubGlobal("fetch", fetchMock);
-  return { fetchMock, availabilityCalls, patchCalls };
+  return { fetchMock, availabilityCalls, patchCalls, clubSearchCalls };
 }
 
 beforeEach(() => {
@@ -148,11 +157,8 @@ describe("MatchCreateForm — HOME/AWAY facility availability", () => {
 
     fireEvent.change(screen.getByTestId("match-create-start-at"), { target: { value: "2026-09-20T10:00" } });
 
-    // PLANNING-RESOURCE-UX-01: visual picker replaces dropdown.
-    // Verify Frei/Belegt states are shown in the visual resource cards.
     await waitFor(() => {
       expect(screen.getByText("Kunstrasen 2")).toBeInTheDocument();
-      // Multiple "Frei" badges may appear (pitch + dressing rooms)
       expect(screen.getAllByText("Frei").length).toBeGreaterThan(0);
     });
   });
@@ -164,7 +170,6 @@ describe("MatchCreateForm — HOME/AWAY facility availability", () => {
     fireEvent.click(screen.getByTestId("match-create-home-away-away"));
     fireEvent.change(screen.getByTestId("match-create-start-at"), { target: { value: "2026-09-20T10:00" } });
 
-    // Visual picker cards are not shown for AWAY matches
     expect(screen.queryByTestId("match-create-pitch")).not.toBeInTheDocument();
     expect(screen.queryByTestId("match-create-home-dressing-room")).not.toBeInTheDocument();
 
@@ -173,19 +178,76 @@ describe("MatchCreateForm — HOME/AWAY facility availability", () => {
   });
 });
 
-describe("MatchCreateForm — Gegner (Club Directory)", () => {
-  it("prefills the editable opponent display name from the directory selection", async () => {
+describe("MatchCreateForm — Gegner (Club Directory search)", () => {
+  it("never eagerly fetches the Club Directory on mount", async () => {
+    const { clubSearchCalls } = installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    await waitFor(() => expect(screen.getByTestId("match-create-team-select")).not.toBeDisabled());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(clubSearchCalls).toHaveLength(0);
+  });
+
+  it("finds a club beyond the old limited dropdown via partial-name search", async () => {
     installFetchMock();
     render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
 
-    await waitFor(() => expect(screen.getByTestId("match-create-opponent-directory-select")).not.toBeDisabled());
-    fireEvent.change(screen.getByTestId("match-create-opponent-directory-select"), { target: { value: "ext-1" } });
+    fireEvent.change(screen.getByTestId("match-create-opponent-club-search-input"), {
+      target: { value: "tele" },
+    });
+
+    expect(await screen.findByText("FC Telegraph")).toBeInTheDocument();
+  });
+
+  it("prefills the editable opponent display name and preserves the canonical club id on selection", async () => {
+    installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    fireEvent.change(screen.getByTestId("match-create-opponent-club-search-input"), {
+      target: { value: "conc" },
+    });
+    await screen.findByTestId("match-create-opponent-club-search-option-club-1");
+    fireEvent.mouseDown(screen.getByTestId("match-create-opponent-club-search-option-club-1"));
 
     const nameInput = screen.getByTestId("match-create-opponent-name") as HTMLInputElement;
     expect(nameInput.value).toBe("FC Concordia Basel");
+    expect(screen.getByTestId("match-create-opponent-club-search")).toHaveTextContent("FC Concordia Basel");
 
     fireEvent.change(nameInput, { target: { value: "FCC Basel (Freundschaftsspiel)" } });
     expect(nameInput.value).toBe("FCC Basel (Freundschaftsspiel)");
+    expect(screen.getByTestId("match-create-opponent-club-search")).toHaveTextContent("FC Concordia Basel");
+  });
+
+  it("allows manual opponent-name entry without a directory selection", async () => {
+    installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    const nameInput = screen.getByTestId("match-create-opponent-name") as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Freundschaftsgast FC" } });
+    expect(nameInput.value).toBe("Freundschaftsgast FC");
+    expect(screen.getByPlaceholderText("Verein suchen…")).toBeInTheDocument();
+  });
+
+  it("searches via the tenant-scoped GET /api/club-directory/clubs endpoint", async () => {
+    const { fetchMock } = installFetchMock();
+    render(<MatchCreateForm pitchHallFacilityGroups={PITCH_HALL_GROUPS} dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS} canValidateDirectly />);
+
+    fireEvent.change(screen.getByTestId("match-create-opponent-club-search-input"), {
+      target: { value: "tele" },
+    });
+
+    await waitFor(
+      () => {
+        const clubCall = fetchMock.mock.calls.find(([u]) => String(u).startsWith("/api/club-directory/clubs"));
+        expect(clubCall).toBeDefined();
+      },
+      { timeout: 1000 },
+    );
+
+    const clubCall = fetchMock.mock.calls.find(([u]) => String(u).startsWith("/api/club-directory/clubs"));
+    const parsed = new URL(String(clubCall![0]), "http://localhost");
+    expect(parsed.pathname).toBe("/api/club-directory/clubs");
+    expect(parsed.searchParams.get("search")).toBe("tele");
   });
 });
 
@@ -201,8 +263,6 @@ describe("MatchCreateForm — submission lifecycle copy + orchestration", () => 
     fireEvent.change(screen.getByTestId("match-create-opponent-name"), { target: { value: "FC Concordia Basel" } });
     fireEvent.change(screen.getByTestId("match-create-start-at"), { target: { value: "2026-09-20T10:00" } });
 
-    // PLANNING-RESOURCE-UX-01: visual picker card replaces the dropdown.
-    // Click the "Kunstrasen 2" pitch card to select it.
     await waitFor(() => expect(screen.getByTestId("match-create-pitch-card-res-pitch-a")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("match-create-pitch-card-res-pitch-a"));
 
@@ -238,18 +298,13 @@ describe("MatchCreateForm — submission lifecycle copy + orchestration", () => 
   });
 });
 
-// ORG-ACCESS-03-C1: writable-teams picker integration
 describe("MatchCreateForm — ORG-ACCESS-03 writable-teams picker", () => {
   it("shows German no-teams message when writable-teams returns empty list", async () => {
-    // Override the writable-teams mock to return empty
-    const emptyTeamsMock = vi.fn(async (url: string, init?: RequestInit) => {
+    const emptyTeamsMock = vi.fn(async (url: string) => {
       if (url === "/api/seasons") {
         return { ok: true, status: 200, json: async () => ({ seasons: [{ id: "s1", key: "2025-2026", name: "Saison 2025/2026", isActive: true }] }) } as Response;
       }
       if (url === "/api/planning/writable-teams?domain=match") {
-        return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
-      }
-      if (url === "/api/club-directory/teams") {
         return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
       }
       return { ok: false, status: 404, json: async () => ({}) } as Response;
@@ -258,27 +313,21 @@ describe("MatchCreateForm — ORG-ACCESS-03 writable-teams picker", () => {
 
     render(<MatchCreateForm pitchHallFacilityGroups={[]} dressingRoomFacilityGroups={[]} canValidateDirectly={false} />);
 
-    // Wait for teams to load (empty)
     await waitFor(() => {
       expect(screen.queryByText("Teams laden…")).not.toBeInTheDocument();
     });
 
-    // Should show German message instead of the select
     expect(screen.queryByTestId("match-create-team-select")).not.toBeInTheDocument();
     expect(screen.getByText(/Kein Team mit Schreibzugriff verfügbar/)).toBeInTheDocument();
   });
 
   it("shows the team select when writable-teams returns results", async () => {
-    // Standard mock with one team
     vi.stubGlobal("fetch", vi.fn(async (url: string) => {
       if (url === "/api/seasons") {
         return { ok: true, status: 200, json: async () => ({ seasons: [{ id: "s1", key: "2025-2026", name: "Saison 2025/2026", isActive: true }] }) } as Response;
       }
       if (url === "/api/planning/writable-teams?domain=match") {
         return { ok: true, status: 200, json: async () => ({ teams: [{ id: "team-1", name: "1. Mannschaft", displayName: "1. Mannschaft", ageGroup: null, genderGroup: null, isActive: true }] }) } as Response;
-      }
-      if (url === "/api/club-directory/teams") {
-        return { ok: true, status: 200, json: async () => ({ teams: [] }) } as Response;
       }
       return { ok: false, status: 404, json: async () => ({}) } as Response;
     }));

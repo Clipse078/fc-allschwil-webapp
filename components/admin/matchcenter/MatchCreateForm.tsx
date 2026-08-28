@@ -16,9 +16,11 @@
  *   2 · Heim / Auswärts    — Event.homeAway
  *   3 · Ort                — Event.location (editable; quick-pick from
  *                            tenant facilities for HOME)
- *   4 · Gegner             — Club-Directory ExternalTeam picker that
- *                            prefills the EXISTING editable Event.opponentName
- *                            text field — never a second opponent identity.
+ *   4 · Gegner             — searchable Club-Directory ExternalClub picker
+ *                            (same ExternalClubPicker as TournamentCenter)
+ *                            that prefills the EXISTING editable
+ *                            Event.opponentName text field — never a second
+ *                            opponent identity.
  *   5 · Termin             — Event.startAt / endAt
  *   6 · Spielfeld/Halle    — HOME only, canonical FacilityResource selection
  *                            + live Frei/Belegt (lib/facilities/availability-service.ts)
@@ -65,6 +67,10 @@ import {
   orchestrateMatchCreation,
   type MatchCreationPlan,
 } from "@/lib/matchcenter/create-match-orchestration";
+import {
+  ExternalClubPicker,
+  type ExternalClubPickerResult,
+} from "@/components/admin/tournamentcenter/ExternalClubPicker";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -76,14 +82,6 @@ type TeamOption = {
   ageGroup: string | null;
   genderGroup: string | null;
   isActive: boolean;
-};
-
-type ExternalTeamOption = {
-  id: string;
-  name: string;
-  shortName?: string | null;
-  categoryLabel: string | null;
-  externalClub: { id: string; name: string };
 };
 
 /** Shape of one row in GET /api/facilities/availability's `availability` array. */
@@ -207,9 +205,8 @@ export default function MatchCreateForm({
 
   // ── 4 · Gegner ───────────────────────────────────────────────────────
   const [opponentName, setOpponentName] = useState("");
-  const [selectedExternalTeamId, setSelectedExternalTeamId] = useState("");
-  const [externalTeamOptions, setExternalTeamOptions] = useState<ExternalTeamOption[]>([]);
-  const [loadingExternalTeams, setLoadingExternalTeams] = useState(true);
+  /** Canonical Club-Directory Verein — searched on demand via ExternalClubPicker. */
+  const [selectedExternalClub, setSelectedExternalClub] = useState<ExternalClubPickerResult | null>(null);
 
   // ── 5 · Termin ───────────────────────────────────────────────────────
   const [startAt, setStartAt] = useState("");
@@ -273,24 +270,8 @@ export default function MatchCreateForm({
       }
     }
 
-    async function loadExternalTeams() {
-      setLoadingExternalTeams(true);
-      try {
-        const res = await fetch("/api/club-directory/teams", { cache: "no-store" });
-        const data = (await res.json().catch(() => null)) as { teams?: ExternalTeamOption[] } | null;
-        if (!res.ok) throw new Error((data as { error?: string } | null)?.error ?? "Externe Teams konnten nicht geladen werden.");
-        if (!active) return;
-        setExternalTeamOptions(data?.teams ?? []);
-      } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.");
-      } finally {
-        if (active) setLoadingExternalTeams(false);
-      }
-    }
-
     loadSeasons();
     loadTeams();
-    loadExternalTeams();
 
     return () => {
       active = false;
@@ -299,20 +280,9 @@ export default function MatchCreateForm({
 
   const selectedTeam = useMemo(() => teamOptions.find((t) => t.id === teamId) ?? null, [teamId, teamOptions]);
 
-  const externalTeamsByClub = useMemo(() => {
-    const groups = new Map<string, { clubName: string; teams: ExternalTeamOption[] }>();
-    for (const t of externalTeamOptions) {
-      const group = groups.get(t.externalClub.id) ?? { clubName: t.externalClub.name, teams: [] };
-      group.teams.push(t);
-      groups.set(t.externalClub.id, group);
-    }
-    return Array.from(groups.values());
-  }, [externalTeamOptions]);
-
-  function handleSelectExternalTeam(externalTeamId: string) {
-    setSelectedExternalTeamId(externalTeamId);
-    const team = externalTeamOptions.find((t) => t.id === externalTeamId);
-    if (team) setOpponentName(team.name);
+  function handleSelectExternalClub(club: ExternalClubPickerResult) {
+    setSelectedExternalClub(club);
+    setOpponentName(club.name);
   }
 
   // Quick-pick facility names for "Ort" — reuses the same tenant facility
@@ -622,27 +592,16 @@ export default function MatchCreateForm({
           onBlurCapture={(e) => handleStepBlur(e, opponentStepComplete, () => setOpponentCollapsed(true))}
         >
           <div className="grid gap-3 md:grid-cols-2">
-            <label className="block space-y-1">
+            <div className="block space-y-1">
               <span className="fca-label">Aus Vereinsverzeichnis</span>
-              <select
-                value={selectedExternalTeamId}
-                onChange={(e) => handleSelectExternalTeam(e.target.value)}
-                disabled={loadingExternalTeams}
-                className="fca-select"
-                data-testid="match-create-opponent-directory-select"
-              >
-                <option value="">{loadingExternalTeams ? "Teams laden…" : "— Auswählen —"}</option>
-                {externalTeamsByClub.map((group) => (
-                  <optgroup key={group.clubName} label={group.clubName}>
-                    {group.teams.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
+              <ExternalClubPicker
+                selected={selectedExternalClub}
+                onSelect={handleSelectExternalClub}
+                onClearSelected={() => setSelectedExternalClub(null)}
+                placeholder="Verein suchen…"
+                testId="match-create-opponent-club-search"
+              />
+            </div>
 
             <label className="block space-y-1">
               <span className="fca-label">Anzeigename</span>
