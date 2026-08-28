@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SportingTeamLogo from "@/components/shared/SportingTeamLogo";
 import type { TeamCockpitResult } from "@/lib/teams/team-cockpit-sporting-data";
 import type { TenantFormatConfig } from "@/lib/tenant-runtime/formatters";
 import { formatResultDateLine } from "./team-overview-formatters";
@@ -60,9 +61,13 @@ export default function TeamLatestResultSummary({
           </p>
 
           <div className="space-y-1">
-            <p className="truncate text-sm text-[var(--text-2)]">
-              {result.home.displayName} vs. {result.away.displayName}
-            </p>
+            <div className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto_auto_minmax(0,1fr)] items-center gap-1.5 text-sm text-[var(--text-2)]">
+              <SportingTeamLogo logoUrl={result.home.logoUrl} size="sm" />
+              <span className="truncate">{result.home.displayName}</span>
+              <span>vs.</span>
+              <SportingTeamLogo logoUrl={result.away.logoUrl} size="sm" />
+              <span className="truncate">{result.away.displayName}</span>
+            </div>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-2)]">
               <span>{result.side === "HOME" ? "Heim" : "Auswärts"}</span>
               <span aria-hidden="true">·</span>

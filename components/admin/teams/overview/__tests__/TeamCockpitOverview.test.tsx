@@ -119,7 +119,7 @@ const TEAM_FIXTURE = {
 
 describe("TEAM-COCKPIT-PREMIUM-01E — sporting snapshot", () => {
   it("A. renders next match summary with detail link", () => {
-    render(
+    const { container } = render(
       <TeamSportingSnapshot
         teamId={TEAM_ID}
         nextMatch={NEXT_MATCH}
@@ -136,6 +136,9 @@ describe("TEAM-COCKPIT-PREMIUM-01E — sporting snapshot", () => {
     expect(screen.getByText("FC Allschwil")).toBeInTheDocument();
     expect(screen.getByText("FC Example")).toBeInTheDocument();
     expect(screen.getByText("Im Brüel")).toBeInTheDocument();
+    expect(
+      Array.from(container.querySelectorAll("img")).map((image) => image.getAttribute("src")),
+    ).toEqual(["/tenant-crest.svg", "/example-crest.svg"]);
   });
 
   it("B. renders next match empty state", () => {
@@ -155,7 +158,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — sporting snapshot", () => {
   });
 
   it("C. renders latest result with score and perspective", () => {
-    render(
+    const { container } = render(
       <TeamSportingSnapshot
         teamId={TEAM_ID}
         nextMatch={null}
@@ -171,6 +174,57 @@ describe("TEAM-COCKPIT-PREMIUM-01E — sporting snapshot", () => {
     );
     expect(screen.getByTestId("team-latest-result-score")).toHaveTextContent("1 : 2");
     expect(screen.getByTestId("team-latest-result-perspective")).toHaveTextContent("Sieg");
+    expect(
+      Array.from(container.querySelectorAll("img")).map((image) => image.getAttribute("src")),
+    ).toEqual(["/tenant-crest.svg", "/example-crest.svg"]);
+  });
+
+  it("C2. keeps the tenant crest with the own team when it is away", () => {
+    const awayResult: TeamCockpitResult = {
+      ...LATEST_RESULT,
+      home: {
+        displayName: "Host FC",
+        isOwnTeam: false,
+        clubName: "Host FC",
+        logoUrl: "/host-crest.svg",
+      },
+      away: {
+        displayName: "1. Mannschaft",
+        isOwnTeam: true,
+        clubName: "FC Allschwil",
+        logoUrl: "/tenant-crest.svg",
+      },
+    };
+
+    const { container } = render(
+      <TeamSportingSnapshot
+        teamId={TEAM_ID}
+        nextMatch={null}
+        latestResult={awayResult}
+        standings={null}
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    expect(
+      Array.from(container.querySelectorAll("img")).map((image) => image.getAttribute("src")),
+    ).toEqual(["/host-crest.svg", "/tenant-crest.svg"]);
+    expect(screen.getByTestId("team-latest-result-score")).toHaveTextContent("1 : 2");
+  });
+
+  it("C3. uses the shield fallback for a missing compact-summary logo", () => {
+    const { container } = render(
+      <TeamSportingSnapshot
+        teamId={TEAM_ID}
+        nextMatch={{ ...NEXT_MATCH, away: { ...NEXT_MATCH.away, logoUrl: null } }}
+        latestResult={null}
+        standings={null}
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    expect(container.querySelectorAll("img")).toHaveLength(1);
+    expect(container.querySelectorAll("svg.lucide-shield")).toHaveLength(1);
   });
 
   it("D. renders result empty state", () => {
@@ -262,7 +316,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — training summary", () => {
             weekdayLabel: "Montag",
             startsAt: "17:00",
             endsAt: "18:30",
-            locationLabel: "KR2",
+            locationLabel: "Kunstrasen 2",
             seriesId: "series-1",
             seriesTitle: "Training",
           },
@@ -273,7 +327,8 @@ describe("TEAM-COCKPIT-PREMIUM-01E — training summary", () => {
     expect(screen.getByTestId("team-training-summary")).toBeInTheDocument();
     expect(screen.getByText("Montag")).toBeInTheDocument();
     expect(screen.getByText(/17:00–18:30/)).toBeInTheDocument();
-    expect(screen.getByText(/KR2/)).toBeInTheDocument();
+    expect(screen.getByText(/Kunstrasen 2/)).toBeInTheDocument();
+    expect(screen.queryByText(/KUNSTRASEN_2/)).not.toBeInTheDocument();
   });
 
   it("J. renders empty training state", () => {

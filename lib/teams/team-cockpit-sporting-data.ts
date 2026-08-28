@@ -298,34 +298,40 @@ export async function getTeamCockpitSportingData(
               ),
           ),
         ];
-        const standingsExternalTeams =
-          opponentProviderTeamIds.length > 0
-            ? await identityDatabase.externalTeam.findMany({
-                where: {
-                  tenantId: input.tenantId,
-                  providerMappings: {
-                    some: {
-                      provider: SFV_PROVIDER,
-                      providerTeamId: { in: opponentProviderTeamIds },
-                    },
+        let standingsExternalTeams: TeamCockpitStandingExternalTeamRecord[] = [];
+        if (opponentProviderTeamIds.length > 0) {
+          try {
+            standingsExternalTeams = await identityDatabase.externalTeam.findMany({
+              where: {
+                tenantId: input.tenantId,
+                providerMappings: {
+                  some: {
+                    provider: SFV_PROVIDER,
+                    providerTeamId: { in: opponentProviderTeamIds },
                   },
                 },
-                select: {
-                  shortName: true,
-                  logoUrl: true,
-                  providerMappings: {
-                    where: {
-                      provider: SFV_PROVIDER,
-                      providerTeamId: { in: opponentProviderTeamIds },
-                    },
-                    select: { providerTeamId: true },
+              },
+              select: {
+                shortName: true,
+                logoUrl: true,
+                providerMappings: {
+                  where: {
+                    provider: SFV_PROVIDER,
+                    providerTeamId: { in: opponentProviderTeamIds },
                   },
-                  externalClub: {
-                    select: { logoUrl: true },
-                  },
+                  select: { providerTeamId: true },
                 },
-              })
-            : [];
+                externalClub: {
+                  select: { logoUrl: true },
+                },
+              },
+            });
+          } catch {
+            // Identity enrichment is additive. Valid provider standings must
+            // still render when the club-directory lookup is unavailable.
+            standingsExternalTeams = [];
+          }
+        }
         const externalTeamByProviderId = new Map<
           number,
           { shortName: string | null; logoUrl: string | null }

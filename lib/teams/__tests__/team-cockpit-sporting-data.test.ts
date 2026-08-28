@@ -811,6 +811,83 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     });
   });
 
+  it("keeps valid standings when optional logo enrichment fails", async () => {
+    mockFetchStandings.mockResolvedValue({
+      competition: {
+        name: "2. Liga interregional",
+        divisionName: "Gruppe 3",
+        groupName: null,
+      },
+      rows: [
+        {
+          position: 1,
+          externalTeamId: 200,
+          teamName: "Opponent FC",
+          shortName: "Opponent",
+          played: 4,
+          won: 3,
+          drawn: 0,
+          lost: 1,
+          goalsFor: 9,
+          goalsAgainst: 4,
+          points: 9,
+          penaltyPoints: -1,
+        },
+        {
+          position: 2,
+          externalTeamId: 123,
+          teamName: "FC Test",
+          shortName: "Provider Short",
+          played: 4,
+          won: 2,
+          drawn: 1,
+          lost: 1,
+          goalsFor: 7,
+          goalsAgainst: 5,
+          points: 7,
+          penaltyPoints: null,
+        },
+      ],
+    });
+    const findMany = vi.fn().mockRejectedValue(new Error("club directory unavailable"));
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      tenantLogoUrl: "/tenant-crest.svg",
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "1. Mannschaft",
+      teamShortName: "1. Mannschaft",
+      sfvMapping: {
+        externalTeamId: 123,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+        providerLeagueName: "2. Liga interregional",
+      },
+      database: {} as TeamMatchQueryDatabase,
+      identityDatabase: { externalTeam: { findMany } },
+      now: NOW,
+    });
+
+    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(data.standings?.rows).toHaveLength(2);
+    expect(data.standings?.rows[0]).toMatchObject({
+      teamName: "Opponent FC",
+      isCurrentTeam: false,
+      logoUrl: null,
+      points: 9,
+      penaltyPoints: -1,
+    });
+    expect(data.standings?.rows[1]).toMatchObject({
+      teamName: "FC Test",
+      shortName: "1. Mannschaft",
+      isCurrentTeam: true,
+      logoUrl: "/tenant-crest.svg",
+      points: 7,
+    });
+  });
+
   it("falls back to providerLeagueName when standings fail", async () => {
     mockFetchStandings.mockResolvedValue(null);
 

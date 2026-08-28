@@ -76,14 +76,50 @@ describe("TEAM-COCKPIT-01D — getTeamTrainingSchedule", () => {
       weekdayLabel: "Montag",
       startsAt: "17:00",
       endsAt: "18:30",
-      locationLabel: "KR2",
+      locationLabel: "Kunstrasen 2",
     });
     expect(schedule[1]).toMatchObject({
       weekdayLabel: "Mittwoch",
       startsAt: "15:45",
       endsAt: "17:15",
-      locationLabel: "KR2",
+      locationLabel: "Kunstrasen 2",
     });
+    expect(schedule.every((entry) => entry.locationLabel !== "KR2")).toBe(true);
+  });
+
+  it("keeps a missing resource allocation gracefully nullable", async () => {
+    vi.mocked(listTrainingSeries).mockResolvedValue([
+      {
+        id: "series-1",
+        tenantId: "tenant-a",
+        teamSeasonId: "ts-1",
+        title: "E1 Training",
+        description: null,
+        status: "ACTIVE",
+        startsAt: "17:00",
+        endsAt: "18:30",
+        timezone: "Europe/Zurich",
+        weekdays: ["MONDAY"],
+        weekdaySchedules: [{ weekday: "MONDAY", startsAt: "17:00", endsAt: "18:30" }],
+        validFrom: null,
+        validUntil: null,
+        archivedAt: null,
+        sessionCount: 0,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+        planningStage: "APPROVED",
+        planningSubmittedAt: null,
+        planningSubmittedById: null,
+        planningValidatedAt: null,
+        planningValidatedById: null,
+        createdByUserId: null,
+      },
+    ]);
+    vi.mocked(listAllocationsByTrainingSeries).mockResolvedValue([]);
+
+    const schedule = await getTeamTrainingSchedule("tenant-a", "ts-1");
+
+    expect(schedule[0]?.locationLabel).toBeNull();
   });
 
   it("returns an empty list when no active training series exist", async () => {

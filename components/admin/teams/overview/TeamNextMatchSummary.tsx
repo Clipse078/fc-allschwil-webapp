@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SportingTeamLogo from "@/components/shared/SportingTeamLogo";
 import type { TeamCockpitMatch } from "@/lib/teams/team-cockpit-sporting-data";
 import type { TenantFormatConfig } from "@/lib/tenant-runtime/formatters";
 import { formatMatchDateLine } from "./team-overview-formatters";
@@ -39,15 +40,21 @@ export default function TeamNextMatchSummary({
           </p>
 
           <div className="space-y-1">
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-              {match.home.displayName}
-            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <SportingTeamLogo logoUrl={match.home.logoUrl} size="sm" />
+              <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                {match.home.displayName}
+              </p>
+            </div>
             <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
               vs.
             </p>
-            <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-              {match.away.displayName}
-            </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <SportingTeamLogo logoUrl={match.away.logoUrl} size="sm" />
+              <p className="truncate text-sm font-semibold text-[var(--foreground)]">
+                {match.away.displayName}
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--text-2)]">
