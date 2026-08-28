@@ -30,6 +30,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { classifyProviderMatchDisposition } from "@/lib/sporting-data/provider-state";
 import type { Prisma } from "@prisma/client";
 import type { ClubScheduleEntry } from "../client";
 import type { SfvScheduleSyncContext } from "./schedule-types";
@@ -381,7 +382,12 @@ export async function updateMatchRecord(
     entry.matchState,
     entry.matchStateName,
   );
-  const status = resolvePersistedEventStatus(existingStatus, mappedStatus);
+  const providerDisposition = classifyProviderMatchDisposition(entry.matchStateName);
+  const status = resolvePersistedEventStatus(
+    existingStatus,
+    mappedStatus,
+    providerDisposition,
+  );
   const resultLabel = buildResultLabel(entry.scoreTeamA, entry.scoreTeamB, status);
   const competition = entry.leagueName ?? entry.divisionName ?? null;
   const venue = entry.stadiumPlaygroundName ?? null;
@@ -572,9 +578,13 @@ export async function processScheduleEntry(
     entry.matchState,
     entry.matchStateName,
   );
+  const providerDisposition = classifyProviderMatchDisposition(
+    entry.matchStateName,
+  );
   const incomingStatus = resolvePersistedEventStatus(
     existing.event.status,
     mappedIncomingStatus,
+    providerDisposition,
   );
   const canonicalHomeAway = mapSfvHomeAway(isHome);
 

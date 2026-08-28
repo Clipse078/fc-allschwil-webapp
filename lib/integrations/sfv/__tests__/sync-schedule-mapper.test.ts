@@ -132,6 +132,16 @@ describe("buildNewEventFields homeAway", () => {
 // ── mapMatchStateToEventStatus ────────────────────────────────────────────────
 
 describe("mapMatchStateToEventStatus", () => {
+  it("maps 'noch nicht ausgetragen' to SCHEDULED", () => {
+    expect(mapMatchStateToEventStatus(0, "noch nicht ausgetragen")).toBe(
+      "SCHEDULED",
+    );
+  });
+
+  it("maps 'pas encore joué' to SCHEDULED", () => {
+    expect(mapMatchStateToEventStatus(0, "pas encore joué")).toBe("SCHEDULED");
+  });
+
   it("maps 'ausgetragen' to COMPLETED", () => {
     expect(mapMatchStateToEventStatus(1, "ausgetragen")).toBe("COMPLETED");
   });
@@ -192,10 +202,16 @@ describe("mapMatchStateToEventStatus", () => {
 // ── resolvePersistedEventStatus ─────────────────────────────────────────────
 
 describe("resolvePersistedEventStatus", () => {
-  it("keeps COMPLETED when incoming provider payload is SCHEDULED", () => {
+  it("keeps COMPLETED when incoming provider disposition is UNKNOWN", () => {
     expect(resolvePersistedEventStatus("COMPLETED", "SCHEDULED")).toBe(
       "COMPLETED",
     );
+  });
+
+  it("allows explicit provider NOT_PLAYED to heal COMPLETED to SCHEDULED", () => {
+    expect(
+      resolvePersistedEventStatus("COMPLETED", "SCHEDULED", "NOT_PLAYED"),
+    ).toBe("SCHEDULED");
   });
 
   it("keeps COMPLETED when incoming provider payload is LIVE", () => {

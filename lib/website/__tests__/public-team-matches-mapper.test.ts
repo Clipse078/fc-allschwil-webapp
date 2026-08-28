@@ -523,6 +523,14 @@ describe("public-team-matches-mapper", () => {
       ).toBe("DRAW");
     });
 
+    it("completed 0-0 remains a DRAW", () => {
+      expect(
+        resolvePublicTeamResultPerspective(
+          createCompletedItem({ side: "AWAY", scoreHome: 0, scoreAway: 0 }),
+        ),
+      ).toBe("DRAW");
+    });
+
     it("F. missing score => UNKNOWN", () => {
       expect(
         resolvePublicTeamResultPerspective(
@@ -589,8 +597,19 @@ describe("public-team-matches-mapper", () => {
       )[0];
 
       expect(mapped?.isAwayTeam).toBe(true);
+      expect(mapped?.score).toEqual({ home: 1, away: 2 });
       expect(mapped?.resultPerspective).toBe("WON");
       expect(mapped?.opponent.name).toBe("Host FC");
+    });
+
+    it("includes a genuine completed 0-0 result as a draw", () => {
+      const mapped = mapPublicTeamResults(
+        [createCompletedItem({ scoreHome: 0, scoreAway: 0 })],
+        identityContext,
+      )[0];
+
+      expect(mapped?.score).toEqual({ home: 0, away: 0 });
+      expect(mapped?.resultPerspective).toBe("DRAW");
     });
 
     it("M. maps logos same as nextMatches", () => {

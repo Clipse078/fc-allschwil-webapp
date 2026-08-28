@@ -397,6 +397,54 @@ describe("updateMatchRecord — homeAway", () => {
     expect(updateData.homeAway).not.toBe("A");
   });
 
+  it("heals explicit NOT_PLAYED from COMPLETED to SCHEDULED and clears resultLabel", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry({ matchStateName: "noch nicht ausgetragen", scoreTeamA: 0, scoreTeamB: 0 }),
+      makeContext(),
+      "FC Opponent B",
+      "team-1",
+      null,
+      "team-1",
+      true,
+      null,
+      null,
+      "COMPLETED",
+    );
+
+    expect(mockEventUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        status: "SCHEDULED",
+        resultLabel: null,
+      }),
+    );
+  });
+
+  it("protects genuine COMPLETED status when provider disposition is UNKNOWN", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry({ matchStateName: "unbekannt", scoreTeamA: 2, scoreTeamB: 1 }),
+      makeContext(),
+      "FC Opponent B",
+      "team-1",
+      null,
+      "team-1",
+      true,
+      null,
+      null,
+      "COMPLETED",
+    );
+
+    expect(mockEventUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        status: "COMPLETED",
+        resultLabel: "2:1",
+      }),
+    );
+  });
+
   // ── U5–U8: PUB-01 — SFV resync must NOT overwrite manually managed fields ──
   //
   // When the admin sets websiteVisible=true and a subsequent SFV schedule sync
@@ -689,5 +737,51 @@ describe("processScheduleEntry — ADMIN-DELETE-02A-C1 tombstone suppression", (
     // CREATE branch for an absent mapping.
     expect(result.outcome.status).not.toBe("suppressed");
     expect(mockEventCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("processScheduleEntry — lifecycle self-healing", () => {
+  it("normal schedule sync heals a poisoned COMPLETED NOT_PLAYED event", async () => {
+    const providerStateName = "noch nicht ausgetragen";
+    const existing = new Map([
+      [
+        99001,
+        {
+          id: "mapping-1",
+          eventId: "event-1",
+          ...makeExistingMappingSnapshot({
+            providerMatchStateName: providerStateName,
+          }),
+          homeExternalTeamId: null,
+          awayExternalTeamId: null,
+          event: makeExistingEventSnapshot("HOME", {
+            startAt: new Date("2026-09-13T13:00:00.000Z"),
+            status: "COMPLETED",
+          }),
+        },
+      ],
+    ]);
+
+    const result = await processScheduleEntry(
+      makeEntry({ matchStateName: providerStateName }),
+      makeContext(),
+      "season-1",
+      existing,
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+    );
+
+    expect(result.outcome).toEqual({
+      status: "updated",
+      scoreChanged: false,
+      kickoffChanged: false,
+      statusChanged: true,
+    });
+    expect(mockEventUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        status: "SCHEDULED",
+        resultLabel: null,
+      }),
+    );
   });
 });

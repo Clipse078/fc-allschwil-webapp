@@ -50,6 +50,10 @@
  */
 
 import type { ClubScheduleEntry } from "../client";
+import {
+  classifyProviderMatchDisposition,
+  type ProviderMatchDisposition,
+} from "@/lib/sporting-data/provider-state";
 import type { SfvScheduleSyncContext } from "./schedule-types";
 import { parseSfvMatchDateTime } from "./provider-time";
 
@@ -108,11 +112,12 @@ export type CanonicalEventStatus =
 export function resolvePersistedEventStatus(
   existingStatus: string,
   incomingStatus: CanonicalEventStatus,
+  providerDisposition: ProviderMatchDisposition = "UNKNOWN",
 ): CanonicalEventStatus {
   const existing = existingStatus.trim().toUpperCase();
 
   if (existing === "COMPLETED" && incomingStatus === "SCHEDULED") {
-    return "COMPLETED";
+    return providerDisposition === "NOT_PLAYED" ? "SCHEDULED" : "COMPLETED";
   }
 
   if (existing === "COMPLETED" && incomingStatus === "LIVE") {
@@ -130,37 +135,22 @@ export function mapMatchStateToEventStatus(
   matchState: number | null | undefined,
   matchStateName: string | null | undefined,
 ): CanonicalEventStatus {
-  const name = (matchStateName ?? "").toLowerCase();
-
-  if (name.includes("annull") || name.includes("annulé") || name.includes("abgesagt")) {
-    return "CANCELLED";
-  }
-
-  if (name.includes("verschob") || name.includes("reporté") || name.includes("postponed")) {
-    return "POSTPONED";
-  }
-
-  if (
-    name.includes("ausgetragen") ||
-    name.includes("gespielt") ||
-    name.includes("joué") ||
-    name.includes("abgeschlossen") ||
-    name.includes("beendet") ||
-    name.includes("terminé") ||
-    name.includes("finished") ||
-    name.includes("completed")
-  ) {
-    return "COMPLETED";
-  }
-
-  if (name.includes("läuft") || name.includes("en cours") || name.includes("live")) {
-    return "LIVE";
-  }
-
-  // Conservative default: preserve as SCHEDULED for unknown states.
   // matchState integer alone is not sufficient evidence.
   void matchState;
-  return "SCHEDULED";
+
+  switch (classifyProviderMatchDisposition(matchStateName)) {
+    case "COMPLETED":
+      return "COMPLETED";
+    case "CANCELLED":
+      return "CANCELLED";
+    case "POSTPONED":
+      return "POSTPONED";
+    case "LIVE":
+      return "LIVE";
+    case "NOT_PLAYED":
+    case "UNKNOWN":
+      return "SCHEDULED";
+  }
 }
 
 /**
