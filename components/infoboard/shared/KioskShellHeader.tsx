@@ -26,6 +26,7 @@ import { Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun } 
 import { resolveWeatherVisual } from "@/components/infoboard/shared/weatherVisual";
 
 import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
+import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 
 export type KioskShellHeaderProps = {
@@ -59,7 +60,6 @@ export type KioskShellHeaderProps = {
 };
 
 const HEADER_BG = "#0A1828";
-const HEADER_BORDER = "3px solid #e87722";
 const SUBTITLE_BORDER = "1px solid rgba(99, 135, 175, 0.16)";
 const MUTED_TEXT = "#6E87A0";
 
@@ -102,7 +102,7 @@ function SharedWeather({
         display: "grid",
         gridTemplateColumns: "auto auto minmax(0, 1fr)",
         alignItems: "center",
-        columnGap: "clamp(8px, 0.75vw, 14px)",
+        columnGap: "14px",
         minWidth: "max-content",
         width: "auto",
         whiteSpace: "nowrap",
@@ -110,7 +110,7 @@ function SharedWeather({
     >
       <Icon
         aria-hidden="true"
-        size={34}
+        size={Number.parseInt(KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-icon"], 10)}
         strokeWidth={1.6}
         style={{
           color: iconColor,
@@ -121,7 +121,7 @@ function SharedWeather({
       <span
         data-testid="header-weather-temperature"
         style={{
-          fontSize: "clamp(1.5rem, 2.1vw, 2.5rem)",
+          fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-temp-font"],
           fontWeight: 800,
           color: "#ffffff",
           lineHeight: 1,
@@ -134,7 +134,7 @@ function SharedWeather({
       <span
         data-testid="header-weather-condition"
         style={{
-          fontSize: "clamp(0.68rem, 0.82vw, 0.95rem)",
+          fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-condition-font"],
           fontWeight: 500,
           color: "rgba(255,255,255,0.74)",
           lineHeight: 1,
@@ -176,24 +176,25 @@ export function KioskShellHeader({
       : rightContent ?? null;
 
   return (
-    <div data-testid="kiosk-shell-header" style={{ flexShrink: 0 }}>
+    <div
+      data-testid="kiosk-shell-header"
+      data-kiosk-shell-contract="true"
+      style={{ flexShrink: 0, ...KIOSK_SHELL_CSS_VARS }}
+    >
       <header
+        data-testid="kiosk-shell-header-bar"
         style={{
           display: "grid",
           gridTemplateColumns:
-            "minmax(0, 1fr) auto auto clamp(220px, 22vw, 360px) 10vw",
+            "minmax(0, 1fr) auto auto minmax(220px, 360px) 192px",
           alignItems: "center",
 
-          paddingLeft: "clamp(12px, 2vw, 32px)",
+          paddingLeft: KIOSK_SHELL_CSS_VARS["--kiosk-shell-padding-x"],
           paddingRight: 0,
           background: HEADER_BG,
-          borderBottom: HEADER_BORDER,
+          borderBottom: `${KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-border"]} solid #e87722`,
 
-          /*
-           * Physical-TV contract:
-           * keep the existing header height exactly.
-           */
-          height: "clamp(60px, 7.5vh, 90px)",
+          height: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-height"],
           flexShrink: 0,
           overflow: "hidden",
         }}
@@ -204,7 +205,7 @@ export function KioskShellHeader({
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "clamp(8px, 1vw, 16px)",
+            gap: "16px",
             minWidth: 0,
             overflow: "hidden",
           }}
@@ -215,7 +216,7 @@ export function KioskShellHeader({
               src={clubLogoSrc}
               alt={`${clubName} Wappen`}
               style={{
-                height: "clamp(36px, 5.5vh, 64px)",
+                height: KIOSK_SHELL_CSS_VARS["--kiosk-shell-crest-height"],
                 width: "auto",
                 objectFit: "contain",
                 flexShrink: 0,
@@ -225,14 +226,14 @@ export function KioskShellHeader({
             <div
               aria-hidden="true"
               style={{
-                height: "clamp(36px, 5.5vh, 64px)",
-                width: "clamp(36px, 5.5vh, 64px)",
+                height: KIOSK_SHELL_CSS_VARS["--kiosk-shell-crest-height"],
+                width: KIOSK_SHELL_CSS_VARS["--kiosk-shell-crest-height"],
                 borderRadius: "50%",
                 background: "rgba(255,255,255,0.10)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: "clamp(12px, 2vh, 22px)",
+                fontSize: "22px",
                 fontWeight: 800,
                 color: "rgba(255,255,255,0.55)",
                 flexShrink: 0,
@@ -253,7 +254,7 @@ export function KioskShellHeader({
             <span
               data-testid="kiosk-header-club-name"
               style={{
-                fontSize: "clamp(1.1rem, 2vw, 2.4rem)",
+                fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-club-name-font"],
                 fontWeight: 800,
                 letterSpacing: "0.06em",
                 color: "#ffffff",
@@ -270,7 +271,7 @@ export function KioskShellHeader({
             {facilityLine && (
               <span
                 style={{
-                  fontSize: "clamp(0.58rem, 0.78vw, 0.88rem)",
+                  fontSize: "14px",
                   letterSpacing: "0.18em",
                   color: "rgba(255,255,255,0.45)",
                   textTransform: "uppercase",
@@ -300,8 +301,8 @@ export function KioskShellHeader({
               justifyContent: "center",
               alignSelf: "center",
               height: "72%",
-              paddingLeft: "clamp(18px, 1.5vw, 28px)",
-              paddingRight: "clamp(18px, 1.5vw, 28px)",
+              paddingLeft: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
+              paddingRight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
               borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
             }}
           >
@@ -326,8 +327,8 @@ export function KioskShellHeader({
               justifyContent: "center",
               alignSelf: "center",
               height: "72%",
-              paddingLeft: "clamp(18px, 1.5vw, 28px)",
-              paddingRight: "clamp(18px, 1.5vw, 28px)",
+              paddingLeft: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
+              paddingRight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
               borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
             }}
           >
@@ -343,7 +344,7 @@ export function KioskShellHeader({
             ) : staticDateFallback != null && showDate ? (
               <span
                 style={{
-                  fontSize: "clamp(0.7rem, 0.9vw, 1rem)",
+                  fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-date-font"],
                   letterSpacing: "0.06em",
                   color: "rgba(255,255,255,0.55)",
                   whiteSpace: "nowrap",
@@ -361,12 +362,12 @@ export function KioskShellHeader({
             display: "flex",
             alignItems: "center",
             justifyContent: "flex-start",
-            minWidth: "clamp(220px, 22vw, 360px)",
+            minWidth: "220px",
             width: "100%",
             alignSelf: "center",
             height: "72%",
-            paddingLeft: "clamp(18px, 1.5vw, 28px)",
-            paddingRight: "clamp(18px, 1.5vw, 28px)",
+            paddingLeft: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
+            paddingRight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-header-zone-padding-x"],
             borderLeft: "1px solid rgba(148, 163, 184, 0.28)",
             overflow: "visible",
           }}
@@ -379,8 +380,8 @@ export function KioskShellHeader({
           data-testid="alexa-safe-zone"
           aria-hidden="true"
           style={{
-            width: "10vw",
-            minWidth: "10vw",
+            width: "192px",
+            minWidth: "192px",
             height: "100%",
             flexShrink: 0,
             pointerEvents: "none",
@@ -394,8 +395,8 @@ export function KioskShellHeader({
           style={{
             display: "flex",
             alignItems: "center",
-            height: "clamp(28px, 3.8vh, 46px)",
-            padding: "0 clamp(12px, 2vw, 32px)",
+            height: KIOSK_SHELL_CSS_VARS["--kiosk-shell-subtitle-height"],
+            padding: `0 ${KIOSK_SHELL_CSS_VARS["--kiosk-shell-padding-x"]}`,
             borderBottom: SUBTITLE_BORDER,
             background: HEADER_BG,
             flexShrink: 0,
@@ -404,7 +405,7 @@ export function KioskShellHeader({
           <span
             data-testid="board-title-text"
             style={{
-              fontSize: "clamp(0.78rem, 1vw, 1.2rem)",
+              fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-subtitle-font"],
               fontWeight: 600,
               letterSpacing: "0.16em",
               textTransform: "uppercase",

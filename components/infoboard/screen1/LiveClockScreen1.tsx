@@ -25,7 +25,7 @@ import {
   formatKioskWeekday,
   formatKioskDateLine,
 } from "@/components/infoboard/kiosk-clock";
-import styles from "./InfoboardScreen1.module.css";
+import styles from "@/components/infoboard/shared/KioskShellClock.module.css";
 
 export type LiveClockScreen1Props = {
   initialTimeIso: string;

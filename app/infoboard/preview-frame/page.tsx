@@ -3,9 +3,9 @@ import { notFound } from "next/navigation";
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   PreviewFrameScreen1,
+  PreviewFrameScreen2,
   PreviewFrameStatic,
 } from "@/components/infoboard/preview/PreviewFrame";
-import { InfoboardScreen2 } from "@/components/infoboard/screen2/InfoboardScreen2";
 import {
   buildScreen1PreviewData,
   buildScreen2PreviewData,
@@ -87,15 +87,12 @@ export default async function InfoboardPreviewFramePage({
   }
 
   return (
-    <PreviewFrameStatic>
-      <InfoboardScreen2
-        feed={data.payload.feed}
-        branding={data.payload.branding}
-        currentTimeIso={data.payload.currentTimeIso}
-        weather={data.weather}
-        theme={data.payload.theme}
-        liveClock={false}
-      />
-    </PreviewFrameStatic>
+    <PreviewFrameScreen2
+      feed={data.payload.feed}
+      branding={data.payload.branding}
+      currentTimeIso={data.payload.currentTimeIso}
+      weather={data.weather}
+      theme={data.payload.theme}
+    />
   );
 }

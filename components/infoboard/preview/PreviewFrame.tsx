@@ -5,6 +5,10 @@ import {
   InfoboardScreen1,
   type InfoboardScreen1Props,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
+import {
+  InfoboardScreen2,
+  type InfoboardScreen2Props,
+} from "@/components/infoboard/screen2/InfoboardScreen2";
 import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
 import type { Screen1StudioCardRef } from "@/components/infoboard/studio/Screen1Studio";
 import { resolveStudioPageIndex } from "@/lib/infoboard/screen1-studio-page-retention";
@@ -115,6 +119,18 @@ export function PreviewFrameScreen1({
           onPaginationStructureChange: applyPageRetention,
         }}
       />
+    </KioskViewportScaler>
+  );
+}
+
+export function PreviewFrameScreen2(screenProps: InfoboardScreen2Props) {
+  useEffect(() => {
+    notifyParent(0, 1, []);
+  }, []);
+
+  return (
+    <KioskViewportScaler>
+      <InfoboardScreen2 {...screenProps} liveClock={false} />
     </KioskViewportScaler>
   );
 }

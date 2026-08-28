@@ -1,3 +1,1 @@
-import type { ReactNode } from "react";
-
 export { default } from "@/components/infoboard/shared/KioskViewportLayout";

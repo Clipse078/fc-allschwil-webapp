@@ -26,6 +26,7 @@
 
 import type { ReactElement } from "react";
 import { AnnouncementTicker } from "@/components/infoboard/screen1/AnnouncementTicker";
+import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 
 // â”€â”€ Props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -70,11 +71,12 @@ export function KioskShellFooter({
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: "0 clamp(12px, 2vw, 32px)",
-    minHeight: "clamp(36px, 4.5vh, 54px)",
+    padding: `0 ${KIOSK_SHELL_CSS_VARS["--kiosk-shell-padding-x"]}`,
+    minHeight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-height"],
     flexShrink: 0,
     overflow: "hidden",
-    gap: "1vw",
+    gap: "16px",
+    ...KIOSK_SHELL_CSS_VARS,
   };
 
   return (
@@ -89,7 +91,7 @@ export function KioskShellFooter({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.6vw",
+          gap: "10px",
           flex: 1,
           minWidth: 0,
           overflow: "hidden",
@@ -128,7 +130,7 @@ export function KioskShellFooter({
         ) : leftLabel ? (
           <span
             style={{
-              fontSize: "clamp(0.65rem, 0.85vw, 1rem)",
+              fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-ticker-font"],
               letterSpacing: "0.10em",
               color: "rgba(255,255,255,0.40)",
               textTransform: "uppercase",
@@ -148,7 +150,7 @@ export function KioskShellFooter({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "0.5vw",
+          gap: "8px",
           flexShrink: 0,
         }}
       >
@@ -159,8 +161,8 @@ export function KioskShellFooter({
               display: "block",
               width: "auto",
               height: "auto",
-              maxHeight: "clamp(22px, 2.7vh, 34px)",
-              maxWidth: "clamp(140px, 12vw, 220px)",
+              maxHeight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-branding-height"],
+              maxWidth: KIOSK_SHELL_CSS_VARS["--kiosk-shell-branding-width"],
               objectFit: "contain",
               marginLeft: "auto",
             }}
