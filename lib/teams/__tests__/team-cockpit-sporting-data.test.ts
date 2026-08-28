@@ -153,6 +153,9 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(data.nextMatches).toHaveLength(1);
     expect(data.nextMatches[0]?.side).toBe("HOME");
     expect(data.nextMatches[0]?.home.isOwnTeam).toBe(true);
+    expect(data.nextMatches[0]?.status).toBe("SCHEDULED");
+    expect(data.nextMatches[0]?.lifecycle).toBe("UPCOMING");
+    expect(data.nextMatches[0]?.competitionName).toBeNull();
   });
 
   it("returns away results with WON/DRAW/LOST perspective and scores", async () => {
@@ -210,6 +213,149 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
 
     expect(data.nextMatches.map((match) => match.eventId)).toEqual(["earlier", "later"]);
     expect(data.results.map((match) => match.eventId)).toEqual(["newer", "older"]);
+  });
+
+  it("maps fixture competition and postponed lifecycle fields", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          eventId: "postponed",
+          lifecycle: "POSTPONED",
+          status: "POSTPONED",
+          competition: {
+            eventCompetitionLabel: "Cup Runde 1",
+            providerLeagueId: null,
+            providerLeagueName: null,
+            providerDivisionId: null,
+            providerDivisionName: null,
+            providerRoundNumber: null,
+            canonicalCompetitionId: null,
+            canonicalCompetitionName: null,
+            canonicalCompetitionShortName: null,
+          },
+        }),
+      ],
+      completed: [],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches[0]?.competitionName).toBe("Cup Runde 1");
+    expect(data.nextMatches[0]?.lifecycle).toBe("POSTPONED");
+    expect(data.nextMatches[0]?.status).toBe("POSTPONED");
+  });
+
+  it("excludes completed results from next matches", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [],
+      completed: [createCompletedMatch()],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches).toHaveLength(0);
+    expect(data.results).toHaveLength(1);
+  });
+
+  it("excludes cancelled fixtures from next matches", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          eventId: "cancelled",
+          lifecycle: "CANCELLED",
+          status: "CANCELLED",
+        }),
+      ],
+      completed: [],
+    });
+
+    const data = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(data.nextMatches).toHaveLength(0);
+  });
+
+  it("L. first detailed fixture matches overview next-match semantics", async () => {
+    mockListMatches.mockResolvedValue({
+      upcoming: [
+        createUpcomingMatch({
+          eventId: "first",
+          startAt: new Date("2026-09-01T18:00:00.000Z"),
+        }),
+        createUpcomingMatch({
+          eventId: "second",
+          startAt: new Date("2026-09-10T18:00:00.000Z"),
+        }),
+      ],
+      completed: [],
+    });
+
+    const overviewData = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+      limits: { nextMatches: 1, results: 0 },
+    });
+
+    const detailData = await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+      limits: { nextMatches: 10, results: 0 },
+    });
+
+    expect(detailData.nextMatches[0]?.eventId).toBe(overviewData.nextMatches[0]?.eventId);
+    expect(detailData.nextMatches[0]?.startAt).toEqual(overviewData.nextMatches[0]?.startAt);
+    expect(detailData.nextMatches[0]?.side).toBe(overviewData.nextMatches[0]?.side);
+  });
+
+  it("M. scopes match query to tenant and current team season", async () => {
+    await getTeamCockpitSportingData({
+      tenantId: TENANT_ID,
+      teamId: TEAM_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      seasonKey: "2026-2027",
+      teamDisplayName: "FC Test",
+      database: {} as TeamMatchQueryDatabase,
+      now: NOW,
+    });
+
+    expect(mockListMatches).toHaveBeenCalledWith(expect.anything(), {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
   });
 
   it("includes website-invisible fixtures for authenticated cockpit", async () => {

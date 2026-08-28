@@ -1,17 +1,55 @@
-import TeamCockpitSportingPlaceholder from "@/components/admin/teams/TeamCockpitSportingPlaceholder";
+import TeamUpcomingMatchesView from "@/components/admin/teams/upcoming-matches/TeamUpcomingMatchesView";
 import { requireTeamCockpitAccess } from "@/lib/teams/team-cockpit-layout";
+import {
+  getTeamCockpitSportingData,
+  TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT,
+} from "@/lib/teams/team-cockpit-sporting-data";
+import { getActiveTenant } from "@/lib/tenants/active-tenant";
 
 type Props = {
   params: Promise<{ teamId: string }>;
 };
 
 export default async function TeamSpielePage({ params }: Props) {
-  await requireTeamCockpitAccess((await params).teamId);
+  const { teamId } = await params;
+  const { tenantId, team } = await requireTeamCockpitAccess(teamId);
+
+  const activeSeason =
+    team.teamSeasons.find((entry) => entry.id === team.currentTeamSeasonId) ?? null;
+
+  const [tenant, sportingData] = await Promise.all([
+    getActiveTenant(),
+    team.currentTeamSeasonId && activeSeason
+      ? getTeamCockpitSportingData({
+          tenantId,
+          teamId: team.id,
+          teamSeasonId: team.currentTeamSeasonId,
+          seasonKey: activeSeason.season.key,
+          teamDisplayName: team.displayName ?? team.name,
+          teamShortName: team.shortName,
+          canonicalCompetition: team.competition
+            ? {
+                name: team.competition.name ?? "",
+                shortName: team.competition.shortName,
+              }
+            : null,
+          sfvMapping: team.currentSeasonSfvMapping,
+          limits: {
+            nextMatches: TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT,
+            results: 0,
+          },
+        })
+      : Promise.resolve(null),
+  ]);
 
   return (
-    <TeamCockpitSportingPlaceholder
-      title="Nächste Spiele"
-      description="Die Spielübersicht für dieses Team wird in einem späteren Schritt implementiert."
+    <TeamUpcomingMatchesView
+      matches={sportingData?.nextMatches ?? []}
+      seasonName={activeSeason?.season.name ?? null}
+      formatConfig={{
+        locale: tenant?.locale,
+        timezone: tenant?.timezone,
+      }}
     />
   );
 }

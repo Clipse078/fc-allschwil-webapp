@@ -19,6 +19,8 @@ import {
   type TeamCanonicalCompetitionContext,
   type TeamCompetitionDisplay,
 } from "@/lib/teams/team-competition-display";
+import type { SportingMatchLifecycle } from "@/lib/sporting-data/lifecycle";
+import type { TeamSeasonMatchCompetitionContext } from "@/lib/teams/team-match-query-service";
 import {
   filterPublicTeamNextMatches,
   filterPublicTeamResults,
@@ -26,6 +28,7 @@ import {
 } from "@/lib/website/public-team-matches-mapper";
 
 export const TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT = 5;
+export const TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT = 10;
 export const TEAM_COCKPIT_RESULTS_DEFAULT_LIMIT = 5;
 
 export type TeamCockpitMatchSide = {
@@ -37,11 +40,14 @@ export type TeamCockpitMatch = {
   eventId: string;
   startAt: Date;
   side: "HOME" | "AWAY";
+  status: string;
+  lifecycle: SportingMatchLifecycle;
   opponentName: string;
   home: TeamCockpitMatchSide;
   away: TeamCockpitMatchSide;
   venueName: string | null;
   location: string | null;
+  competitionName: string | null;
 };
 
 export type TeamCockpitResultPerspective = "WON" | "DRAW" | "LOST" | "UNKNOWN";
@@ -102,6 +108,27 @@ export type GetTeamCockpitSportingDataInput = {
   database?: TeamMatchQueryDatabase;
 };
 
+function meaningful(value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+export function resolveCockpitMatchCompetitionName(
+  competition: TeamSeasonMatchCompetitionContext,
+): string | null {
+  return (
+    meaningful(competition.eventCompetitionLabel) ??
+    meaningful(competition.canonicalCompetitionName) ??
+    meaningful(competition.canonicalCompetitionShortName) ??
+    meaningful(competition.providerLeagueName) ??
+    meaningful(competition.providerDivisionName)
+  );
+}
+
 function mapCockpitMatchSide(
   side: TeamSeasonMatchItem["home"],
   ownTeamId: string,
@@ -117,11 +144,14 @@ function mapCockpitMatch(item: TeamSeasonMatchItem, ownTeamId: string): TeamCock
     eventId: item.eventId,
     startAt: item.startAt,
     side: item.side,
+    status: item.status,
+    lifecycle: item.lifecycle,
     opponentName: item.opponent.displayName,
     home: mapCockpitMatchSide(item.home, ownTeamId),
     away: mapCockpitMatchSide(item.away, ownTeamId),
     venueName: item.venueName,
     location: item.location,
+    competitionName: resolveCockpitMatchCompetitionName(item.competition),
   };
 }
 

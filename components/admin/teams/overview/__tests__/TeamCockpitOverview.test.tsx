@@ -21,11 +21,14 @@ const NEXT_MATCH: TeamCockpitMatch = {
   eventId: "event-upcoming",
   startAt: new Date("2026-08-29T16:00:00.000Z"),
   side: "HOME",
+  status: "SCHEDULED",
+  lifecycle: "UPCOMING",
   opponentName: "FC Example",
   home: { displayName: "FC Allschwil", isOwnTeam: true },
   away: { displayName: "FC Example", isOwnTeam: false },
   venueName: "Im Brüel",
   location: "Im Brüel",
+  competitionName: "Junioren A Promotion",
 };
 
 const LATEST_RESULT: TeamCockpitResult = {
