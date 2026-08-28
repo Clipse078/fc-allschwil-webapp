@@ -53,6 +53,15 @@ export const KIOSK_SHELL_WEATHER_TEMP_FONT_PX = 40;
 /** Shared header weather condition label. */
 export const KIOSK_SHELL_WEATHER_CONDITION_FONT_PX = 16;
 
+/** Minimum width reserved for the header weather zone. */
+export const KIOSK_SHELL_WEATHER_ZONE_MIN_WIDTH_PX = 220;
+
+/** Maximum width allocated to the header weather zone. */
+export const KIOSK_SHELL_WEATHER_ZONE_MAX_WIDTH_PX = 360;
+
+/** Alexa / Fully Kiosk safe zone width in the header. */
+export const KIOSK_SHELL_ALEXA_SAFE_ZONE_WIDTH_PX = 192;
+
 /** Welcome / subtitle strip typography. */
 export const KIOSK_SHELL_SUBTITLE_FONT_PX = 19;
 

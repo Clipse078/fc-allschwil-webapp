@@ -44,7 +44,9 @@ describe("INFOBOARD-KIOSK-VIEWPORT-01D — Screen 2 kiosk viewport", () => {
     const css = readRepoFile("components/infoboard/shared/KioskViewportScaler.module.css");
     expect(css).not.toMatch(/:global\(html\)/);
     expect(css).not.toMatch(/:global\(body\)/);
-    expect(css).not.toContain("infoboard-anlageplan-root");
+    expect(css).toContain(
+      ':global([data-kiosk-viewport-canvas="true"]) [data-testid="infoboard-anlageplan-root"]',
+    );
   });
 
   it("PreviewFrameScreen1 and PreviewFrameScreen2 both apply KioskViewportScaler", () => {
