@@ -13,4 +13,13 @@
   flex-shrink: 0;
   transform-origin: center center;
   overflow: hidden;
+  container-type: size;
+  container-name: physical-infoboard;
+}
+
+:global([data-kiosk-viewport-canvas="true"]) [data-testid="infoboard-anlageplan-root"] {
+  height: 100%;
+  max-height: 100%;
+  width: 100%;
+  min-height: 0;
 }

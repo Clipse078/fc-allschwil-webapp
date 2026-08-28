@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import {
   PreviewFrameScreen1,
   PreviewFrameScreen2,
-  PreviewFrameStatic,
+  PreviewFrameAnlageplan,
 } from "@/components/infoboard/preview/PreviewFrame";
 import {
   buildScreen1PreviewData,
@@ -74,15 +73,13 @@ export default async function InfoboardPreviewFramePage({
   const data = await buildScreen2PreviewData(previewTenant, preview.now);
   if (data.renderer === "anlageplan") {
     return (
-      <PreviewFrameStatic>
-        <InfoboardAnlageplan
-          payload={data.payload}
-          weather={data.weather}
-          shellConfig={data.shellConfig}
-          branding={data.branding}
-          liveClock={false}
-        />
-      </PreviewFrameStatic>
+      <PreviewFrameAnlageplan
+        payload={data.payload}
+        weather={data.weather}
+        shellConfig={data.shellConfig}
+        branding={data.branding}
+        liveClock={false}
+      />
     );
   }
 

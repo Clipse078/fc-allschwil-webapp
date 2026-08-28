@@ -185,6 +185,53 @@
   width: 100%;
 }
 
+/*
+ * Inside the physical-TV canvas, size tokens must track the 1920×1080 logical
+ * surface (container queries) — not the browser viewport (vh/vw). Otherwise
+ * Dashboard Preview iframes and production kiosks diverge even with the same
+ * KioskViewportScaler wrapper.
+ */
+@container physical-infoboard (width >= 1px) {
+  .root {
+    --ib-header-height: clamp(72px, 8cqh, 96px);
+    --ib-board-title-h: clamp(32px, 4cqh, 46px);
+    --ib-footer-height: clamp(40px, 5cqh, 56px);
+    --ib-fs-header-time: clamp(2.6rem, 3.4cqw, 4rem);
+    --ib-fs-header-date: clamp(0.7rem, 0.9cqw, 1rem);
+    --ib-fs-club-name: clamp(1.5rem, 2cqw, 2.4rem);
+    --ib-fs-board-title: clamp(0.9rem, 1.1cqw, 1.3rem);
+    --ib-fs-status-label: clamp(0.8rem, 1.05cqw, 1.3rem);
+    --ib-fs-event-time: clamp(2rem, 2.8cqw, 3.6rem);
+    --ib-fs-event-end-time: clamp(0.85rem, 1.1cqw, 1.35rem);
+    --ib-fs-event-type: clamp(0.7rem, 0.9cqw, 1.1rem);
+    --ib-fs-event-team: clamp(1.4rem, 1.9cqw, 2.6rem);
+    --ib-fs-event-opponent: clamp(1.1rem, 1.5cqw, 2rem);
+    --ib-fs-vs-label: clamp(0.65rem, 0.82cqw, 1rem);
+    --ib-fs-match-role: clamp(0.62rem, 0.75cqw, 0.88rem);
+    --ib-training-logo-size: clamp(1.75rem, 2.8cqh, 2.625rem);
+    --ib-match-logo-size: clamp(2rem, 2.35cqw, 2.375rem);
+    --ib-tournament-logo-size: clamp(2.25rem, 2.8cqw, 3.4375rem);
+    --ib-tournament-logo-size-large: clamp(2.75rem, 3.4cqw, 3.4375rem);
+    --ib-training-font-size: clamp(2rem, 3cqw, 4rem);
+    --ib-training-font-size-compact: clamp(1.15rem, 1.55cqw, 2.2rem);
+    --ib-training-font-size-dense: clamp(1.05rem, 1.4cqw, 2rem);
+    --ib-match-font-size: clamp(1.65rem, 2.15cqw, 2.75rem);
+    --ib-match-opponent-font-size: clamp(0.935rem, 1.25cqw, 1.65rem);
+    --ib-tournament-font-size: clamp(1.15rem, 1.55cqw, 2.6rem);
+    --ib-fs-dest-label: clamp(0.6rem, 0.78cqw, 0.92rem);
+    --ib-fs-dest-pitch: clamp(1.5rem, 2.1cqw, 2.8rem);
+    --ib-fs-dest-room: clamp(1rem, 1.4cqw, 1.9rem);
+    --ib-fs-dest-team: clamp(0.75rem, 0.95cqw, 1.2rem);
+    --ib-fs-participant: clamp(0.8rem, 1cqw, 1.25rem);
+    --ib-fs-participant-room: clamp(0.9rem, 1.15cqw, 1.45rem);
+    --ib-fs-footer: clamp(0.8rem, 1cqw, 1.15rem);
+    --ib-fs-powered-by: clamp(0.5rem, 0.62cqw, 0.72rem);
+    --ib-card-gap: clamp(4px, 0.5cqh, 8px);
+    --ib-card-pad-v: clamp(8px, 1.1cqh, 14px);
+    --ib-card-pad-h: clamp(14px, 1.6cqw, 24px);
+  }
+}
+
 /* ─── Header ─────────────────────────────────────────────────────────────── */
 
 .header {
@@ -1010,7 +1057,7 @@
   white-space: nowrap;
   align-items: center;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.8rem, 1vw, 1.15rem);
+  font-size: var(--kiosk-shell-footer-ticker-font, 26px);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1046,7 +1093,7 @@
   white-space: normal;
   word-break: break-word;
   font-family: var(--font-display, "Barlow Condensed", sans-serif);
-  font-size: clamp(0.8rem, 1vw, 1.15rem);
+  font-size: var(--kiosk-shell-footer-ticker-font, 26px);
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;

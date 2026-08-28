@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   resolveKioskTenant: vi.fn(),
-  buildScreen1LivePayload: vi.fn(),
+  buildScreen1KioskPresentation: vi.fn(),
   notFound: vi.fn(),
   eventFindMany: vi.fn().mockResolvedValue([]),
   facilityResourceFindMany: vi.fn().mockResolvedValue([]),
@@ -52,15 +52,9 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
-  const actual = await vi.importActual<
-    typeof import("@/lib/publishing/infoboard/screen1-live-service")
-  >("@/lib/publishing/infoboard/screen1-live-service");
-  return {
-    ...actual,
-    buildScreen1LivePayload: mocks.buildScreen1LivePayload,
-  };
-});
+vi.mock("@/lib/infoboard/screen1-kiosk-presentation", () => ({
+  buildScreen1KioskPresentation: mocks.buildScreen1KioskPresentation,
+}));
 
 vi.mock("next/navigation", () => ({
   notFound: mocks.notFound,
@@ -140,13 +134,30 @@ const MOCK_PAYLOAD = {
   headerConfig: null,
 };
 
+const MOCK_PRESENTATION = {
+  payload: MOCK_PAYLOAD,
+  weather: { isAvailable: false as const },
+  infoboardScreen1Props: {
+    feed: MOCK_PAYLOAD.feed,
+    branding: MOCK_PAYLOAD.branding,
+    currentTimeIso: MOCK_PAYLOAD.currentTimeIso,
+    weather: { isAvailable: false as const },
+    announcement: undefined,
+    eventPresentation: MOCK_PAYLOAD.eventPresentation,
+    theme: MOCK_PAYLOAD.theme,
+    headerConfig: undefined,
+    presentation: undefined,
+    studio: undefined,
+  },
+};
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("InfoboardScreen1Page (production route)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.resolveKioskTenant.mockResolvedValue(ACTIVE_TENANT);
-    mocks.buildScreen1LivePayload.mockResolvedValue(MOCK_PAYLOAD);
+    mocks.buildScreen1KioskPresentation.mockResolvedValue(MOCK_PRESENTATION);
     mocks.notFound.mockImplementation(() => {
       throw new Error("NEXT_NOT_FOUND");
     });
@@ -176,12 +187,12 @@ describe("InfoboardScreen1Page (production route)", () => {
       expect(container.textContent).not.toMatch(/keine Trainings/i);
     });
 
-    it("calls buildScreen1LivePayload (not internal API fetch)", async () => {
+    it("calls buildScreen1KioskPresentation (not internal API fetch)", async () => {
       const { default: Page } = await import("../page");
       await Page();
 
       // Verify the live service was called directly (no HTTP fetch to own API)
-      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledTimes(1);
+      expect(mocks.buildScreen1KioskPresentation).toHaveBeenCalledTimes(1);
     });
 
     it("passes currentTimeIso from payload to component", async () => {
@@ -191,7 +202,7 @@ describe("InfoboardScreen1Page (production route)", () => {
       // currentTimeIso is rendered as a clock time in the header
       // The component shows time in HH:MM format in Zurich timezone
       // 16:00 UTC = 18:00 Zurich (UTC+2 in summer)
-      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledWith(
+      expect(mocks.buildScreen1KioskPresentation).toHaveBeenCalledWith(
         expect.objectContaining({ now: expect.any(Date) }),
       );
     });
@@ -209,10 +220,10 @@ describe("InfoboardScreen1Page (production route)", () => {
       const { default: Page } = await import("../page");
       await Page();
 
-      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0];
+      const serviceCall = mocks.buildScreen1KioskPresentation.mock.calls[0];
       expect(serviceCall).toBeDefined();
       // Verify the page actually calls the live service
-      expect(mocks.buildScreen1LivePayload).toHaveBeenCalledTimes(1);
+      expect(mocks.buildScreen1KioskPresentation).toHaveBeenCalledTimes(1);
     });
 
     it("does not import or use preview fixture content", async () => {
@@ -254,7 +265,7 @@ describe("InfoboardScreen1Page (production route)", () => {
         // notFound throws
       }
 
-      expect(mocks.buildScreen1LivePayload).not.toHaveBeenCalled();
+      expect(mocks.buildScreen1KioskPresentation).not.toHaveBeenCalled();
     });
   });
 
@@ -270,7 +281,7 @@ describe("InfoboardScreen1Page (production route)", () => {
       const { default: Page } = await import("../page");
       await Page();
 
-      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0][0];
+      const serviceCall = mocks.buildScreen1KioskPresentation.mock.calls[0][0];
       expect(serviceCall.tenant.id).toBe("tenant-fca");
     });
   });
@@ -285,7 +296,14 @@ describe("InfoboardScreen1Page (production route)", () => {
 
   describe("display theme (INFOBOARD-INTEGRATION-01B)", () => {
     it("passes the resolved theme from the payload to the root data-theme attribute", async () => {
-      mocks.buildScreen1LivePayload.mockResolvedValue({ ...MOCK_PAYLOAD, theme: "LIGHT" });
+      mocks.buildScreen1KioskPresentation.mockResolvedValue({
+        ...MOCK_PRESENTATION,
+        payload: { ...MOCK_PAYLOAD, theme: "LIGHT" },
+        infoboardScreen1Props: {
+          ...MOCK_PRESENTATION.infoboardScreen1Props,
+          theme: "LIGHT",
+        },
+      });
       const { default: Page } = await import("../page");
       const { container } = render(await Page());
 
@@ -306,7 +324,7 @@ describe("InfoboardScreen1Page (production route)", () => {
       const { default: Page } = await import("../page");
       await Page();
 
-      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0][0];
+      const serviceCall = mocks.buildScreen1KioskPresentation.mock.calls[0][0];
       expect(serviceCall.tenant.infoboardDisplayTheme).toBe("LIGHT");
     });
 
@@ -316,7 +334,7 @@ describe("InfoboardScreen1Page (production route)", () => {
       const { default: Page } = await import("../page");
       await Page();
 
-      const serviceCall = mocks.buildScreen1LivePayload.mock.calls[0][0];
+      const serviceCall = mocks.buildScreen1KioskPresentation.mock.calls[0][0];
       expect(serviceCall.tenant.infoboardDisplayTheme).toBe("DARK");
     });
   });

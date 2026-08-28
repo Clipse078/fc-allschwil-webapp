@@ -75,7 +75,7 @@ export function KioskShellFooter({
     minHeight: KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-height"],
     flexShrink: 0,
     overflow: "hidden",
-    gap: "16px",
+    gap: KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-gap"],
     ...KIOSK_SHELL_CSS_VARS,
   };
 
@@ -91,7 +91,7 @@ export function KioskShellFooter({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-gap"],
           flex: 1,
           minWidth: 0,
           overflow: "hidden",
@@ -110,8 +110,8 @@ export function KioskShellFooter({
               }}
             >
               <svg
-                width="16"
-                height="16"
+                width={KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-announcement-icon"]}
+                height={KIOSK_SHELL_CSS_VARS["--kiosk-shell-footer-announcement-icon"]}
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"

@@ -24,9 +24,9 @@ describe("INFOBOARD-KIOSK-VIEWPORT-01D — Screen 2 kiosk viewport", () => {
     expect(layout).toContain("min-h-screen");
   });
 
-  it("screen-1 route layout applies KioskViewportScaler", () => {
-    const layout = readRepoFile("app/infoboard/screen-1/layout.tsx");
-    expect(layout).toContain("Screen1KioskViewportLayout");
+  it("Screen 1 kiosk route layout applies PhysicalInfoboardViewport", () => {
+    const layout = readRepoFile("components/infoboard/shared/KioskViewportLayout.tsx");
+    expect(layout).toContain("PhysicalInfoboardViewport");
   });
 
   it("screen-2 route layout applies KioskViewportScaler", () => {
@@ -44,15 +44,18 @@ describe("INFOBOARD-KIOSK-VIEWPORT-01D — Screen 2 kiosk viewport", () => {
     const css = readRepoFile("components/infoboard/shared/KioskViewportScaler.module.css");
     expect(css).not.toMatch(/:global\(html\)/);
     expect(css).not.toMatch(/:global\(body\)/);
-    expect(css).not.toContain("infoboard-anlageplan-root");
+    expect(css).toContain(
+      ':global([data-kiosk-viewport-canvas="true"]) [data-testid="infoboard-anlageplan-root"]',
+    );
   });
 
-  it("PreviewFrameScreen1 and PreviewFrameScreen2 both apply KioskViewportScaler", () => {
+  it("PreviewFrameScreen1 and PreviewFrameScreen2 both apply PhysicalInfoboardViewport", () => {
     const previewFrame = readRepoFile("components/infoboard/preview/PreviewFrame.tsx");
-    expect(previewFrame).toContain("KioskViewportScaler");
-    expect(previewFrame).toMatch(/PreviewFrameScreen1[\s\S]*KioskViewportScaler/);
-    expect(previewFrame).toMatch(/PreviewFrameScreen2[\s\S]*KioskViewportScaler/);
-    expect(previewFrame).not.toMatch(/PreviewFrameStatic[\s\S]*KioskViewportScaler/);
+    expect(previewFrame).toContain("PhysicalInfoboardViewport");
+    expect(previewFrame).toMatch(/PreviewFrameScreen1[\s\S]*PhysicalInfoboardViewport/);
+    expect(previewFrame).toMatch(/PreviewFrameScreen2[\s\S]*PhysicalInfoboardViewport/);
+    expect(previewFrame).toMatch(/PreviewFrameAnlageplan[\s\S]*PhysicalInfoboardViewport/);
+    expect(previewFrame).not.toMatch(/PreviewFrameStatic/);
   });
 
   it("InfoboardScreen2 renders without an extra scaler when not wrapped by layout", () => {

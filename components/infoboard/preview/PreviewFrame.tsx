@@ -9,7 +9,11 @@ import {
   InfoboardScreen2,
   type InfoboardScreen2Props,
 } from "@/components/infoboard/screen2/InfoboardScreen2";
-import { KioskViewportScaler } from "@/components/infoboard/shared/KioskViewportScaler";
+import {
+  InfoboardAnlageplan,
+  type InfoboardAnlageplanProps,
+} from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
+import { PhysicalInfoboardViewport } from "@/components/infoboard/shared/PhysicalInfoboardViewport";
 import type { Screen1StudioCardRef } from "@/components/infoboard/studio/Screen1Studio";
 import { resolveStudioPageIndex } from "@/lib/infoboard/screen1-studio-page-retention";
 import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
@@ -106,7 +110,7 @@ export function PreviewFrameScreen1({
   }, [pageCount]);
 
   return (
-    <KioskViewportScaler>
+    <PhysicalInfoboardViewport>
       <InfoboardScreen1
         {...screenProps}
         studio={studio}
@@ -119,7 +123,7 @@ export function PreviewFrameScreen1({
           onPaginationStructureChange: applyPageRetention,
         }}
       />
-    </KioskViewportScaler>
+    </PhysicalInfoboardViewport>
   );
 }
 
@@ -129,15 +133,20 @@ export function PreviewFrameScreen2(screenProps: InfoboardScreen2Props) {
   }, []);
 
   return (
-    <KioskViewportScaler>
+    <PhysicalInfoboardViewport>
       <InfoboardScreen2 {...screenProps} liveClock={false} />
-    </KioskViewportScaler>
+    </PhysicalInfoboardViewport>
   );
 }
 
-export function PreviewFrameStatic({ children }: { children: React.ReactNode }) {
+export function PreviewFrameAnlageplan(props: InfoboardAnlageplanProps) {
   useEffect(() => {
     notifyParent(0, 1, []);
   }, []);
-  return children;
+
+  return (
+    <PhysicalInfoboardViewport>
+      <InfoboardAnlageplan {...props} />
+    </PhysicalInfoboardViewport>
+  );
 }
