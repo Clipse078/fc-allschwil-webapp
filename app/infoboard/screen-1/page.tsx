@@ -39,6 +39,7 @@ import {
   createCanonicalInfoboardSourceLoader,
   type CanonicalInfoboardPolicyDatabase,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
+import type { Screen1TenantContext } from "@/lib/publishing/infoboard/screen1-live-service";
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 
 export const metadata: Metadata = {
