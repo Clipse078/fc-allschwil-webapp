@@ -60,7 +60,9 @@ const STANDINGS: TeamCockpitStandings = {
     lost: 3,
     goalsFor: 15,
     goalsAgainst: 10,
+    goalDifference: 5,
     points: index === 2 ? 18 : 10,
+    penaltyPoints: null,
   })),
 };
 

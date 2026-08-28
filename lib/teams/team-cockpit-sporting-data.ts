@@ -72,7 +72,9 @@ export type TeamCockpitStandingsRow = {
   lost: number;
   goalsFor: number;
   goalsAgainst: number;
+  goalDifference: number;
   points: number;
+  penaltyPoints: number | null;
 };
 
 export type TeamCockpitStandings = {
@@ -240,7 +242,9 @@ export async function getTeamCockpitSportingData(
           lost: row.lost,
           goalsFor: row.goalsFor,
           goalsAgainst: row.goalsAgainst,
+          goalDifference: row.goalsFor - row.goalsAgainst,
           points: row.points,
+          penaltyPoints: row.penaltyPoints,
         })),
         };
       }

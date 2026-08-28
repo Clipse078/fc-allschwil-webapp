@@ -526,6 +526,8 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
     expect(data.competition?.source).toBe("STANDINGS");
     expect(data.standings?.rows[0]?.isCurrentTeam).toBe(true);
     expect(data.standings?.rows[0]?.position).toBe(1);
+    expect(data.standings?.rows[0]?.goalDifference).toBe(2);
+    expect(data.standings?.rows[0]?.penaltyPoints).toBeNull();
   });
 
   it("falls back to providerLeagueName when standings fail", async () => {

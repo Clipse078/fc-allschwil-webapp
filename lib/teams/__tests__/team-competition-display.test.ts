@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatTeamCompetitionDisplayLabel,
+  formatTeamCompetitionContextLine,
   resolveCurrentSeasonSfvMapping,
   resolveTeamCompetitionDisplay,
 } from "../team-competition-display";
@@ -82,6 +83,28 @@ describe("TEAM-COCKPIT-PREMIUM-01C — resolveTeamCompetitionDisplay", () => {
         source: "PROVIDER_MAPPING",
       }),
     ).toBe("2LI");
+  });
+
+  it("formats competition context without duplicate fragments", () => {
+    expect(
+      formatTeamCompetitionContextLine({
+        name: "Junioren A Promotion",
+        divisionName: "Junioren A Promotion",
+        groupName: "Gruppe 1",
+        source: "STANDINGS",
+      }),
+    ).toBe("Junioren A Promotion · Gruppe 1");
+  });
+
+  it("formats competition context with division and group when distinct", () => {
+    expect(
+      formatTeamCompetitionContextLine({
+        name: "2. Liga interregional",
+        divisionName: "Gruppe 3",
+        groupName: null,
+        source: "STANDINGS",
+      }),
+    ).toBe("2. Liga interregional · Gruppe 3");
   });
 });
 

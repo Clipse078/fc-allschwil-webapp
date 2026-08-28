@@ -140,3 +140,39 @@ export function formatTeamCompetitionDisplayLabel(
 
   return meaningful(display.shortName) ?? meaningful(display.name);
 }
+
+/**
+ * Formats standings competition context into one clean line, avoiding duplicate
+ * fragments when division/group repeat the competition name.
+ */
+export function formatTeamCompetitionContextLine(
+  display: TeamCompetitionDisplay | null,
+): string | null {
+  if (!display) {
+    return null;
+  }
+
+  const parts: string[] = [];
+  const seen = new Set<string>();
+
+  function appendPart(value: string | null | undefined) {
+    const normalized = meaningful(value);
+    if (!normalized) {
+      return;
+    }
+
+    const key = normalized.toLocaleLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+
+    seen.add(key);
+    parts.push(normalized);
+  }
+
+  appendPart(display.name);
+  appendPart(display.divisionName);
+  appendPart(display.groupName);
+
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
