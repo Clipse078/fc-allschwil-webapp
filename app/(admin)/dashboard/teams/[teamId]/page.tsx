@@ -10,6 +10,8 @@ import { getTeamTrainingSchedule } from "@/lib/teams/team-training-schedule";
 import { getOrgUnits } from "@/lib/org/queries";
 import { getEligibleCompetitions } from "@/lib/competitions/queries";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
+import { auth } from "@/auth";
+import { resolveTeamDocumentAccess } from "@/lib/teams/team-document-auth";
 
 type Props = {
   params: Promise<{
@@ -19,7 +21,19 @@ type Props = {
 
 export default async function TeamOverviewPage({ params }: Props) {
   const { teamId } = await params;
-  const { tenantId, team, canManage } = await requireTeamCockpitAccess(teamId);
+  const { tenantId, tenantKey, team, canManage } = await requireTeamCockpitAccess(teamId);
+
+  const session = await auth();
+  const photoAccess =
+    session?.user?.id != null
+      ? await resolveTeamDocumentAccess({
+          userId: session.user.id,
+          tenantId,
+          tenantKey,
+          teamId,
+        })
+      : null;
+  const canManagePhoto = photoAccess?.canManageDocuments ?? false;
 
   const activeSeason =
     team.teamSeasons.find((entry) => entry.id === team.currentTeamSeasonId) ?? null;
@@ -74,6 +88,7 @@ export default async function TeamOverviewPage({ params }: Props) {
       trainerCount={cockpitMetrics.trainerCount}
       formatConfig={formatConfig}
       canManage={canManage}
+      canManagePhoto={canManagePhoto}
       availableOrgUnits={availableOrgUnits.map((ou) => ({
         id: ou.id,
         name: ou.name,

@@ -228,6 +228,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
       infoboardTrainingDisplayName: true,
       infoboardMatchDisplayName: true,
       infoboardTournamentDisplayName: true,
+      photoUrl: true,
       slug: true,
       category: true,
       genderGroup: true,

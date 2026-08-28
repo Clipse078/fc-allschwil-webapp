@@ -3,7 +3,19 @@
  */
 
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), back: vi.fn(), push: vi.fn() }),
+}));
+
+vi.mock("next/image", () => ({
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} />
+  ),
+}));
+
 import TeamSportingSnapshot from "../TeamSportingSnapshot";
 import TeamTrainingSummary from "../TeamTrainingSummary";
 import TeamCompositionSummary from "../TeamCompositionSummary";
@@ -301,6 +313,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — overview regression", () => {
         trainerCount={2}
         formatConfig={FORMAT_CONFIG}
         canManage={false}
+        canManagePhoto={false}
         availableOrgUnits={[]}
         availableCompetitions={[]}
       />,
@@ -322,6 +335,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — overview regression", () => {
         trainerCount={2}
         formatConfig={FORMAT_CONFIG}
         canManage={false}
+        canManagePhoto={false}
         availableOrgUnits={[]}
         availableCompetitions={[]}
       />,
@@ -342,6 +356,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — overview regression", () => {
         trainerCount={2}
         formatConfig={FORMAT_CONFIG}
         canManage={true}
+        canManagePhoto={true}
         availableOrgUnits={[]}
         availableCompetitions={[]}
       />,
@@ -363,6 +378,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E — overview regression", () => {
         trainerCount={2}
         formatConfig={FORMAT_CONFIG}
         canManage={false}
+        canManagePhoto={false}
         availableOrgUnits={[]}
         availableCompetitions={[]}
       />,

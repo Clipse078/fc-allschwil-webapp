@@ -3,12 +3,21 @@ import { describe, expect, it } from "vitest";
 import {
   getExternalClubLogoKey,
   getExternalTeamLogoKey,
+  getTeamPhotoKey,
   getTenantLogoKey,
 } from "../tenant-paths";
 
 describe("getTenantLogoKey", () => {
   it("builds the tenant-scoped logo key", () => {
     expect(getTenantLogoKey("fc-allschwil", "png")).toBe("logos/fc-allschwil.png");
+  });
+});
+
+describe("getTeamPhotoKey", () => {
+  it("builds the tenant- and team-scoped photo key", () => {
+    expect(getTeamPhotoKey("fc-allschwil", "team-1", "jpg")).toBe(
+      "team-photos/fc-allschwil/team-1.jpg",
+    );
   });
 });
 

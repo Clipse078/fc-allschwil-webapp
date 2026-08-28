@@ -10,6 +10,7 @@ import TeamTrainingSummary from "./TeamTrainingSummary";
 import TeamCompositionSummary from "./TeamCompositionSummary";
 import TeamOverviewOperationalLinks from "./TeamOverviewOperationalLinks";
 import TeamOverviewSettingsSection from "./TeamOverviewSettingsSection";
+import TeamPhotoSection from "./TeamPhotoSection";
 
 type OrgUnitOption = {
   id: string;
@@ -33,6 +34,7 @@ type Team = {
   infoboardTrainingDisplayName: string | null;
   infoboardMatchDisplayName: string | null;
   infoboardTournamentDisplayName: string | null;
+  photoUrl?: string | null;
   slug: string;
   category: string;
   genderGroup: string | null;
@@ -68,6 +70,7 @@ type Props = {
   trainerCount: number;
   formatConfig: TenantFormatConfig;
   canManage: boolean;
+  canManagePhoto: boolean;
   availableOrgUnits: OrgUnitOption[];
   availableCompetitions: CompetitionOption[];
 };
@@ -86,11 +89,19 @@ export default function TeamCockpitOverviewContent({
   trainerCount,
   formatConfig,
   canManage,
+  canManagePhoto,
   availableOrgUnits,
   availableCompetitions,
 }: Props) {
   return (
     <div className="space-y-6" data-testid="team-cockpit-overview-content">
+      <TeamPhotoSection
+        teamId={team.id}
+        teamDisplayName={team.shortName ?? team.name}
+        initialPhotoUrl={team.photoUrl ?? null}
+        canManagePhoto={canManagePhoto}
+      />
+
       <TeamOverviewSettingsSection
         initialTeam={team}
         canManage={canManage}

@@ -1580,6 +1580,10 @@ model Team {
   /// Presentation-only. Falls back to infoboardDisplayName and canonical Team
   /// naming when unset. Never written by provider sync.
   infoboardTournamentDisplayName String?
+  /// TEAM-COCKPIT-PREMIUM-01K — optional public team photo (visual identity).
+  /// Tenant/team-owned, survives season rollover. Stored in public Vercel Blob.
+  /// Never written by provider sync. Distinct from private TeamDocument storage.
+  photoUrl                       String?
   // slug is unique per tenant (tenant-scoped) since TEAM-CORE-02.
   // Legacy global @unique dropped; replaced by @@unique([tenantId, slug]) below.
   // Queries must always scope by tenantId when resolving by slug.
