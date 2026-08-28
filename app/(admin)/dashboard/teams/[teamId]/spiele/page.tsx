@@ -4,7 +4,6 @@ import {
   getTeamCockpitSportingData,
   TEAM_COCKPIT_NEXT_MATCHES_DETAIL_LIMIT,
 } from "@/lib/teams/team-cockpit-sporting-data";
-import { getActiveTenant } from "@/lib/tenants/active-tenant";
 
 type Props = {
   params: Promise<{ teamId: string }>;
@@ -12,16 +11,17 @@ type Props = {
 
 export default async function TeamSpielePage({ params }: Props) {
   const { teamId } = await params;
-  const { tenantId, team } = await requireTeamCockpitAccess(teamId);
+  const { tenantId, team, tenant } = await requireTeamCockpitAccess(teamId);
 
   const activeSeason =
     team.teamSeasons.find((entry) => entry.id === team.currentTeamSeasonId) ?? null;
 
-  const [tenant, sportingData] = await Promise.all([
-    getActiveTenant(),
+  const sportingData =
     team.currentTeamSeasonId && activeSeason
-      ? getTeamCockpitSportingData({
+      ? await getTeamCockpitSportingData({
           tenantId,
+          tenantClubName: tenant.name,
+          tenantLogoUrl: tenant.logoUrl,
           teamId: team.id,
           teamSeasonId: team.currentTeamSeasonId,
           seasonKey: activeSeason.season.key,
@@ -39,8 +39,7 @@ export default async function TeamSpielePage({ params }: Props) {
             results: 0,
           },
         })
-      : Promise.resolve(null),
-  ]);
+      : null;
 
   return (
     <TeamUpcomingMatchesView

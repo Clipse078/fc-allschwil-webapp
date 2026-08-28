@@ -13,6 +13,7 @@ function createRow(overrides: Partial<TeamCockpitStandingsRow> = {}): TeamCockpi
     teamName: "FC Test",
     shortName: null,
     isCurrentTeam: false,
+    logoUrl: null,
     played: 10,
     won: 5,
     drawn: 2,

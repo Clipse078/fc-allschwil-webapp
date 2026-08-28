@@ -52,7 +52,9 @@ export async function getTeamTrainingSchedule(
       (allocation) => classifyFacilityResourceType(allocation.facilityResourceType) === "PITCH_HALL",
     );
     const locationLabel =
-      pitchAllocation?.facilityResourceCode ?? pitchAllocation?.facilityResourceName ?? null;
+      pitchAllocation?.facilityResourceName?.trim() ||
+      pitchAllocation?.facilityResourceCode?.trim() ||
+      null;
 
     for (const schedule of series.weekdaySchedules) {
       entries.push({

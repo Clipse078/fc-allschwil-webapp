@@ -8,6 +8,7 @@ import {
   isSportingMatchPastKickoff,
   type SportingMatchLifecycle,
 } from "@/lib/sporting-data/lifecycle";
+import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
 
 export type TeamMatchPerspectiveSide = "HOME" | "AWAY";
 
@@ -17,6 +18,8 @@ export interface TeamMatchSideIdentity {
   canonicalTeamId: string | null;
   canonicalExternalTeamId: string | null;
   displayName: string;
+  clubName: string | null;
+  externalLogoUrl: string | null;
   providerTeamId: number | null;
   providerTeamName: string | null;
 }
@@ -105,6 +108,11 @@ interface TeamMatchExternalTeamRecord {
   name: string;
   shortName: string | null;
   alternativeName: string | null;
+  logoUrl: string | null;
+  externalClub: {
+    name: string;
+    logoUrl: string | null;
+  };
 }
 
 interface TeamMatchMappingRecord {
@@ -228,6 +236,13 @@ const teamMatchRelations = {
           name: true,
           shortName: true,
           alternativeName: true,
+          logoUrl: true,
+          externalClub: {
+            select: {
+              name: true,
+              logoUrl: true,
+            },
+          },
         },
       },
       awayExternalTeam: {
@@ -236,6 +251,13 @@ const teamMatchRelations = {
           name: true,
           shortName: true,
           alternativeName: true,
+          logoUrl: true,
+          externalClub: {
+            select: {
+              name: true,
+              logoUrl: true,
+            },
+          },
         },
       },
     },
@@ -317,6 +339,13 @@ function toSideIdentity(input: {
     canonicalTeamId: input.canonicalTeam?.id ?? null,
     canonicalExternalTeamId: input.canonicalExternalTeam?.id ?? null,
     displayName: resolvedName || input.fallbackName.trim() || "Unknown team",
+    clubName: input.canonicalExternalTeam?.externalClub?.name ?? null,
+    externalLogoUrl: input.canonicalExternalTeam
+      ? resolveExternalTeamLogoUrl(
+          input.canonicalExternalTeam,
+          input.canonicalExternalTeam.externalClub ?? { logoUrl: null },
+        )
+      : null,
     providerTeamId: input.providerTeamId,
     providerTeamName: input.providerTeamName,
   };

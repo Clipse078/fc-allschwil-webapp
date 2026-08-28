@@ -141,6 +141,14 @@ beforeEach(() => {
   mocks.requireTeamCockpitAccess.mockResolvedValue({
     tenantId: TENANT_ID,
     tenantKey: "tenant-a",
+    tenant: {
+      id: TENANT_ID,
+      key: "tenant-a",
+      name: "FC Test",
+      logoUrl: "/tenant-crest.svg",
+      locale: "de-CH",
+      timezone: "Europe/Zurich",
+    },
     team: TEAM_FIXTURE,
     canManage: true,
     canDelete: true,
@@ -208,6 +216,8 @@ describe("TEAM-COCKPIT-PREMIUM-01E — Team overview page", () => {
     expect(mocks.getTeamCockpitSportingData).toHaveBeenCalledWith(
       expect.objectContaining({
         tenantId: TENANT_ID,
+        tenantClubName: "FC Test",
+        tenantLogoUrl: "/tenant-crest.svg",
         teamId: TEAM_ID,
         teamSeasonId: "ts-1",
         limits: { nextMatches: 1, results: 1 },

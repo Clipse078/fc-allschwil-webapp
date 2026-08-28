@@ -56,6 +56,8 @@ function createSide(
     canonicalTeamId: TEAM_ID,
     canonicalExternalTeamId: null,
     displayName: "FC Example E1",
+    clubName: null,
+    externalLogoUrl: null,
     providerTeamId: null,
     providerTeamName: null,
     ...overrides,

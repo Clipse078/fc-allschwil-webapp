@@ -1,5 +1,6 @@
 import type { TeamCockpitMatch } from "@/lib/teams/team-cockpit-sporting-data";
 import type { TenantFormatConfig } from "@/lib/tenant-runtime/formatters";
+import SportingTeamLogo from "@/components/shared/SportingTeamLogo";
 import {
   formatFixtureDateLine,
   formatFixtureTime,
@@ -47,13 +48,25 @@ export default function TeamUpcomingMatchRow({ match, formatConfig }: Props) {
       </div>
 
       <div className="min-w-0 space-y-1">
-        <p className={teamNameClassName(match.home.isOwnTeam)} data-testid="team-upcoming-home">
-          {match.home.displayName}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <SportingTeamLogo logoUrl={match.home.logoUrl} />
+          <p
+            className={teamNameClassName(match.home.isOwnTeam)}
+            data-testid="team-upcoming-home"
+          >
+            {match.home.displayName}
+          </p>
+        </div>
         <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">vs</p>
-        <p className={teamNameClassName(match.away.isOwnTeam)} data-testid="team-upcoming-away">
-          {match.away.displayName}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <SportingTeamLogo logoUrl={match.away.logoUrl} />
+          <p
+            className={teamNameClassName(match.away.isOwnTeam)}
+            data-testid="team-upcoming-away"
+          >
+            {match.away.displayName}
+          </p>
+        </div>
         <p
           className="pt-1 text-xs font-medium text-[var(--text-2)]"
           data-testid={`team-upcoming-homeaway-${match.eventId}`}

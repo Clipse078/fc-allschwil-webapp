@@ -16,6 +16,15 @@ import {
 const TEAM_ID = "team-1";
 const FORMAT_CONFIG = { locale: "de-CH", timezone: "Europe/Zurich" };
 
+function createSide(displayName: string, isOwnTeam: boolean) {
+  return {
+    displayName,
+    isOwnTeam,
+    clubName: isOwnTeam ? "FC Allschwil" : displayName,
+    logoUrl: isOwnTeam ? "/tenant-crest.svg" : "/opponent-crest.svg",
+  };
+}
+
 function createResult(overrides: Partial<TeamCockpitResult> = {}): TeamCockpitResult {
   return {
     eventId: "event-1",
@@ -24,8 +33,8 @@ function createResult(overrides: Partial<TeamCockpitResult> = {}): TeamCockpitRe
     status: "COMPLETED",
     lifecycle: "COMPLETED",
     opponentName: "FC Example",
-    home: { displayName: "FC Allschwil", isOwnTeam: true },
-    away: { displayName: "FC Example", isOwnTeam: false },
+    home: createSide("1. Mannschaft", true),
+    away: createSide("FC Example", false),
     venueName: "Im Brüel",
     location: "Im Brüel",
     competitionName: "Junioren A Promotion",
@@ -49,7 +58,7 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
         eventId: "event-older",
         startAt: new Date("2026-07-10T16:00:00.000Z"),
         opponentName: "FC Older",
-        away: { displayName: "FC Older", isOwnTeam: false },
+        away: createSide("FC Older", false),
         scoreHome: 0,
         scoreAway: 3,
         teamScore: 0,
@@ -83,7 +92,7 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
     );
 
     const row = screen.getByTestId("team-result-event-1");
-    expect(within(row).getByTestId("team-result-home")).toHaveTextContent("FC Allschwil");
+    expect(within(row).getByTestId("team-result-home")).toHaveTextContent("1. Mannschaft");
     expect(within(row).getByTestId("team-result-away")).toHaveTextContent("FC Example");
     expect(within(row).getByTestId("team-result-homeaway-event-1")).toHaveTextContent("Heim");
   });
@@ -92,8 +101,8 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
     const awayResult = createResult({
       eventId: "event-away",
       side: "AWAY",
-      home: { displayName: "FC Example", isOwnTeam: false },
-      away: { displayName: "FC Allschwil", isOwnTeam: true },
+      home: createSide("FC Example", false),
+      away: createSide("1. Mannschaft", true),
     });
 
     render(
@@ -106,7 +115,7 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
 
     const row = screen.getByTestId("team-result-event-away");
     expect(within(row).getByTestId("team-result-home")).toHaveTextContent("FC Example");
-    expect(within(row).getByTestId("team-result-away")).toHaveTextContent("FC Allschwil");
+    expect(within(row).getByTestId("team-result-away")).toHaveTextContent("1. Mannschaft");
     expect(within(row).getByTestId("team-result-homeaway-event-away")).toHaveTextContent(
       "Auswärts",
     );
@@ -137,8 +146,8 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
     const awayWin = createResult({
       eventId: "away-win",
       side: "AWAY",
-      home: { displayName: "FC Example", isOwnTeam: false },
-      away: { displayName: "FC Allschwil", isOwnTeam: true },
+      home: createSide("FC Example", false),
+      away: createSide("1. Mannschaft", true),
       scoreHome: 1,
       scoreAway: 3,
       teamScore: 3,
@@ -156,6 +165,63 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
 
     expect(screen.getByTestId("team-result-score-away-win")).toHaveTextContent("1 : 3");
     expect(screen.getByTestId("team-result-perspective-away-win")).toHaveTextContent("Sieg");
+  });
+
+  it("renders both crests in home/away order without changing away perspective", () => {
+    const awayWin = createResult({
+      eventId: "crest-order",
+      side: "AWAY",
+      home: {
+        ...createSide("Zürich City SC 1", false),
+        logoUrl: "/zurich-crest.svg",
+      },
+      away: createSide("1. Mannschaft", true),
+      scoreHome: 4,
+      scoreAway: 1,
+      teamScore: 1,
+      opponentScore: 4,
+      resultPerspective: "LOST",
+    });
+
+    render(
+      <TeamResultsView
+        results={[awayWin]}
+        seasonName="2026/2027"
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    const row = screen.getByTestId("team-result-crest-order");
+    expect(
+      Array.from(row.querySelectorAll("img"), (logo) => logo.getAttribute("src")),
+    ).toEqual(["/zurich-crest.svg", "/tenant-crest.svg"]);
+    expect(within(row).getByTestId("team-result-score-crest-order")).toHaveTextContent(
+      "4 : 1",
+    );
+    expect(within(row).getByTestId("team-result-perspective-crest-order")).toHaveTextContent(
+      "Niederlage",
+    );
+  });
+
+  it("uses a fallback without changing result semantics when a crest is missing", () => {
+    render(
+      <TeamResultsView
+        results={[
+          createResult({
+            away: { ...createSide("No Crest FC", false), logoUrl: null },
+          }),
+        ]}
+        seasonName="2026/2027"
+        formatConfig={FORMAT_CONFIG}
+      />,
+    );
+
+    const row = screen.getByTestId("team-result-event-1");
+    expect(row.querySelector("svg")).toBeInTheDocument();
+    expect(within(row).getByTestId("team-result-score-event-1")).toHaveTextContent(
+      "2 : 1",
+    );
+    expect(row).toHaveAttribute("data-perspective", "WON");
   });
 
   it("F. maps WON to Sieg", () => {
@@ -317,8 +383,8 @@ describe("TEAM-COCKPIT-PREMIUM-01G — TeamResultsView", () => {
     const latestResult = createResult({
       eventId: "latest",
       side: "AWAY",
-      home: { displayName: "FC Example", isOwnTeam: false },
-      away: { displayName: "FC Allschwil", isOwnTeam: true },
+      home: createSide("FC Example", false),
+      away: createSide("1. Mannschaft", true),
       scoreHome: 1,
       scoreAway: 2,
       teamScore: 2,
