@@ -16,7 +16,7 @@
  * distinguish the two assignment slots.
  */
 
-import { useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, DoorOpen } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type {
@@ -55,19 +55,34 @@ function formatClockTime(iso: string): string {
   }
 }
 
-// ── OccupiedRoomChip — very compact occupied display ──────────────────────────
+// ── OccupiedRoomChip — compact occupied display, selectable with confirm ─────
 
 function OccupiedRoomChip({
   resourceName,
   resourceId,
   annotation,
+  isSelected,
+  disabled,
+  onSelect,
+  onDeselect,
   testId,
 }: {
   resourceName: string;
   resourceId: string;
   annotation: ResourceAvailabilityAnnotation | undefined;
+  isSelected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
   testId?: string;
 }) {
+  const [pendingOccupiedConfirm, setPendingOccupiedConfirm] = useState(false);
+  const isSharedSelection = isSelected;
+
+  useEffect(() => {
+    if (isSelected) setPendingOccupiedConfirm(false);
+  }, [isSelected, resourceId]);
+
   const conflictTime =
     annotation?.conflictStartAt && annotation?.conflictEndAt
       ? `${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
@@ -76,25 +91,99 @@ function OccupiedRoomChip({
   const rawLabel = annotation?.conflictLabel ?? null;
   const shortLabel = rawLabel && rawLabel.length > 28 ? rawLabel.slice(0, 26) + "…" : rawLabel;
 
+  const handleClick = () => {
+    if (disabled) return;
+    if (isSelected) {
+      onDeselect();
+      setPendingOccupiedConfirm(false);
+      return;
+    }
+    setPendingOccupiedConfirm(true);
+  };
+
+  const handleConfirmAssign = () => {
+    onSelect();
+    setPendingOccupiedConfirm(false);
+  };
+
   return (
-    <div
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
       data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
-      className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50/60 px-2.5 py-1.5"
+      aria-pressed={isSelected}
+      aria-label={`${resourceName} Belegt`}
       title={rawLabel ?? undefined}
+      className={cn(
+        "flex w-full items-start gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-all",
+        isSharedSelection
+          ? "border-amber-400 bg-amber-50/70 ring-1 ring-amber-300"
+          : pendingOccupiedConfirm
+            ? "border-amber-300 bg-amber-50/60 ring-1 ring-amber-200"
+            : "border-rose-200 bg-rose-50/60 hover:border-amber-300",
+        disabled ? "cursor-default opacity-50" : "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1",
+      )}
     >
-      <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-500 inline-block" />
-      <div className="min-w-0">
+      <span
+        className={cn(
+          "mt-1 h-1.5 w-1.5 shrink-0 rounded-full inline-block",
+          isSharedSelection ? "bg-amber-500" : "bg-rose-500",
+        )}
+      />
+      <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5 flex-wrap">
           <span className="text-xs font-semibold text-[var(--foreground)]">{resourceName}</span>
-          <span className="text-[10px] font-medium text-rose-600">Belegt</span>
+          {isSharedSelection ? (
+            <span className="text-[10px] font-medium text-amber-700">Mehrfachbelegung</span>
+          ) : (
+            <span className="text-[10px] font-medium text-rose-600">Belegt</span>
+          )}
         </div>
         {(shortLabel || conflictTime) && (
-          <p className="text-[10px] text-rose-700 leading-tight truncate">
+          <p
+            className={cn(
+              "text-[10px] leading-tight truncate",
+              isSharedSelection ? "text-amber-800" : "text-rose-700",
+            )}
+          >
             {[shortLabel, conflictTime].filter(Boolean).join(" · ")}
           </p>
         )}
+        {pendingOccupiedConfirm && !isSelected && (
+          <div className="mt-1 space-y-0.5" data-testid={testId ? `${testId}-occupied-confirm-${resourceId}` : undefined}>
+            <p className="text-[10px] leading-tight text-amber-800">
+              {resourceName} ist in diesem Zeitraum bereits belegt.
+            </p>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleConfirmAssign();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleConfirmAssign();
+                }
+              }}
+              className="inline-flex text-[10px] font-semibold text-[var(--sce-primary)] underline underline-offset-2"
+              data-testid={testId ? `${testId}-assign-anyway-${resourceId}` : undefined}
+            >
+              Trotzdem zuweisen
+            </span>
+          </div>
+        )}
+        {isSharedSelection && (
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--sce-primary)]">
+            <Check className="h-2.5 w-2.5" />
+            Gewählt
+          </span>
+        )}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -237,7 +326,7 @@ function AvailabilitySummary({
     <p className="inline-flex items-center gap-2 text-xs font-medium">
       <span className="flex items-center gap-1 text-emerald-600">
         <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-        {free} verfügbar
+        {free} frei
       </span>
       {occupied > 0 && (
         <>
@@ -314,6 +403,10 @@ export function VisualDressingRoomPicker({
               resourceName={r.name}
               resourceId={r.id}
               annotation={availabilityByResourceId.get(r.id)}
+              isSelected={selectedResourceIds.has(r.id)}
+              disabled={disabled}
+              onSelect={() => handleSelect(r.id)}
+              onDeselect={() => onDeselect(r.id)}
               testId={testId}
             />
           ))}

@@ -25,6 +25,7 @@ import {
   WeekplannerPlanAllocationArchivedResourceError,
   WeekplannerPlanAllocationArchivedFacilityError,
   WeekplannerPlanAllocationDuplicateError,
+  WeekplannerPlanAllocationOccupancyValidationError,
 } from "@/lib/weekplanner/plan-errors";
 
 const VIEW_PERMISSIONS = [
@@ -94,6 +95,8 @@ export async function POST(request: NextRequest, { params }: Params) {
       participantId: typeof body.participantId === "string" ? body.participantId.trim() || null : null,
       facilityResourceId: body.facilityResourceId.trim(),
       notes: typeof body.notes === "string" ? body.notes.trim() || null : null,
+      occupancyBeforeMinutes: body.occupancyBeforeMinutes,
+      occupancyAfterMinutes: body.occupancyAfterMinutes,
     });
     return NextResponse.json({ allocation }, { status: 201 });
   } catch (err) {
@@ -123,6 +126,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     }
     if (err instanceof WeekplannerPlanAllocationDuplicateError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof WeekplannerPlanAllocationOccupancyValidationError) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
     }
     throw err;
   }

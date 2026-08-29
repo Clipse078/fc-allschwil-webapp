@@ -34,6 +34,8 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
+import { getActiveWochenplanPlan } from "@/lib/wochenplan/plan-service";
+import { resolvePublicWeekplannerPlan } from "@/lib/wochenplan/public-plan-resolution";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@prisma/client";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import { zonedDateKey, WEEKPLANNER_DEFAULT_TIMEZONE } from "./date";
@@ -44,6 +46,7 @@ import type {
   CreateWeekplannerPlanInput,
   CreateWeekplannerPlanAllocationInput,
   SetWeekplannerPlanActivityTimeOverrideInput,
+  UpdateWeekplannerPlanAllocationInput,
 } from "./plan-types";
 import {
   WeekplannerPlanNotFoundError,
@@ -60,8 +63,10 @@ import {
   WeekplannerPlanAllocationResourceNotFoundError,
   WeekplannerPlanAllocationArchivedResourceError,
   WeekplannerPlanAllocationArchivedFacilityError,
+  WeekplannerPlanAllocationOccupancyValidationError,
   WeekplannerPlanTimeOverrideInvalidRangeError,
 } from "./plan-errors";
+import { validatePlanOccupancyMinutes } from "./plan-allocation-semantics";
 
 const MAX_NAME_LENGTH = 100;
 const WEEK_ID_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -78,6 +83,7 @@ type PlanRow = {
   updatedAt: Date;
   archivedAt: Date | null;
   isActive: boolean;
+  wochenplanPlanId: string | null;
   _count?: { allocations: number };
 };
 
@@ -92,6 +98,8 @@ type AllocationRow = {
   facilityResourceId: string;
   notes: string | null;
   displayOrder: number;
+  occupancyBeforeMinutes: number;
+  occupancyAfterMinutes: number;
   createdAt: Date;
   updatedAt: Date;
   facilityResource: {
@@ -128,6 +136,7 @@ function planToDto(row: PlanRow): WeekplannerPlanDto {
     updatedAt: row.updatedAt.toISOString(),
     archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
     isActive: row.isActive,
+    wochenplanPlanId: row.wochenplanPlanId,
   };
 }
 
@@ -148,9 +157,25 @@ function allocationToDto(row: AllocationRow): WeekplannerPlanAllocationDto {
     facilityName: row.facilityResource.facility.name,
     notes: row.notes,
     displayOrder: row.displayOrder,
+    occupancyBeforeMinutes: row.occupancyBeforeMinutes,
+    occupancyAfterMinutes: row.occupancyAfterMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function parseOccupancyFields(
+  input: { occupancyBeforeMinutes?: number | null; occupancyAfterMinutes?: number | null },
+): { occupancyBeforeMinutes: number; occupancyAfterMinutes: number } {
+  try {
+    return {
+      occupancyBeforeMinutes: validatePlanOccupancyMinutes(input.occupancyBeforeMinutes, "occupancyBeforeMinutes"),
+      occupancyAfterMinutes: validatePlanOccupancyMinutes(input.occupancyAfterMinutes, "occupancyAfterMinutes"),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new WeekplannerPlanAllocationOccupancyValidationError(message);
+  }
 }
 
 // ── Validation helpers ────────────────────────────────────────────────────
@@ -292,6 +317,50 @@ async function requireNameAvailable(
   }
 }
 
+/** WOCHENPLAN-2.0-01E — validates a tenant-level WochenplanPlan link target. */
+async function requireWochenplanPlanLink(
+  tenantId: string,
+  wochenplanPlanId: string,
+): Promise<void> {
+  const definition = await prisma.wochenplanPlan.findFirst({
+    where: { id: wochenplanPlanId, tenantId, archivedAt: null },
+    select: { id: true, isDefault: true },
+  });
+  if (!definition) {
+    throw new WeekplannerPlanValidationError(
+      `WochenplanPlan "${wochenplanPlanId}" not found or archived for this tenant`,
+    );
+  }
+  if (definition.isDefault) {
+    throw new WeekplannerPlanValidationError(
+      "The default WochenplanPlan does not require a week-scoped WeekplannerPlan — use Standardplan",
+    );
+  }
+}
+
+async function requireWochenplanPlanLinkAvailable(
+  tenantId: string,
+  weekId: string,
+  wochenplanPlanId: string,
+  excludePlanId?: string,
+): Promise<void> {
+  const conflict = await prisma.weekplannerPlan.findFirst({
+    where: {
+      tenantId,
+      weekId,
+      wochenplanPlanId,
+      archivedAt: null,
+      ...(excludePlanId ? { id: { not: excludePlanId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (conflict) {
+    throw new WeekplannerPlanValidationError(
+      `A week plan for WochenplanPlan "${wochenplanPlanId}" already exists for week ${weekId}`,
+    );
+  }
+}
+
 async function requireAllocation(tenantId: string, allocationId: string): Promise<AllocationRow> {
   const allocation = await prisma.weekplannerPlanAllocation.findFirst({
     where: { id: allocationId, tenantId },
@@ -328,6 +397,12 @@ export async function createWeekplannerPlan(
   const name = validatePlanName(input.name);
   await requireNameAvailable(tenantId, weekId, name);
 
+  const wochenplanPlanId = input.wochenplanPlanId?.trim() || null;
+  if (wochenplanPlanId) {
+    await requireWochenplanPlanLink(tenantId, wochenplanPlanId);
+    await requireWochenplanPlanLinkAvailable(tenantId, weekId, wochenplanPlanId);
+  }
+
   try {
     const plan = await prisma.weekplannerPlan.create({
       data: {
@@ -335,12 +410,18 @@ export async function createWeekplannerPlan(
         weekId,
         name,
         createdByUserId: input.createdByUserId ?? null,
+        wochenplanPlanId,
       },
     });
     return planToDto(plan);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("unique") || message.includes("Unique")) {
+      if (wochenplanPlanId) {
+        throw new WeekplannerPlanValidationError(
+          `A week plan for WochenplanPlan "${wochenplanPlanId}" already exists for week ${weekId}`,
+        );
+      }
       throw new WeekplannerPlanNameConflictError(name);
     }
     throw err;
@@ -503,22 +584,25 @@ export async function deactivateWeekplannerPlan(tenantId: string, planId: string
 }
 
 /**
- * Canonical read resolver for which plan is OPERATIONALLY active for a
- * tenant+week — the contract future Infoboard/Website publication
- * consumers resolve against (not wired in this slice).
+ * Canonical read resolver for which plan is operationally active for a
+ * tenant+week. Resolves from the tenant-level active WochenplanPlan
+ * (WochenplanPlan.isActive) — the same source as the public website feed.
  *
- * Returns null when Standardplan is operationally active (no active
- * alternative plan exists), or the active WeekplannerPlan otherwise. Never
- * returns an archived plan.
+ * Returns null when Standardplan is operationally active (default active plan
+ * or no linked materialized week instance), or the linked WeekplannerPlan
+ * otherwise. Never returns an archived plan.
  */
 export async function getOperationalWeekplannerPlan(
   tenantId: string,
   weekId: string,
 ): Promise<WeekplannerPlanDto | null> {
-  const plan = await prisma.weekplannerPlan.findFirst({
-    where: { tenantId, weekId, isActive: true, archivedAt: null },
-  });
-  return plan ? planToDto(plan) : null;
+  const activeWochenplanPlan = await getActiveWochenplanPlan(tenantId);
+  const resolved = await resolvePublicWeekplannerPlan(tenantId, weekId, activeWochenplanPlan);
+  if (!resolved.weekplannerPlanId) {
+    return null;
+  }
+
+  return getWeekplannerPlan(tenantId, resolved.weekplannerPlanId);
 }
 
 // ── Public API — WeekplannerPlanAllocation (overrides) ────────────────────
@@ -549,6 +633,7 @@ export async function createWeekplannerPlanAllocation(
 ): Promise<WeekplannerPlanAllocationDto> {
   const { weekplannerPlanId, activityType, activityId, allocationGroup, facilityResourceId, notes, displayOrder } =
     input;
+  const occupancy = parseOccupancyFields(input);
 
   await requireActivePlan(tenantId, weekplannerPlanId);
   await requireActivityInTenant(tenantId, activityType, activityId);
@@ -606,6 +691,8 @@ export async function createWeekplannerPlanAllocation(
         facilityResourceId,
         notes: notes ?? null,
         displayOrder: order,
+        occupancyBeforeMinutes: occupancy.occupancyBeforeMinutes,
+        occupancyAfterMinutes: occupancy.occupancyAfterMinutes,
       },
       include: allocationInclude,
     });
@@ -627,6 +714,47 @@ export async function createWeekplannerPlanAllocation(
 export async function deleteWeekplannerPlanAllocation(tenantId: string, allocationId: string): Promise<void> {
   await requireAllocation(tenantId, allocationId);
   await prisma.weekplannerPlanAllocation.delete({ where: { id: allocationId } });
+}
+
+export async function updateWeekplannerPlanAllocation(
+  tenantId: string,
+  allocationId: string,
+  input: UpdateWeekplannerPlanAllocationInput,
+): Promise<WeekplannerPlanAllocationDto> {
+  const existing = await requireAllocation(tenantId, allocationId);
+  await requireActivePlan(tenantId, existing.weekplannerPlanId);
+
+  const data: {
+    notes?: string | null;
+    displayOrder?: number;
+    occupancyBeforeMinutes?: number;
+    occupancyAfterMinutes?: number;
+  } = {};
+
+  if (input.notes !== undefined) data.notes = input.notes ?? null;
+  if (input.displayOrder !== undefined) data.displayOrder = input.displayOrder;
+
+  if (input.occupancyBeforeMinutes !== undefined || input.occupancyAfterMinutes !== undefined) {
+    const occupancy = parseOccupancyFields({
+      occupancyBeforeMinutes:
+        input.occupancyBeforeMinutes !== undefined
+          ? input.occupancyBeforeMinutes
+          : existing.occupancyBeforeMinutes,
+      occupancyAfterMinutes:
+        input.occupancyAfterMinutes !== undefined
+          ? input.occupancyAfterMinutes
+          : existing.occupancyAfterMinutes,
+    });
+    data.occupancyBeforeMinutes = occupancy.occupancyBeforeMinutes;
+    data.occupancyAfterMinutes = occupancy.occupancyAfterMinutes;
+  }
+
+  const allocation = await prisma.weekplannerPlanAllocation.update({
+    where: { id: allocationId },
+    data,
+    include: allocationInclude,
+  });
+  return allocationToDto(allocation as unknown as AllocationRow);
 }
 
 // ── Public API — WeekplannerPlanActivityOverride (WEEKPLANNER-01D time overrides) ──

@@ -127,6 +127,28 @@ function checkType(
   return null;
 }
 
+// ── Shared home-match location semantics (Infoboard + public Wochenplan) ─────
+
+/**
+ * Canonical HOME/AWAY eligibility for facility-relevant match surfacing.
+ *
+ * Shared by Infoboard Screen 1/2 and the public Wochenplan current-week feed
+ * so both surfaces agree on which matches are home-hosted at the tenant
+ * facility. Does not evaluate visibility flags — callers layer those on top.
+ */
+export function evaluateHomeMatchLocation(homeAway: string | null): PublicationDecision {
+  const normalized = homeAway != null ? homeAway.trim().toUpperCase() : null;
+
+  if (normalized === "HOME") {
+    return { eligible: true, reason: "ELIGIBLE" };
+  }
+  if (normalized === "AWAY") {
+    return { eligible: false, reason: "AWAY_MATCH" };
+  }
+  // null, blank, NEUTRAL, or any unrecognised value
+  return { eligible: false, reason: "HOME_AWAY_UNKNOWN" };
+}
+
 // ── Infoboard shared policy (Screen 1 and Screen 2) ───────────────────────────
 
 function evaluateInfoboard(
@@ -147,17 +169,7 @@ function evaluateInfoboard(
   }
 
   if (event.type === "MATCH") {
-    const normalized =
-      event.homeAway != null ? event.homeAway.trim().toUpperCase() : null;
-
-    if (normalized === "HOME") {
-      return { eligible: true, reason: "ELIGIBLE" };
-    }
-    if (normalized === "AWAY") {
-      return { eligible: false, reason: "AWAY_MATCH" };
-    }
-    // null, blank, NEUTRAL, or any unrecognised value
-    return { eligible: false, reason: "HOME_AWAY_UNKNOWN" };
+    return evaluateHomeMatchLocation(event.homeAway);
   }
 
   // TRAINING and TOURNAMENT: a visible event is eligible.

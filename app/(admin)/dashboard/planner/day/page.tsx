@@ -129,6 +129,8 @@ async function buildOverridesByKey(
       facilityResourceId: allocation.facilityResourceId,
       facilityResourceName: allocation.facilityResourceName,
       facilityResourceCode: allocation.facilityResourceCode,
+      occupancyBeforeMinutes: allocation.occupancyBeforeMinutes,
+      occupancyAfterMinutes: allocation.occupancyAfterMinutes,
     });
     byKey[key] = list;
   }

@@ -42,6 +42,8 @@ function overrideRow(overrides: Partial<WeekplannerOverrideRow> = {}): Weekplann
     facilityResourceId: "res-halle",
     facilityResourceName: "Halle Gartenhof",
     facilityResourceCode: "HALLE",
+    occupancyBeforeMinutes: 0,
+    occupancyAfterMinutes: 0,
     ...overrides,
   };
 }

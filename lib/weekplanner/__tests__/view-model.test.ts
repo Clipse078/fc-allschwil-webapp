@@ -20,9 +20,30 @@ const WEEK_DAYS = [
   "2026-08-16",
 ];
 
-const PITCH = { facilityResourceId: "res-pitch-1", code: "KUNSTRASEN_1", name: "Kunstrasen 1", facilityName: "Sportanlage" };
-const ROOM_A = { facilityResourceId: "res-room-a", code: "G1", name: "Garderobe 1", facilityName: "Garderobentrakt" };
-const ROOM_B = { facilityResourceId: "res-room-b", code: "G2", name: "Garderobe 2", facilityName: "Garderobentrakt" };
+const PITCH = {
+  facilityResourceId: "res-pitch-1",
+  code: "KUNSTRASEN_1",
+  name: "Kunstrasen 1",
+  facilityName: "Sportanlage",
+  occupancyBeforeMinutes: 0,
+  occupancyAfterMinutes: 0,
+};
+const ROOM_A = {
+  facilityResourceId: "res-room-a",
+  code: "G1",
+  name: "Garderobe 1",
+  facilityName: "Garderobentrakt",
+  occupancyBeforeMinutes: 0,
+  occupancyAfterMinutes: 0,
+};
+const ROOM_B = {
+  facilityResourceId: "res-room-b",
+  code: "G2",
+  name: "Garderobe 2",
+  facilityName: "Garderobentrakt",
+  occupancyBeforeMinutes: 0,
+  occupancyAfterMinutes: 0,
+};
 
 function trainingItem(overrides: Partial<WeekplannerTrainingItem> = {}): WeekplannerTrainingItem {
   return {
@@ -121,6 +142,48 @@ describe("detectWeekplannerConflicts", () => {
     const training = trainingItem();
     const [flagged] = detectWeekplannerConflicts([training]);
     expect(flagged.conflicts).toEqual([]);
+  });
+
+  it("detects dressing-room occupancy overlap when event windows only touch", () => {
+    const training = trainingItem({
+      startAt: new Date("2026-08-10T15:00:00.000Z"),
+      endAt: new Date("2026-08-10T16:30:00.000Z"),
+      dressingRoomAllocations: [{ ...ROOM_A, occupancyBeforeMinutes: 45, occupancyAfterMinutes: 30 }],
+    });
+    const match = matchItem({
+      startAt: new Date("2026-08-10T16:30:00.000Z"),
+      endAt: new Date("2026-08-10T18:00:00.000Z"),
+      dressingRoomAllocations: [{ ...ROOM_A, occupancyBeforeMinutes: 60, occupancyAfterMinutes: 45 }],
+    });
+
+    const [, flaggedMatch] = detectWeekplannerConflicts([training, match]);
+    expect(flaggedMatch.conflicts).toEqual([
+      { facilityResourceId: ROOM_A.facilityResourceId, facilityResourceName: ROOM_A.name },
+    ]);
+  });
+
+  it("uses effective plan time override with occupancy buffers", () => {
+    const training = trainingItem({
+      startAt: new Date("2026-08-10T15:30:00.000Z"),
+      endAt: new Date("2026-08-10T17:00:00.000Z"),
+      canonicalStartAt: new Date("2026-08-10T15:00:00.000Z"),
+      canonicalEndAt: new Date("2026-08-10T16:30:00.000Z"),
+      timeOverridden: true,
+      pitchAllocations: [{ ...PITCH, facilityResourceId: "res-pitch-plan", code: "PLAN_PITCH" }],
+      dressingRoomAllocations: [{ ...ROOM_A, occupancyBeforeMinutes: 45, occupancyAfterMinutes: 30 }],
+    });
+    const other = trainingItem({
+      id: "training:s2",
+      trainingSessionId: "s2",
+      title: "F3 Training",
+      startAt: new Date("2026-08-10T15:00:00.000Z"),
+      endAt: new Date("2026-08-10T16:00:00.000Z"),
+      pitchAllocations: [{ ...PITCH, facilityResourceId: "res-pitch-other", code: "OTHER_PITCH" }],
+      dressingRoomAllocations: [ROOM_B],
+    });
+
+    const [flaggedTraining] = detectWeekplannerConflicts([training, other]);
+    expect(flaggedTraining.conflicts).toEqual([]);
   });
 });
 

@@ -9,6 +9,7 @@
  * Planning already resolve:
  *
  *   getOperationalWeekplannerPlan(tenantId, weekId)  (lib/weekplanner/plan-service.ts)
+ *     -> resolves from WochenplanPlan.isActive via resolvePublicWeekplannerPlan
  *     -> null                => Standardplan is operationally active
  *     -> WeekplannerPlanDto  => that plan is operationally active
  *   getWeekplannerDay(tenantId, dayWindow, planId)   (lib/weekplanner/queries.ts)

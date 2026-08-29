@@ -23,8 +23,21 @@
 import { useEffect, useState } from "react";
 import type { ResourceAvailabilityAnnotation } from "@/components/admin/training/FacilityResourceSelector";
 
-/** Shape of one row in GET /api/facilities/availability's `availability` array. */
-type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & { resourceId: string; resourceCode: string };
+type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & {
+  resourceId: string;
+  resourceCode: string;
+  conflicts?: Array<{ label: string; startAt: string; endAt: string }>;
+};
+
+function rowToAnnotation(row: ResourceAvailabilityRow): ResourceAvailabilityAnnotation {
+  return {
+    status: row.status,
+    conflictLabel: row.conflictLabel,
+    conflictStartAt: row.conflictStartAt,
+    conflictEndAt: row.conflictEndAt,
+    conflicts: row.conflicts,
+  };
+}
 
 export type UseFacilityAvailabilityOptions = {
   /** Gate — e.g. `homeAway === "HOME"`. When false, no fetch runs and both maps are cleared. */
@@ -36,6 +49,13 @@ export type UseFacilityAvailabilityOptions = {
   excludeEventId?: string;
   /** Excludes this TrainingSession's own occurrence (TrainingSession edit-mode self-exclusion). */
   excludeTrainingSessionId?: string;
+  /** WOCHENPLAN-2.0-01H-E2 — prospective occupancy buffers for the query window. */
+  occupancyBeforeMinutes?: number;
+  occupancyAfterMinutes?: number;
+  /** WOCHENPLAN-2.0-01H-E2 — weekplanner plan context for effective-state availability. */
+  weekplannerPlanId?: string;
+  excludeWeekplannerActivityType?: "TRAINING" | "MATCH" | "TOURNAMENT";
+  excludeWeekplannerActivityId?: string;
   /**
    * Which field of each availability row to key the returned maps by.
    * "id" (default) suits id-based selectors (FacilityResourceSelector).
@@ -62,7 +82,9 @@ async function fetchAvailabilityGroup(
     });
     const data = (await res.json().catch(() => null)) as { availability?: ResourceAvailabilityRow[] } | null;
     if (!res.ok || !data?.availability) return new Map();
-    return new Map(data.availability.map((a) => [keyBy === "code" ? a.resourceCode : a.resourceId, a]));
+    return new Map(
+      data.availability.map((a) => [keyBy === "code" ? a.resourceCode : a.resourceId, rowToAnnotation(a)]),
+    );
   } catch {
     return new Map();
   }
@@ -79,6 +101,11 @@ export function useFacilityAvailability({
   endAt,
   excludeEventId,
   excludeTrainingSessionId,
+  occupancyBeforeMinutes,
+  occupancyAfterMinutes,
+  weekplannerPlanId,
+  excludeWeekplannerActivityType,
+  excludeWeekplannerActivityId,
   keyBy = "id",
 }: UseFacilityAvailabilityOptions): FacilityAvailabilityMaps {
   const [pitchAvailability, setPitchAvailability] = useState<Map<string, ResourceAvailabilityAnnotation>>(
@@ -105,6 +132,11 @@ export function useFacilityAvailability({
       if (endAt) params.set("endAt", endAt);
       if (excludeEventId) params.set("excludeEventId", excludeEventId);
       if (excludeTrainingSessionId) params.set("excludeTrainingSessionId", excludeTrainingSessionId);
+      if (weekplannerPlanId) params.set("weekplannerPlanId", weekplannerPlanId);
+      if (excludeWeekplannerActivityType) params.set("excludeWeekplannerActivityType", excludeWeekplannerActivityType);
+      if (excludeWeekplannerActivityId) params.set("excludeWeekplannerActivityId", excludeWeekplannerActivityId);
+      if (occupancyBeforeMinutes != null) params.set("occupancyBeforeMinutes", String(occupancyBeforeMinutes));
+      if (occupancyAfterMinutes != null) params.set("occupancyAfterMinutes", String(occupancyAfterMinutes));
 
       const [pitch, room] = await Promise.all([
         fetchAvailabilityGroup("PITCH_HALL", params, keyBy),
@@ -120,7 +152,19 @@ export function useFacilityAvailability({
     return () => {
       active = false;
     };
-  }, [isActive, startAt, endAt, excludeEventId, excludeTrainingSessionId, keyBy]);
+  }, [
+    isActive,
+    startAt,
+    endAt,
+    excludeEventId,
+    excludeTrainingSessionId,
+    occupancyBeforeMinutes,
+    occupancyAfterMinutes,
+    weekplannerPlanId,
+    excludeWeekplannerActivityType,
+    excludeWeekplannerActivityId,
+    keyBy,
+  ]);
 
   if (!isActive) {
     return { pitchAvailability: EMPTY_AVAILABILITY_MAP, dressingRoomAvailability: EMPTY_AVAILABILITY_MAP };

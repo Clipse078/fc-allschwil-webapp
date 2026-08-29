@@ -60,6 +60,8 @@ export async function POST(request: NextRequest) {
       weekId: body.weekId,
       name: body.name,
       createdByUserId: auth.session.user?.id ?? null,
+      wochenplanPlanId:
+        typeof body.wochenplanPlanId === "string" ? body.wochenplanPlanId : null,
     });
     return NextResponse.json({ plan }, { status: 201 });
   } catch (err) {

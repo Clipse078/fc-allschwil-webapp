@@ -7,16 +7,24 @@ import { resolveTrainingWeekWindow, TRAINING_DEFAULT_TIMEZONE } from "@/lib/trai
 import { getWeekplannerWeek } from "@/lib/weekplanner/queries";
 import { planOverrideKey } from "@/lib/weekplanner/plan-override-key";
 import { listWeekplannerPlans, listWeekplannerPlanAllocations } from "@/lib/weekplanner/plan-service";
+import { listWochenplanPlans } from "@/lib/wochenplan/plan-service";
+import { materializeLinkedWeekplannerPlan } from "@/lib/wochenplan/plan-materialization";
 import { getFacilitiesForTenant } from "@/lib/facilities/queries";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import WeekPlannerPage from "@/components/admin/planner/WeekPlannerPage";
 import type { WeekplannerOverrideRow } from "@/components/admin/planner/WeekplannerAllocationOverrideEditor";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
 
 type PlannerWeekPageProps = {
   searchParams?: Promise<{
     week?: string;
-    /** WEEKPLANNER-01B — selected WeekplannerPlan id. Absent/invalid = Standardplan. */
+    /**
+     * WOCHENPLAN-2.0-01F — WochenplanPlan id for the selected variant.
+     * Non-default alternatives are materialized server-side into a linked
+     * WeekplannerPlan for this week. Legacy direct WeekplannerPlan ids are
+     * still accepted for backward compatibility.
+     */
     plan?: string;
   }>;
 };
@@ -42,6 +50,12 @@ type PlannerWeekPageProps = {
  * different-week planId is silently treated as "no plan selected" (the
  * Standardplan) rather than a hard error — e.g. navigating to a week that
  * doesn't have the previously selected plan.
+ *
+ * WOCHENPLAN-2.0-01F — Plan materialization.
+ *
+ * When `?plan=` matches a non-default WochenplanPlan, the server
+ * idempotently materializes (or reuses) the linked WeekplannerPlan for
+ * (tenantId, weekId, wochenplanPlanId) before loading effective week state.
  */
 export default async function PlannerWeekPageRoute({
   searchParams,
@@ -67,9 +81,48 @@ export default async function PlannerWeekPageRoute({
   const weekWindow = resolveTrainingWeekWindow({ weekParam: params.week, now, timeZone: timezone });
   const todayParam = resolveTrainingWeekWindow({ now, timeZone: timezone }).param;
 
-  const plans = await listWeekplannerPlans(tenantContext.id, weekWindow.param);
+  const [wochenplanPlans, weekplannerPlans] = await Promise.all([
+    listWochenplanPlans(tenantContext.id),
+    listWeekplannerPlans(tenantContext.id, weekWindow.param),
+  ]);
+
+  const defaultWochenplanPlan =
+    wochenplanPlans.find((plan) => plan.isDefault) ?? wochenplanPlans[0] ?? null;
   const requestedPlanId = params.plan?.trim();
-  const activePlan = requestedPlanId ? plans.find((plan) => plan.id === requestedPlanId) ?? null : null;
+
+  let viewedWochenplanPlanId = defaultWochenplanPlan?.id ?? null;
+  let materializedWeekplannerPlan: WeekplannerPlanDto | null = null;
+
+  if (requestedPlanId) {
+    const wochenplanMatch = wochenplanPlans.find((plan) => plan.id === requestedPlanId);
+    if (wochenplanMatch) {
+      viewedWochenplanPlanId = wochenplanMatch.id;
+      if (!wochenplanMatch.isDefault) {
+        const materialized = await materializeLinkedWeekplannerPlan(
+          tenantContext.id,
+          weekWindow.param,
+          wochenplanMatch.id,
+          { createdByUserId: session.user?.id ?? null },
+        );
+        materializedWeekplannerPlan = materialized.weekplannerPlan;
+      }
+    } else {
+      const legacyPlan = weekplannerPlans.find((plan) => plan.id === requestedPlanId) ?? null;
+      if (legacyPlan) {
+        materializedWeekplannerPlan = legacyPlan;
+        viewedWochenplanPlanId =
+          legacyPlan.wochenplanPlanId ?? defaultWochenplanPlan?.id ?? null;
+      }
+    }
+  }
+
+  const plans =
+    materializedWeekplannerPlan &&
+    !weekplannerPlans.some((plan) => plan.id === materializedWeekplannerPlan!.id)
+      ? [...weekplannerPlans, materializedWeekplannerPlan]
+      : weekplannerPlans;
+
+  const activePlan = materializedWeekplannerPlan;
 
   const week = await getWeekplannerWeek(
     tenantContext.id,
@@ -115,7 +168,11 @@ export default async function PlannerWeekPageRoute({
       todayParam={todayParam}
       locale={tenantContext.locale ?? "de-CH"}
       timezone={timezone}
+      wochenplanPlans={wochenplanPlans}
       plans={plans}
+      viewedWochenplanPlanId={viewedWochenplanPlanId}
+      selectedPlanParam={requestedPlanId ?? defaultWochenplanPlan?.id ?? null}
+      materializedWeekplannerPlanId={activePlan?.id ?? null}
       activePlanId={activePlan?.id ?? null}
       canManagePlans={canManagePlans}
       overrideEditing={overrideEditing}
@@ -144,6 +201,8 @@ async function buildOverridesByKey(
       facilityResourceId: allocation.facilityResourceId,
       facilityResourceName: allocation.facilityResourceName,
       facilityResourceCode: allocation.facilityResourceCode,
+      occupancyBeforeMinutes: allocation.occupancyBeforeMinutes,
+      occupancyAfterMinutes: allocation.occupancyAfterMinutes,
     });
     byKey[key] = list;
   }

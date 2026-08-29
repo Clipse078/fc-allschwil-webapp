@@ -155,6 +155,15 @@ export class WeekplannerPlanTimeOverrideNotFoundError extends Error {
   }
 }
 
+/** WOCHENPLAN-2.0-01H-E2 — occupancy buffer validation failed (non-integer or negative). */
+export class WeekplannerPlanAllocationOccupancyValidationError extends Error {
+  readonly code = "WEEKPLANNER_PLAN_ALLOCATION_OCCUPANCY_VALIDATION" as const;
+  constructor(message: string) {
+    super(message);
+    this.name = "WeekplannerPlanAllocationOccupancyValidationError";
+  }
+}
+
 /**
  * WEEKPLANNER-01D — the requested override start/end would resolve to
  * either an invalid range (end at or before start) or a different calendar

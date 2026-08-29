@@ -24,6 +24,7 @@ import type {
   WeekplannerWeek,
 } from "@/lib/weekplanner/types";
 import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
+import type { WochenplanPlanDto } from "@/lib/wochenplan/plan-types";
 import { planOverrideKey } from "@/lib/weekplanner/plan-override-key";
 import { WeekplannerPlanBar } from "./WeekplannerPlanBar";
 import {
@@ -35,6 +36,7 @@ import { WeekplannerActivityOverridePanel } from "./WeekplannerActivityOverrideP
 import { WeekplannerOverridePanelProvider } from "./WeekplannerOverridePanelContext";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import { WeekplannerPlanningSheet } from "./WeekplannerPlanningSheet";
+import { WeekplannerOperationalPlanningSheet } from "./WeekplannerOperationalPlanningSheet";
 
 /**
  * WEEKPLANNER-01B — populated only when an alternative plan is selected AND
@@ -67,7 +69,11 @@ type WeekPlannerPageProps = {
   todayParam: string;
   locale?: string;
   timezone?: string;
+  wochenplanPlans?: WochenplanPlanDto[];
   plans?: WeekplannerPlanDto[];
+  viewedWochenplanPlanId?: string | null;
+  selectedPlanParam?: string | null;
+  materializedWeekplannerPlanId?: string | null;
   activePlanId?: string | null;
   canManagePlans?: boolean;
   overrideEditing?: OverrideEditingContext;
@@ -211,12 +217,12 @@ function ConflictBadge({ item }: { item: WeekplannerItem }) {
 
   return (
     <div
-      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700"
-      title={`Doppelbelegung: ${resourceNames}`}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800"
+      title={`Geteilte Belegung: ${resourceNames}`}
       data-testid="weekplanner-conflict-badge"
     >
-      <AlertTriangle className="h-3.5 w-3.5" />
-      Doppelbelegung · {resourceNames}
+      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+      Geteilte Belegung · {resourceNames}
     </div>
   );
 }
@@ -304,6 +310,7 @@ function WeekplannerCard({
   overrideEditing,
   canonicalEditing,
   onEdit,
+  onOperationalEdit,
 }: {
   item: WeekplannerItem;
   locale: string;
@@ -313,6 +320,8 @@ function WeekplannerCard({
   canonicalEditing?: CanonicalEditingContext;
   /** PLANNING-UX-C3 — opens the Sheet editor for this item. Undefined = editing not available. */
   onEdit?: (item: WeekplannerItem) => void;
+  /** WOCHENPLAN-2.0-01H-C — opens operational override editor for alternative plans. */
+  onOperationalEdit?: (item: WeekplannerItem) => void;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
@@ -326,6 +335,7 @@ function WeekplannerCard({
     ((item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
       ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents));
   const showCanonicalEditButton = isStandardplan && canEditThisItem && !!onEdit;
+  const showOperationalEditButton = !isStandardplan && !!overrideEditing && !!onOperationalEdit;
 
   // PLANNING-UX-C3 — incomplete planning detection
   const missingAllocations = isStandardplan ? getMissingAllocations(item) : [];
@@ -521,7 +531,7 @@ function WeekplannerCard({
         onEdit={showCanonicalEditButton ? () => onEdit?.(item) : undefined}
       />
 
-      {/* PLANNING-UX-C3 — "Planung bearbeiten" button (shown when no incomplete badge or as supplementary) */}
+      {/* PLANNING-UX-C3 — "Planung bearbeiten" button (Standardplan) */}
       {showCanonicalEditButton && missingAllocations.length === 0 && (
         <div className="mt-2.5">
           <button
@@ -529,6 +539,20 @@ function WeekplannerCard({
             onClick={() => onEdit?.(item)}
             className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
             data-testid={`weekplanner-canonical-edit-${item.type.toLowerCase()}`}
+          >
+            Planung bearbeiten
+          </button>
+        </div>
+      )}
+
+      {/* WOCHENPLAN-2.0-01H-C — operational editing for alternative plans */}
+      {showOperationalEditButton && (
+        <div className="mt-2.5">
+          <button
+            type="button"
+            onClick={() => onOperationalEdit?.(item)}
+            className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
+            data-testid={`weekplanner-operational-edit-${item.type.toLowerCase()}`}
           >
             Planung bearbeiten
           </button>
@@ -556,6 +580,7 @@ function DayColumn({
   overrideEditing,
   canonicalEditing,
   onEdit,
+  onOperationalEdit,
 }: {
   day: WeekplannerDay;
   locale: string;
@@ -564,6 +589,7 @@ function DayColumn({
   overrideEditing?: OverrideEditingContext;
   canonicalEditing?: CanonicalEditingContext;
   onEdit?: (item: WeekplannerItem) => void;
+  onOperationalEdit?: (item: WeekplannerItem) => void;
 }) {
   const today = isToday(day.dayKey, timezone);
 
@@ -609,6 +635,7 @@ function DayColumn({
               overrideEditing={overrideEditing}
               canonicalEditing={canonicalEditing}
               onEdit={onEdit}
+              onOperationalEdit={onOperationalEdit}
             />
           ))
         )}
@@ -622,7 +649,11 @@ export default function WeekPlannerPage({
   todayParam,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  wochenplanPlans = [],
   plans = [],
+  viewedWochenplanPlanId = null,
+  selectedPlanParam = null,
+  materializedWeekplannerPlanId = null,
   activePlanId = null,
   canManagePlans = false,
   overrideEditing,
@@ -648,6 +679,7 @@ export default function WeekPlannerPage({
 
   // PLANNING-UX-C3 — lifted Sheet state: one active editing item at most.
   const [editingItem, setEditingItem] = useState<WeekplannerItem | null>(null);
+  const [operationalEditingItem, setOperationalEditingItem] = useState<WeekplannerItem | null>(null);
 
   const canEdit = !!canonicalEditing;
 
@@ -657,6 +689,11 @@ export default function WeekPlannerPage({
       (item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
       ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents);
     if (canEditThisItem) setEditingItem(item);
+  }
+
+  function handleOperationalEdit(item: WeekplannerItem) {
+    if (!overrideEditing) return;
+    setOperationalEditingItem(item);
   }
 
   return (
@@ -670,8 +707,10 @@ export default function WeekPlannerPage({
       <SectionCard>
         <WeekplannerPlanBar
           weekParam={week.param}
-          plans={plans}
-          activePlanId={activePlanId}
+          wochenplanPlans={wochenplanPlans}
+          weekplannerPlans={plans}
+          selectedPlanParam={selectedPlanParam ?? viewedWochenplanPlanId}
+          materializedWeekplannerPlanId={materializedWeekplannerPlanId}
           canManage={canManagePlans}
         />
       </SectionCard>
@@ -697,7 +736,7 @@ export default function WeekPlannerPage({
             <Link href={CANONICAL_MODULE_HREF.TOURNAMENT.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
               {CANONICAL_MODULE_HREF.TOURNAMENT.label}
             </Link>{" "}
-            — oder erstellen Sie oben einen Alternativplan, um nur für diese Woche abzuweichen.
+            — oder wählen Sie oben einen Alternativ-Wochenplan, um nur für diese Woche abzuweichen.
           </span>
         </div>
       )}
@@ -743,14 +782,14 @@ export default function WeekPlannerPage({
         </div>
       </SectionCard>
 
-      {/* PLANNING-UX-C3 — RED: Doppelbelegung. Semantically distinct from AMBER below. */}
+      {/* PLANNING-UX-C3 — AMBER: shared resource occupancy (informational, not a hard error). */}
       {conflictCount > 0 && (
         <div
-          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700"
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800"
           data-testid="weekplanner-conflict-summary"
         >
-          <AlertTriangle className="h-4 w-4" />
-          {conflictCount} {conflictCount === 1 ? "Eintrag" : "Einträge"} mit Doppelbelegung diese Woche
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          {conflictCount} {conflictCount === 1 ? "Eintrag" : "Einträge"} mit geteilter Ressourcenbelegung diese Woche
         </div>
       )}
 
@@ -787,6 +826,7 @@ export default function WeekPlannerPage({
                   overrideEditing={overrideEditing}
                   canonicalEditing={activePlanId === null ? canonicalEditing : undefined}
                   onEdit={canEdit && activePlanId === null ? handleEdit : undefined}
+                  onOperationalEdit={overrideEditing ? handleOperationalEdit : undefined}
                 />
               ))}
             </div>
@@ -802,6 +842,19 @@ export default function WeekPlannerPage({
           timezone={timezone}
           onClose={() => setEditingItem(null)}
           onSaved={() => setEditingItem(null)}
+        />
+      )}
+
+      {overrideEditing && (
+        <WeekplannerOperationalPlanningSheet
+          item={operationalEditingItem}
+          planId={overrideEditing.planId}
+          planName={overrideEditing.planName}
+          overridesByKey={overrideEditing.overridesByKey}
+          facilityGroupsByAllocationGroup={overrideEditing.facilityGroupsByAllocationGroup}
+          timezone={timezone}
+          onClose={() => setOperationalEditingItem(null)}
+          onSaved={() => setOperationalEditingItem(null)}
         />
       )}
     </div>

@@ -29,6 +29,11 @@ export type WeekplannerPlanDto = {
    * see lib/weekplanner/plan-service.ts#activateWeekplannerPlan.
    */
   isActive: boolean;
+  /**
+   * WOCHENPLAN-2.0-01E — stable link to the tenant-level WochenplanPlan
+   * definition. Null for Standardplan-equivalent ad-hoc week plans.
+   */
+  wochenplanPlanId: string | null;
 };
 
 export type WeekplannerPlanAllocationDto = {
@@ -49,6 +54,8 @@ export type WeekplannerPlanAllocationDto = {
   facilityName: string;
   notes: string | null;
   displayOrder: number;
+  occupancyBeforeMinutes: number;
+  occupancyAfterMinutes: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -57,6 +64,8 @@ export type CreateWeekplannerPlanInput = {
   weekId: string;
   name: string;
   createdByUserId?: string | null;
+  /** WOCHENPLAN-2.0-01E — optional stable link to tenant-level WochenplanPlan. */
+  wochenplanPlanId?: string | null;
 };
 
 export type CreateWeekplannerPlanAllocationInput = {
@@ -67,6 +76,15 @@ export type CreateWeekplannerPlanAllocationInput = {
   /** Required for TOURNAMENT+DRESSING_ROOM; must be omitted/empty otherwise. */
   participantId?: string | null;
   facilityResourceId: string;
+  notes?: string | null;
+  displayOrder?: number;
+  occupancyBeforeMinutes?: number | null;
+  occupancyAfterMinutes?: number | null;
+};
+
+export type UpdateWeekplannerPlanAllocationInput = {
+  occupancyBeforeMinutes?: number | null;
+  occupancyAfterMinutes?: number | null;
   notes?: string | null;
   displayOrder?: number;
 };

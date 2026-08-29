@@ -32,7 +32,15 @@
 import { prisma } from "@/lib/db/prisma";
 import type { FacilityResourceType } from "@prisma/client";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
+import { computeResourceOccupancyWindow, isMeaningfulEventInterval } from "@/lib/facilities/resource-occupancy-window";
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "@/lib/training/allocation-groups";
+import {
+  findWeekplannerPlanConflicts,
+  findWeekplannerReplacedActivities,
+  shouldExcludeCanonicalEvent,
+  shouldExcludeCanonicalTraining,
+} from "@/lib/weekplanner/availability-integration";
+import type { WeekplannerActivityType } from "@/lib/weekplanner/plan-types";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -42,6 +50,13 @@ export type AvailabilityResourceGroup = Extract<TrainingAllocationGroupKey, "PIT
 export type ResourceAvailabilityStatus = "FREE" | "OCCUPIED";
 
 export type ResourceAvailabilityConflictSource = "TRAINING" | "MATCH" | "TOURNAMENT";
+
+export type ResourceAvailabilityConflictDetail = {
+  label: string;
+  startAt: string;
+  endAt: string;
+  sourceType: ResourceAvailabilityConflictSource;
+};
 
 export type ResourceAvailability = {
   resourceId: string;
@@ -55,6 +70,7 @@ export type ResourceAvailability = {
   conflictStartAt: string | null;
   conflictEndAt: string | null;
   conflictSourceType: ResourceAvailabilityConflictSource | null;
+  conflicts: ResourceAvailabilityConflictDetail[];
 };
 
 export type GetResourceAvailabilityInput = {
@@ -73,6 +89,14 @@ export type GetResourceAvailabilityInput = {
    * separate exclusion key from `excludeEventId`.
    */
   excludeTrainingSessionId?: string;
+  /** WOCHENPLAN-2.0-01H-E2 — expands the query window before event start. */
+  occupancyBeforeMinutes?: number;
+  /** WOCHENPLAN-2.0-01H-E2 — expands the query window after event end. */
+  occupancyAfterMinutes?: number;
+  /** WOCHENPLAN-2.0-01H-E2 — weekplanner plan context for effective-state resolution. */
+  weekplannerPlanId?: string;
+  excludeWeekplannerActivityType?: WeekplannerActivityType;
+  excludeWeekplannerActivityId?: string;
 };
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -106,6 +130,7 @@ async function findTrainingConflicts(
   endAt: Date,
   group: AvailabilityResourceGroup,
   excludeTrainingSessionId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   const sessions = await prisma.trainingSession.findMany({
     where: {
@@ -142,6 +167,8 @@ async function findTrainingConflicts(
   const conflicts: ConflictWindow[] = [];
 
   for (const session of sessions) {
+    if (shouldExcludeCanonicalTraining(session.id, replacedActivities)) continue;
+
     const effectiveStart = session.overrideStartAt ?? session.startAt;
     const effectiveEnd = session.overrideEndAt ?? session.endAt;
 
@@ -183,6 +210,7 @@ async function findMatchConflicts(
   group: AvailabilityResourceGroup,
   resourcesByCode: Map<string, string>,
   excludeEventId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   const events = await prisma.event.findMany({
     where: {
@@ -206,6 +234,8 @@ async function findMatchConflicts(
   const conflicts: ConflictWindow[] = [];
 
   for (const event of events) {
+    if (shouldExcludeCanonicalEvent(event.id, "MATCH", replacedActivities)) continue;
+
     if (!timeRangesOverlap({ startA: startAt, endA: endAt, startB: event.startAt, endB: event.endAt })) {
       continue;
     }
@@ -213,6 +243,7 @@ async function findMatchConflicts(
     const label = event.opponentName ? `vs. ${event.opponentName}` : event.title;
     const effectiveStart = event.startAt;
     const effectiveEnd = event.endAt ?? event.startAt;
+    if (!isMeaningfulEventInterval(effectiveStart, effectiveEnd)) continue;
 
     const codes = group === "PITCH_HALL" ? [event.pitchCode] : [event.homeDressingRoomCode, event.awayDressingRoomCode];
 
@@ -239,6 +270,7 @@ async function findTournamentConflicts(
   group: AvailabilityResourceGroup,
   candidateResourceIds: string[],
   excludeEventId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   if (candidateResourceIds.length === 0) return [];
 
@@ -258,6 +290,8 @@ async function findTournamentConflicts(
     });
 
     for (const row of rows) {
+      if (shouldExcludeCanonicalEvent(row.event.id, "TOURNAMENT", replacedActivities)) continue;
+
       if (!timeRangesOverlap({ startA: startAt, endA: endAt, startB: row.event.startAt, endB: row.event.endAt })) {
         continue;
       }
@@ -297,6 +331,8 @@ async function findTournamentConflicts(
 
   for (const row of rows) {
     const participant = row.tournamentParticipant;
+    if (shouldExcludeCanonicalEvent(participant.event.id, "TOURNAMENT", replacedActivities)) continue;
+
     if (!timeRangesOverlap({
       startA: startAt,
       endA: endAt,
@@ -338,9 +374,64 @@ async function findTournamentConflicts(
 export async function getResourceAvailability(
   input: GetResourceAvailabilityInput,
 ): Promise<ResourceAvailability[]> {
-  const { tenantId, group, excludeEventId, excludeTrainingSessionId } = input;
-  const startAt = toDate(input.startAt);
-  const endAt = input.endAt ? toDate(input.endAt) : startAt;
+  const {
+    tenantId,
+    group,
+    excludeEventId,
+    excludeTrainingSessionId,
+    weekplannerPlanId,
+    excludeWeekplannerActivityType,
+    excludeWeekplannerActivityId,
+  } = input;
+  const eventStartAt = toDate(input.startAt);
+  const eventEndAt = input.endAt ? toDate(input.endAt) : eventStartAt;
+
+  if (!isMeaningfulEventInterval(eventStartAt, eventEndAt)) {
+    const resources = await prisma.facilityResource.findMany({
+      where: {
+        tenantId,
+        type: { in: RESOURCE_TYPES_BY_GROUP[group] },
+        status: { not: "ARCHIVED" },
+        facility: { status: { not: "ARCHIVED" } },
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        facilityId: true,
+        facility: { select: { name: true } },
+      },
+      orderBy: [{ facility: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
+    });
+
+    return resources.map((resource) => ({
+      resourceId: resource.id,
+      resourceName: resource.name,
+      resourceCode: resource.code,
+      facilityId: resource.facilityId,
+      facilityName: resource.facility.name,
+      status: "FREE" as const,
+      conflictLabel: null,
+      conflictStartAt: null,
+      conflictEndAt: null,
+      conflictSourceType: null,
+      conflicts: [],
+    }));
+  }
+
+  const queryWindow = computeResourceOccupancyWindow(
+    eventStartAt,
+    eventEndAt,
+    input.occupancyBeforeMinutes ?? 0,
+    input.occupancyAfterMinutes ?? 0,
+  );
+  const startAt = queryWindow.effectiveStartAt;
+  const endAt = queryWindow.effectiveEndAt;
+
+  const replacedActivities =
+    weekplannerPlanId != null
+      ? await findWeekplannerReplacedActivities(tenantId, weekplannerPlanId, group)
+      : new Set<string>();
 
   const resources = await prisma.facilityResource.findMany({
     where: {
@@ -363,20 +454,57 @@ export async function getResourceAvailability(
   if (resources.length === 0) return [];
 
   const resourcesByCode = new Map(resources.map((r) => [r.code, r.id]));
+  const resourceRefsByCode = new Map(
+    resources.map((r) => [
+      r.code,
+      {
+        facilityResourceId: r.id,
+        code: r.code,
+        name: r.name,
+        facilityName: r.facility.name,
+        occupancyBeforeMinutes: 0,
+        occupancyAfterMinutes: 0,
+      },
+    ]),
+  );
   const resourceIds = resources.map((r) => r.id);
 
-  const [trainingConflicts, matchConflicts, tournamentConflicts] = await Promise.all([
-    findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId),
-    findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId),
-    findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId),
+  const useEffectivePlanOccupancy = weekplannerPlanId != null;
+
+  const [trainingConflicts, matchConflicts, tournamentConflicts, weekplannerConflicts] = await Promise.all([
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId, replacedActivities),
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId, replacedActivities),
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId, replacedActivities),
+    weekplannerPlanId
+      ? findWeekplannerPlanConflicts(tenantId, startAt, endAt, group, {
+          weekplannerPlanId,
+          excludeActivityType: excludeWeekplannerActivityType,
+          excludeActivityId: excludeWeekplannerActivityId,
+        }, resourceRefsByCode)
+      : Promise.resolve([]),
   ]);
 
-  const conflictsByResourceId = new Map<string, ConflictWindow>();
-  for (const conflict of [...trainingConflicts, ...matchConflicts, ...tournamentConflicts]) {
-    const existing = conflictsByResourceId.get(conflict.resourceId);
-    if (!existing || conflict.startAt.getTime() < existing.startAt.getTime()) {
-      conflictsByResourceId.set(conflict.resourceId, conflict);
-    }
+  const conflictsByResourceId = new Map<string, ConflictWindow[]>();
+  for (const conflict of [
+    ...trainingConflicts,
+    ...matchConflicts,
+    ...tournamentConflicts,
+    ...weekplannerConflicts,
+  ]) {
+    const list = conflictsByResourceId.get(conflict.resourceId) ?? [];
+    list.push(conflict);
+    conflictsByResourceId.set(conflict.resourceId, list);
+  }
+
+  for (const [resourceId, list] of conflictsByResourceId) {
+    list.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    conflictsByResourceId.set(resourceId, list);
   }
 
   // FULL/HALF pitch derived availability rules (PLANNING-RESOURCE-UX-01-C2):
@@ -401,33 +529,35 @@ export async function getResourceAvailability(
       if (fullPitches.length === 0 || halfPitches.length === 0) continue;
 
       for (const full of fullPitches) {
-        const fullConflict = conflictsByResourceId.get(full.id);
-        if (fullConflict) {
-          // FULL occupied → derive HALF as unavailable (unless already marked)
+        const fullConflicts = conflictsByResourceId.get(full.id) ?? [];
+        if (fullConflicts.length > 0) {
+          const representative = fullConflicts[0]!;
           for (const half of halfPitches) {
-            if (!conflictsByResourceId.has(half.id)) {
-              conflictsByResourceId.set(half.id, {
-                ...fullConflict,
-                resourceId: half.id,
-                label: `${fullConflict.label} (ganzes Feld belegt)`,
-              });
+            if ((conflictsByResourceId.get(half.id) ?? []).length === 0) {
+              conflictsByResourceId.set(half.id, [
+                {
+                  ...representative,
+                  resourceId: half.id,
+                  label: `${representative.label} (ganzes Feld belegt)`,
+                },
+              ]);
             }
           }
         }
       }
 
-      // Any HALF occupied → derive FULL as unavailable
-      const occupiedHalves = halfPitches.filter((h) => conflictsByResourceId.has(h.id));
+      const occupiedHalves = halfPitches.filter((h) => (conflictsByResourceId.get(h.id) ?? []).length > 0);
       if (occupiedHalves.length > 0) {
         for (const full of fullPitches) {
-          if (!conflictsByResourceId.has(full.id)) {
-            // Use the earliest occupying half's conflict as the representative
-            const representative = conflictsByResourceId.get(occupiedHalves[0]!.id)!;
-            conflictsByResourceId.set(full.id, {
-              ...representative,
-              resourceId: full.id,
-              label: `${representative.label} (Hälfte belegt)`,
-            });
+          if ((conflictsByResourceId.get(full.id) ?? []).length === 0) {
+            const representative = conflictsByResourceId.get(occupiedHalves[0]!.id)![0]!;
+            conflictsByResourceId.set(full.id, [
+              {
+                ...representative,
+                resourceId: full.id,
+                label: `${representative.label} (Hälfte belegt)`,
+              },
+            ]);
           }
         }
       }
@@ -435,18 +565,26 @@ export async function getResourceAvailability(
   }
 
   return resources.map((resource) => {
-    const conflict = conflictsByResourceId.get(resource.id);
+    const conflictList = conflictsByResourceId.get(resource.id) ?? [];
+    const primary = conflictList[0];
+    const conflicts = conflictList.map((conflict) => ({
+      label: conflict.label,
+      startAt: conflict.startAt.toISOString(),
+      endAt: conflict.endAt.toISOString(),
+      sourceType: conflict.sourceType,
+    }));
     return {
       resourceId: resource.id,
       resourceName: resource.name,
       resourceCode: resource.code,
       facilityId: resource.facilityId,
       facilityName: resource.facility.name,
-      status: conflict ? "OCCUPIED" : "FREE",
-      conflictLabel: conflict?.label ?? null,
-      conflictStartAt: conflict?.startAt.toISOString() ?? null,
-      conflictEndAt: conflict?.endAt.toISOString() ?? null,
-      conflictSourceType: conflict?.sourceType ?? null,
+      status: primary ? "OCCUPIED" : "FREE",
+      conflictLabel: primary?.label ?? null,
+      conflictStartAt: primary?.startAt.toISOString() ?? null,
+      conflictEndAt: primary?.endAt.toISOString() ?? null,
+      conflictSourceType: primary?.sourceType ?? null,
+      conflicts,
     } satisfies ResourceAvailability;
   });
 }

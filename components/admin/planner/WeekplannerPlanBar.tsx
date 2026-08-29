@@ -3,150 +3,103 @@
 /**
  * components/admin/planner/WeekplannerPlanBar.tsx
  *
- * WEEKPLANNER-01B — plan selector + "+ Plan erstellen" + minimal plan
- * management (rename / archive / delete-where-safe), per the product
- * spec's example:
- *
- *   Plan:
- *   [ Standardplan ▼ ]
- *     Standardplan
- *     Schlechtwetterplan
- *     + Plan erstellen
- *
- * Fully generic — no plan name is ever hardcoded here.
- *
- * WEEKPLANNER-01E — adds the OPERATIONAL activation status/action, fully
- * independent of `activePlanId` (which is only the admin VIEW selection —
- * `?plan=<id>` never implicitly activates a plan). The operational banner
- * always reflects `plans.find((p) => p.isActive)` (null == Standardplan
- * operationally active); activation/deactivation is only offered while
- * viewing that same alternative plan, as an explicit action.
+ * WOCHENPLAN-2.0-01H-E5 — premium plan switcher with publish + hard-delete.
+ * Viewing a plan is independent from activation.
  */
 
-import { useCallback, useState, useTransition } from "react";
+import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Check, Loader2, Pencil, Plus, Power, PowerOff, Trash2, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { PopoverContent } from "@/components/ui/Popover";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
+import type { WochenplanPlanDto } from "@/lib/wochenplan/plan-types";
 import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
-
-const STANDARDPLAN_VALUE = "";
+import { WeekplannerPlanCreateDialog } from "./WeekplannerPlanCreateDialog";
 
 type Props = {
   weekParam: string;
-  plans: WeekplannerPlanDto[];
-  activePlanId: string | null;
+  wochenplanPlans: WochenplanPlanDto[];
+  weekplannerPlans: WeekplannerPlanDto[];
+  selectedPlanParam: string | null;
+  materializedWeekplannerPlanId: string | null;
   canManage: boolean;
 };
 
-function buildWeekplannerHref(weekParam: string, planId: string | null): string {
+function buildWeekplannerHref(weekParam: string, wochenplanPlanId: string | null): string {
   const params = new URLSearchParams({ week: weekParam });
-  if (planId) params.set("plan", planId);
+  if (wochenplanPlanId) params.set("plan", wochenplanPlanId);
   return `/dashboard/planner/week?${params.toString()}`;
 }
 
-export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }: Props) {
+function PlanStatusBadge({ isActive }: { isActive: boolean }) {
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide",
+        isActive ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700",
+      )}
+    >
+      {isActive ? "Aktiv" : "Entwurf"}
+    </span>
+  );
+}
+
+export function WeekplannerPlanBar({
+  weekParam,
+  wochenplanPlans,
+  weekplannerPlans,
+  selectedPlanParam,
+  materializedWeekplannerPlanId: _materializedWeekplannerPlanId,
+  canManage,
+}: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
-  const [newPlanName, setNewPlanName] = useState("");
-  const [isRenaming, setIsRenaming] = useState(false);
-  const [renameValue, setRenameValue] = useState("");
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isPublishDialogOpen, setIsPublishDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [planPendingDelete, setPlanPendingDelete] = useState<WochenplanPlanDto | null>(null);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [overflowPlanId, setOverflowPlanId] = useState<string | null>(null);
+  const switcherAnchorRef = useRef<HTMLButtonElement>(null);
 
-  const activePlan = activePlanId ? plans.find((p) => p.id === activePlanId) ?? null : null;
-
-  // WEEKPLANNER-01E — the OPERATIONALLY active plan (or null == Standardplan
-  // operationally active). Deliberately independent of `activePlan` above
-  // (the admin VIEW selection) — viewing a plan never activates it.
-  const operationalPlan = plans.find((p) => p.isActive) ?? null;
+  const defaultPlan = wochenplanPlans.find((p) => p.isDefault) ?? wochenplanPlans[0] ?? null;
+  const selectedValue = selectedPlanParam ?? defaultPlan?.id ?? "";
+  const viewedWochenplanPlan =
+    wochenplanPlans.find((p) => p.id === selectedValue) ??
+    (selectedValue ? null : defaultPlan);
+  const viewedLegacyPlan =
+    !viewedWochenplanPlan && selectedValue
+      ? weekplannerPlans.find((p) => p.id === selectedValue) ?? null
+      : null;
+  const viewedPlan = viewedWochenplanPlan ?? viewedLegacyPlan;
+  const activePlan = wochenplanPlans.find((p) => p.isActive) ?? null;
+  const isViewingActive = viewedWochenplanPlan?.isActive ?? false;
+  const draftPlans = wochenplanPlans.filter((p) => !p.isActive);
 
   const handleSelect = useCallback(
     (value: string) => {
+      setSwitcherOpen(false);
       router.push(buildWeekplannerHref(weekParam, value || null));
     },
     [router, weekParam],
   );
 
-  const handleCreate = useCallback(() => {
-    const name = newPlanName.trim();
-    if (!name) return;
+  const handlePublish = useCallback(() => {
+    if (!viewedWochenplanPlan || viewedWochenplanPlan.isActive) return;
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch("/api/weekplanner/plans", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ weekId: weekParam, name }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
-        }
-        const data = (await res.json()) as { plan: WeekplannerPlanDto };
-        setIsCreating(false);
-        setNewPlanName("");
-        router.push(buildWeekplannerHref(weekParam, data.plan.id));
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Fehler beim Erstellen");
-      }
-    });
-  }, [newPlanName, weekParam, router]);
-
-  const handleRename = useCallback(() => {
-    if (!activePlan) return;
-    const name = renameValue.trim();
-    if (!name || name === activePlan.name) {
-      setIsRenaming(false);
-      return;
-    }
-    setError(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
-        }
-        setIsRenaming(false);
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Fehler beim Umbenennen");
-      }
-    });
-  }, [activePlan, renameValue, router]);
-
-  const handleArchive = useCallback(() => {
-    if (!activePlan) return;
-    setError(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ archived: true }),
-        });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
-        }
-        router.push(buildWeekplannerHref(weekParam, null));
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Fehler beim Archivieren");
-      }
-    });
-  }, [activePlan, weekParam, router]);
-
-  const handleActivate = useCallback(() => {
-    if (!activePlan) return;
-    setError(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
+        const res = await fetch(`/api/wochenplan/plans/${viewedWochenplanPlan.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ active: true }),
@@ -155,213 +108,165 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
           const data = await res.json().catch(() => ({}));
           throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
         }
+        setIsPublishDialogOpen(false);
         router.refresh();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Fehler beim Aktivieren");
+        setError(err instanceof Error ? err.message : "Fehler beim Veröffentlichen");
       }
     });
-  }, [activePlan, router]);
+  }, [viewedWochenplanPlan, router]);
 
-  const handleDeactivate = useCallback(() => {
-    if (!activePlan) return;
+  const handleDelete = useCallback(() => {
+    if (!planPendingDelete) return;
     setError(null);
     startTransition(async () => {
       try {
-        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active: false }),
+        const res = await fetch(`/api/wochenplan/plans/${planPendingDelete.id}`, {
+          method: "DELETE",
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
           throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
         }
-        router.refresh();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Fehler beim Deaktivieren");
-      }
-    });
-  }, [activePlan, router]);
-
-  const handleDelete = useCallback(() => {
-    if (!activePlan) return;
-    setError(null);
-    startTransition(async () => {
-      try {
-        const res = await fetch(`/api/weekplanner/plans/${activePlan.id}`, { method: "DELETE" });
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
+        setIsDeleteDialogOpen(false);
+        setPlanPendingDelete(null);
+        if (viewedWochenplanPlan?.id === planPendingDelete.id) {
+          router.push(buildWeekplannerHref(weekParam, activePlan?.id ?? defaultPlan?.id ?? null));
         }
-        router.push(buildWeekplannerHref(weekParam, null));
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Fehler beim Löschen");
       }
     });
-  }, [activePlan, weekParam, router]);
+  }, [planPendingDelete, viewedWochenplanPlan?.id, activePlan?.id, defaultPlan?.id, weekParam, router]);
+
+  if (wochenplanPlans.length === 0) return null;
 
   return (
     <div className="space-y-2" data-testid="weekplanner-plan-bar">
       <div className="flex flex-wrap items-center gap-2">
-        <label htmlFor="weekplanner-plan-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-          Plan
-        </label>
+        <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+          Wochenplan
+        </span>
 
-        <select
-          id="weekplanner-plan-select"
-          data-testid="weekplanner-plan-select"
-          value={activePlanId ?? STANDARDPLAN_VALUE}
-          onChange={(e) => handleSelect(e.target.value)}
-          className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
+        <button
+          ref={switcherAnchorRef}
+          type="button"
+          data-testid="weekplanner-plan-switcher"
+          onClick={() => setSwitcherOpen((open) => !open)}
+          className="inline-flex min-w-[14rem] max-w-[min(100vw-2rem,28rem)] items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
+          aria-haspopup="listbox"
+          aria-expanded={switcherOpen}
         >
-          <option value={STANDARDPLAN_VALUE}>Standardplan</option>
-          {plans.map((plan) => (
-            <option key={plan.id} value={plan.id}>
-              {plan.name}
-            </option>
-          ))}
-        </select>
+          <span className="flex min-w-0 flex-1 items-center gap-2">
+            {isViewingActive ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" /> : null}
+            <span className="min-w-0 flex-1 text-left leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
+              {viewedPlan?.name ?? "Plan wählen"}
+            </span>
+            {viewedWochenplanPlan ? (
+              <span className="shrink-0">
+                <PlanStatusBadge isActive={viewedWochenplanPlan.isActive} />
+              </span>
+            ) : null}
+          </span>
+          <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden="true" />
+        </button>
 
-        {canManage && !isCreating && (
+        {canManage && viewedWochenplanPlan && !isViewingActive ? (
           <button
             type="button"
-            onClick={() => setIsCreating(true)}
+            onClick={() => setIsPublishDialogOpen(true)}
+            disabled={isPending}
+            data-testid="weekplanner-plan-publish-button"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--sce-primary)] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+          >
+            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+            Veröffentlichen
+          </button>
+        ) : null}
+
+        {canManage ? (
+          <button
+            type="button"
+            onClick={() => setIsCreateDialogOpen(true)}
             data-testid="weekplanner-plan-create-button"
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
           >
             <Plus className="h-3.5 w-3.5" />
-            Plan erstellen
+            Neuer Plan
           </button>
-        )}
+        ) : null}
+      </div>
 
-        {canManage && activePlan && !isRenaming && (
-          <>
+      <PopoverContent
+        open={switcherOpen}
+        onOpenChange={setSwitcherOpen}
+        anchorRef={switcherAnchorRef}
+        matchAnchorWidth={false}
+        maxHeight={360}
+        className="w-[min(100vw-2rem,28rem)] max-w-[28rem] p-0"
+      >
+        <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
+          Plan auswählen
+        </div>
+
+        {activePlan ? (
+          <div className="border-t border-[var(--border)] px-1 py-1">
+            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Aktiv</p>
+            <PlanSwitcherRow
+              plan={activePlan}
+              selected={viewedWochenplanPlan?.id === activePlan.id}
+              canManage={canManage}
+              onSelect={() => handleSelect(activePlan.id)}
+              onDelete={() => {
+                setSwitcherOpen(false);
+                setPlanPendingDelete(activePlan);
+                setIsDeleteDialogOpen(true);
+              }}
+              onOverflowToggle={(open) => setOverflowPlanId(open ? activePlan.id : null)}
+              overflowOpen={overflowPlanId === activePlan.id}
+            />
+          </div>
+        ) : null}
+
+        {draftPlans.length > 0 ? (
+          <div className="border-t border-[var(--border)] px-1 py-1">
+            <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">Entwürfe</p>
+            {draftPlans.map((plan) => (
+              <PlanSwitcherRow
+                key={plan.id}
+                plan={plan}
+                selected={viewedWochenplanPlan?.id === plan.id}
+                canManage={canManage}
+                onSelect={() => handleSelect(plan.id)}
+                onDelete={() => {
+                  setSwitcherOpen(false);
+                  setPlanPendingDelete(plan);
+                  setIsDeleteDialogOpen(true);
+                }}
+                onOverflowToggle={(open) => setOverflowPlanId(open ? plan.id : null)}
+                overflowOpen={overflowPlanId === plan.id}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {canManage ? (
+          <div className="border-t border-[var(--border)] p-1">
             <button
               type="button"
               onClick={() => {
-                setRenameValue(activePlan.name);
-                setIsRenaming(true);
+                setSwitcherOpen(false);
+                setIsCreateDialogOpen(true);
               }}
-              data-testid="weekplanner-plan-rename-button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
             >
-              <Pencil className="h-3 w-3" />
-              Umbenennen
+              <Plus className="h-4 w-4" />
+              Neuer Plan
             </button>
-            {activePlan.isActive ? (
-              <button
-                type="button"
-                onClick={() => startTransition(handleDeactivate)}
-                disabled={isPending}
-                data-testid="weekplanner-plan-deactivate-button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
-              >
-                <PowerOff className="h-3 w-3" />
-                Betriebsplan deaktivieren
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => startTransition(handleActivate)}
-                disabled={isPending}
-                data-testid="weekplanner-plan-activate-button"
-                className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
-              >
-                <Power className="h-3 w-3" />
-                Als Betriebsplan aktivieren
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => startTransition(handleArchive)}
-              disabled={isPending}
-              data-testid="weekplanner-plan-archive-button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
-            >
-              <Archive className="h-3 w-3" />
-              Archivieren
-            </button>
-            <button
-              type="button"
-              onClick={() => startTransition(handleDelete)}
-              disabled={isPending}
-              data-testid="weekplanner-plan-delete-button"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-50 disabled:opacity-50"
-              title="Nur möglich, wenn der Plan keine Ressourcen-Overrides enthält"
-            >
-              <Trash2 className="h-3 w-3" />
-              Löschen
-            </button>
-          </>
-        )}
-      </div>
-
-      {isCreating && (
-        <div className="flex flex-wrap items-center gap-2" data-testid="weekplanner-plan-create-form">
-          <input
-            type="text"
-            value={newPlanName}
-            onChange={(e) => setNewPlanName(e.target.value)}
-            placeholder="z. B. Schlechtwetterplan"
-            data-testid="weekplanner-plan-create-input"
-            autoFocus
-            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm focus:border-[var(--sce-primary)] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => startTransition(handleCreate)}
-            disabled={isPending || !newPlanName.trim()}
-            data-testid="weekplanner-plan-create-submit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--sce-primary)] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            Erstellen
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setIsCreating(false);
-              setNewPlanName("");
-            }}
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-2)]"
-          >
-            <X className="h-3.5 w-3.5" />
-            Abbrechen
-          </button>
-        </div>
-      )}
-
-      {isRenaming && activePlan && (
-        <div className="flex flex-wrap items-center gap-2" data-testid="weekplanner-plan-rename-form">
-          <input
-            type="text"
-            value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
-            autoFocus
-            data-testid="weekplanner-plan-rename-input"
-            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm focus:border-[var(--sce-primary)] focus:outline-none"
-          />
-          <button
-            type="button"
-            onClick={() => startTransition(handleRename)}
-            disabled={isPending || !renameValue.trim()}
-            data-testid="weekplanner-plan-rename-submit"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--sce-primary)] px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-            Speichern
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsRenaming(false)}
-            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-sm text-[var(--muted)] hover:bg-[var(--surface-2)]"
-          >
-            <X className="h-3.5 w-3.5" />
-            Abbrechen
-          </button>
-        </div>
-      )}
+          </div>
+        ) : null}
+      </PopoverContent>
 
       {error && (
         <p className="text-xs text-rose-600" role="alert" data-testid="weekplanner-plan-bar-error">
@@ -369,21 +274,187 @@ export function WeekplannerPlanBar({ weekParam, plans, activePlanId, canManage }
         </p>
       )}
 
-      <div
-        className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-        data-testid="weekplanner-operational-plan-banner"
-      >
-        Betriebsplan · {operationalPlan ? operationalPlan.name : "Standardplan"}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {isViewingActive ? (
+          <div
+            className="inline-flex items-center gap-1.5 font-semibold text-emerald-700"
+            data-testid="weekplanner-active-plan-banner"
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            Aktiver Plan · {viewedPlan?.name ?? activePlan?.name ?? "—"}
+          </div>
+        ) : viewedPlan ? (
+          <>
+            <div
+              className="inline-flex items-center gap-1.5 font-semibold text-amber-700"
+              data-testid="weekplanner-draft-plan-banner"
+            >
+              Entwurf · {viewedPlan.name}
+            </div>
+            {activePlan ? (
+              <span className="text-[var(--muted)]" data-testid="weekplanner-current-active-reference">
+                Aktiver Plan: {activePlan.name}
+              </span>
+            ) : null}
+          </>
+        ) : null}
       </div>
 
-      {activePlan && (
-        <div
-          className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
-          data-testid="weekplanner-active-plan-banner"
-        >
-          Ansicht · {activePlan.name}
-        </div>
-      )}
+      <WeekplannerPlanCreateDialog
+        open={isCreateDialogOpen}
+        weekParam={weekParam}
+        wochenplanPlans={wochenplanPlans}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onCreated={(planId) => {
+          setIsCreateDialogOpen(false);
+          router.push(buildWeekplannerHref(weekParam, planId));
+          router.refresh();
+        }}
+      />
+
+      <Dialog
+        open={isPublishDialogOpen}
+        onClose={() => setIsPublishDialogOpen(false)}
+        title={viewedWochenplanPlan ? `${viewedWochenplanPlan.name} veröffentlichen?` : "Plan veröffentlichen"}
+        description={
+          viewedWochenplanPlan
+            ? `Dieser Plan wird zum aktiven Wochenplan und wird für Website und Infoboard verwendet.${
+                activePlan
+                  ? ` Der aktuell aktive Plan "${activePlan.name}" wird als Entwurf gespeichert.`
+                  : ""
+              }`
+            : undefined
+        }
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsPublishDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={handlePublish} disabled={isPending} data-testid="weekplanner-plan-publish-confirm">
+              {isPending ? "Veröffentliche…" : "Plan veröffentlichen"}
+            </Button>
+          </>
+        }
+      />
+
+      <Dialog
+        open={isDeleteDialogOpen}
+        onClose={() => {
+          setIsDeleteDialogOpen(false);
+          setPlanPendingDelete(null);
+        }}
+        title={planPendingDelete ? `"${planPendingDelete.name}" endgültig löschen?` : "Plan löschen"}
+        description="Dieser Entwurf und seine Wochenplanung werden dauerhaft gelöscht. Diese Aktion kann nicht rückgängig gemacht werden."
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setIsDeleteDialogOpen(false);
+                setPlanPendingDelete(null);
+              }}
+            >
+              Abbrechen
+            </Button>
+            <Button
+              variant="danger"
+              onClick={handleDelete}
+              disabled={isPending}
+              data-testid="weekplanner-plan-delete-confirm"
+            >
+              {isPending ? "Lösche…" : "Plan endgültig löschen"}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }
+
+function PlanSwitcherRow({
+  plan,
+  selected,
+  canManage,
+  onSelect,
+  onDelete,
+  onOverflowToggle,
+  overflowOpen,
+}: {
+  plan: WochenplanPlanDto;
+  selected: boolean;
+  canManage: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onOverflowToggle: (open: boolean) => void;
+  overflowOpen: boolean;
+}) {
+  const localOverflowRef = useRef<HTMLButtonElement>(null);
+  const showOverflow = canManage && !plan.isActive && !plan.isDefault;
+
+  return (
+    <div className="flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)]">
+      <button
+        type="button"
+        role="option"
+        aria-selected={selected}
+        data-testid={`weekplanner-plan-option-${plan.id}`}
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left text-sm"
+      >
+        <span className="mt-0.5 shrink-0">
+          {selected ? <Check className="h-3.5 w-3.5 text-[var(--sce-primary)]" /> : <span className="inline-block w-3.5" />}
+        </span>
+        <span
+          className="min-w-0 flex-1 font-medium leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden"
+          data-testid={`weekplanner-plan-option-name-${plan.id}`}
+        >
+          {plan.name}
+        </span>
+      </button>
+
+      <div className="flex shrink-0 items-center gap-0.5 self-center">
+        <PlanStatusBadge isActive={plan.isActive} />
+
+        {showOverflow ? (
+          <>
+            <button
+              ref={localOverflowRef}
+              type="button"
+              aria-label={`Aktionen für ${plan.name}`}
+              data-testid={`weekplanner-plan-overflow-${plan.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOverflowToggle(!overflowOpen);
+              }}
+              className="rounded-md p-1.5 text-[var(--muted)] transition hover:bg-white hover:text-[var(--foreground)]"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </button>
+            <PopoverContent
+              open={overflowOpen}
+              onOpenChange={onOverflowToggle}
+              anchorRef={localOverflowRef}
+              matchAnchorWidth={false}
+              maxHeight={120}
+              className="min-w-[12rem] p-1"
+            >
+              <button
+                type="button"
+                onClick={onDelete}
+                data-testid={`weekplanner-plan-delete-${plan.id}`}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-rose-700 transition hover:bg-rose-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Plan endgültig löschen
+              </button>
+            </PopoverContent>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+export { buildWeekplannerHref };

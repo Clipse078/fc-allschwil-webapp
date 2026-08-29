@@ -495,15 +495,69 @@ export type TeamDetailData = {
 // ---------------------------------------------------------------------------
 // Public weekplan — website-safe shape
 //
-// Grouped by calendar day. Events use the same PublicWebsiteEventItem shape.
+// Grouped by calendar day. Events use PublicWochenplanEventItem (extends the
+// legacy PublicWebsiteEventItem for backward compatibility).
 // Intentionally omits: pitch/dressing-room allocation codes, board grid keys.
 // ---------------------------------------------------------------------------
+
+/** Canonical club/team identity for public Wochenplan match/tournament cards. */
+export type PublicWochenplanClubIdentity = {
+  displayName: string;
+  logoUrl: string | null;
+  teamId: string | null;
+  externalClubId: string | null;
+};
+
+export type PublicWochenplanMatchIdentity = {
+  home: PublicWochenplanClubIdentity;
+  away: PublicWochenplanClubIdentity;
+};
+
+export type PublicWochenplanPitch = {
+  name: string;
+  facilityName: string | null;
+};
+
+/**
+ * Discriminated public Wochenplan event — TRAINING | MATCH | TOURNAMENT.
+ * Extends PublicWebsiteEventItem so legacy consumers (WeekplanTeaserRenderer)
+ * can still read id/title/startAt/location/team without migration.
+ */
+export type PublicWochenplanEventItem = PublicWebsiteEventItem & {
+  /** Discriminator aligned with WeekplannerItemType. */
+  kind: "TRAINING" | "MATCH" | "TOURNAMENT";
+  matchIdentity?: PublicWochenplanMatchIdentity;
+  organizer?: PublicWebsiteTournamentOrganizer | null;
+  participants?: PublicWebsiteTournamentParticipant[];
+  pitch?: PublicWochenplanPitch | null;
+};
 
 export type PublicWochenplanDay = {
   date: string;
   calendarWeek: number;
   weekdayLabel: string;
-  events: PublicWebsiteEventItem[];
+  events: PublicWochenplanEventItem[];
+};
+
+export type PublicWochenplanActivePlan = {
+  id: string;
+  name: string;
+};
+
+export type PublicWochenplanCurrentWeek = {
+  weekId: string;
+  rangeLabel: string;
+  calendarWeekLabel: string;
+  calendarWeek: number;
+  timeZone: string;
+};
+
+export type PublicWochenplanSummary = {
+  trainingCount: number;
+  matchCount: number;
+  tournamentCount: number;
+  /** Display label when a team filter is active, e.g. "Junioren F2". */
+  teamLabel: string | null;
 };
 
 export type PublicWochenplanPublication = {
@@ -513,10 +567,23 @@ export type PublicWochenplanPublication = {
   variantBadge: string;
   isPublished: boolean;
   publishedAt: Date | null;
+  /** WOCHENPLAN-2.0-01B — active tenant plan id (for future preview flows). */
+  activePlanId?: string | null;
+  activePlanName?: string | null;
 };
 
 export type WeekplanData = {
   publication: PublicWochenplanPublication | null;
+  /** Always present in current-week mode — the tenant-defined active/public plan. */
+  activePlan: PublicWochenplanActivePlan;
+  currentWeek: PublicWochenplanCurrentWeek;
+  summary: PublicWochenplanSummary;
+  days: PublicWochenplanDay[];
+};
+
+/** Legacy season-scope response — publication/summary/currentWeek omitted. */
+export type WeekplanSeasonData = {
+  publication: null;
   days: PublicWochenplanDay[];
 };
 

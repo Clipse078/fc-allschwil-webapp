@@ -73,6 +73,7 @@ const mocks = vi.hoisted(() => ({
   eventFindMany: vi.fn(),
   seasonFindFirst: vi.fn(),
   wochenplanPlanFindFirst: vi.fn(),
+  buildPublicCurrentWeekFeed: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -82,6 +83,10 @@ vi.mock("@/lib/db/prisma", () => ({
     season: { findFirst: mocks.seasonFindFirst },
     wochenplanPlan: { findFirst: mocks.wochenplanPlanFindFirst },
   },
+}));
+
+vi.mock("@/lib/wochenplan/public-feed", () => ({
+  buildPublicCurrentWeekFeed: mocks.buildPublicCurrentWeekFeed,
 }));
 
 const { GET } = await import("../route");
@@ -233,13 +238,26 @@ describe("GET /api/public/[tenant]/website/weekplan?scope=season", () => {
   });
 });
 
-describe("GET /api/public/[tenant]/website/weekplan (week mode — unchanged behavior)", () => {
+describe("GET /api/public/[tenant]/website/weekplan (week mode — canonical current-week)", () => {
+  const CURRENT_WEEK_FEED = {
+    publication: null,
+    activePlan: { id: "plan-1", name: "Standardplan" },
+    currentWeek: {
+      weekId: "2026-08-24",
+      rangeLabel: "24. Aug – 30. Aug 2026",
+      calendarWeekLabel: "KW 35",
+      calendarWeek: 35,
+      timeZone: "Europe/Zurich",
+    },
+    summary: { trainingCount: 0, matchCount: 0, tournamentCount: 0, teamLabel: null },
+    days: [],
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.tenantFindFirst.mockResolvedValue(ACTIVE_TENANT);
-    mocks.eventFindMany.mockResolvedValue([]);
+    mocks.buildPublicCurrentWeekFeed.mockResolvedValue(CURRENT_WEEK_FEED);
     mocks.seasonFindFirst.mockResolvedValue(null);
-    mocks.wochenplanPlanFindFirst.mockResolvedValue(null);
   });
 
   it("returns 200 without scope param (default week mode)", async () => {
@@ -247,34 +265,36 @@ describe("GET /api/public/[tenant]/website/weekplan (week mode — unchanged beh
     expect(res.status).toBe(200);
   });
 
-  it("does NOT call season.findFirst when scope is not 'season'", async () => {
+  it("uses buildPublicCurrentWeekFeed in default week mode", async () => {
     await GET(makeRequest(), makeParams());
-    expect(mocks.seasonFindFirst).not.toHaveBeenCalled();
+    expect(mocks.buildPublicCurrentWeekFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "tenant-fca" }),
+    );
+    expect(mocks.eventFindMany).not.toHaveBeenCalled();
   });
 
   it("meta.scope is 'week' in default mode", async () => {
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
     expect(body.meta.scope).toBe("week");
+    expect(body.meta.mode).toBe("current-week");
   });
 
-  it("meta.filters is present in default mode", async () => {
-    const res = await GET(makeRequest(), makeParams());
-    const body = await res.json();
-    expect(body.meta).toHaveProperty("filters");
-  });
-
-  it("responds with data.days and data.publication in default mode", async () => {
+  it("responds with canonical current-week data shape", async () => {
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
     expect(body.data).toHaveProperty("days");
-    expect(body.data).toHaveProperty("publication");
+    expect(body.data).toHaveProperty("activePlan");
+    expect(body.data).toHaveProperty("currentWeek");
+    expect(body.data).toHaveProperty("summary");
+    expect(body.data.activePlan.name).toBe("Standardplan");
   });
 
-  it("passes explicit seasonKey from query param in week mode", async () => {
-    await GET(makeRequest("seasonKey=2025-26"), makeParams());
-    const call = mocks.eventFindMany.mock.calls[0][0];
-    expect(call.where.season).toEqual({ key: "2025-26" });
+  it("passes teamSlug to buildPublicCurrentWeekFeed", async () => {
+    await GET(makeRequest("teamSlug=f1"), makeParams());
+    expect(mocks.buildPublicCurrentWeekFeed).toHaveBeenCalledWith(
+      expect.objectContaining({ teamSlug: "f1" }),
+    );
   });
 
   it("does not query season.findFirst for non-season scopes", async () => {
