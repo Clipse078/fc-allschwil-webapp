@@ -561,6 +561,11 @@
   object-fit: contain;
 }
 
+/* Explicit dark-surface inversion for predominantly dark crests (Screen 1). */
+.clubLogoInvertOnDark {
+  filter: brightness(0) invert(1);
+}
+
 .matchClubLogoPlaceholder,
 .tournamentClubLogoPlaceholder {
   display: inline-block;

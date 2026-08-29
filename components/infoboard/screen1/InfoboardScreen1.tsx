@@ -90,6 +90,10 @@ import {
   EMPTY_SCREEN1_STUDIO_CONFIG,
   type Screen1StudioConfig,
 } from "@/lib/infoboard/screen1-studio-types";
+import {
+  shouldInvertLogoOnDarkSurface,
+  type LogoContrastMode,
+} from "@/lib/club-directory/logo-contrast";
 import styles from "./InfoboardScreen1.module.css";
 
 // ── Public types ──────────────────────────────────────────────────────────────
@@ -722,6 +726,10 @@ type MatchClubLogoProps = {
   testId?: string;
   presentation?: "match" | "tournament";
   showLogos?: boolean;
+  /** Explicit crest contrast. Tournament Screen-1 only for now. */
+  contrastMode?: LogoContrastMode;
+  /** When false, invert-on-dark crests render unchanged (e.g. LIGHT theme). */
+  isDarkSurface?: boolean;
 };
 
 /**
@@ -735,10 +743,12 @@ function MatchClubLogo({
   testId,
   presentation = "match",
   showLogos = true,
+  contrastMode = "normal",
+  isDarkSurface = true,
 }: MatchClubLogoProps): ReactElement | null {
   if (!showLogos) return null;
 
-  const logoClassName =
+  const baseLogoClassName =
     presentation === "tournament"
       ? logoUrl
         ? styles.tournamentClubLogo
@@ -746,6 +756,15 @@ function MatchClubLogo({
       : logoUrl
         ? styles.matchClubLogo
         : styles.matchClubLogoPlaceholder;
+
+  const invertOnDark = shouldInvertLogoOnDarkSurface(
+    contrastMode,
+    isDarkSurface,
+    Boolean(logoUrl),
+  );
+  const logoClassName = invertOnDark
+    ? `${baseLogoClassName} ${styles.clubLogoInvertOnDark}`
+    : baseLogoClassName;
 
   if (logoUrl) {
     return (
@@ -756,6 +775,7 @@ function MatchClubLogo({
         aria-hidden="true"
         className={logoClassName}
         data-testid={testId}
+        data-logo-contrast={invertOnDark ? "invert-on-dark" : "normal"}
       />
     );
   }
@@ -1285,6 +1305,7 @@ type EventCardProps = {
   presentation?: Screen1PresentationConfig;
   cardStyle?: CSSProperties;
   resolvedPresentation?: ResolvedCardPresentation;
+  isDarkSurface?: boolean;
 };
 
 function EventCard({
@@ -1295,6 +1316,7 @@ function EventCard({
   presentation = DEFAULT_SCREEN1_PRESENTATION,
   cardStyle,
   resolvedPresentation,
+  isDarkSurface = true,
 }: EventCardProps): ReactElement {
   const { event, temporal } = item;
   const startTime = formatTime(event.startAt, timeZone);
@@ -1426,6 +1448,8 @@ function EventCard({
                     testId={`tournament-participant-logo-${participant.id}`}
                     presentation="tournament"
                     showLogos={tournamentShowLogos}
+                    contrastMode={participant.clubLogoContrastMode ?? "normal"}
+                    isDarkSurface={isDarkSurface}
                   />
                 ))}
               </div>
@@ -1659,6 +1683,7 @@ export function InfoboardScreen1({
               presentation={presentation}
               cardStyle={cardStyle}
               resolvedPresentation={resolved}
+              isDarkSurface={theme === "DARK"}
             />
           );
         })}

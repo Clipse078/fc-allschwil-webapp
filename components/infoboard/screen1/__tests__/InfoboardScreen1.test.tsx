@@ -1455,6 +1455,191 @@ describe("Dynamic tournament logo groups — INFOBOARD-TOURNAMENT-LOGOS-02A", ()
   });
 });
 
+describe("Dark crest contrast — INFOBOARD-TOURNAMENT-LOGOS-02B", () => {
+  function renderMixedContrastTournament(
+    allocations: InfoboardTeamAllocationPresentation[],
+    theme: "DARK" | "LIGHT" = "DARK",
+  ) {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "evt-contrast",
+          type: "TOURNAMENT",
+          displayTitle: "Contrast Test Turnier",
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        theme={theme}
+        eventPresentation={makeEventPresentation("evt-contrast", allocations)}
+      />,
+    );
+
+    return screen.getByTestId("tournament-participants");
+  }
+
+  it("leaves normal colored logos unchanged on dark surface", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "colored-1",
+        teamDisplayName: "FC Allschwil",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/allschwil.png",
+        clubLogoContrastMode: "normal",
+      },
+    ]);
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(img?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("applies invert-on-dark class for explicitly marked dark crests", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "dark-crest",
+        teamDisplayName: "FC Black Stars Basel",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/black-stars.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("invert-on-dark");
+    expect(img?.className).toContain("clubLogoInvertOnDark");
+  });
+
+  it("does not invert invert-on-dark crests on light surface", () => {
+    const logoArea = renderMixedContrastTournament(
+      [
+        {
+          id: "dark-crest",
+          teamDisplayName: "FC Black Stars Basel",
+          dressingRoomLabel: "B",
+          clubLogoUrl: "https://cdn.example.com/black-stars.png",
+          clubLogoContrastMode: "invert-on-dark",
+        },
+      ],
+      "LIGHT",
+    );
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(img?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("does not invert placeholder identities", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "missing-crest",
+        teamDisplayName: "Unknown Club",
+        dressingRoomLabel: "C",
+        clubLogoUrl: null,
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const placeholder = logoArea.querySelector('[data-testid="tournament-participant-logo-missing-crest-placeholder"]');
+    expect(placeholder).toBeTruthy();
+    expect(placeholder?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("renders mixed colored and inverted logos together", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "colored",
+        teamDisplayName: "FC Nordstern",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/nordstern.png",
+        clubLogoContrastMode: "normal",
+      },
+      {
+        id: "dark",
+        teamDisplayName: "FC Black Stars Basel",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/black-stars.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const images = logoArea.querySelectorAll("img");
+    expect(images).toHaveLength(2);
+    expect(images[0]?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(images[1]?.getAttribute("data-logo-contrast")).toBe("invert-on-dark");
+  });
+
+  it("preserves six-logo PlayMore identity count with contrast enabled", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_6TEAM}
+        eventPresentation={[
+          {
+            eventId: PREVIEW_FIXTURE_TOURNAMENT_6TEAM.current[0]!.id,
+            participantAllocations: PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS[0]!
+              .participantAllocations!.map((participant, index) => ({
+                ...participant,
+                clubLogoContrastMode: index === 3 ? "invert-on-dark" : "normal",
+              })),
+          },
+        ]}
+      />,
+    );
+
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(
+      logoArea.querySelectorAll('[data-testid^="tournament-participant-logo-"]').length,
+    ).toBe(6);
+  });
+
+  it("preserves participant ordering with contrast metadata", () => {
+    const allocations: InfoboardTeamAllocationPresentation[] = [
+      {
+        id: "order-1",
+        teamDisplayName: "First",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/1.png",
+        clubLogoContrastMode: "normal",
+      },
+      {
+        id: "order-2",
+        teamDisplayName: "Second",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/2.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+      {
+        id: "order-3",
+        teamDisplayName: "Third",
+        dressingRoomLabel: "C",
+        clubLogoUrl: "https://cdn.example.com/3.png",
+      },
+    ];
+
+    const logoArea = renderMixedContrastTournament(allocations);
+    const ids = [...logoArea.querySelectorAll("img")].map((img) =>
+      img.getAttribute("data-testid"),
+    );
+    expect(ids).toEqual([
+      "tournament-participant-logo-order-1",
+      "tournament-participant-logo-order-2",
+      "tournament-participant-logo-order-3",
+    ]);
+  });
+
+  it("keeps match and training rendering unchanged", () => {
+    const { container } = render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} />);
+    expect(screen.queryByTestId("tournament-participants")).toBeNull();
+    expect(screen.getAllByTestId("match-home-team-row").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("training-row-matrix").length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-logo-contrast="invert-on-dark"]')).toBeNull();
+  });
+});
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // â”€â”€ Tournament rows â€” 6-team allocation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

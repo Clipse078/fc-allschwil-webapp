@@ -26,6 +26,8 @@
  *   - No color fields beyond announcement presentation.
  */
 
+import type { LogoContrastMode } from "@/lib/club-directory/logo-contrast";
+
 /**
  * Tenant-configurable announcement bar presentation inputs.
  *
@@ -52,6 +54,11 @@ export type InfoboardTeamAllocationPresentation = {
   readonly isHomeTeam?: boolean;
   /** Canonical club crest URL for tournament logo row; null when unavailable. */
   readonly clubLogoUrl?: string | null;
+  /**
+   * Explicit crest contrast for dark Infoboard surfaces. Defaults to `normal`
+   * when omitted. Populated from canonical club identity when available.
+   */
+  readonly clubLogoContrastMode?: LogoContrastMode;
 };
 
 /**
