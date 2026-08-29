@@ -36,6 +36,7 @@ import { WeekplannerActivityOverridePanel } from "./WeekplannerActivityOverrideP
 import { WeekplannerOverridePanelProvider } from "./WeekplannerOverridePanelContext";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import { WeekplannerPlanningSheet } from "./WeekplannerPlanningSheet";
+import { WeekplannerOperationalPlanningSheet } from "./WeekplannerOperationalPlanningSheet";
 
 /**
  * WEEKPLANNER-01B — populated only when an alternative plan is selected AND
@@ -309,6 +310,7 @@ function WeekplannerCard({
   overrideEditing,
   canonicalEditing,
   onEdit,
+  onOperationalEdit,
 }: {
   item: WeekplannerItem;
   locale: string;
@@ -318,6 +320,8 @@ function WeekplannerCard({
   canonicalEditing?: CanonicalEditingContext;
   /** PLANNING-UX-C3 — opens the Sheet editor for this item. Undefined = editing not available. */
   onEdit?: (item: WeekplannerItem) => void;
+  /** WOCHENPLAN-2.0-01H-C — opens operational override editor for alternative plans. */
+  onOperationalEdit?: (item: WeekplannerItem) => void;
 }) {
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
@@ -331,6 +335,7 @@ function WeekplannerCard({
     ((item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
       ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents));
   const showCanonicalEditButton = isStandardplan && canEditThisItem && !!onEdit;
+  const showOperationalEditButton = !isStandardplan && !!overrideEditing && !!onOperationalEdit;
 
   // PLANNING-UX-C3 — incomplete planning detection
   const missingAllocations = isStandardplan ? getMissingAllocations(item) : [];
@@ -526,7 +531,7 @@ function WeekplannerCard({
         onEdit={showCanonicalEditButton ? () => onEdit?.(item) : undefined}
       />
 
-      {/* PLANNING-UX-C3 — "Planung bearbeiten" button (shown when no incomplete badge or as supplementary) */}
+      {/* PLANNING-UX-C3 — "Planung bearbeiten" button (Standardplan) */}
       {showCanonicalEditButton && missingAllocations.length === 0 && (
         <div className="mt-2.5">
           <button
@@ -534,6 +539,20 @@ function WeekplannerCard({
             onClick={() => onEdit?.(item)}
             className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
             data-testid={`weekplanner-canonical-edit-${item.type.toLowerCase()}`}
+          >
+            Planung bearbeiten
+          </button>
+        </div>
+      )}
+
+      {/* WOCHENPLAN-2.0-01H-C — operational editing for alternative plans */}
+      {showOperationalEditButton && (
+        <div className="mt-2.5">
+          <button
+            type="button"
+            onClick={() => onOperationalEdit?.(item)}
+            className="text-xs font-medium text-[var(--sce-primary)] hover:underline"
+            data-testid={`weekplanner-operational-edit-${item.type.toLowerCase()}`}
           >
             Planung bearbeiten
           </button>
@@ -561,6 +580,7 @@ function DayColumn({
   overrideEditing,
   canonicalEditing,
   onEdit,
+  onOperationalEdit,
 }: {
   day: WeekplannerDay;
   locale: string;
@@ -569,6 +589,7 @@ function DayColumn({
   overrideEditing?: OverrideEditingContext;
   canonicalEditing?: CanonicalEditingContext;
   onEdit?: (item: WeekplannerItem) => void;
+  onOperationalEdit?: (item: WeekplannerItem) => void;
 }) {
   const today = isToday(day.dayKey, timezone);
 
@@ -614,6 +635,7 @@ function DayColumn({
               overrideEditing={overrideEditing}
               canonicalEditing={canonicalEditing}
               onEdit={onEdit}
+              onOperationalEdit={onOperationalEdit}
             />
           ))
         )}
@@ -657,6 +679,7 @@ export default function WeekPlannerPage({
 
   // PLANNING-UX-C3 — lifted Sheet state: one active editing item at most.
   const [editingItem, setEditingItem] = useState<WeekplannerItem | null>(null);
+  const [operationalEditingItem, setOperationalEditingItem] = useState<WeekplannerItem | null>(null);
 
   const canEdit = !!canonicalEditing;
 
@@ -666,6 +689,11 @@ export default function WeekPlannerPage({
       (item.type === "TRAINING" && canonicalEditing.canManageTrainings) ||
       ((item.type === "MATCH" || item.type === "TOURNAMENT") && canonicalEditing.canManageEvents);
     if (canEditThisItem) setEditingItem(item);
+  }
+
+  function handleOperationalEdit(item: WeekplannerItem) {
+    if (!overrideEditing) return;
+    setOperationalEditingItem(item);
   }
 
   return (
@@ -798,6 +826,7 @@ export default function WeekPlannerPage({
                   overrideEditing={overrideEditing}
                   canonicalEditing={activePlanId === null ? canonicalEditing : undefined}
                   onEdit={canEdit && activePlanId === null ? handleEdit : undefined}
+                  onOperationalEdit={overrideEditing ? handleOperationalEdit : undefined}
                 />
               ))}
             </div>
@@ -813,6 +842,19 @@ export default function WeekPlannerPage({
           timezone={timezone}
           onClose={() => setEditingItem(null)}
           onSaved={() => setEditingItem(null)}
+        />
+      )}
+
+      {overrideEditing && (
+        <WeekplannerOperationalPlanningSheet
+          item={operationalEditingItem}
+          planId={overrideEditing.planId}
+          planName={overrideEditing.planName}
+          overridesByKey={overrideEditing.overridesByKey}
+          facilityGroupsByAllocationGroup={overrideEditing.facilityGroupsByAllocationGroup}
+          timezone={timezone}
+          onClose={() => setOperationalEditingItem(null)}
+          onSaved={() => setOperationalEditingItem(null)}
         />
       )}
     </div>

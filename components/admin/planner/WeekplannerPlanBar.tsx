@@ -18,9 +18,10 @@
 
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, Power, PowerOff } from "lucide-react";
+import { Loader2, Plus, Power, PowerOff } from "lucide-react";
 import type { WochenplanPlanDto } from "@/lib/wochenplan/plan-types";
 import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
+import { WeekplannerPlanCreateDialog } from "./WeekplannerPlanCreateDialog";
 
 type Props = {
   weekParam: string;
@@ -49,6 +50,7 @@ export function WeekplannerPlanBar({
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   const defaultPlan = wochenplanPlans.find((p) => p.isDefault) ?? wochenplanPlans[0] ?? null;
   const selectedValue = selectedPlanParam ?? defaultPlan?.id ?? "";
@@ -154,6 +156,18 @@ export function WeekplannerPlanBar({
           ) : null}
         </select>
 
+        {canManage ? (
+          <button
+            type="button"
+            onClick={() => setIsCreateDialogOpen(true)}
+            data-testid="weekplanner-plan-create-button"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Neuer Plan
+          </button>
+        ) : null}
+
         {canManage && viewingAlternative && materializedPlan ? (
           materializedPlan.isActive ? (
             <button
@@ -209,6 +223,18 @@ export function WeekplannerPlanBar({
           </div>
         ) : null}
       </div>
+
+      <WeekplannerPlanCreateDialog
+        open={isCreateDialogOpen}
+        weekParam={weekParam}
+        wochenplanPlans={wochenplanPlans}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onCreated={(planId) => {
+          setIsCreateDialogOpen(false);
+          router.push(buildWeekplannerHref(weekParam, planId));
+          router.refresh();
+        }}
+      />
     </div>
   );
 }
