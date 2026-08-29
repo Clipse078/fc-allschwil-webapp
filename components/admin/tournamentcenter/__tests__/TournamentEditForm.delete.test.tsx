@@ -71,6 +71,7 @@ describe("TournamentEditForm — ADMIN-DELETE-02A permission gating", () => {
         canDelete={false}
         pitchHallFacilityGroups={[]}
         dressingRoomFacilityGroups={[]}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -85,6 +86,7 @@ describe("TournamentEditForm — ADMIN-DELETE-02A permission gating", () => {
         canDelete={true}
         pitchHallFacilityGroups={[]}
         dressingRoomFacilityGroups={[]}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -99,6 +101,7 @@ describe("TournamentEditForm — ADMIN-DELETE-02A permission gating", () => {
         canDelete={true}
         pitchHallFacilityGroups={[]}
         dressingRoomFacilityGroups={[]}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -127,6 +130,7 @@ describe("TournamentEditForm — ADMIN-DELETE-02A-C1 impact never blocks", () =>
         canDelete={true}
         pitchHallFacilityGroups={[]}
         dressingRoomFacilityGroups={[]}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -169,6 +173,7 @@ describe("TournamentEditForm — ADMIN-DELETE-02A-C1 impact never blocks", () =>
         canDelete={true}
         pitchHallFacilityGroups={[]}
         dressingRoomFacilityGroups={[]}
+        timezone="Europe/Zurich"
       />,
     );
 

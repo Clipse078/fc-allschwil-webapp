@@ -25,6 +25,7 @@ const mocks = vi.hoisted(() => ({
   externalClubFindFirst: vi.fn(),
   eventCreate: vi.fn(),
   auditLogCreate: vi.fn(),
+  tenantFindUnique: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -55,6 +56,7 @@ vi.mock("@/lib/db/prisma", () => ({
     team: { findUnique: mocks.teamFindUnique },
     externalClub: { findFirst: mocks.externalClubFindFirst },
     event: { create: mocks.eventCreate },
+    tenant: { findUnique: mocks.tenantFindUnique },
     auditLog: { create: mocks.auditLogCreate },
     $transaction: (fn: (tx: unknown) => unknown) =>
       fn({ event: { create: mocks.eventCreate } }),
@@ -114,6 +116,7 @@ describe("POST /api/events", () => {
     });
     mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
     mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
+    mocks.tenantFindUnique.mockResolvedValue({ timezone: "Europe/Zurich" });
     mocks.eventCreate.mockResolvedValue({
       id: "event-1",
       title: "E1 Hallenturnier",
@@ -144,6 +147,23 @@ describe("POST /api/events", () => {
 
     const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
     expect(call.data.tenantId).toBe("tenant-1");
+  });
+
+  it("parses tournament datetime-local startAt in tenant timezone (summer 13:30 → 11:30Z)", async () => {
+    const res = await POST(
+      makeRequest({
+        ...VALID_BODY,
+        startAt: "2026-08-30T13:30",
+        endAt: "2026-08-30T15:00",
+        meetingTime: "2026-08-30T12:45",
+      }),
+    );
+    expect(res.status).toBe(201);
+
+    const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
+    expect((call.data.startAt as Date).toISOString()).toBe("2026-08-30T11:30:00.000Z");
+    expect((call.data.endAt as Date).toISOString()).toBe("2026-08-30T13:00:00.000Z");
+    expect((call.data.meetingTime as Date).toISOString()).toBe("2026-08-30T10:45:00.000Z");
   });
 
   it("sets tenantId to null when the session has no active tenant (legacy/platform-only actor)", async () => {

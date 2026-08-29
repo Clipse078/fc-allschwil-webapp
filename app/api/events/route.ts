@@ -10,6 +10,10 @@ import { resolveEventReviewDecision } from "@/lib/workflow/event-review-policy";
 import { createPlanningAuthorizationPolicy } from "@/lib/planning/planning-authorization-policy";
 import type { PlanningDomain } from "@/lib/planning/planning-authorization-policy";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import {
+  parseTenantLocalDateTimeInput,
+  resolveTenantEventTimezone,
+} from "@/lib/events/tenant-local-datetime";
 
 const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
 const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
@@ -302,9 +306,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Serien-Enddatum ist erforderlich." }, { status: 400 });
     }
 
-    const startAt = new Date(startAtRaw);
-    const endAt = endAtRaw ? new Date(endAtRaw) : null;
-    const meetingTime = meetingTimeRaw ? new Date(meetingTimeRaw) : null;
+    let startAt: Date;
+    let endAt: Date | null;
+    let meetingTime: Date | null;
+
+    if (type === "TOURNAMENT") {
+      const tenant = await prisma.tenant.findUnique({
+        where: { id: actorTenantId },
+        select: { timezone: true },
+      });
+      const timeZone = resolveTenantEventTimezone(tenant?.timezone);
+
+      startAt = parseTenantLocalDateTimeInput(startAtRaw, timeZone) ?? new Date(Number.NaN);
+      endAt = endAtRaw ? parseTenantLocalDateTimeInput(endAtRaw, timeZone) : null;
+      meetingTime = meetingTimeRaw ? parseTenantLocalDateTimeInput(meetingTimeRaw, timeZone) : null;
+    } else {
+      startAt = new Date(startAtRaw);
+      endAt = endAtRaw ? new Date(endAtRaw) : null;
+      meetingTime = meetingTimeRaw ? new Date(meetingTimeRaw) : null;
+    }
     const recurrenceUntil = isRecurring && recurrenceUntilRaw ? parseRecurrenceUntilEndOfDay(recurrenceUntilRaw) : null;
 
     if (Number.isNaN(startAt.getTime())) {

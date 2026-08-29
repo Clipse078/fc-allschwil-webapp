@@ -101,6 +101,7 @@ export default async function TournamentEditPage({ params }: Props) {
             dressingRoomFacilityGroups={dressingRoomFacilityGroups}
             isCoordinatorForPlanning={canManage}
             isProtectedSource={isProtectedSource}
+            timezone={tenantContext.timezone ?? "Europe/Zurich"}
           />
         </div>
       </div>

@@ -149,6 +149,7 @@ describe("TournamentEditForm — RESOURCE-AVAILABILITY-UX-01 availability", () =
         canManage={true}
         pitchHallFacilityGroups={PITCH_HALL_GROUPS}
         dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -176,6 +177,7 @@ describe("TournamentEditForm — RESOURCE-AVAILABILITY-UX-01 availability", () =
         canManage={true}
         pitchHallFacilityGroups={PITCH_HALL_GROUPS}
         dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        timezone="Europe/Zurich"
       />,
     );
 
@@ -192,13 +194,14 @@ describe("TournamentEditForm — RESOURCE-AVAILABILITY-UX-01 availability", () =
         canManage={true}
         pitchHallFacilityGroups={PITCH_HALL_GROUPS}
         dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        timezone="Europe/Zurich"
       />,
     );
 
     await waitFor(() => expect(availabilityCalls.length).toBeGreaterThan(0));
     const initialCallCount = availabilityCalls.length;
 
-    const startInputs = screen.getAllByDisplayValue("2026-09-20T09:00");
+    const startInputs = screen.getAllByDisplayValue("2026-09-20T11:00");
     fireEvent.change(startInputs[0]!, { target: { value: "2026-09-21T09:00" } });
 
     await waitFor(() => expect(availabilityCalls.length).toBeGreaterThan(initialCallCount));
@@ -214,6 +217,7 @@ describe("TournamentEditForm — RESOURCE-AVAILABILITY-UX-01 availability", () =
         canManage={true}
         pitchHallFacilityGroups={PITCH_HALL_GROUPS}
         dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        timezone="Europe/Zurich"
       />,
     );
 
