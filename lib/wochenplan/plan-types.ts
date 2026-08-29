@@ -37,6 +37,16 @@ export type CreateWochenplanPlanInput = {
   description?: string | null;
 };
 
+export type WochenplanPlanCreationMode = "empty" | "copy";
+
+export type CreateWochenplanPlanWithWeekInput = {
+  name: string;
+  description?: string | null;
+  weekId: string;
+  mode: WochenplanPlanCreationMode;
+  sourceWochenplanPlanId?: string | null;
+};
+
 export type UpsertWochenplanPlanAllocationInput = {
   wochenplanPlanId: string;
   eventId: string;
