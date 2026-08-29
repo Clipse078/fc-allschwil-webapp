@@ -326,7 +326,7 @@ function AvailabilitySummary({
     <p className="inline-flex items-center gap-2 text-xs font-medium">
       <span className="flex items-center gap-1 text-emerald-600">
         <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-        {free} verfügbar
+        {free} frei
       </span>
       {occupied > 0 && (
         <>

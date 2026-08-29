@@ -260,4 +260,150 @@ describe("findWeekplannerPlanConflicts — effective plan occupancy", () => {
       }),
     );
   });
+
+  it("reports canonical-fallback dressing-room occupancy when no plan override rows exist", async () => {
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-a",
+        startAt: new Date("2026-08-10T15:00:00.000Z"),
+        endAt: new Date("2026-08-10T16:30:00.000Z"),
+        trainingSeriesId: "series-a",
+        trainingSeries: { title: "Junioren F2" },
+      },
+      {
+        id: "session-b",
+        startAt: new Date("2026-08-10T15:15:00.000Z"),
+        endAt: new Date("2026-08-10T18:45:00.000Z"),
+        trainingSeriesId: "series-b",
+        trainingSeries: { title: "Frauen 1" },
+      },
+    ]);
+    mocks.trainingAllocationFindMany.mockResolvedValue([
+      {
+        trainingSeriesId: "series-a",
+        facilityResource: {
+          id: ROOM_ID,
+          code: "E1",
+          name: "Garderobe E1",
+          type: "DRESSING_ROOM",
+          facility: { name: "Garderobentrakt" },
+        },
+      },
+    ]);
+
+    const conflicts = await findWeekplannerPlanConflicts(
+      TENANT,
+      new Date("2026-08-10T15:15:00.000Z"),
+      new Date("2026-08-10T18:45:00.000Z"),
+      "DRESSING_ROOM",
+      {
+        weekplannerPlanId: PLAN_ID,
+        excludeActivityType: "TRAINING",
+        excludeActivityId: "session-b",
+      },
+      resourceByCode,
+    );
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toMatchObject({
+      resourceId: ROOM_ID,
+      label: "Junioren F2",
+      sourceType: "TRAINING",
+    });
+  });
+
+  it("uses TrainingCenter occurrence time overrides before plan time overrides", async () => {
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-a",
+        startAt: new Date("2026-08-10T10:00:00.000Z"),
+        endAt: new Date("2026-08-10T11:00:00.000Z"),
+        overrideStartAt: new Date("2026-08-10T15:00:00.000Z"),
+        overrideEndAt: new Date("2026-08-10T16:30:00.000Z"),
+        trainingSeriesId: "series-a",
+        trainingSeries: { title: "Junioren F2" },
+      },
+    ]);
+    mocks.trainingAllocationFindMany.mockResolvedValue([
+      {
+        trainingSeriesId: "series-a",
+        facilityResource: {
+          id: ROOM_ID,
+          code: "E1",
+          name: "Garderobe E1",
+          type: "DRESSING_ROOM",
+          facility: { name: "Garderobentrakt" },
+        },
+      },
+    ]);
+
+    const conflicts = await findWeekplannerPlanConflicts(
+      TENANT,
+      new Date("2026-08-10T15:15:00.000Z"),
+      new Date("2026-08-10T16:00:00.000Z"),
+      "DRESSING_ROOM",
+      { weekplannerPlanId: PLAN_ID },
+      resourceByCode,
+    );
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.startAt.toISOString()).toBe("2026-08-10T15:00:00.000Z");
+    expect(conflicts[0]?.endAt.toISOString()).toBe("2026-08-10T16:30:00.000Z");
+  });
+
+  it("applies buffer-only dressing-room override occupancy windows", async () => {
+    mocks.weekplannerPlanAllocationFindMany.mockResolvedValue([
+      {
+        activityType: "TRAINING",
+        activityId: "session-a",
+        allocationGroup: "DRESSING_ROOM",
+        participantId: "",
+        occupancyBeforeMinutes: 45,
+        occupancyAfterMinutes: 30,
+        facilityResource: {
+          id: ROOM_ID,
+          code: "E1",
+          name: "Garderobe E1",
+          type: "DRESSING_ROOM",
+          facility: { name: "Garderobentrakt" },
+        },
+      },
+    ]);
+    mocks.trainingSessionFindMany.mockResolvedValue([
+      {
+        id: "session-a",
+        startAt: new Date("2026-08-10T17:00:00.000Z"),
+        endAt: new Date("2026-08-10T18:30:00.000Z"),
+        overrideStartAt: null,
+        overrideEndAt: null,
+        trainingSeriesId: "series-a",
+        trainingSeries: { title: "Junioren F2" },
+      },
+    ]);
+    mocks.trainingAllocationFindMany.mockResolvedValue([
+      {
+        trainingSeriesId: "series-a",
+        facilityResource: {
+          id: ROOM_ID,
+          code: "E1",
+          name: "Garderobe E1",
+          type: "DRESSING_ROOM",
+          facility: { name: "Garderobentrakt" },
+        },
+      },
+    ]);
+
+    const conflicts = await findWeekplannerPlanConflicts(
+      TENANT,
+      new Date("2026-08-10T16:20:00.000Z"),
+      new Date("2026-08-10T16:25:00.000Z"),
+      "DRESSING_ROOM",
+      { weekplannerPlanId: PLAN_ID },
+      resourceByCode,
+    );
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.startAt.toISOString()).toBe("2026-08-10T16:15:00.000Z");
+    expect(conflicts[0]?.endAt.toISOString()).toBe("2026-08-10T19:00:00.000Z");
+  });
 });

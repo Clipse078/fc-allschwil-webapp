@@ -66,6 +66,23 @@ export function activityIdentityKey(activityType: WeekplannerItemType, activityI
   return `${activityType}:${activityId}`;
 }
 
+/**
+ * TRAININGCENTER-02 canonical occurrence time — session-level override wins
+ * when present, matching lib/facilities/availability-service.ts#findTrainingConflicts
+ * and listTrainingSessions toDto().
+ */
+export function resolveCanonicalTrainingSessionTime(session: {
+  startAt: Date;
+  endAt: Date;
+  overrideStartAt?: Date | null;
+  overrideEndAt?: Date | null;
+}): { startAt: Date; endAt: Date } {
+  return {
+    startAt: session.overrideStartAt ?? session.startAt,
+    endAt: session.overrideEndAt ?? session.endAt,
+  };
+}
+
 export function allocationGroupKey(
   activityType: WeekplannerItemType,
   activityId: string,

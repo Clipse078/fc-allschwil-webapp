@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   collectActivitiesWithOverrides,
+  resolveCanonicalTrainingSessionTime,
   resolveEffectiveAllocation,
   resolveEffectiveTime,
 } from "../effective-plan-resolution";
@@ -55,6 +56,19 @@ describe("resolveEffectiveTime", () => {
     );
     expect(result.overridden).toBe(true);
     expect(result.startAt.toISOString()).toBe("2026-08-10T15:00:00.000Z");
+  });
+});
+
+describe("resolveCanonicalTrainingSessionTime", () => {
+  it("prefers occurrence-level override instants over series-generated defaults", () => {
+    const result = resolveCanonicalTrainingSessionTime({
+      startAt: new Date("2026-08-10T10:00:00.000Z"),
+      endAt: new Date("2026-08-10T11:00:00.000Z"),
+      overrideStartAt: new Date("2026-08-10T15:00:00.000Z"),
+      overrideEndAt: new Date("2026-08-10T16:30:00.000Z"),
+    });
+    expect(result.startAt.toISOString()).toBe("2026-08-10T15:00:00.000Z");
+    expect(result.endAt.toISOString()).toBe("2026-08-10T16:30:00.000Z");
   });
 });
 

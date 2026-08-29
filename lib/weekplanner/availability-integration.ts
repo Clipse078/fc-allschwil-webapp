@@ -32,6 +32,7 @@ import type { AvailabilityResourceGroup } from "@/lib/facilities/availability-se
 import {
   activityIdentityKey,
   collectActivitiesWithOverrides,
+  resolveCanonicalTrainingSessionTime,
   resolveEffectiveAllocation,
   resolveEffectiveTime,
   type TimeOverrideEntry,
@@ -266,6 +267,8 @@ async function collectTrainingOccupants(
       id: true,
       startAt: true,
       endAt: true,
+      overrideStartAt: true,
+      overrideEndAt: true,
       trainingSeriesId: true,
       trainingSeries: { select: { title: true } },
     },
@@ -335,11 +338,12 @@ async function collectTrainingOccupants(
       standardplanDressingRoom,
     );
 
+    const canonicalTime = resolveCanonicalTrainingSessionTime(session);
     const time = resolveEffectiveTime(
       timeOverridesByKey,
       activityIdentityKey("TRAINING", session.id),
-      session.startAt,
-      session.endAt,
+      canonicalTime.startAt,
+      canonicalTime.endAt,
     );
     if (!isMeaningfulEventInterval(time.startAt, time.endAt)) continue;
 
@@ -387,6 +391,9 @@ async function collectMatchOccupants(
     const homeRoomRef = match.operational.homeDressingRoomCode
       ? resourceByCode.get(match.operational.homeDressingRoomCode)
       : undefined;
+    const awayRoomRef = match.operational.awayDressingRoomCode
+      ? resourceByCode.get(match.operational.awayDressingRoomCode)
+      : undefined;
 
     const pitch = resolveEffectiveAllocation(
       overridesByKey,
@@ -411,19 +418,45 @@ async function collectMatchOccupants(
     );
     if (!isMeaningfulEventInterval(time.startAt, time.endAt)) continue;
 
-    const allocations = group === "PITCH_HALL" ? pitch.allocations : dressingRoom.allocations;
-    if (allocations.length === 0) continue;
-
     const label = match.away.displayName ? `vs. ${match.away.displayName}` : match.title;
-    pushAllocationConflicts(
-      conflicts,
-      allocations,
-      { startAt: time.startAt, endAt: time.endAt },
-      label,
-      "MATCH",
-      queryStartAt,
-      queryEndAt,
-    );
+    const activityWindow = { startAt: time.startAt, endAt: time.endAt };
+
+    if (group === "PITCH_HALL") {
+      if (pitch.allocations.length === 0) continue;
+      pushAllocationConflicts(
+        conflicts,
+        pitch.allocations,
+        activityWindow,
+        label,
+        "MATCH",
+        queryStartAt,
+        queryEndAt,
+      );
+      continue;
+    }
+
+    if (dressingRoom.allocations.length > 0) {
+      pushAllocationConflicts(
+        conflicts,
+        dressingRoom.allocations,
+        activityWindow,
+        label,
+        "MATCH",
+        queryStartAt,
+        queryEndAt,
+      );
+    }
+    if (awayRoomRef) {
+      pushAllocationConflicts(
+        conflicts,
+        [awayRoomRef],
+        activityWindow,
+        label,
+        "MATCH",
+        queryStartAt,
+        queryEndAt,
+      );
+    }
   }
 }
 
