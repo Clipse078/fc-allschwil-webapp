@@ -40,6 +40,7 @@ import {
   TournamentParticipantDuplicateError,
   TournamentParticipantTenantMismatchError,
 } from "./errors";
+import { resolveTournamentParticipantLogoUrl } from "./club-identity";
 
 // TOURNAMENTCENTER-UX-03: canonical external-participant identity for NEW
 // participants is a Club-Directory ExternalClub (+ tournament-specific
@@ -66,11 +67,12 @@ const participantInclude = {
       name: true,
       shortName: true,
       categoryLabel: true,
-      externalClub: { select: { id: true, name: true, shortName: true } },
+      logoUrl: true,
+      externalClub: { select: { id: true, name: true, shortName: true, logoUrl: true } },
     },
   },
   externalClub: {
-    select: { id: true, name: true, shortName: true },
+    select: { id: true, name: true, shortName: true, logoUrl: true },
   },
   dressingRoomAllocations: {
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -119,9 +121,10 @@ type ParticipantRow = {
     name: string;
     shortName: string | null;
     categoryLabel: string | null;
-    externalClub: { id: string; name: string; shortName: string | null };
+    logoUrl: string | null;
+    externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null };
   } | null;
-  externalClub: { id: string; name: string; shortName: string | null } | null;
+  externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
   dressingRoomAllocations: Array<{
     id: string;
     notes: string | null;
@@ -137,7 +140,8 @@ type ParticipantRow = {
   }>;
 };
 
-function toDto(row: ParticipantRow): TournamentParticipantDto {
+function toDto(row: ParticipantRow, tenantLogoUrl: string | null = null): TournamentParticipantDto {
+  const logoUrl = resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
   const dressingRoomAllocations = row.dressingRoomAllocations.map((allocation) => ({
     id: allocation.id,
     facilityResourceId: allocation.facilityResource.id,
@@ -156,6 +160,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
       tournamentId: row.eventId,
       kind: "TEAM",
       displayName: row.team.name,
+      logoUrl,
       team: row.team,
       externalTeam: null,
       externalClub: null,
@@ -175,6 +180,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
       tournamentId: row.eventId,
       kind: "EXTERNAL_CLUB",
       displayName: rawDisplayName ?? row.externalClub.name,
+      logoUrl,
       team: null,
       externalTeam: null,
       externalClub: {
@@ -182,6 +188,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
           id: row.externalClub.id,
           name: row.externalClub.name,
           shortName: row.externalClub.shortName,
+          logoUrl: row.externalClub.logoUrl,
         },
         rawDisplayName,
       },
@@ -201,13 +208,19 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
       tournamentId: row.eventId,
       kind: "EXTERNAL_TEAM",
       displayName: row.externalTeam.name,
+      logoUrl,
       team: null,
       externalTeam: {
         id: row.externalTeam.id,
         name: row.externalTeam.name,
         shortName: row.externalTeam.shortName,
         categoryLabel: row.externalTeam.categoryLabel,
-        club: row.externalTeam.externalClub,
+        club: {
+          id: row.externalTeam.externalClub.id,
+          name: row.externalTeam.externalClub.name,
+          shortName: row.externalTeam.externalClub.shortName,
+          logoUrl: row.externalTeam.externalClub.logoUrl,
+        },
       },
       externalClub: null,
       manualLabel: null,
@@ -223,6 +236,7 @@ function toDto(row: ParticipantRow): TournamentParticipantDto {
     tournamentId: row.eventId,
     kind: "MANUAL",
     displayName: row.manualLabel ?? "Unbenannt",
+    logoUrl: null,
     team: null,
     externalTeam: null,
     externalClub: null,
@@ -275,7 +289,7 @@ export async function listTournamentParticipants(
     include: participantInclude,
   });
 
-  return (rows as unknown as ParticipantRow[]).map(toDto);
+  return (rows as unknown as ParticipantRow[]).map((row) => toDto(row));
 }
 
 /**

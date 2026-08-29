@@ -26,7 +26,11 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getPublicEvents, TOURNAMENT_EVENT_TYPES } from "@/lib/events/public-event-feed";
-import { toPublicWebsiteEvent } from "@/lib/website/public-events-mapper";
+import {
+  indexTournamentsByEventId,
+  toPublicWebsiteTournament,
+} from "@/lib/website/public-tournaments-mapper";
+import { listTournamentsByIds } from "@/lib/tournaments/tournament-service";
 import {
   buildWebsiteEnvelope,
   resolveTenantFromParams,
@@ -72,7 +76,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       eventTypes: TOURNAMENT_EVENT_TYPES,
     });
 
-    const tournaments = rawEvents.map(toPublicWebsiteEvent);
+    const tournamentDtos = await listTournamentsByIds(
+      tenant.id,
+      rawEvents.map((event) => event.id),
+    );
+    const tournamentsById = indexTournamentsByEventId(tournamentDtos);
+
+    const tournaments = rawEvents.map((event) => {
+      const tournament = tournamentsById.get(event.id);
+      if (!tournament) {
+        throw new Error(`Missing tournament DTO for public event ${event.id}`);
+      }
+      return toPublicWebsiteTournament(event, tournament);
+    });
 
     return NextResponse.json(
       buildWebsiteEnvelope(

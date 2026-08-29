@@ -23,6 +23,12 @@ vi.mock("@/lib/db/prisma", () => ({
     team: {
       findFirst: vi.fn(),
     },
+    tenant: {
+      findFirst: vi.fn(),
+    },
+    externalClub: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -91,6 +97,19 @@ const baseRow = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(prisma.tenant.findFirst).mockResolvedValue({
+    name: "FC Allschwil",
+    logoUrl: "https://cdn.example.com/fca.png",
+  } as never);
+  vi.mocked(prisma.externalClub.findMany).mockResolvedValue([
+    {
+      id: "club-aesch",
+      name: "FC Aesch",
+      shortName: null,
+      alternativeName: null,
+      logoUrl: "https://cdn.example.com/aesch.png",
+    },
+  ] as never);
 });
 
 // ── A. listTournaments ─────────────────────────────────────────────────────────
@@ -140,7 +159,18 @@ describe("B. getTournament", () => {
       id: "participant-1",
       kind: "TEAM",
       displayName: "FC Allschwil E1",
+      logoUrl: "https://cdn.example.com/fca.png",
     });
+  });
+
+  it("resolves organizer logo from canonical external club", async () => {
+    vi.mocked(prisma.event.findFirst).mockResolvedValue(baseRow as never);
+
+    const result = await getTournament(TENANT_A, TOURNAMENT_ID);
+
+    expect(result.organizerLogoUrl).toBe("https://cdn.example.com/aesch.png");
+    expect(result.organizerExternalClubId).toBe("club-aesch");
+    expect(result.teamLogoUrl).toBe("https://cdn.example.com/fca.png");
   });
 
   it("maps tournamentResourceAllocations to the resourceAllocations DTO list", async () => {

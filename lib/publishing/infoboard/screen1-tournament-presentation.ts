@@ -8,7 +8,7 @@
  * tenant boundaries.
  */
 
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveTournamentParticipantLogoUrl } from "@/lib/tournaments/club-identity";
 import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 import type { InfoboardEventPresentationExtension } from "@/components/infoboard/screen1/screen1-presentation-types";
 
@@ -141,12 +141,7 @@ function resolveParticipantLogoUrl(
   row: TournamentParticipantRow,
   tenantLogoUrl: string | null,
 ): string | null {
-  if (row.team) return tenantLogoUrl?.trim() || null;
-  if (row.externalClub) return row.externalClub.logoUrl?.trim() || null;
-  if (row.externalTeam) {
-    return resolveExternalTeamLogoUrl(row.externalTeam, row.externalTeam.externalClub);
-  }
-  return null;
+  return resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
 }
 
 function resolveDressingRoomLabel(

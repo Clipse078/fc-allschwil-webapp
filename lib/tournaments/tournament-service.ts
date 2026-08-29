@@ -31,8 +31,15 @@ import { prisma } from "@/lib/db/prisma";
 import {
   findTournamentEventById,
   findAllTournamentEvents,
+  tournamentEventSelect,
   type TournamentEventRow,
 } from "./queries";
+import {
+  resolveTournamentOrganizerIdentity,
+  resolveTournamentParticipantLogoUrl,
+  type ResolvedOrganizerClub,
+} from "./club-identity";
+import { resolveOrganizerClubsByName } from "./organizer-club-resolver";
 import {
   TournamentNotFoundError,
   TournamentValidationError,
@@ -62,7 +69,9 @@ function normalizeHomeAway(value: string | null): TournamentHomeAway {
 
 function toParticipantDto(
   row: TournamentEventRow["tournamentParticipants"][number],
+  tenantLogoUrl: string | null,
 ): TournamentParticipantDto {
+  const logoUrl = resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
   const dressingRoomAllocations = row.dressingRoomAllocations.map((allocation) => ({
     id: allocation.id,
     facilityResourceId: allocation.facilityResource.id,
@@ -81,6 +90,7 @@ function toParticipantDto(
       tournamentId: row.eventId,
       kind: "TEAM",
       displayName: row.team.name,
+      logoUrl,
       team: row.team,
       externalTeam: null,
       externalClub: null,
@@ -100,6 +110,7 @@ function toParticipantDto(
       tournamentId: row.eventId,
       kind: "EXTERNAL_CLUB",
       displayName: rawDisplayName ?? row.externalClub.name,
+      logoUrl,
       team: null,
       externalTeam: null,
       externalClub: {
@@ -107,6 +118,7 @@ function toParticipantDto(
           id: row.externalClub.id,
           name: row.externalClub.name,
           shortName: row.externalClub.shortName,
+          logoUrl: row.externalClub.logoUrl,
         },
         rawDisplayName,
       },
@@ -125,13 +137,19 @@ function toParticipantDto(
       tournamentId: row.eventId,
       kind: "EXTERNAL_TEAM",
       displayName: row.externalTeam.name,
+      logoUrl,
       team: null,
       externalTeam: {
         id: row.externalTeam.id,
         name: row.externalTeam.name,
         shortName: row.externalTeam.shortName,
         categoryLabel: row.externalTeam.categoryLabel,
-        club: row.externalTeam.externalClub,
+        club: {
+          id: row.externalTeam.externalClub.id,
+          name: row.externalTeam.externalClub.name,
+          shortName: row.externalTeam.externalClub.shortName,
+          logoUrl: row.externalTeam.externalClub.logoUrl,
+        },
       },
       externalClub: null,
       manualLabel: null,
@@ -147,6 +165,7 @@ function toParticipantDto(
     tournamentId: row.eventId,
     kind: "MANUAL",
     displayName: row.manualLabel ?? "Unbenannt",
+    logoUrl: null,
     team: null,
     externalTeam: null,
     externalClub: null,
@@ -174,10 +193,41 @@ function toResourceAllocationDto(
   };
 }
 
-function toDto(row: TournamentEventRow): TournamentDto {
+type TournamentTenantContext = {
+  name: string;
+  logoUrl: string | null;
+};
+
+async function loadTournamentTenantContext(
+  tenantId: string,
+): Promise<TournamentTenantContext> {
+  const tenant = await prisma.tenant.findFirst({
+    where: { id: tenantId },
+    select: { name: true, logoUrl: true },
+  });
+  return {
+    name: tenant?.name ?? "",
+    logoUrl: tenant?.logoUrl ?? null,
+  };
+}
+
+function toDto(
+  row: TournamentEventRow,
+  tenantContext: TournamentTenantContext,
+  organizerClub: ResolvedOrganizerClub | null,
+): TournamentDto {
   if (row.tenantId === null) {
     throw new Error(`Tournament event ${row.id} has no tenantId.`);
   }
+
+  const homeAway = normalizeHomeAway(row.homeAway);
+  const organizerIdentity = resolveTournamentOrganizerIdentity({
+    organizerName: row.organizerName,
+    homeAway,
+    tenantName: tenantContext.name,
+    tenantLogoUrl: tenantContext.logoUrl,
+    resolvedOrganizerClub: organizerClub,
+  });
 
   return {
     id: row.id,
@@ -191,13 +241,18 @@ function toDto(row: TournamentEventRow): TournamentDto {
     meetingTime: row.meetingTime ? row.meetingTime.toISOString() : null,
     location: row.location,
     organizerName: row.organizerName,
+    organizerLogoUrl: organizerIdentity.logoUrl,
+    organizerExternalClubId: organizerIdentity.externalClubId,
     competitionLabel: row.competitionLabel,
     resultLabel: row.resultLabel,
     remarks: row.remarks,
     season: row.season,
     team: row.team,
-    homeAway: normalizeHomeAway(row.homeAway),
-    participants: row.tournamentParticipants.map(toParticipantDto),
+    teamLogoUrl: row.team ? tenantContext.logoUrl?.trim() || null : null,
+    homeAway,
+    participants: row.tournamentParticipants.map((participant) =>
+      toParticipantDto(participant, tenantContext.logoUrl),
+    ),
     resourceAllocations: row.tournamentResourceAllocations.map(toResourceAllocationDto),
     visibility: {
       websiteVisible: row.websiteVisible,
@@ -270,8 +325,64 @@ export async function listTournaments(
   tenantId: string,
   filter: ListTournamentsFilter = {},
 ): Promise<TournamentDto[]> {
-  const rows = await findAllTournamentEvents(tenantId, { status: filter.status });
-  return rows.map(toDto);
+  const [rows, tenantContext] = await Promise.all([
+    findAllTournamentEvents(tenantId, { status: filter.status }),
+    loadTournamentTenantContext(tenantId),
+  ]);
+
+  const organizerClubs = await resolveOrganizerClubsByName(
+    tenantId,
+    rows.map((row) => row.organizerName ?? ""),
+  );
+
+  return rows.map((row) =>
+    toDto(
+      row,
+      tenantContext,
+      row.organizerName?.trim()
+        ? organizerClubs.get(row.organizerName.trim()) ?? null
+        : null,
+    ),
+  );
+}
+
+/**
+ * Lists tournaments by event ids for public feed enrichment.
+ * Returns only tournaments matching the supplied ids (tenant-scoped).
+ */
+export async function listTournamentsByIds(
+  tenantId: string,
+  tournamentIds: readonly string[],
+): Promise<TournamentDto[]> {
+  if (tournamentIds.length === 0) return [];
+
+  const [rows, tenantContext] = await Promise.all([
+    prisma.event.findMany({
+      where: {
+        tenantId,
+        type: "TOURNAMENT",
+        id: { in: [...tournamentIds] },
+      },
+      orderBy: [{ startAt: "asc" }, { id: "asc" }],
+      select: tournamentEventSelect,
+    }),
+    loadTournamentTenantContext(tenantId),
+  ]);
+
+  const organizerClubs = await resolveOrganizerClubsByName(
+    tenantId,
+    rows.map((row) => row.organizerName ?? ""),
+  );
+
+  return rows.map((row) =>
+    toDto(
+      row,
+      tenantContext,
+      row.organizerName?.trim()
+        ? organizerClubs.get(row.organizerName.trim()) ?? null
+        : null,
+    ),
+  );
 }
 
 /**
@@ -280,11 +391,26 @@ export async function listTournaments(
  * @throws {TournamentNotFoundError} Not found, cross-tenant, or not a TOURNAMENT event.
  */
 export async function getTournament(tenantId: string, tournamentId: string): Promise<TournamentDto> {
-  const row = await findTournamentEventById(tenantId, tournamentId);
+  const [row, tenantContext] = await Promise.all([
+    findTournamentEventById(tenantId, tournamentId),
+    loadTournamentTenantContext(tenantId),
+  ]);
   if (!row) {
     throw new TournamentNotFoundError(tournamentId);
   }
-  return toDto(row);
+
+  const organizerClubs = await resolveOrganizerClubsByName(
+    tenantId,
+    row.organizerName?.trim() ? [row.organizerName.trim()] : [],
+  );
+
+  return toDto(
+    row,
+    tenantContext,
+    row.organizerName?.trim()
+      ? organizerClubs.get(row.organizerName.trim()) ?? null
+      : null,
+  );
 }
 
 /**
@@ -340,7 +466,18 @@ export async function updateTournament(
   if (input.teamPageVisible !== undefined) data.teamPageVisible = input.teamPageVisible;
 
   if (Object.keys(data).length === 0) {
-    return toDto(existing);
+    const tenantContext = await loadTournamentTenantContext(tenantId);
+    const organizerClubs = await resolveOrganizerClubsByName(
+      tenantId,
+      existing.organizerName?.trim() ? [existing.organizerName.trim()] : [],
+    );
+    return toDto(
+      existing,
+      tenantContext,
+      existing.organizerName?.trim()
+        ? organizerClubs.get(existing.organizerName.trim()) ?? null
+        : null,
+    );
   }
 
   await prisma.event.update({ where: { id: tournamentId }, data });
@@ -363,7 +500,7 @@ export async function cancelTournament(tenantId: string, tournamentId: string): 
   }
 
   if (existing.status === "CANCELLED") {
-    return toDto(existing);
+    return getTournament(tenantId, tournamentId);
   }
 
   if (existing.status === "ARCHIVED" || existing.status === "COMPLETED") {
@@ -390,7 +527,7 @@ export async function restoreTournament(tenantId: string, tournamentId: string):
   }
 
   if (existing.status === "SCHEDULED") {
-    return toDto(existing);
+    return getTournament(tenantId, tournamentId);
   }
 
   if (existing.status !== "CANCELLED") {

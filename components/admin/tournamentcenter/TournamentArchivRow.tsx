@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { CalendarDays, MapPin, Shield, Trophy } from "lucide-react";
+import { CalendarDays, MapPin, Trophy } from "lucide-react";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
 
 const STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Abgeschlossen",
@@ -66,7 +67,13 @@ export default function TournamentArchivRow({ tournament, locale, timezone }: To
             className="inline-flex items-center gap-1.5"
             data-testid={`tournament-archiv-team-${tournament.id}`}
           >
-            <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <ClubLogo
+              logoUrl={tournament.teamLogoUrl}
+              name={tournament.team.name}
+              size="sm"
+              bare
+              className="h-3.5 w-3.5"
+            />
             <span>
               <span className="font-medium text-[var(--foreground)]">Mannschaft:</span>{" "}
               {tournament.team.name}
@@ -79,7 +86,13 @@ export default function TournamentArchivRow({ tournament, locale, timezone }: To
             className="inline-flex items-center gap-1.5"
             data-testid={`tournament-archiv-organizer-${tournament.id}`}
           >
-            <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <ClubLogo
+              logoUrl={tournament.organizerLogoUrl}
+              name={tournament.organizerName}
+              size="sm"
+              bare
+              className="h-3.5 w-3.5"
+            />
             <span>
               <span className="font-medium text-[var(--foreground)]">Veranstalter:</span>{" "}
               {tournament.organizerName}

@@ -19,6 +19,8 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
     meetingTime: null,
     location: "Turnhalle Binningen",
     organizerName: "FC Aesch",
+    organizerLogoUrl: null,
+    organizerExternalClubId: null,
     competitionLabel: null,
     resultLabel: null,
     remarks: null,
@@ -31,6 +33,7 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
       genderGroup: null,
       ageGroup: "E",
     },
+    teamLogoUrl: null,
     // Fully READY by default (matches lib/tournaments/__tests__/operational-state.test.ts):
     // one participant with a dressing room, one Spielfeld/Halle allocation.
     homeAway: "HOME",
@@ -40,6 +43,7 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
         tournamentId: "tournament-1",
         kind: "TEAM",
         displayName: "FC Allschwil E1",
+        logoUrl: null,
         team: {
           id: "team-1",
           name: "FC Allschwil E1",

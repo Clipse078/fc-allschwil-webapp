@@ -91,11 +91,14 @@ export const tournamentEventSelect = {
           name: true,
           shortName: true,
           categoryLabel: true,
-          externalClub: { select: { id: true, name: true, shortName: true } },
+          logoUrl: true,
+          externalClub: {
+            select: { id: true, name: true, shortName: true, logoUrl: true },
+          },
         },
       },
       externalClub: {
-        select: { id: true, name: true, shortName: true },
+        select: { id: true, name: true, shortName: true, logoUrl: true },
       },
       dressingRoomAllocations: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
