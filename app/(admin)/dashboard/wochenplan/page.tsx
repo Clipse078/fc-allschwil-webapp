@@ -1,10 +1,12 @@
 ﻿import Link from "next/link";
 import { ChevronLeft, ChevronRight, CalendarDays, AlertCircle } from "lucide-react";
 import WochenplanBoard from "@/components/admin/wochenplan/WochenplanBoard";
+import WochenplanPlanBar from "@/components/admin/wochenplan/WochenplanPlanBar";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenantId } from "@/lib/tenants/active-tenant";
 import { getWochenplanBoardData } from "@/lib/wochenplan/queries";
+import { listWochenplanPlans } from "@/lib/wochenplan/plan-service";
 import { getWeekWindow, getIsoWeekNumber, startOfIsoWeek } from "@/lib/planner/date-utils";
 import {
   getActiveResourceOptionsForTenant,
@@ -15,7 +17,7 @@ import { getWochenplanPublication } from "@/lib/wochenplan/publication-queries";
 import type { WochenplanBoardPitchRowKey, WochenplanEventItem } from "@/lib/wochenplan/types";
 
 type PageProps = {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{ week?: string; plan?: string }>;
 };
 
 /**
@@ -50,13 +52,16 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
   await requirePermission(PERMISSIONS.WOCHENPLAN_MANAGE);
   const tenantId = await getActiveTenantId();
 
-  const { week } = await searchParams;
+  const { week, plan } = await searchParams;
   const { weekId, start, end, previousWeekId, nextWeekId } = getWeekWindow(week);
 
-  // Load real events + active publication in parallel (scoped to actor's tenant)
-  const [boardData, publication] = await Promise.all([
-    getWochenplanBoardData(start, end, weekId, tenantId),
+  const viewedPlanId = plan?.trim() || null;
+
+  // Load real events + active publication + tenant plans in parallel
+  const [boardData, publication, plans] = await Promise.all([
+    getWochenplanBoardData(start, end, weekId, tenantId, viewedPlanId),
     tenantId ? getWochenplanPublication(tenantId, weekId) : Promise.resolve(null),
+    tenantId ? listWochenplanPlans(tenantId) : Promise.resolve([]),
   ]);
 
   // Resolve pitch row labels via the canonical facility/resource display helper.
@@ -145,6 +150,15 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         </div>
       </section>
 
+      {tenantId && plans.length > 0 ? (
+        <WochenplanPlanBar
+          weekParam={weekId}
+          plans={plans}
+          viewedPlanId={viewedPlanId ?? plans.find((p) => p.isDefault)?.id ?? plans[0]?.id ?? null}
+          canManage
+        />
+      ) : null}
+
       {/* Summary of unplaced events */}
       {boardData.unplaced.length > 0 ? (
         <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
@@ -185,6 +199,8 @@ export default async function WochenplanPage({ searchParams }: PageProps) {
         activeVariantLabel={publication?.isPublished ? publication.variantLabel : null}
         roomOptions={roomOptions}
         historicalRoomNamesByCode={historicalRoomNamesByCode}
+        viewedPlanId={viewedPlanId ?? plans.find((p) => p.isDefault)?.id ?? plans[0]?.id ?? null}
+        activePlanName={plans.find((p) => p.isActive)?.name ?? null}
       />
     </div>
   );

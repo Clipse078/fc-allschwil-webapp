@@ -30,6 +30,15 @@ import { prisma } from "@/lib/db/prisma";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveFacilityResourcesByCodesForTenant } from "@/lib/facilities/queries";
+import {
+  getWochenplanPlan,
+  upsertWochenplanPlanAllocation,
+} from "@/lib/wochenplan/plan-service";
+import {
+  WochenplanPlanNotFoundError,
+  WochenplanPlanValidationError,
+  WochenplanPlanAllocationEventNotFoundError,
+} from "@/lib/wochenplan/plan-errors";
 import type { FacilityResourceType } from "@prisma/client";
 
 type RouteContext = { params: Promise<{ eventId: string }> };
@@ -151,6 +160,43 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     event.awayDressingRoomCode,
   );
   if (!awayResult.ok) return NextResponse.json({ error: awayResult.error }, { status: 400 });
+
+  const planId = typeof body.planId === "string" && body.planId.trim() ? body.planId.trim() : null;
+
+  if (planId && tenantId) {
+    try {
+      const plan = await getWochenplanPlan(tenantId, planId);
+      if (!plan.isDefault) {
+        const allocation = await upsertWochenplanPlanAllocation(tenantId, {
+          wochenplanPlanId: planId,
+          eventId,
+          pitchCode: pitchResult.value,
+          homeDressingRoomCode: homeResult.value,
+          awayDressingRoomCode: awayResult.value,
+        });
+        return NextResponse.json({
+          event: {
+            id: eventId,
+            pitchCode: allocation.pitchCode,
+            homeDressingRoomCode: allocation.homeDressingRoomCode,
+            awayDressingRoomCode: allocation.awayDressingRoomCode,
+          },
+          planId,
+        });
+      }
+    } catch (err) {
+      if (err instanceof WochenplanPlanNotFoundError) {
+        return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+      }
+      if (err instanceof WochenplanPlanValidationError) {
+        return NextResponse.json({ error: err.message }, { status: 422 });
+      }
+      if (err instanceof WochenplanPlanAllocationEventNotFoundError) {
+        return NextResponse.json({ error: err.message }, { status: 404 });
+      }
+      throw err;
+    }
+  }
 
   const updated = await prisma.event.update({
     where: { id: eventId },

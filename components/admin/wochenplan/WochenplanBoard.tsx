@@ -648,6 +648,10 @@ type WochenplanBoardProps = {
    * has no entry here (e.g. no DB resource can be resolved at all).
    */
   historicalRoomNamesByCode?: Record<string, string>;
+  /** WOCHENPLAN-2.0-01B — plan being viewed/edited. */
+  viewedPlanId?: string | null;
+  /** WOCHENPLAN-2.0-01B — tenant's public/active plan name for publish bar. */
+  activePlanName?: string | null;
 };
 
 export default function WochenplanBoard({
@@ -657,6 +661,8 @@ export default function WochenplanBoard({
   activeVariantLabel,
   roomOptions: roomOptionsProp,
   historicalRoomNamesByCode: historicalRoomNamesByCodeProp,
+  viewedPlanId,
+  activePlanName,
 }: WochenplanBoardProps) {
   const PITCH_ROWS = pitchRowsProp ?? DEFAULT_PITCH_ROWS;
   const ROOM_OPTIONS = roomOptionsProp ?? DEFAULT_DRESSING_ROOMS;
@@ -706,6 +712,7 @@ export default function WochenplanBoard({
           pitchCode,
           homeDressingRoomCode: event.allocation.homeDressingRoomCode,
           awayDressingRoomCode: event.allocation.awayDressingRoomCode,
+          ...(viewedPlanId ? { planId: viewedPlanId } : {}),
         }),
       });
 
@@ -935,6 +942,7 @@ export default function WochenplanBoard({
         onPublish={publishWeek}
         weekId={weekId}
         activeVariantLabel={publishedVariant}
+        activePlanName={activePlanName}
       />
 
       <div className="grid gap-6 xl:grid-cols-[1.45fr_0.55fr]">

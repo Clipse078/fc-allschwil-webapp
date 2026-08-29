@@ -640,6 +640,10 @@ model Tenant {
   facilities              Facility[]
   facilityResources       FacilityResource[]
   wochenplanPublications  WochenplanPublication[]
+  // WOCHENPLAN-2.0-01B: tenant-defined named Wochenplan variants + sparse
+  // per-event allocation overrides for alternative plans.
+  wochenplanPlans         WochenplanPlan[]
+  wochenplanPlanAllocations WochenplanPlanAllocation[]
   newsArticles            NewsArticle[]
   mediaAssets             MediaAsset[]
   mediaFolders            MediaFolder[]
@@ -2795,6 +2799,72 @@ model WochenplanPublication {
   @@unique([tenantId, weekId])
   @@index([tenantId, weekId])
   @@index([tenantId, isPublished])
+}
+
+// ---------------------------------------------------------------------------
+// WochenplanPlan — WOCHENPLAN-2.0-01B: Tenant-Level Named Weekly Plans
+//
+// Multiple tenant-defined plans (arbitrary names). Exactly one non-archived
+// plan per tenant may be isActive (public/operational). Exactly one non-
+// archived plan per tenant may be isDefault — its allocations are stored on
+// the canonical Event.pitchCode/*DressingRoomCode fields; alternative plans
+// store sparse overrides in WochenplanPlanAllocation.
+//
+// Viewing a plan (admin ?plan=<id>) is independent of isActive — only an
+// explicit activate action changes the public plan.
+// ---------------------------------------------------------------------------
+
+model WochenplanPlan {
+  id           String    @id @default(cuid())
+  tenantId     String
+  /// Tenant-chosen, generic plan name.
+  name         String
+  description  String?
+  /// True for at most one non-archived plan per tenant — canonical Event
+  /// fields hold this plan's allocations.
+  isDefault    Boolean   @default(false)
+  /// True for at most one non-archived plan per tenant — the public plan.
+  isActive     Boolean   @default(false)
+  displayOrder Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  archivedAt   DateTime?
+
+  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  allocations WochenplanPlanAllocation[]
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+  @@index([tenantId, isDefault])
+  @@index([tenantId, archivedAt])
+}
+
+// ---------------------------------------------------------------------------
+// WochenplanPlanAllocation — sparse per-event allocation override within an
+// alternative WochenplanPlan. No row for an event = inherit canonical Event
+// allocation fields. A present row fully replaces that event's allocation
+// within this plan only.
+// ---------------------------------------------------------------------------
+
+model WochenplanPlanAllocation {
+  id                   String   @id @default(cuid())
+  tenantId             String
+  wochenplanPlanId     String
+  /// Event.id — tenant-validated at the service layer, not a DB relation.
+  eventId              String
+  pitchCode            String?
+  homeDressingRoomCode String?
+  awayDressingRoomCode String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  wochenplanPlan WochenplanPlan @relation(fields: [wochenplanPlanId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([wochenplanPlanId, eventId])
+  @@index([tenantId])
+  @@index([wochenplanPlanId])
+  @@index([eventId])
 }
 
 // ---------------------------------------------------------------------------

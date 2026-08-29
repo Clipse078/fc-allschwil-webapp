@@ -39,6 +39,8 @@ import {
   getWochenplanPublication,
   formatWochenplanVariantBadge,
 } from "@/lib/wochenplan/publication-queries";
+import { getActiveWochenplanPlan } from "@/lib/wochenplan/plan-service";
+import { applyWochenplanPlanAllocations } from "@/lib/wochenplan/plan-queries";
 import {
   buildWebsiteEnvelope,
   resolveTenantFromParams,
@@ -113,8 +115,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       maxLimit: isSeasonScope ? SEASON_SCOPE_MAX_LIMIT : undefined,
     });
 
+    const activePlan = await getActiveWochenplanPlan(tenant.id);
+
+    const resolvedDays = await Promise.all(
+      rawDays.map(async (day) => ({
+        ...day,
+        events: await applyWochenplanPlanAllocations(tenant.id, day.events, activePlan),
+      })),
+    );
+
     // Map each day's events to the website-safe shape.
-    const days: PublicWochenplanDay[] = rawDays.map((day) => ({
+    const days: PublicWochenplanDay[] = resolvedDays.map((day) => ({
       date: day.date,
       calendarWeek: day.calendarWeek,
       weekdayLabel: day.weekdayLabel,
@@ -126,13 +137,16 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let publication: PublicWochenplanPublication | null = null;
     if (!isSeasonScope && weekId) {
       const pub = await getWochenplanPublication(tenant.id, weekId);
+      const variantLabel = activePlan?.name ?? pub?.variantLabel ?? "Wochenplan";
       if (pub?.isPublished) {
         publication = {
           weekId: pub.weekId,
-          variantLabel: pub.variantLabel,
-          variantBadge: formatWochenplanVariantBadge(pub.weekId, pub.variantLabel),
+          variantLabel,
+          variantBadge: formatWochenplanVariantBadge(pub.weekId, variantLabel),
           isPublished: pub.isPublished,
           publishedAt: pub.publishedAt,
+          activePlanId: activePlan?.id ?? null,
+          activePlanName: activePlan?.name ?? null,
         };
       }
     }

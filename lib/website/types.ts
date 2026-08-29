@@ -513,6 +513,9 @@ export type PublicWochenplanPublication = {
   variantBadge: string;
   isPublished: boolean;
   publishedAt: Date | null;
+  /** WOCHENPLAN-2.0-01B — active tenant plan id (for future preview flows). */
+  activePlanId?: string | null;
+  activePlanName?: string | null;
 };
 
 export type WeekplanData = {

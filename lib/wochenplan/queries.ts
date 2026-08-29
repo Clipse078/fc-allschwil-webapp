@@ -19,6 +19,7 @@ import type {
   WochenplanBoardSlotKey,
   WochenplanBoardCategoryKey,
 } from "@/lib/wochenplan/types";
+import { applyWochenplanPlanAllocations, resolveWochenplanPlanForRead } from "@/lib/wochenplan/plan-queries";
 
 // ── Slot snap ────────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ export async function getWochenplanBoardData(
   weekEnd: Date,
   weekId: string,
   tenantId?: string | null,
+  wochenplanPlanId?: string | null,
 ): Promise<WochenplanBoardData> {
   const events = await prisma.event.findMany({
     where: {
@@ -193,10 +195,28 @@ export async function getWochenplanBoardData(
     select: BOARD_EVENT_SELECT,
   });
 
+  let resolvedEvents = events as unknown as BoardEventRow[];
+  if (tenantId) {
+    const plan = await resolveWochenplanPlanForRead(tenantId, wochenplanPlanId);
+    if (plan && !plan.isDefault) {
+      resolvedEvents = await applyWochenplanPlanAllocations(
+        tenantId,
+        resolvedEvents.map((e) => ({
+          ...e,
+          id: e.id,
+          pitchCode: e.pitchCode,
+          homeDressingRoomCode: e.homeDressingRoomCode,
+          awayDressingRoomCode: e.awayDressingRoomCode,
+        })),
+        plan,
+      );
+    }
+  }
+
   const placed: WochenplanBoardEvent[] = [];
   const unplaced: WochenplanBoardData["unplaced"] = [];
 
-  for (const event of events as unknown as BoardEventRow[]) {
+  for (const event of resolvedEvents) {
     const dayKey = toDayKey(event.startAt);
     if (!dayKey) {
       unplaced.push({
