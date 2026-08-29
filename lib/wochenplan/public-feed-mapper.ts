@@ -18,6 +18,8 @@ import { resolvePitchDisplay } from "@/lib/publishing/presentation/allocation-di
 import type { TournamentDto } from "@/lib/tournaments/types";
 import type {
   PublicWochenplanClubIdentity,
+  PublicWochenplanDressingRoom,
+  PublicWochenplanDressingRoomRole,
   PublicWochenplanEventItem,
   PublicWochenplanMatchIdentity,
   PublicWochenplanPitch,
@@ -134,6 +136,80 @@ function toPublicPitch(ref: WeekplannerResourceRef | undefined): PublicWochenpla
     name: ref.name,
     facilityName: ref.facilityName,
   };
+}
+
+function toPublicDressingRoom(
+  ref: WeekplannerResourceRef,
+  role: PublicWochenplanDressingRoomRole,
+  participantLabel: string | null = null,
+): PublicWochenplanDressingRoom {
+  return {
+    name: ref.name,
+    facilityName: meaningful(ref.facilityName),
+    role,
+    ...(role === "TOURNAMENT_PARTICIPANT" ? { participantLabel } : {}),
+  };
+}
+
+function dedupeDressingRooms(
+  rooms: readonly PublicWochenplanDressingRoom[],
+): PublicWochenplanDressingRoom[] {
+  const seen = new Set<string>();
+  const deduped: PublicWochenplanDressingRoom[] = [];
+  for (const room of rooms) {
+    const key = [
+      room.role,
+      room.name,
+      room.facilityName ?? "",
+      room.participantLabel ?? "",
+    ].join("\0");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(room);
+  }
+  return deduped;
+}
+
+function mapResourceRefsToDressingRooms(
+  refs: readonly WeekplannerResourceRef[],
+  role: PublicWochenplanDressingRoomRole,
+  participantLabel: string | null = null,
+): PublicWochenplanDressingRoom[] {
+  return refs.map((ref) => toPublicDressingRoom(ref, role, participantLabel));
+}
+
+export function mapTrainingDressingRooms(
+  item: WeekplannerTrainingItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms(
+    mapResourceRefsToDressingRooms(item.dressingRoomAllocations, "TRAINING"),
+  );
+  return rooms.length > 0 ? rooms : null;
+}
+
+export function mapMatchDressingRooms(
+  item: WeekplannerMatchItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms([
+    ...mapResourceRefsToDressingRooms(item.dressingRoomAllocations, "HOME"),
+    ...mapResourceRefsToDressingRooms(item.awayDressingRoomAllocations, "AWAY"),
+  ]);
+  return rooms.length > 0 ? rooms : null;
+}
+
+export function mapTournamentDressingRooms(
+  item: WeekplannerTournamentItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms(
+    item.participantAllocations.flatMap((participant) =>
+      mapResourceRefsToDressingRooms(
+        participant.dressingRoomAllocations,
+        "TOURNAMENT_PARTICIPANT",
+        participant.participantLabel,
+      ),
+    ),
+  );
+  return rooms.length > 0 ? rooms : null;
 }
 
 function buildOwnClubIdentity(
@@ -351,6 +427,7 @@ export function mapTrainingToPublicEvent(
     ...base,
     kind: "TRAINING",
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms: mapTrainingDressingRooms(item),
   };
 }
 
@@ -392,6 +469,7 @@ export function mapMatchToPublicEvent(
       canonicalLogoByProviderClubId,
     ),
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms: mapMatchDressingRooms(item),
   };
 }
 
@@ -443,6 +521,8 @@ export function mapTournamentToPublicEvent(
     meetingTime: policy?.meetingTime ?? null,
   });
 
+  const dressingRooms = mapTournamentDressingRooms(item);
+
   if (tournament) {
     return {
       ...baseEvent,
@@ -450,6 +530,7 @@ export function mapTournamentToPublicEvent(
       organizer: toPublicOrganizer(tournament),
       participants: tournament.participants.map(toPublicParticipant),
       pitch: toPublicPitch(item.pitchAllocations[0]),
+      dressingRooms,
     };
   }
 
@@ -461,6 +542,7 @@ export function mapTournamentToPublicEvent(
       : null,
     participants: [],
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms,
   };
 }
 
