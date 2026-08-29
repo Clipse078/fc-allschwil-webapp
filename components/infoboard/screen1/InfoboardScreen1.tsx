@@ -1418,7 +1418,7 @@ function EventCard({
                 className={styles.tournamentParticipantLogos}
                 data-testid="tournament-participants"
               >
-                {participantAllocations.slice(0, 4).map((participant) => (
+                {participantAllocations.map((participant) => (
                   <MatchClubLogo
                     key={participant.id}
                     logoUrl={participant.clubLogoUrl ?? null}

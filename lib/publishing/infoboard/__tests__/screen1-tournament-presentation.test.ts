@@ -421,4 +421,45 @@ describe("buildScreen1TournamentPresentationExtensions", () => {
       },
     ]);
   });
+
+  it("maps all tournament participants without an artificial logo cap", async () => {
+    const participants = Array.from({ length: 6 }, (_, index) => ({
+      id: `p-${index + 1}`,
+      eventId: "evt-t6",
+      displayName: `Club ${index + 1}`,
+      manualLabel: null,
+      displayOrder: index,
+      team: null,
+      externalClub: {
+        name: `Club ${index + 1}`,
+        shortName: null,
+        logoUrl: `https://cdn.example.com/club-${index + 1}.png`,
+      },
+      externalTeam: null,
+      dressingRoomAllocations: [],
+    }));
+
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => participants,
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t6"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations).toHaveLength(6);
+    expect(extensions[0]?.participantAllocations?.map((row) => row.id)).toEqual([
+      "p-1",
+      "p-2",
+      "p-3",
+      "p-4",
+      "p-5",
+      "p-6",
+    ]);
+  });
 });
