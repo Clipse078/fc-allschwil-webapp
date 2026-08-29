@@ -8,7 +8,7 @@
  *   2. a single request-time `now` value (never calls new Date() internally);
  *   3. an injected PublicationEventLoader<Screen1SourceEvent>;
  *   4. buildInfoboardScreen1Feed() from PP-02A;
- *   5. static presentation extensions (empty — no canonical tournament model);
+ *   5. static presentation extensions (tournament participant logos via INFOBOARD-LOGO-02);
  *   6. announcement (null — no persisted announcement setting exists);
  *   7. tenant-aware branding resolution.
  *
@@ -46,9 +46,12 @@ import type {
   InfoboardEventPresentationExtension,
 } from "@/components/infoboard/screen1/screen1-presentation-types";
 import {
-  loadScreen1TournamentPresentationExtensions,
+  buildScreen1TournamentPresentationExtensions,
+  resolveCanonicalTournamentEventId,
+  type Screen1TournamentFeedContext,
   type Screen1TournamentPresentationDatabase,
 } from "./screen1-tournament-presentation";
+import type { ResolvedOrganizerClub } from "@/lib/tournaments/club-identity";
 import type { Screen1PresentationConfig } from "@/lib/infoboard/screen1-logo-settings";
 import type { Screen1StudioConfig } from "@/lib/infoboard/screen1-studio-types";
 
@@ -204,8 +207,23 @@ export async function buildScreen1LivePayload(params: {
   readonly boardConfig?: InfoboardBoardConfig | null;
   /** Optional DB access for tournament participant presentation (INFOBOARD-LOGO-02). */
   readonly tournamentPresentationDatabase?: Screen1TournamentPresentationDatabase | null;
+  /**
+   * Optional organizer-club resolver for tournament logo fallbacks when no
+   * explicit TournamentParticipant rows exist. Injected at composition boundaries
+   * only — keeps this service free of Prisma imports.
+   */
+  readonly resolveOrganizerClubsByName?: (
+    organizerNames: readonly string[],
+  ) => Promise<ReadonlyMap<string, ResolvedOrganizerClub>>;
 }): Promise<InfoboardScreen1LivePayload> {
-  const { tenant, now, loader, boardConfig, tournamentPresentationDatabase } = params;
+  const {
+    tenant,
+    now,
+    loader,
+    boardConfig,
+    tournamentPresentationDatabase,
+    resolveOrganizerClubsByName,
+  } = params;
 
   // ── Bounded date window ───────────────────────────────────────────────────
   // No server-local midnight calculation. Fixed UTC offsets relative to `now`.
@@ -233,21 +251,40 @@ export async function buildScreen1LivePayload(params: {
   });
 
   // ── Presentation extensions ───────────────────────────────────────────────
-  const tournamentEventIds = [
+  const tournamentContexts: Screen1TournamentFeedContext[] = [
     ...feed.current,
     ...feed.next,
     ...feed.later,
   ]
     .filter((event) => event.type === "TOURNAMENT")
-    .map((event) => event.id);
+    .map((event) => ({
+      feedEventId: event.id,
+      canonicalEventId: resolveCanonicalTournamentEventId(event.id),
+      organizerName: event.organizerDisplayName,
+      teamDisplayName: event.teamDisplayName,
+      homeAway: null,
+    }));
+
+  const organizerNames = tournamentContexts
+    .map((tournament) => tournament.organizerName)
+    .filter((name): name is string => Boolean(name?.trim()));
+
+  const organizerClubsByName =
+    resolveOrganizerClubsByName != null && organizerNames.length > 0
+      ? await resolveOrganizerClubsByName(organizerNames)
+      : new Map<string, ResolvedOrganizerClub>();
 
   const eventPresentation: readonly InfoboardEventPresentationExtension[] =
-    tournamentPresentationDatabase != null && tournamentEventIds.length > 0
-      ? await loadScreen1TournamentPresentationExtensions(
+    tournamentPresentationDatabase != null && tournamentContexts.length > 0
+      ? await buildScreen1TournamentPresentationExtensions(
           tournamentPresentationDatabase,
-          tenant.id,
-          tournamentEventIds,
-          tenant.logoUrl ?? null,
+          {
+            tenantId: tenant.id,
+            tenantName: tenant.name,
+            tenantLogoUrl: tenant.logoUrl ?? null,
+            tournaments: tournamentContexts,
+            organizerClubsByName,
+          },
         )
       : [];
 

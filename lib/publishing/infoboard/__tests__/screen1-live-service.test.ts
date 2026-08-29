@@ -189,11 +189,66 @@ describe("buildScreen1LivePayload", () => {
   });
 
   describe("eventPresentation", () => {
-    it("eventPresentation is an empty array (no canonical tournament model)", async () => {
+    it("eventPresentation is an empty array when no tournament database is supplied", async () => {
       const loader = makeEmptyLoader();
       const payload = await buildScreen1LivePayload({ tenant: TENANT_FCA, now: NOW, loader });
 
       expect(payload.eventPresentation).toEqual([]);
+    });
+
+    it("maps canonical tournament participants onto prefixed feed event ids", async () => {
+      const tournament = makeBaseEvent({
+        id: "tournament:evt-playmore",
+        type: "TOURNAMENT",
+        infoboardVisible: true,
+        websiteVisible: true,
+        title: "BRACK.CH PLAYMORE TURNIER",
+        organizerName: "BRACK.CH",
+        team: { name: "FC Allschwil" },
+        startAt: new Date("2026-07-24T17:00:00.000Z"),
+        endAt: new Date("2026-07-24T19:00:00.000Z"),
+      });
+      const loader = makeLoader([tournament]);
+      const payload = await buildScreen1LivePayload({
+        tenant: TENANT_FCA,
+        now: NOW,
+        loader,
+        tournamentPresentationDatabase: {
+          tournamentParticipant: {
+            findMany: async () => [
+              {
+                id: "p-ext",
+                eventId: "evt-playmore",
+                displayName: null,
+                manualLabel: null,
+                displayOrder: 0,
+                team: null,
+                externalClub: {
+                  name: "FC Möhlin-Riburg/ACLI",
+                  shortName: null,
+                  logoUrl: "https://cdn.example.com/moehlin.png",
+                },
+                externalTeam: null,
+                dressingRoomAllocations: [],
+              },
+            ],
+          },
+        },
+      });
+
+      expect(payload.eventPresentation).toEqual([
+        {
+          eventId: "tournament:evt-playmore",
+          participantAllocations: [
+            {
+              id: "p-ext",
+              teamDisplayName: "FC Möhlin-Riburg/ACLI",
+              dressingRoomLabel: null,
+              clubLogoUrl: "https://cdn.example.com/moehlin.png",
+            },
+          ],
+        },
+      ]);
     });
 
     it("eventPresentation is always a new array (not mutated)", async () => {

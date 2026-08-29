@@ -127,6 +127,44 @@ function makeEventPresentation(
   return [{ eventId, participantAllocations: allocations }];
 }
 
+describe("Canonical tournament logo rendering — INFOBOARD-TOURNAMENT-LOGOS-01A", () => {
+  it("renders tournament crests when extensions use prefixed feed event ids", () => {
+    const feed = makeFeed({
+      isEmpty: false,
+      emptyStateReason: null,
+      next: [
+        makeEvent({
+          id: "tournament:evt-playmore",
+          type: "TOURNAMENT",
+          displayTitle: "BRACK.CH PLAYMORE TURNIER",
+          teamDisplayName: null,
+          organizerDisplayName: "BRACK.CH",
+          startAt: "2026-09-05T08:00:00.000Z",
+          temporalBucket: "next",
+        }),
+      ],
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        currentTimeIso="2026-09-05T07:00:00.000Z"
+        eventPresentation={makeEventPresentation("tournament:evt-playmore", [
+          {
+            id: "p-ext",
+            teamDisplayName: "FC Möhlin-Riburg/ACLI",
+            dressingRoomLabel: null,
+            clubLogoUrl: "https://cdn.example.com/moehlin.png",
+          },
+        ])}
+      />,
+    );
+
+    expect(screen.getByTestId("tournament-participants")).toBeTruthy();
+    expect(screen.getByTestId("tournament-participant-logo-p-ext")).toBeTruthy();
+  });
+});
+
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // â”€â”€ Header â€” club logo â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

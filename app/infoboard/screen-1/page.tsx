@@ -40,7 +40,6 @@ import {
   type CanonicalInfoboardPolicyDatabase,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
 import type { Screen1TenantContext } from "@/lib/publishing/infoboard/screen1-live-service";
-import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 1",
@@ -61,19 +60,6 @@ function createPrismaDb(): CanonicalInfoboardPolicyDatabase {
         prisma.trainingSession.findMany(
           args as Parameters<typeof prisma.trainingSession.findMany>[0],
         ) as unknown as ReturnType<CanonicalInfoboardPolicyDatabase["trainingSession"]["findMany"]>,
-    },
-  };
-}
-
-function createTournamentPresentationDb(): Screen1TournamentPresentationDatabase {
-  return {
-    tournamentParticipant: {
-      findMany: (args) =>
-        prisma.tournamentParticipant.findMany(
-          args as Parameters<typeof prisma.tournamentParticipant.findMany>[0],
-        ) as unknown as ReturnType<
-          Screen1TournamentPresentationDatabase["tournamentParticipant"]["findMany"]
-        >,
     },
   };
 }
@@ -118,7 +104,6 @@ export default async function InfoboardScreen1Page() {
     now,
     loader: createCanonicalInfoboardSourceLoader(db),
     board,
-    tournamentPresentationDatabase: createTournamentPresentationDb(),
   });
 
   // ── Render ─────────────────────────────────────────────────────────────────
