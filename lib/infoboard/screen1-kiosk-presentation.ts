@@ -18,8 +18,13 @@ import {
 } from "@/lib/publishing/infoboard/screen1-live-service";
 import type { Screen1SourceEvent } from "@/lib/publishing/infoboard/screen1-event-mapper";
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
+import type { ResolvedOrganizerClub } from "@/lib/tournaments/club-identity";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { fetchCurrentWeather } from "@/lib/weather/weather-service";
+import {
+  createScreen1TournamentPresentationDatabase,
+  resolveScreen1OrganizerClubsByName,
+} from "@/lib/infoboard/screen1-tournament-composition";
 
 export type Screen1KioskPresentation = {
   readonly payload: InfoboardScreen1LivePayload;
@@ -37,18 +42,31 @@ export async function buildScreen1KioskPresentation(params: {
   readonly board?: InboardRow | null;
   readonly boardConfig?: InfoboardBoardConfig | null;
   readonly tournamentPresentationDatabase?: Screen1TournamentPresentationDatabase | null;
+  readonly resolveOrganizerClubsByName?: (
+    organizerNames: readonly string[],
+  ) => Promise<ReadonlyMap<string, ResolvedOrganizerClub>>;
   readonly weather?: WeatherResult;
 }): Promise<Screen1KioskPresentation> {
   const boardConfig =
     params.boardConfig ??
     (params.board != null ? buildBoardConfig(params.board) : null);
 
+  const tournamentPresentationDatabase =
+    params.tournamentPresentationDatabase ??
+    createScreen1TournamentPresentationDatabase();
+
+  const resolveOrganizerClubsByName =
+    params.resolveOrganizerClubsByName ??
+    ((organizerNames) =>
+      resolveScreen1OrganizerClubsByName(params.tenant.id, organizerNames));
+
   const payload = await buildScreen1LivePayload({
     tenant: params.tenant,
     now: params.now,
     loader: params.loader,
     boardConfig,
-    tournamentPresentationDatabase: params.tournamentPresentationDatabase ?? null,
+    tournamentPresentationDatabase,
+    resolveOrganizerClubsByName,
   });
 
   const weather = params.weather ?? (await fetchCurrentWeather());

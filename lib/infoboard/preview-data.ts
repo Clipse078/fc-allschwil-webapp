@@ -10,7 +10,10 @@ import {
   buildScreen1KioskPresentation,
 } from "@/lib/infoboard/screen1-kiosk-presentation";
 import type { Screen1TenantContext } from "@/lib/publishing/infoboard/screen1-live-service";
-import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
+import {
+  createScreen1TournamentPresentationDatabase,
+  resolveScreen1OrganizerClubsByName,
+} from "@/lib/infoboard/screen1-tournament-composition";
 import {
   buildScreen2LivePayload,
   type Screen2PitchRow,
@@ -58,19 +61,6 @@ function createPreviewDatabase(): Screen2SourceDatabase {
   };
 }
 
-function createTournamentDatabase(): Screen1TournamentPresentationDatabase {
-  return {
-    tournamentParticipant: {
-      findMany: (args) =>
-        prisma.tournamentParticipant.findMany(
-          args as Parameters<typeof prisma.tournamentParticipant.findMany>[0],
-        ) as unknown as ReturnType<
-          Screen1TournamentPresentationDatabase["tournamentParticipant"]["findMany"]
-        >,
-    },
-  };
-}
-
 export async function buildScreen1PreviewData(tenant: PreviewTenant, now: Date) {
   const database = createPreviewDatabase();
   const board = await getInfoboardBySlug("screen-1", tenant.id);
@@ -79,7 +69,9 @@ export async function buildScreen1PreviewData(tenant: PreviewTenant, now: Date) 
     now,
     loader: createCanonicalInfoboardSourceLoader(database),
     board,
-    tournamentPresentationDatabase: createTournamentDatabase(),
+    tournamentPresentationDatabase: createScreen1TournamentPresentationDatabase(),
+    resolveOrganizerClubsByName: (organizerNames) =>
+      resolveScreen1OrganizerClubsByName(tenant.id, organizerNames),
   });
   return {
     payload: presentation.payload,

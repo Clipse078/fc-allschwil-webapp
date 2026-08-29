@@ -42,7 +42,10 @@ import {
   buildScreen1LivePayload,
   type Screen1TenantContext,
 } from "@/lib/publishing/infoboard/screen1-live-service";
-import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
+import {
+  createScreen1TournamentPresentationDatabase,
+  resolveScreen1OrganizerClubsByName,
+} from "@/lib/infoboard/screen1-tournament-composition";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { buildBoardConfig } from "@/lib/infoboard/board-config";
 
@@ -152,16 +155,9 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       now,
       loader,
       boardConfig,
-      tournamentPresentationDatabase: {
-        tournamentParticipant: {
-          findMany: (args) =>
-            prisma.tournamentParticipant.findMany(
-              args as Parameters<typeof prisma.tournamentParticipant.findMany>[0],
-            ) as unknown as ReturnType<
-              Screen1TournamentPresentationDatabase["tournamentParticipant"]["findMany"]
-            >,
-        },
-      },
+      tournamentPresentationDatabase: createScreen1TournamentPresentationDatabase(),
+      resolveOrganizerClubsByName: (organizerNames) =>
+        resolveScreen1OrganizerClubsByName(tenant.id, organizerNames),
     });
 
     // ── Response ───────────────────────────────────────────────────────────
