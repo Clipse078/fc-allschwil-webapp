@@ -58,11 +58,14 @@ const TOURNAMENT: TournamentDto = {
   meetingTime: null,
   location: null,
   organizerName: null,
+  organizerLogoUrl: null,
+  organizerExternalClubId: null,
   competitionLabel: null,
   resultLabel: null,
   remarks: null,
   season: { id: "season-1", key: "2025-2026", name: "Saison 2025/2026" },
   team: null,
+  teamLogoUrl: null,
   homeAway: "HOME",
   participants: [
     {

@@ -71,11 +71,69 @@ function makeTournamentRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makeTournamentDtoFromRow(row: ReturnType<typeof makeTournamentRow>) {
+  return {
+    id: row.id,
+    tenantId: "tenant-fca",
+    title: row.title,
+    description: row.description ?? null,
+    status: row.status,
+    source: row.source,
+    startAt: row.startAt.toISOString(),
+    endAt: row.endAt ? row.endAt.toISOString() : null,
+    meetingTime: row.meetingTime ? row.meetingTime.toISOString() : null,
+    location: row.location,
+    organizerName: row.organizerName,
+    organizerLogoUrl: "https://cdn.example.com/fca.png",
+    organizerExternalClubId: null,
+    competitionLabel: row.competitionLabel,
+    resultLabel: row.resultLabel,
+    remarks: row.remarks,
+    season: row.season
+      ? { id: row.season.id, key: row.season.key, name: row.season.name }
+      : null,
+    team: row.team,
+    teamLogoUrl: row.team ? "https://cdn.example.com/fca.png" : null,
+    homeAway: "HOME",
+    participants: row.team
+      ? [
+          {
+            id: `participant-${row.id}`,
+            tournamentId: row.id,
+            kind: "TEAM",
+            displayName: row.team.name,
+            logoUrl: "https://cdn.example.com/fca.png",
+            team: row.team,
+            externalTeam: null,
+            externalClub: null,
+            manualLabel: null,
+            displayOrder: 0,
+            dressingRoomAllocations: [],
+            createdAt: "2026-08-01T00:00:00.000Z",
+            updatedAt: "2026-08-01T00:00:00.000Z",
+          },
+        ]
+      : [],
+    resourceAllocations: [],
+    visibility: {
+      websiteVisible: row.websiteVisible,
+      infoboardVisible: row.infoboardVisible,
+      homepageVisible: row.homepageVisible,
+      wochenplanVisible: row.wochenplanVisible,
+      teamPageVisible: row.teamPageVisible,
+    },
+    reviewStage: "APPROVED",
+    createdAt: "2026-08-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+  };
+}
+
 // ── Mocks ─────────────────────────────────────────────────────────────────────
 
 const mocks = vi.hoisted(() => ({
   tenantFindFirst: vi.fn(),
   eventFindMany: vi.fn(),
+  listTournamentsByIds: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -83,6 +141,10 @@ vi.mock("@/lib/db/prisma", () => ({
     tenant: { findFirst: mocks.tenantFindFirst },
     event: { findMany: mocks.eventFindMany },
   },
+}));
+
+vi.mock("@/lib/tournaments/tournament-service", () => ({
+  listTournamentsByIds: mocks.listTournamentsByIds,
 }));
 
 const { GET } = await import("../route");
@@ -115,11 +177,14 @@ describe("GET /api/public/[tenant]/website/tournaments — team participation", 
     vi.clearAllMocks();
     mocks.tenantFindFirst.mockResolvedValue(ACTIVE_TENANT);
     mocks.eventFindMany.mockResolvedValue([]);
+    mocks.listTournamentsByIds.mockResolvedValue([]);
   });
 
   // 5. F1 Tournament linked to F1 team
   it("F1 tournament record carries F1 team identity", async () => {
-    mocks.eventFindMany.mockResolvedValue([makeTournamentRow()]);
+    const row = makeTournamentRow();
+    mocks.eventFindMany.mockResolvedValue([row]);
+    mocks.listTournamentsByIds.mockResolvedValue([makeTournamentDtoFromRow(row)]);
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
     const t = body.data.tournaments[0];
@@ -141,6 +206,7 @@ describe("GET /api/public/[tenant]/website/tournaments — team participation", 
       },
     });
     mocks.eventFindMany.mockResolvedValue([f2Row]);
+    mocks.listTournamentsByIds.mockResolvedValue([makeTournamentDtoFromRow(f2Row)]);
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
     const t = body.data.tournaments[0];
@@ -159,6 +225,10 @@ describe("GET /api/public/[tenant]/website/tournaments — team participation", 
     const f1Row = makeTournamentRow({ id: "evt-t-f1", ...sharedMeta, team: { id: "team-f1", name: "F1", slug: "f1", category: "AKTIVE", genderGroup: "MALE", ageGroup: null } });
     const f2Row = makeTournamentRow({ id: "evt-t-f2", ...sharedMeta, team: { id: "team-f2", name: "F2", slug: "f2", category: "AKTIVE", genderGroup: "MALE", ageGroup: null } });
     mocks.eventFindMany.mockResolvedValue([f1Row, f2Row]);
+    mocks.listTournamentsByIds.mockResolvedValue([
+      makeTournamentDtoFromRow(f1Row),
+      makeTournamentDtoFromRow(f2Row),
+    ]);
 
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
@@ -178,8 +248,9 @@ describe("GET /api/public/[tenant]/website/tournaments — team participation", 
   });
 
   it("teamSlug=f1 query does not return F2 records", async () => {
-    // DB returns only F1 records when teamSlug=f1 is applied
-    mocks.eventFindMany.mockResolvedValue([makeTournamentRow()]);
+    const row = makeTournamentRow();
+    mocks.eventFindMany.mockResolvedValue([row]);
+    mocks.listTournamentsByIds.mockResolvedValue([makeTournamentDtoFromRow(row)]);
     const res = await GET(makeRequest("teamSlug=f1"), makeParams());
     const body = await res.json();
     body.data.tournaments.forEach((t: { team: { slug: string } }) => {
@@ -233,13 +304,42 @@ describe("GET /api/public/[tenant]/website/tournaments — team participation", 
   });
 
   it("response contains team.id and team.slug for each tournament", async () => {
-    mocks.eventFindMany.mockResolvedValue([makeTournamentRow()]);
+    const row = makeTournamentRow();
+    mocks.eventFindMany.mockResolvedValue([row]);
+    mocks.listTournamentsByIds.mockResolvedValue([makeTournamentDtoFromRow(row)]);
     const res = await GET(makeRequest(), makeParams());
     const body = await res.json();
     const t = body.data.tournaments[0];
     expect(t.team).toHaveProperty("id");
     expect(t.team).toHaveProperty("slug");
     expect(t.team).toHaveProperty("name");
+  });
+
+  it("exposes canonical organizer and participant logos additively", async () => {
+    const row = makeTournamentRow({
+      organizerName: "FC Diegten-Eptingen",
+    });
+    const dto = makeTournamentDtoFromRow(row);
+    dto.organizerLogoUrl = "https://cdn.example.com/diegten.png";
+    dto.organizerExternalClubId = "club-diegten";
+    mocks.eventFindMany.mockResolvedValue([row]);
+    mocks.listTournamentsByIds.mockResolvedValue([dto]);
+
+    const res = await GET(makeRequest(), makeParams());
+    const body = await res.json();
+    const t = body.data.tournaments[0];
+
+    expect(t.organizerName).toBe("FC Diegten-Eptingen");
+    expect(t.organizer).toEqual({
+      displayName: "FC Diegten-Eptingen",
+      logoUrl: "https://cdn.example.com/diegten.png",
+      externalClubId: "club-diegten",
+    });
+    expect(t.participants[0]).toMatchObject({
+      displayName: "FC Allschwil F1",
+      logoUrl: "https://cdn.example.com/fca.png",
+      teamId: "team-f1",
+    });
   });
 });
 

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { CalendarDays, CheckCircle2, CircleAlert, MapPin, Shield, Trophy, Users } from "lucide-react";
+import { CalendarDays, CheckCircle2, CircleAlert, MapPin, Trophy, Users } from "lucide-react";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import type { TournamentOperationalAssessment } from "@/lib/tournaments/operational-state";
 import { Badge, type BadgeVariant } from "@/components/ui/Badge";
+import { ClubLogo } from "@/components/admin/club-directory/ClubLogo";
 
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: "Entwurf",
@@ -106,7 +107,13 @@ export default function TournamentListRow({
               className="inline-flex items-center gap-1.5"
               data-testid={`tournament-team-${tournament.id}`}
             >
-              <Shield className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <ClubLogo
+                logoUrl={tournament.teamLogoUrl}
+                name={tournament.team.name}
+                size="sm"
+                bare
+                className="h-3.5 w-3.5"
+              />
               <span>
                 <span className="font-medium text-[var(--foreground)]">Mannschaft:</span>{" "}
                 {tournament.team.name}
@@ -119,7 +126,13 @@ export default function TournamentListRow({
               className="inline-flex items-center gap-1.5"
               data-testid={`tournament-organizer-${tournament.id}`}
             >
-              <Trophy className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <ClubLogo
+                logoUrl={tournament.organizerLogoUrl}
+                name={tournament.organizerName}
+                size="sm"
+                bare
+                className="h-3.5 w-3.5"
+              />
               <span>
                 <span className="font-medium text-[var(--foreground)]">Veranstalter:</span>{" "}
                 {tournament.organizerName}

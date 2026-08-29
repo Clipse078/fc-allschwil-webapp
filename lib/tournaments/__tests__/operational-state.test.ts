@@ -12,6 +12,7 @@ function createParticipant(overrides: Partial<TournamentParticipantDto> = {}): T
     tournamentId: "tournament-1",
     kind: "TEAM",
     displayName: "FC Allschwil E1",
+    logoUrl: null,
     team: {
       id: "team-1",
       name: "FC Allschwil E1",
@@ -56,6 +57,8 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
     meetingTime: null,
     location: "Turnhalle Binningen",
     organizerName: "FC Aesch",
+    organizerLogoUrl: null,
+    organizerExternalClubId: null,
     competitionLabel: null,
     resultLabel: null,
     remarks: null,
@@ -68,6 +71,7 @@ function createTournament(overrides: Partial<TournamentDto> = {}): TournamentDto
       genderGroup: null,
       ageGroup: "E",
     },
+    teamLogoUrl: null,
     homeAway: "HOME",
     participants: [createParticipant()],
     resourceAllocations: [
@@ -204,7 +208,7 @@ describe("assessTournamentOperationalState", () => {
             name: "BSC Old Boys E1",
             shortName: null,
             categoryLabel: "E1",
-            club: { id: "club-1", name: "BSC Old Boys", shortName: null },
+            club: { id: "club-1", name: "BSC Old Boys", shortName: null, logoUrl: null },
           },
           kind: "EXTERNAL_TEAM",
           dressingRoomAllocations: [

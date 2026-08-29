@@ -47,6 +47,8 @@ function makeTournament(overrides: Partial<TournamentDto> = {}): TournamentDto {
     meetingTime: null,
     location: "Turnhalle Binningen",
     organizerName: "BSC Old Boys",
+    organizerLogoUrl: null,
+    organizerExternalClubId: null,
     competitionLabel: null,
     resultLabel: null,
     remarks: null,
@@ -59,6 +61,7 @@ function makeTournament(overrides: Partial<TournamentDto> = {}): TournamentDto {
       genderGroup: null,
       ageGroup: "F",
     },
+    teamLogoUrl: null,
     homeAway: "AWAY",
     participants: [],
     resourceAllocations: [],
@@ -97,7 +100,7 @@ describe("TournamentListRow — participating Team and organiser context", () =>
   it("shows Veranstalter from organizerName (not inferred from title)", () => {
     render(
       <TournamentListRow
-        tournament={makeTournament()}
+        tournament={makeTournament({ organizerLogoUrl: "https://cdn.example.com/bsc.png" })}
         assessment={READY_ASSESSMENT}
         locale="de-CH"
         timezone="Europe/Zurich"
@@ -107,6 +110,7 @@ describe("TournamentListRow — participating Team and organiser context", () =>
     const el = screen.getByTestId("tournament-organizer-t1");
     expect(el.textContent).toMatch(/Veranstalter/);
     expect(el.textContent).toMatch(/BSC Old Boys/);
+    expect(screen.getByAltText("Logo BSC Old Boys")).toBeInTheDocument();
   });
 
   it("omits Mannschaft row when team is null", () => {

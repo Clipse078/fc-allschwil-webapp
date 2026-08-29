@@ -46,6 +46,8 @@ export type TournamentExternalClubReference = {
   id: string;
   name: string;
   shortName: string | null;
+  /** Canonical Club Directory crest when available. */
+  logoUrl: string | null;
 };
 
 export type TournamentExternalTeamReference = {
@@ -112,6 +114,8 @@ export type TournamentParticipantDto = {
    * (trimmed) when set, otherwise externalClub.club.name (clean fallback).
    */
   displayName: string;
+  /** Canonical crest URL resolved via lib/tournaments/club-identity.ts. */
+  logoUrl: string | null;
   team: TournamentTeamReference | null;
   /** HISTORICAL ONLY — see TournamentParticipantKind. */
   externalTeam: TournamentExternalTeamReference | null;
@@ -144,6 +148,10 @@ export type TournamentDto = {
   meetingTime: string | null;
   location: string | null;
   organizerName: string | null;
+  /** Canonical organizer crest when resolvable from Club Directory or tenant. */
+  organizerLogoUrl: string | null;
+  /** Set when organizer resolves to a canonical ExternalClub. */
+  organizerExternalClubId: string | null;
   competitionLabel: string | null;
   resultLabel: string | null;
   remarks: string | null;
@@ -157,6 +165,8 @@ export type TournamentDto = {
    * see `participants` below.
    */
   team: TournamentTeamReference | null;
+  /** Canonical tenant crest for Event.teamId when set. */
+  teamLogoUrl: string | null;
   homeAway: TournamentHomeAway;
   /** Canonical multi-team participant list — see TOURNAMENTCENTER-01B. */
   participants: TournamentParticipantDto[];

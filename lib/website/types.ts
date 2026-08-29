@@ -178,7 +178,31 @@ export type ClubEventsData = {
 };
 
 export type TournamentsData = {
-  tournaments: PublicWebsiteEventItem[];
+  tournaments: PublicWebsiteTournamentItem[];
+};
+
+/**
+ * TOURNAMENT-LOGOS-01A — additive tournament identity fields for the public
+ * website. Existing PublicWebsiteEventItem fields are preserved unchanged.
+ */
+export type PublicWebsiteTournamentOrganizer = {
+  displayName: string;
+  logoUrl: string | null;
+  externalClubId: string | null;
+};
+
+export type PublicWebsiteTournamentParticipant = {
+  id: string;
+  displayName: string;
+  logoUrl: string | null;
+  kind: string;
+  teamId: string | null;
+  externalClubId: string | null;
+};
+
+export type PublicWebsiteTournamentItem = PublicWebsiteEventItem & {
+  organizer: PublicWebsiteTournamentOrganizer | null;
+  participants: PublicWebsiteTournamentParticipant[];
 };
 
 export type TrainingsData = {
