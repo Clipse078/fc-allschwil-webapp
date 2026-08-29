@@ -2,34 +2,23 @@
  * GET /api/public/[tenant]/website/weekplan
  *
  * Returns the published week plan (Wochenplan) for the specified tenant.
- * Results are grouped by calendar day, ordered chronologically.
+ * Results are grouped by calendar day (Monday–Sunday), ordered chronologically.
  *
- * Only events with wochenplanVisible = true and websiteVisible = true are
- * included, scoped to the tenant. Only SCHEDULED, LIVE, COMPLETED, and
- * POSTPONED events appear.
- *
- * The publication field carries the active variant label (e.g. "Schlechtwetter-
- * Wochenplan") for the requested weekId. Returns null when the week has not been
- * published or when no weekId is supplied, and always null when scope=season.
- *
- * Tenant is resolved from the [tenant] path segment.
- * Results are always tenant-isolated.
+ * WOCHENPLAN-2.0-01C — default week mode serves the canonical CURRENT WEEK
+ * from /dashboard/planner/week (Weekplanner), not the legacy Wochenplan board.
+ * Content types: trainings, HOME matches, HOME tournaments with canonical
+ * sporting identity. Active tenant plan name is always exposed.
  *
  * Query params:
- *   scope      — "season" to return the full active-season schedule.
- *                When scope=season the active Season is resolved from the DB
- *                (Season.isActive = true), weekId is ignored, limit defaults
- *                to SEASON_SCOPE_MAX_LIMIT, and publication is always null.
- *                Omit or pass any other value for the default week-oriented mode.
- *   weekId     — ISO week identifier, e.g. "2026-W26". Required for publication
- *                state. Ignored when scope=season.
- *   seasonKey  — Filter by season key. Default: all seasons. Ignored when
- *                scope=season (the active season key is used instead).
- *   teamSlug   — Filter by team slug. Default: all teams.
- *   dateFrom   — ISO date lower bound for startAt. Default: no lower bound.
- *   dateTo     — ISO date upper bound for startAt. Default: no upper bound.
- *   limit      — Max events returned. Default/max: 100/250 (week mode) or
- *                SEASON_SCOPE_MAX_LIMIT (season mode). Capped at the mode max.
+ *   scope      — "season" to return the legacy full active-season schedule
+ *                (Event-based, backward compatible). Omit for current-week mode.
+ *   weekId     — Ignored for content in current-week mode (always resolves the
+ *                tenant-timezone current week). Still used for publication metadata.
+ *   seasonKey  — Optional season filter in current-week mode.
+ *   teamSlug   — Filter by canonical team slug. Never overrides HOME/facility rules.
+ *   dateFrom   — Legacy week-mode filter (ignored in current-week mode).
+ *   dateTo     — Legacy week-mode filter (ignored in current-week mode).
+ *   limit      — Max events (season mode only).
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -41,13 +30,18 @@ import {
 } from "@/lib/wochenplan/publication-queries";
 import { getActiveWochenplanPlan } from "@/lib/wochenplan/plan-service";
 import { applyWochenplanPlanAllocations } from "@/lib/wochenplan/plan-queries";
+import { buildPublicCurrentWeekFeed } from "@/lib/wochenplan/public-feed";
 import {
   buildWebsiteEnvelope,
   resolveTenantFromParams,
   assertWebsiteEnabled,
 } from "@/lib/website/response-helpers";
 import { prisma } from "@/lib/db/prisma";
-import type { PublicWochenplanDay, PublicWochenplanPublication } from "@/lib/website/types";
+import type {
+  PublicWochenplanDay,
+  PublicWochenplanPublication,
+  WeekplanSeasonData,
+} from "@/lib/website/types";
 
 type RouteParams = { params: Promise<{ tenant: string }> };
 
@@ -84,9 +78,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     let activeSeason: { key: string; name: string } | null = null;
 
     if (isSeasonScope) {
-      // Resolve the canonical active season; its key scopes all events.
-      // Season has no tenantId — it is global. Tenant isolation is enforced
-      // at the Event level (Event.tenantId) by getGroupedWochenplan.
       activeSeason = await prisma.season.findFirst({
         where: { isActive: true },
         select: { key: true, name: true },
@@ -104,68 +95,97 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       effectiveSeasonKey = searchParams.get("seasonKey");
     }
 
-    // Fetch grouped wochenplan events, scoped to this tenant.
-    const rawDays = await getGroupedWochenplan({
+    // ── Season scope: legacy Event-based feed (backward compatible) ─────────
+    if (isSeasonScope) {
+      const rawDays = await getGroupedWochenplan({
+        tenantId: tenant.id,
+        seasonKey: effectiveSeasonKey,
+        teamSlug,
+        dateFrom: null,
+        dateTo: null,
+        limit: rawLimit ?? SEASON_SCOPE_MAX_LIMIT,
+        maxLimit: SEASON_SCOPE_MAX_LIMIT,
+      });
+
+      const activePlan = await getActiveWochenplanPlan(tenant.id);
+
+      const resolvedDays = await Promise.all(
+        rawDays.map(async (day) => ({
+          ...day,
+          events: await applyWochenplanPlanAllocations(tenant.id, day.events, activePlan),
+        })),
+      );
+
+      const days: PublicWochenplanDay[] = resolvedDays.map((day) => ({
+        date: day.date,
+        calendarWeek: day.calendarWeek,
+        weekdayLabel: day.weekdayLabel,
+        events: day.events.map((event) => ({
+          ...toPublicWebsiteEvent(event),
+          kind: event.type as "TRAINING" | "MATCH" | "TOURNAMENT",
+        })),
+      }));
+
+      const seasonData: WeekplanSeasonData = {
+        publication: null,
+        days,
+      };
+
+      const countEvents = days.reduce((sum, day) => sum + day.events.length, 0);
+
+      return NextResponse.json(
+        buildWebsiteEnvelope(tenant, seasonData, {
+          scope: "season",
+          countDays: days.length,
+          countEvents,
+          season: activeSeason,
+        }),
+      );
+    }
+
+    // ── Current-week mode: canonical Weekplanner feed ───────────────────────
+    const feed = await buildPublicCurrentWeekFeed({
       tenantId: tenant.id,
-      seasonKey: effectiveSeasonKey,
+      tenantName: tenant.name,
       teamSlug,
-      dateFrom: isSeasonScope ? null : dateFrom,
-      dateTo: isSeasonScope ? null : dateTo,
-      limit: isSeasonScope ? (rawLimit ?? SEASON_SCOPE_MAX_LIMIT) : rawLimit,
-      maxLimit: isSeasonScope ? SEASON_SCOPE_MAX_LIMIT : undefined,
+      seasonKey: effectiveSeasonKey,
     });
 
-    const activePlan = await getActiveWochenplanPlan(tenant.id);
-
-    const resolvedDays = await Promise.all(
-      rawDays.map(async (day) => ({
-        ...day,
-        events: await applyWochenplanPlanAllocations(tenant.id, day.events, activePlan),
-      })),
-    );
-
-    // Map each day's events to the website-safe shape.
-    const days: PublicWochenplanDay[] = resolvedDays.map((day) => ({
-      date: day.date,
-      calendarWeek: day.calendarWeek,
-      weekdayLabel: day.weekdayLabel,
-      events: day.events.map(toPublicWebsiteEvent),
-    }));
-
-    // Resolve publication state for the requested week (null when not published).
-    // Season-scope queries have no single-week publication state — always null.
-    let publication: PublicWochenplanPublication | null = null;
-    if (!isSeasonScope && weekId) {
+    // Enrich publication when weekId matches and week is published
+    let publication: PublicWochenplanPublication | null = feed.publication;
+    if (weekId && weekId !== feed.currentWeek.weekId) {
       const pub = await getWochenplanPublication(tenant.id, weekId);
-      const variantLabel = activePlan?.name ?? pub?.variantLabel ?? "Wochenplan";
+      const activePlanName = feed.activePlan.name;
       if (pub?.isPublished) {
         publication = {
           weekId: pub.weekId,
-          variantLabel,
-          variantBadge: formatWochenplanVariantBadge(pub.weekId, variantLabel),
+          variantLabel: activePlanName,
+          variantBadge: formatWochenplanVariantBadge(pub.weekId, activePlanName),
           isPublished: pub.isPublished,
           publishedAt: pub.publishedAt,
-          activePlanId: activePlan?.id ?? null,
-          activePlanName: activePlan?.name ?? null,
+          activePlanId: feed.activePlan.id || null,
+          activePlanName,
         };
+      } else {
+        publication = null;
       }
     }
 
-    const countEvents = days.reduce((sum, day) => sum + day.events.length, 0);
+    const data = { ...feed, publication };
+    const countEvents = data.days.reduce((sum, day) => sum + day.events.length, 0);
 
     return NextResponse.json(
-      buildWebsiteEnvelope(
-        tenant,
-        { publication, days },
-        {
-          scope: isSeasonScope ? "season" : "week",
-          countDays: days.length,
-          countEvents,
-          ...(isSeasonScope
-            ? { season: activeSeason }
-            : { filters: { weekId, seasonKey: effectiveSeasonKey, teamSlug, dateFrom, dateTo, limit: rawLimit } }),
+      buildWebsiteEnvelope(tenant, data, {
+        scope: "week",
+        mode: "current-week",
+        countDays: data.days.length,
+        countEvents,
+        filters: {
+          weekId: feed.currentWeek.weekId,
+          seasonKey: effectiveSeasonKey,
+          teamSlug,
         },
-      ),
+      }),
     );
   } catch (error) {
     console.error("[public/[tenant]/website/weekplan] GET failed:", error);
