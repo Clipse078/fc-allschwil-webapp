@@ -1,6 +1,7 @@
 /**
  * GET   /api/wochenplan/plans/[planId]
  * PATCH /api/wochenplan/plans/[planId] — rename ({ name }) or activate ({ active: true })
+ * DELETE /api/wochenplan/plans/[planId] — hard delete draft plan (WOCHENPLAN-2.0-01H-E5)
  *
  * WOCHENPLAN-2.0-01B — minimal tenant-level plan lifecycle.
  */
@@ -8,10 +9,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { logAction } from "@/lib/audit/log-action";
 import {
   getWochenplanPlan,
   renameWochenplanPlan,
   activateWochenplanPlan,
+  deleteWochenplanPlan,
 } from "@/lib/wochenplan/plan-service";
 import {
   WochenplanPlanNotFoundError,
@@ -19,6 +22,9 @@ import {
   WochenplanPlanNameConflictError,
   WochenplanPlanArchivedError,
   WochenplanPlanActivationConflictError,
+  WochenplanPlanDeleteActiveForbiddenError,
+  WochenplanPlanDeleteLastPlanForbiddenError,
+  WochenplanPlanDeleteDefaultForbiddenError,
 } from "@/lib/wochenplan/plan-errors";
 
 const VIEW_PERMISSIONS = [PERMISSIONS.WOCHENPLAN_MANAGE, PERMISSIONS.EVENTS_VIEW] as const;
@@ -86,6 +92,48 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     if (err instanceof WochenplanPlanActivationConflictError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    throw err;
+  }
+}
+
+export async function DELETE(_request: NextRequest, { params }: Params) {
+  const auth = await requireApiAnyPermission([...MANAGE_PERMISSIONS]);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
+
+  const tenantId = auth.session.user?.activeTenantId;
+  const actorUserId = auth.session.user?.id ?? null;
+  if (!tenantId) return NextResponse.json({ error: "Tenant context required" }, { status: 400 });
+
+  const { planId } = await params;
+
+  try {
+    const deleted = await deleteWochenplanPlan(tenantId, planId);
+
+    await logAction({
+      tenantId,
+      actorUserId,
+      moduleKey: "wochenplan",
+      entityType: "WochenplanPlan",
+      entityId: deleted.id,
+      action: "hard_delete",
+      beforeJson: { id: deleted.id, name: deleted.name },
+      metadataJson: { deletedPlanName: deleted.name },
+    });
+
+    return NextResponse.json({ deleted });
+  } catch (err) {
+    if (err instanceof WochenplanPlanNotFoundError) {
+      return NextResponse.json({ error: "Plan not found" }, { status: 404 });
+    }
+    if (err instanceof WochenplanPlanDeleteActiveForbiddenError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof WochenplanPlanDeleteLastPlanForbiddenError) {
+      return NextResponse.json({ error: err.message }, { status: 409 });
+    }
+    if (err instanceof WochenplanPlanDeleteDefaultForbiddenError) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
     throw err;

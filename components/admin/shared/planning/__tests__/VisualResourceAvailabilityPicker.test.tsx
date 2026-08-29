@@ -44,7 +44,7 @@ describe("VisualResourceAvailabilityPicker — availability display", () => {
       />,
     );
 
-    expect(screen.getByText("1 verfügbar")).toBeInTheDocument();
+    expect(screen.getByText("1 frei")).toBeInTheDocument();
     expect(screen.getByText("1 belegt")).toBeInTheDocument();
   });
 

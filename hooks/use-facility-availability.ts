@@ -23,8 +23,21 @@
 import { useEffect, useState } from "react";
 import type { ResourceAvailabilityAnnotation } from "@/components/admin/training/FacilityResourceSelector";
 
-/** Shape of one row in GET /api/facilities/availability's `availability` array. */
-type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & { resourceId: string; resourceCode: string };
+type ResourceAvailabilityRow = ResourceAvailabilityAnnotation & {
+  resourceId: string;
+  resourceCode: string;
+  conflicts?: Array<{ label: string; startAt: string; endAt: string }>;
+};
+
+function rowToAnnotation(row: ResourceAvailabilityRow): ResourceAvailabilityAnnotation {
+  return {
+    status: row.status,
+    conflictLabel: row.conflictLabel,
+    conflictStartAt: row.conflictStartAt,
+    conflictEndAt: row.conflictEndAt,
+    conflicts: row.conflicts,
+  };
+}
 
 export type UseFacilityAvailabilityOptions = {
   /** Gate — e.g. `homeAway === "HOME"`. When false, no fetch runs and both maps are cleared. */
@@ -69,7 +82,9 @@ async function fetchAvailabilityGroup(
     });
     const data = (await res.json().catch(() => null)) as { availability?: ResourceAvailabilityRow[] } | null;
     if (!res.ok || !data?.availability) return new Map();
-    return new Map(data.availability.map((a) => [keyBy === "code" ? a.resourceCode : a.resourceId, a]));
+    return new Map(
+      data.availability.map((a) => [keyBy === "code" ? a.resourceCode : a.resourceId, rowToAnnotation(a)]),
+    );
   } catch {
     return new Map();
   }

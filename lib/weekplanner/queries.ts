@@ -73,6 +73,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { isMeaningfulEventInterval } from "@/lib/facilities/resource-occupancy-window";
 import { getWochenplanPlanBaselineMode, type WochenplanPlanBaselineMode } from "@/lib/wochenplan/plan-baseline";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
@@ -528,7 +529,9 @@ async function findWeekplannerHomeMatches(
       homeRoomRef ? [homeRoomRef] : [],
     );
     const canonicalStartAt = new Date(match.startAt);
-    const canonicalEndAt = match.endAt ? new Date(match.endAt) : canonicalStartAt;
+    const rawEndAt = match.endAt ? new Date(match.endAt) : null;
+    const canonicalEndAt =
+      rawEndAt && isMeaningfulEventInterval(canonicalStartAt, rawEndAt) ? rawEndAt : canonicalStartAt;
     const time = resolveEffectiveTime(
       timeOverridesByKey,
       planTimeOverrideKey("MATCH", match.id),

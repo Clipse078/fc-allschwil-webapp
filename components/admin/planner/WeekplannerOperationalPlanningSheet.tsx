@@ -14,7 +14,7 @@ import { Sheet } from "@/components/ui/Sheet";
 import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
-import { computeResourceOccupancyWindow } from "@/lib/facilities/resource-occupancy-window";
+import { computeResourceOccupancyWindow, isMeaningfulEventInterval } from "@/lib/facilities/resource-occupancy-window";
 import { isCanonicalAllocationGroupState } from "@/lib/weekplanner/plan-allocation-semantics";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import type { WeekplannerItem } from "@/lib/weekplanner/types";
@@ -35,6 +35,20 @@ type Props = {
   onClose: () => void;
   onSaved: () => void;
 };
+
+function toDateInputValue(iso: Date | string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+function effectiveEndTimeValue(endAt: Date | string, startAt: Date | string, timeZone: string): string {
+  if (!isMeaningfulEventInterval(startAt, endAt)) return "";
+  return toTimeInputValue(endAt, timeZone);
+}
 
 function toTimeInputValue(iso: Date | string, timeZone: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -314,8 +328,10 @@ function TrainingOperationalEditor({
     [endTime, item.endAt, timezone],
   );
 
+  const timesValid = !!startTime && !!endTime && startTime < endTime;
+
   const { pitchAvailability, dressingRoomAvailability } = useFacilityAvailability({
-    enabled: !!startAt,
+    enabled: timesValid && !!startAt,
     startAt,
     endAt,
     excludeTrainingSessionId: activityId,
@@ -331,7 +347,6 @@ function TrainingOperationalEditor({
   const roomOverrideRows =
     overridesByKey[planOverrideKey("TRAINING", activityId, "DRESSING_ROOM")] ?? [];
 
-  const timesValid = !!startTime && !!endTime && startTime < endTime;
   const timeChanged = startTime !== initStart || endTime !== initEnd;
   const pitchChanged = !setsEqual(selectedPitchIds, initPitchIds);
   const roomChanged = !setsEqual(selectedRoomIds, initRoomIds);
@@ -554,9 +569,10 @@ function MatchOperationalEditor({
   const locale = "de-CH";
 
   const initStart = toTimeInputValue(item.startAt, timezone);
-  const initEnd = toTimeInputValue(item.endAt, timezone);
+  const initEnd = effectiveEndTimeValue(item.endAt, item.startAt, timezone);
   const canonicalStart = toTimeInputValue(item.canonicalStartAt, timezone);
-  const canonicalEnd = toTimeInputValue(item.canonicalEndAt, timezone);
+  const canonicalEnd = effectiveEndTimeValue(item.canonicalEndAt, item.canonicalStartAt, timezone);
+  const displayDate = toDateInputValue(item.startAt, timezone);
   const initPitchIds = new Set(item.pitchAllocations.map((r) => r.facilityResourceId));
   const initRoomIds = new Set(item.dressingRoomAllocations.map((r) => r.facilityResourceId));
   const canonicalPitchIds = new Set(item.canonicalPitchAllocations.map((r) => r.facilityResourceId));
@@ -576,13 +592,15 @@ function MatchOperationalEditor({
     () => combineTimeWithReferenceDay(startTime, item.startAt, timezone) ?? "",
     [startTime, item.startAt, timezone],
   );
-  const endAt = useMemo(
-    () => combineTimeWithReferenceDay(endTime, item.endAt, timezone) ?? "",
-    [endTime, item.endAt, timezone],
-  );
+  const endAt = useMemo(() => {
+    if (!endTime) return "";
+    return combineTimeWithReferenceDay(endTime, item.startAt, timezone) ?? "";
+  }, [endTime, item.startAt, timezone]);
+
+  const timesValid = !!startTime && !!endTime && startTime < endTime;
 
   const { pitchAvailability, dressingRoomAvailability } = useFacilityAvailability({
-    enabled: !!startAt,
+    enabled: timesValid && !!startAt,
     startAt,
     endAt,
     excludeEventId: activityId,
@@ -596,7 +614,6 @@ function MatchOperationalEditor({
   const pitchOverrideRows = overridesByKey[planOverrideKey("MATCH", activityId, "PITCH_HALL")] ?? [];
   const roomOverrideRows = overridesByKey[planOverrideKey("MATCH", activityId, "DRESSING_ROOM")] ?? [];
 
-  const timesValid = !!startTime && !!endTime && startTime < endTime;
   const timeChanged = startTime !== initStart || endTime !== initEnd;
   const pitchChanged = !setsEqual(selectedPitchIds, initPitchIds);
   const roomChanged = !setsEqual(selectedRoomIds, initRoomIds);
@@ -704,17 +721,27 @@ function MatchOperationalEditor({
         )}
 
         <div className="space-y-2">
-          <SectionLabel>Zeit</SectionLabel>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <SectionLabel>Datum &amp; Uhrzeit</SectionLabel>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="block space-y-1" htmlFor={`${formId}-date`}>
+              <span className="fca-label">Datum</span>
+              <input id={`${formId}-date`} type="date" value={displayDate} readOnly className="fca-input bg-[var(--surface-2)]" />
+            </label>
             <label className="block space-y-1" htmlFor={`${formId}-start`}>
               <span className="fca-label">Beginn</span>
-              <input id={`${formId}-start`} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="fca-input" />
+              <input id={`${formId}-start`} type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="fca-input" data-testid="weekplanner-match-operational-start" />
             </label>
             <label className="block space-y-1" htmlFor={`${formId}-end`}>
               <span className="fca-label">Ende</span>
-              <input id={`${formId}-end`} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="fca-input" />
+              <input id={`${formId}-end`} type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="fca-input" data-testid="weekplanner-match-operational-end" />
             </label>
           </div>
+          {!timesValid && endTime ? (
+            <p className="text-xs text-amber-700">Bitte eine gültige Endzeit angeben (nach Beginn).</p>
+          ) : null}
+          {!endTime ? (
+            <p className="text-xs text-[var(--muted)]">Endzeit für die operative Spielplanung festlegen.</p>
+          ) : null}
         </div>
 
         <div className="space-y-2">

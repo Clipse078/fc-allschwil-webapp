@@ -10,8 +10,13 @@
 
 import { prisma } from "@/lib/db/prisma";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@prisma/client";
-import { computeResourceOccupancyWindow, resourceOccupancyWindowsOverlap } from "@/lib/facilities/resource-occupancy-window";
+import {
+  computeResourceOccupancyWindow,
+  isMeaningfulEventInterval,
+  resourceOccupancyWindowsOverlap,
+} from "@/lib/facilities/resource-occupancy-window";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
+import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import { planOverrideKey } from "@/lib/weekplanner/plan-override-key";
 import type { AvailabilityResourceGroup } from "@/lib/facilities/availability-service";
 
@@ -46,23 +51,43 @@ function overlapsQuery(
   );
 }
 
-/** Activities whose canonical booking is replaced by overrides in the context plan for this group. */
+function activityKey(activityType: WeekplannerActivityType, activityId: string): string {
+  return `${activityType}:${activityId}`;
+}
+
+/**
+ * Activities whose canonical booking is replaced by overrides in the context plan
+ * for this group — allocation overrides OR time overrides.
+ */
 export async function findWeekplannerReplacedActivities(
   tenantId: string,
   weekplannerPlanId: string,
   group: AvailabilityResourceGroup,
 ): Promise<Set<string>> {
-  const rows = await prisma.weekplannerPlanAllocation.findMany({
-    where: {
-      tenantId,
-      weekplannerPlanId,
-      allocationGroup: GROUP_TO_PLANNER_GROUP[group],
-    },
-    select: { activityType: true, activityId: true },
-    distinct: ["activityType", "activityId"],
-  });
+  const [allocationRows, timeOverrideRows] = await Promise.all([
+    prisma.weekplannerPlanAllocation.findMany({
+      where: {
+        tenantId,
+        weekplannerPlanId,
+        allocationGroup: GROUP_TO_PLANNER_GROUP[group],
+      },
+      select: { activityType: true, activityId: true },
+      distinct: ["activityType", "activityId"],
+    }),
+    prisma.weekplannerPlanActivityOverride.findMany({
+      where: { tenantId, weekplannerPlanId },
+      select: { activityType: true, activityId: true },
+    }),
+  ]);
 
-  return new Set(rows.map((row) => `${row.activityType}:${row.activityId}`));
+  const replaced = new Set<string>();
+  for (const row of allocationRows) {
+    replaced.add(activityKey(row.activityType, row.activityId));
+  }
+  for (const row of timeOverrideRows) {
+    replaced.add(activityKey(row.activityType, row.activityId));
+  }
+  return replaced;
 }
 
 async function resolveActivityLabel(
@@ -104,10 +129,11 @@ async function resolveEffectiveActivityWindow(
       select: { startAt: true, endAt: true },
     });
     if (!session) return null;
-    return {
-      startAt: timeOverride?.overrideStartAt ?? session.startAt,
-      endAt: timeOverride?.overrideEndAt ?? session.endAt,
-    };
+    const startAt = timeOverride?.overrideStartAt ?? session.startAt;
+    const canonicalEnd = session.endAt;
+    const endAt = timeOverride?.overrideEndAt ?? canonicalEnd;
+    if (!isMeaningfulEventInterval(startAt, endAt)) return null;
+    return { startAt, endAt };
   }
 
   const event = await prisma.event.findFirst({
@@ -115,16 +141,93 @@ async function resolveEffectiveActivityWindow(
     select: { startAt: true, endAt: true },
   });
   if (!event) return null;
-  const endAt = event.endAt ?? event.startAt;
-  return {
-    startAt: timeOverride?.overrideStartAt ?? event.startAt,
-    endAt: timeOverride?.overrideEndAt ?? endAt,
-  };
+  const startAt = timeOverride?.overrideStartAt ?? event.startAt;
+  const canonicalEnd = event.endAt ?? event.startAt;
+  const endAt = timeOverride?.overrideEndAt ?? canonicalEnd;
+  if (!isMeaningfulEventInterval(startAt, endAt)) return null;
+  return { startAt, endAt };
+}
+
+async function resolveCanonicalResourceIds(
+  tenantId: string,
+  activityType: WeekplannerActivityType,
+  activityId: string,
+  group: AvailabilityResourceGroup,
+  resourcesByCode: Map<string, string>,
+): Promise<string[]> {
+  if (activityType === "TRAINING") {
+    const session = await prisma.trainingSession.findFirst({
+      where: { id: activityId, tenantId },
+      select: {
+        sessionAllocations: {
+          select: { facilityResourceId: true, facilityResource: { select: { type: true } } },
+        },
+        trainingSeries: {
+          select: {
+            allocations: {
+              select: { facilityResourceId: true, facilityResource: { select: { type: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!session) return [];
+
+    const overridesForGroup = session.sessionAllocations.filter(
+      (a) => classifyFacilityResourceType(a.facilityResource.type) === group,
+    );
+    const effective =
+      overridesForGroup.length > 0 ? overridesForGroup : session.trainingSeries.allocations.filter(
+        (a) => classifyFacilityResourceType(a.facilityResource.type) === group,
+      );
+    return effective.map((a) => a.facilityResourceId);
+  }
+
+  if (activityType === "MATCH") {
+    const event = await prisma.event.findFirst({
+      where: { id: activityId, tenantId, type: "MATCH" },
+      select: { pitchCode: true, homeDressingRoomCode: true, awayDressingRoomCode: true },
+    });
+    if (!event) return [];
+    const codes =
+      group === "PITCH_HALL"
+        ? [event.pitchCode]
+        : [event.homeDressingRoomCode, event.awayDressingRoomCode];
+    return codes
+      .filter((code): code is string => Boolean(code))
+      .map((code) => resourcesByCode.get(code))
+      .filter((id): id is string => Boolean(id));
+  }
+
+  if (activityType === "TOURNAMENT" && group === "PITCH_HALL") {
+    const rows = await prisma.tournamentResourceAllocation.findMany({
+      where: { tenantId, eventId: activityId },
+      select: { facilityResourceId: true },
+    });
+    return rows.map((r) => r.facilityResourceId);
+  }
+
+  if (activityType === "TOURNAMENT" && group === "DRESSING_ROOM") {
+    const rows = await prisma.tournamentParticipantAllocation.findMany({
+      where: { tenantId, tournamentParticipant: { eventId: activityId } },
+      select: { facilityResourceId: true },
+    });
+    return rows.map((r) => r.facilityResourceId);
+  }
+
+  return [];
+}
+
+function pushConflict(
+  conflicts: ConflictWindow[],
+  conflict: ConflictWindow,
+): void {
+  conflicts.push(conflict);
 }
 
 /**
  * Collects weekplanner-sourced conflicts for one query occupancy window.
- * Scoped to the context plan's week; excludes the activity being edited.
+ * Scoped to the context plan only; excludes the activity being edited.
  */
 export async function findWeekplannerPlanConflicts(
   tenantId: string,
@@ -132,51 +235,57 @@ export async function findWeekplannerPlanConflicts(
   queryEndAt: Date,
   group: AvailabilityResourceGroup,
   context: WeekplannerAvailabilityContext,
+  resourcesByCode: Map<string, string>,
 ): Promise<ConflictWindow[]> {
   const contextPlan = await prisma.weekplannerPlan.findFirst({
     where: { id: context.weekplannerPlanId, tenantId, archivedAt: null },
-    select: { id: true, weekId: true },
+    select: { id: true },
   });
   if (!contextPlan) return [];
 
-  const allocations = await prisma.weekplannerPlanAllocation.findMany({
-    where: {
-      tenantId,
-      allocationGroup: GROUP_TO_PLANNER_GROUP[group],
-      weekplannerPlan: { weekId: contextPlan.weekId, archivedAt: null },
-    },
-    select: {
-      weekplannerPlanId: true,
-      activityType: true,
-      activityId: true,
-      facilityResourceId: true,
-      occupancyBeforeMinutes: true,
-      occupancyAfterMinutes: true,
-    },
-  });
+  const [allocations, timeOverrides] = await Promise.all([
+    prisma.weekplannerPlanAllocation.findMany({
+      where: {
+        tenantId,
+        weekplannerPlanId: context.weekplannerPlanId,
+        allocationGroup: GROUP_TO_PLANNER_GROUP[group],
+      },
+      select: {
+        activityType: true,
+        activityId: true,
+        facilityResourceId: true,
+        occupancyBeforeMinutes: true,
+        occupancyAfterMinutes: true,
+      },
+    }),
+    prisma.weekplannerPlanActivityOverride.findMany({
+      where: { tenantId, weekplannerPlanId: context.weekplannerPlanId },
+      select: { activityType: true, activityId: true },
+    }),
+  ]);
 
   const conflicts: ConflictWindow[] = [];
   const labelCache = new Map<string, string>();
   const windowCache = new Map<string, { startAt: Date; endAt: Date } | null>();
+  const activitiesWithAllocationOverride = new Set<string>();
 
   for (const row of allocations) {
+    const key = activityKey(row.activityType, row.activityId);
+    activitiesWithAllocationOverride.add(key);
+
     if (
-      row.weekplannerPlanId === context.weekplannerPlanId &&
       row.activityType === context.excludeActivityType &&
       row.activityId === context.excludeActivityId
     ) {
       continue;
     }
 
-    const windowKey = `${row.weekplannerPlanId}:${row.activityType}:${row.activityId}`;
+    const windowKey = `${row.activityType}:${row.activityId}`;
     if (!windowCache.has(windowKey)) {
-      const resolved = await resolveEffectiveActivityWindow(
-        tenantId,
-        row.weekplannerPlanId,
-        row.activityType,
-        row.activityId,
+      windowCache.set(
+        windowKey,
+        await resolveEffectiveActivityWindow(tenantId, context.weekplannerPlanId, row.activityType, row.activityId),
       );
-      windowCache.set(windowKey, resolved);
     }
     const activityWindow = windowCache.get(windowKey);
     if (!activityWindow) continue;
@@ -192,20 +301,75 @@ export async function findWeekplannerPlanConflicts(
       continue;
     }
 
-    const labelKey = `${row.activityType}:${row.activityId}`;
-    let label = labelCache.get(labelKey);
+    let label = labelCache.get(key);
     if (!label) {
       label = await resolveActivityLabel(tenantId, row.activityType, row.activityId);
-      labelCache.set(labelKey, label);
+      labelCache.set(key, label);
     }
 
-    conflicts.push({
+    pushConflict(conflicts, {
       resourceId: row.facilityResourceId,
       label,
       startAt: occupancy.effectiveStartAt,
       endAt: occupancy.effectiveEndAt,
       sourceType: row.activityType,
     });
+  }
+
+  for (const row of timeOverrides) {
+    const key = activityKey(row.activityType, row.activityId);
+    if (activitiesWithAllocationOverride.has(key)) continue;
+
+    if (
+      row.activityType === context.excludeActivityType &&
+      row.activityId === context.excludeActivityId
+    ) {
+      continue;
+    }
+
+    const activityWindow = await resolveEffectiveActivityWindow(
+      tenantId,
+      context.weekplannerPlanId,
+      row.activityType,
+      row.activityId,
+    );
+    if (!activityWindow) continue;
+
+    const resourceIds = await resolveCanonicalResourceIds(
+      tenantId,
+      row.activityType,
+      row.activityId,
+      group,
+      resourcesByCode,
+    );
+    if (resourceIds.length === 0) continue;
+
+    const occupancy = computeResourceOccupancyWindow(
+      activityWindow.startAt,
+      activityWindow.endAt,
+      0,
+      0,
+    );
+
+    if (!overlapsQuery(queryStartAt, queryEndAt, occupancy.effectiveStartAt, occupancy.effectiveEndAt)) {
+      continue;
+    }
+
+    let label = labelCache.get(key);
+    if (!label) {
+      label = await resolveActivityLabel(tenantId, row.activityType, row.activityId);
+      labelCache.set(key, label);
+    }
+
+    for (const resourceId of resourceIds) {
+      pushConflict(conflicts, {
+        resourceId,
+        label,
+        startAt: occupancy.effectiveStartAt,
+        endAt: occupancy.effectiveEndAt,
+        sourceType: row.activityType,
+      });
+    }
   }
 
   return conflicts;
@@ -235,6 +399,7 @@ export function canonicalEventOverlapsQuery(
   eventStartAt: Date,
   eventEndAt: Date,
 ): boolean {
+  if (!isMeaningfulEventInterval(eventStartAt, eventEndAt)) return false;
   return timeRangesOverlap({
     startA: queryStartAt,
     endA: queryEndAt,

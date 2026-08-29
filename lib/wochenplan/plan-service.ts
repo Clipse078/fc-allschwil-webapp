@@ -31,6 +31,9 @@ import {
   WochenplanPlanArchivedError,
   WochenplanPlanActivationConflictError,
   WochenplanPlanAllocationEventNotFoundError,
+  WochenplanPlanDeleteActiveForbiddenError,
+  WochenplanPlanDeleteLastPlanForbiddenError,
+  WochenplanPlanDeleteDefaultForbiddenError,
 } from "./plan-errors";
 
 const MAX_NAME_LENGTH = 100;
@@ -337,4 +340,45 @@ export async function listWochenplanPlanAllocations(
 
 export function isDefaultPlan(plan: Pick<WochenplanPlanDto, "isDefault">): boolean {
   return plan.isDefault;
+}
+
+/**
+ * Permanently deletes a draft WochenplanPlan and all linked week-scoped
+ * materialized state (WeekplannerPlan rows, allocations, time overrides).
+ * Canonical TrainingSession/Event/Match data is never touched.
+ */
+export async function deleteWochenplanPlan(
+  tenantId: string,
+  planId: string,
+): Promise<{ id: string; name: string }> {
+  const plan = await requirePlan(tenantId, planId);
+
+  if (plan.isActive) {
+    throw new WochenplanPlanDeleteActiveForbiddenError(planId);
+  }
+  if (plan.isDefault) {
+    throw new WochenplanPlanDeleteDefaultForbiddenError(planId);
+  }
+
+  const remainingPlans = await prisma.wochenplanPlan.count({
+    where: { tenantId, archivedAt: null },
+  });
+  if (remainingPlans <= 1) {
+    throw new WochenplanPlanDeleteLastPlanForbiddenError(planId);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const linkedWeekplannerPlans = await tx.weekplannerPlan.findMany({
+      where: { tenantId, wochenplanPlanId: planId },
+      select: { id: true },
+    });
+
+    for (const linked of linkedWeekplannerPlans) {
+      await tx.weekplannerPlan.delete({ where: { id: linked.id } });
+    }
+
+    await tx.wochenplanPlan.delete({ where: { id: plan.id } });
+  });
+
+  return { id: plan.id, name: plan.name };
 }

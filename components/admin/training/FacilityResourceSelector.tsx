@@ -39,11 +39,19 @@ export type FacilityGroup = {
  * Purely additive: when a caller doesn't pass `availabilityByResourceId`,
  * the selector renders exactly as before.
  */
+export type ResourceAvailabilityConflict = {
+  label: string;
+  startAt: string;
+  endAt: string;
+};
+
 export type ResourceAvailabilityAnnotation = {
   status: "FREE" | "OCCUPIED";
   conflictLabel?: string | null;
   conflictStartAt?: string | null;
   conflictEndAt?: string | null;
+  /** Additional overlapping occupants when more than one booking conflicts. */
+  conflicts?: ResourceAvailabilityConflict[];
 };
 
 type Props = {

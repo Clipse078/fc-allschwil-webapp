@@ -62,6 +62,11 @@ export function computeResourceOccupancyWindow(
   };
 }
 
+/** True when [startAt, endAt) spans a positive duration — start==end is not meaningful. */
+export function isMeaningfulEventInterval(startAt: Date | string, endAt: Date | string): boolean {
+  return new Date(endAt).getTime() > new Date(startAt).getTime();
+}
+
 /** Half-open interval overlap on effective occupancy windows. */
 export function resourceOccupancyWindowsOverlap(
   a: Pick<ResourceOccupancyWindow, "effectiveStartAt" | "effectiveEndAt">,

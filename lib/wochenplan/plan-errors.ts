@@ -61,3 +61,27 @@ export class WochenplanPlanAllocationEventNotFoundError extends Error {
     this.name = "WochenplanPlanAllocationEventNotFoundError";
   }
 }
+
+export class WochenplanPlanDeleteActiveForbiddenError extends Error {
+  readonly code = "WOCHENPLAN_PLAN_DELETE_ACTIVE_FORBIDDEN" as const;
+  constructor(planId: string) {
+    super(`The active WochenplanPlan "${planId}" cannot be deleted — publish another plan first`);
+    this.name = "WochenplanPlanDeleteActiveForbiddenError";
+  }
+}
+
+export class WochenplanPlanDeleteLastPlanForbiddenError extends Error {
+  readonly code = "WOCHENPLAN_PLAN_DELETE_LAST_PLAN_FORBIDDEN" as const;
+  constructor(planId: string) {
+    super(`WochenplanPlan "${planId}" cannot be deleted — at least one plan must remain`);
+    this.name = "WochenplanPlanDeleteLastPlanForbiddenError";
+  }
+}
+
+export class WochenplanPlanDeleteDefaultForbiddenError extends Error {
+  readonly code = "WOCHENPLAN_PLAN_DELETE_DEFAULT_FORBIDDEN" as const;
+  constructor(planId: string) {
+    super(`The default WochenplanPlan "${planId}" cannot be deleted`);
+    this.name = "WochenplanPlanDeleteDefaultForbiddenError";
+  }
+}

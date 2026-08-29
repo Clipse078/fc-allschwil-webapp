@@ -202,11 +202,12 @@ function ResourceCard({
       ? `${formatClockTime(annotation.conflictStartAt)}–${formatClockTime(annotation.conflictEndAt)}`
       : null;
 
-  // Truncate the conflict label to max ~30 chars for display
   const rawLabel = annotation?.conflictLabel ?? null;
   const conflictLabel = rawLabel && rawLabel.length > 32
     ? rawLabel.slice(0, 30) + "…"
     : rawLabel;
+  const additionalConflicts = (annotation?.conflicts?.length ?? 0) > 1 ? annotation!.conflicts!.slice(1) : [];
+  const isMultiOccupied = additionalConflicts.length > 0;
 
   const borderClass = isSharedSelection
     ? "border-amber-400 ring-1 ring-amber-300"
@@ -265,23 +266,37 @@ function ResourceCard({
               Mehrfachbelegung
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600">Belegt</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700">Belegt</span>
           )}
+          {isMultiOccupied ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700">Mehrfach belegt</span>
+          ) : null}
           {conflictLabel && (
             <p
               className={cn(
                 "text-[10px] leading-tight truncate",
-                isSharedSelection ? "text-amber-800" : "text-rose-700",
+                isSharedSelection || isMultiOccupied ? "text-amber-800" : "text-amber-800",
               )}
             >
               {conflictLabel}
             </p>
           )}
           {conflictTime && (
-            <p className={cn("text-[10px]", isSharedSelection ? "text-amber-700" : "text-rose-600")}>
+            <p className={cn("text-[10px]", isSharedSelection || isMultiOccupied ? "text-amber-700" : "text-amber-700")}>
               {conflictTime}
             </p>
           )}
+          {additionalConflicts.map((conflict, index) => {
+            const extraTime =
+              conflict.startAt && conflict.endAt
+                ? `${formatClockTime(conflict.startAt)}–${formatClockTime(conflict.endAt)}`
+                : null;
+            return (
+              <p key={`${conflict.label}-${index}`} className="text-[10px] leading-tight text-amber-700 truncate">
+                {[conflict.label, extraTime].filter(Boolean).join(" · ")}
+              </p>
+            );
+          })}
           {pendingOccupiedConfirm && !isSelected && (
             <div className="mt-1.5 space-y-1" data-testid={testId ? `${testId}-occupied-confirm-${resourceId}` : undefined}>
               <p className="text-[10px] leading-tight text-amber-800">
@@ -428,13 +443,13 @@ function AvailabilitySummary({
     <p className="inline-flex items-center gap-2 text-xs font-medium">
       <span className="flex items-center gap-1 text-emerald-600">
         <span className="h-2 w-2 rounded-full bg-emerald-500 inline-block" />
-        {free} verfügbar
+        {free} frei
       </span>
       {occupied > 0 && (
         <>
           <span className="text-[var(--muted)]">·</span>
-          <span className="flex items-center gap-1 text-rose-600">
-            <span className="h-2 w-2 rounded-full bg-rose-500 inline-block" />
+          <span className="flex items-center gap-1 text-amber-700">
+            <span className="h-2 w-2 rounded-full bg-amber-500 inline-block" />
             {occupied} belegt
           </span>
         </>

@@ -32,7 +32,7 @@
 import { prisma } from "@/lib/db/prisma";
 import type { FacilityResourceType } from "@prisma/client";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
-import { computeResourceOccupancyWindow } from "@/lib/facilities/resource-occupancy-window";
+import { computeResourceOccupancyWindow, isMeaningfulEventInterval } from "@/lib/facilities/resource-occupancy-window";
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "@/lib/training/allocation-groups";
 import {
   findWeekplannerPlanConflicts,
@@ -51,6 +51,13 @@ export type ResourceAvailabilityStatus = "FREE" | "OCCUPIED";
 
 export type ResourceAvailabilityConflictSource = "TRAINING" | "MATCH" | "TOURNAMENT";
 
+export type ResourceAvailabilityConflictDetail = {
+  label: string;
+  startAt: string;
+  endAt: string;
+  sourceType: ResourceAvailabilityConflictSource;
+};
+
 export type ResourceAvailability = {
   resourceId: string;
   resourceName: string;
@@ -63,6 +70,7 @@ export type ResourceAvailability = {
   conflictStartAt: string | null;
   conflictEndAt: string | null;
   conflictSourceType: ResourceAvailabilityConflictSource | null;
+  conflicts: ResourceAvailabilityConflictDetail[];
 };
 
 export type GetResourceAvailabilityInput = {
@@ -235,6 +243,7 @@ async function findMatchConflicts(
     const label = event.opponentName ? `vs. ${event.opponentName}` : event.title;
     const effectiveStart = event.startAt;
     const effectiveEnd = event.endAt ?? event.startAt;
+    if (!isMeaningfulEventInterval(effectiveStart, effectiveEnd)) continue;
 
     const codes = group === "PITCH_HALL" ? [event.pitchCode] : [event.homeDressingRoomCode, event.awayDressingRoomCode];
 
@@ -376,6 +385,40 @@ export async function getResourceAvailability(
   } = input;
   const eventStartAt = toDate(input.startAt);
   const eventEndAt = input.endAt ? toDate(input.endAt) : eventStartAt;
+
+  if (!isMeaningfulEventInterval(eventStartAt, eventEndAt)) {
+    const resources = await prisma.facilityResource.findMany({
+      where: {
+        tenantId,
+        type: { in: RESOURCE_TYPES_BY_GROUP[group] },
+        status: { not: "ARCHIVED" },
+        facility: { status: { not: "ARCHIVED" } },
+      },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        facilityId: true,
+        facility: { select: { name: true } },
+      },
+      orderBy: [{ facility: { sortOrder: "asc" } }, { sortOrder: "asc" }, { name: "asc" }],
+    });
+
+    return resources.map((resource) => ({
+      resourceId: resource.id,
+      resourceName: resource.name,
+      resourceCode: resource.code,
+      facilityId: resource.facilityId,
+      facilityName: resource.facility.name,
+      status: "FREE" as const,
+      conflictLabel: null,
+      conflictStartAt: null,
+      conflictEndAt: null,
+      conflictSourceType: null,
+      conflicts: [],
+    }));
+  }
+
   const queryWindow = computeResourceOccupancyWindow(
     eventStartAt,
     eventEndAt,
@@ -422,21 +465,25 @@ export async function getResourceAvailability(
           weekplannerPlanId,
           excludeActivityType: excludeWeekplannerActivityType,
           excludeActivityId: excludeWeekplannerActivityId,
-        })
+        }, resourcesByCode)
       : Promise.resolve([]),
   ]);
 
-  const conflictsByResourceId = new Map<string, ConflictWindow>();
+  const conflictsByResourceId = new Map<string, ConflictWindow[]>();
   for (const conflict of [
     ...trainingConflicts,
     ...matchConflicts,
     ...tournamentConflicts,
     ...weekplannerConflicts,
   ]) {
-    const existing = conflictsByResourceId.get(conflict.resourceId);
-    if (!existing || conflict.startAt.getTime() < existing.startAt.getTime()) {
-      conflictsByResourceId.set(conflict.resourceId, conflict);
-    }
+    const list = conflictsByResourceId.get(conflict.resourceId) ?? [];
+    list.push(conflict);
+    conflictsByResourceId.set(conflict.resourceId, list);
+  }
+
+  for (const [resourceId, list] of conflictsByResourceId) {
+    list.sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
+    conflictsByResourceId.set(resourceId, list);
   }
 
   // FULL/HALF pitch derived availability rules (PLANNING-RESOURCE-UX-01-C2):
@@ -461,33 +508,35 @@ export async function getResourceAvailability(
       if (fullPitches.length === 0 || halfPitches.length === 0) continue;
 
       for (const full of fullPitches) {
-        const fullConflict = conflictsByResourceId.get(full.id);
-        if (fullConflict) {
-          // FULL occupied → derive HALF as unavailable (unless already marked)
+        const fullConflicts = conflictsByResourceId.get(full.id) ?? [];
+        if (fullConflicts.length > 0) {
+          const representative = fullConflicts[0]!;
           for (const half of halfPitches) {
-            if (!conflictsByResourceId.has(half.id)) {
-              conflictsByResourceId.set(half.id, {
-                ...fullConflict,
-                resourceId: half.id,
-                label: `${fullConflict.label} (ganzes Feld belegt)`,
-              });
+            if ((conflictsByResourceId.get(half.id) ?? []).length === 0) {
+              conflictsByResourceId.set(half.id, [
+                {
+                  ...representative,
+                  resourceId: half.id,
+                  label: `${representative.label} (ganzes Feld belegt)`,
+                },
+              ]);
             }
           }
         }
       }
 
-      // Any HALF occupied → derive FULL as unavailable
-      const occupiedHalves = halfPitches.filter((h) => conflictsByResourceId.has(h.id));
+      const occupiedHalves = halfPitches.filter((h) => (conflictsByResourceId.get(h.id) ?? []).length > 0);
       if (occupiedHalves.length > 0) {
         for (const full of fullPitches) {
-          if (!conflictsByResourceId.has(full.id)) {
-            // Use the earliest occupying half's conflict as the representative
-            const representative = conflictsByResourceId.get(occupiedHalves[0]!.id)!;
-            conflictsByResourceId.set(full.id, {
-              ...representative,
-              resourceId: full.id,
-              label: `${representative.label} (Hälfte belegt)`,
-            });
+          if ((conflictsByResourceId.get(full.id) ?? []).length === 0) {
+            const representative = conflictsByResourceId.get(occupiedHalves[0]!.id)![0]!;
+            conflictsByResourceId.set(full.id, [
+              {
+                ...representative,
+                resourceId: full.id,
+                label: `${representative.label} (Hälfte belegt)`,
+              },
+            ]);
           }
         }
       }
@@ -495,18 +544,26 @@ export async function getResourceAvailability(
   }
 
   return resources.map((resource) => {
-    const conflict = conflictsByResourceId.get(resource.id);
+    const conflictList = conflictsByResourceId.get(resource.id) ?? [];
+    const primary = conflictList[0];
+    const conflicts = conflictList.map((conflict) => ({
+      label: conflict.label,
+      startAt: conflict.startAt.toISOString(),
+      endAt: conflict.endAt.toISOString(),
+      sourceType: conflict.sourceType,
+    }));
     return {
       resourceId: resource.id,
       resourceName: resource.name,
       resourceCode: resource.code,
       facilityId: resource.facilityId,
       facilityName: resource.facility.name,
-      status: conflict ? "OCCUPIED" : "FREE",
-      conflictLabel: conflict?.label ?? null,
-      conflictStartAt: conflict?.startAt.toISOString() ?? null,
-      conflictEndAt: conflict?.endAt.toISOString() ?? null,
-      conflictSourceType: conflict?.sourceType ?? null,
+      status: primary ? "OCCUPIED" : "FREE",
+      conflictLabel: primary?.label ?? null,
+      conflictStartAt: primary?.startAt.toISOString() ?? null,
+      conflictEndAt: primary?.endAt.toISOString() ?? null,
+      conflictSourceType: primary?.sourceType ?? null,
+      conflicts,
     } satisfies ResourceAvailability;
   });
 }
