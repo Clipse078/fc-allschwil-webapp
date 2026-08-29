@@ -54,6 +54,8 @@ export type WeekplannerPlanAllocationDto = {
   facilityName: string;
   notes: string | null;
   displayOrder: number;
+  occupancyBeforeMinutes: number;
+  occupancyAfterMinutes: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -74,6 +76,15 @@ export type CreateWeekplannerPlanAllocationInput = {
   /** Required for TOURNAMENT+DRESSING_ROOM; must be omitted/empty otherwise. */
   participantId?: string | null;
   facilityResourceId: string;
+  notes?: string | null;
+  displayOrder?: number;
+  occupancyBeforeMinutes?: number | null;
+  occupancyAfterMinutes?: number | null;
+};
+
+export type UpdateWeekplannerPlanAllocationInput = {
+  occupancyBeforeMinutes?: number | null;
+  occupancyAfterMinutes?: number | null;
   notes?: string | null;
   displayOrder?: number;
 };

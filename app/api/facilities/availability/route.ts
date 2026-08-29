@@ -28,8 +28,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getResourceAvailability, type AvailabilityResourceGroup } from "@/lib/facilities/availability-service";
+import type { WeekplannerActivityType } from "@/lib/weekplanner/plan-types";
 
 const VALID_GROUPS: readonly AvailabilityResourceGroup[] = ["PITCH_HALL", "DRESSING_ROOM"];
+const ACTIVITY_TYPES: readonly WeekplannerActivityType[] = ["TRAINING", "MATCH", "TOURNAMENT"];
+
+function parseNonNegativeInt(raw: string | null, label: string): number | "invalid" {
+  if (raw == null || raw === "") return 0;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) return "invalid";
+  return parsed;
+}
 
 export async function GET(request: NextRequest) {
   const access = await requireApiAnyPermission([
@@ -53,6 +62,11 @@ export async function GET(request: NextRequest) {
   const groupRaw = searchParams.get("group");
   const excludeEventId = searchParams.get("excludeEventId") ?? undefined;
   const excludeTrainingSessionId = searchParams.get("excludeTrainingSessionId") ?? undefined;
+  const weekplannerPlanId = searchParams.get("weekplannerPlanId") ?? undefined;
+  const excludeWeekplannerActivityId = searchParams.get("excludeWeekplannerActivityId") ?? undefined;
+  const excludeWeekplannerActivityTypeRaw = searchParams.get("excludeWeekplannerActivityType");
+  const occupancyBeforeRaw = parseNonNegativeInt(searchParams.get("occupancyBeforeMinutes"), "occupancyBeforeMinutes");
+  const occupancyAfterRaw = parseNonNegativeInt(searchParams.get("occupancyAfterMinutes"), "occupancyAfterMinutes");
 
   if (!startAtRaw || Number.isNaN(new Date(startAtRaw).getTime())) {
     return NextResponse.json({ error: "startAt is required and must be a valid date." }, { status: 400 });
@@ -63,6 +77,21 @@ export async function GET(request: NextRequest) {
   if (!groupRaw || !VALID_GROUPS.includes(groupRaw as AvailabilityResourceGroup)) {
     return NextResponse.json({ error: "group must be one of PITCH_HALL, DRESSING_ROOM." }, { status: 400 });
   }
+  if (occupancyBeforeRaw === "invalid") {
+    return NextResponse.json({ error: "occupancyBeforeMinutes must be a non-negative integer." }, { status: 400 });
+  }
+  if (occupancyAfterRaw === "invalid") {
+    return NextResponse.json({ error: "occupancyAfterMinutes must be a non-negative integer." }, { status: 400 });
+  }
+  if (
+    excludeWeekplannerActivityTypeRaw &&
+    !ACTIVITY_TYPES.includes(excludeWeekplannerActivityTypeRaw as WeekplannerActivityType)
+  ) {
+    return NextResponse.json(
+      { error: `excludeWeekplannerActivityType must be one of ${ACTIVITY_TYPES.join(", ")}.` },
+      { status: 400 },
+    );
+  }
 
   const availability = await getResourceAvailability({
     tenantId,
@@ -71,6 +100,11 @@ export async function GET(request: NextRequest) {
     group: groupRaw as AvailabilityResourceGroup,
     excludeEventId,
     excludeTrainingSessionId,
+    occupancyBeforeMinutes: occupancyBeforeRaw,
+    occupancyAfterMinutes: occupancyAfterRaw,
+    weekplannerPlanId,
+    excludeWeekplannerActivityType: excludeWeekplannerActivityTypeRaw as WeekplannerActivityType | undefined,
+    excludeWeekplannerActivityId,
   });
 
   return NextResponse.json({ availability });

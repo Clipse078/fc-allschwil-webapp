@@ -145,6 +145,8 @@ function allocationRow(overrides: Record<string, unknown> = {}) {
     facilityResourceId: PITCH_RESOURCE.id,
     notes: null,
     displayOrder: 0,
+    occupancyBeforeMinutes: 0,
+    occupancyAfterMinutes: 0,
     createdAt: new Date("2026-08-01T00:00:00.000Z"),
     updatedAt: new Date("2026-08-01T00:00:00.000Z"),
     facilityResource: {

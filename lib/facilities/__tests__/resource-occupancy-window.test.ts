@@ -1,6 +1,6 @@
 /**
  * WOCHENPLAN-2.0-01H-E — resource occupancy window derivation tests.
- * Pure functions only; persistence blocked on schema decision.
+ * Pure functions only; persistence on WeekplannerPlanAllocation (01H-E2).
  */
 
 import { describe, expect, it } from "vitest";

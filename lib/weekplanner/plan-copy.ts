@@ -102,6 +102,8 @@ async function copyOverrideRows(
         facilityResourceId: row.facilityResourceId,
         notes: row.notes,
         displayOrder: row.displayOrder,
+        occupancyBeforeMinutes: row.occupancyBeforeMinutes,
+        occupancyAfterMinutes: row.occupancyAfterMinutes,
       })),
     });
   }

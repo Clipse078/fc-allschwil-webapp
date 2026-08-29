@@ -6,8 +6,8 @@
  * Distinguishes EVENT WINDOW (canonical startAt/endAt) from RESOURCE OCCUPANCY
  * WINDOW (effective reservation interval including optional before/after buffers).
  *
- * Persistence of beforeMinutes/afterMinutes per allocation requires a schema
- * extension on WeekplannerPlanAllocation (see WOCHENPLAN-2.0-01H-E schema gate).
+ * Persistence of occupancyBeforeMinutes/occupancyAfterMinutes per allocation
+ * is stored on WeekplannerPlanAllocation (WOCHENPLAN-2.0-01H-E2).
  * This module is the shared derivation primitive — no duplicate scheduling engine.
  */
 

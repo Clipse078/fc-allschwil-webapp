@@ -6,6 +6,10 @@
  * chronological ordering, and resource-conflict ("⚠ Doppelbelegung")
  * detection.
  *
+ * WOCHENPLAN-2.0-01H-E2 — conflict detection uses effective resource
+ * occupancy windows (event time + before/after buffers) via the shared
+ * primitive in lib/facilities/resource-occupancy-window.ts.
+ *
  * Reuses the existing canonical overlap primitive
  * (lib/facilities/allocation-rules.ts#timeRangesOverlap) — the same one
  * already used by the live resource-availability aggregator
@@ -17,7 +21,7 @@
  * Pure, synchronous, no I/O.
  */
 
-import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
+import { computeResourceOccupancyWindow, resourceOccupancyWindowsOverlap } from "@/lib/facilities/resource-occupancy-window";
 import { zonedDateKey, WEEKPLANNER_DEFAULT_TIMEZONE } from "./date";
 import type {
   WeekplannerConflict,
@@ -27,9 +31,14 @@ import type {
   WeekplannerWeek,
 } from "./types";
 
-/** Every FacilityResource this item claims to occupy, regardless of role (pitch/hall vs. dressing room). */
-function collectResourceRefs(item: WeekplannerItem): WeekplannerResourceRef[] {
-  const refs = [...item.pitchAllocations, ...item.dressingRoomAllocations];
+type OccupiedResource = WeekplannerResourceRef & {
+  effectiveStartAt: Date;
+  effectiveEndAt: Date;
+};
+
+/** Every FacilityResource this item claims to occupy, with derived occupancy windows. */
+function collectOccupiedResources(item: WeekplannerItem): OccupiedResource[] {
+  const refs: WeekplannerResourceRef[] = [...item.pitchAllocations, ...item.dressingRoomAllocations];
 
   if (item.type === "MATCH") {
     refs.push(...item.awayDressingRoomAllocations);
@@ -41,14 +50,26 @@ function collectResourceRefs(item: WeekplannerItem): WeekplannerResourceRef[] {
     }
   }
 
-  return refs;
+  return refs.map((ref) => {
+    const window = computeResourceOccupancyWindow(
+      item.startAt,
+      item.endAt,
+      ref.occupancyBeforeMinutes,
+      ref.occupancyAfterMinutes,
+    );
+    return {
+      ...ref,
+      effectiveStartAt: window.effectiveStartAt,
+      effectiveEndAt: window.effectiveEndAt,
+    };
+  });
 }
 
 /**
  * Annotates every item with the FacilityResources it shares an overlapping
- * booking window with, across every OTHER item in `items` (any type,
- * any day) — a genuine double-booking is exactly two canonical items
- * claiming the same FacilityResource for overlapping time windows.
+ * effective occupancy window with, across every OTHER item in `items` (any
+ * type, any day) — a genuine double-booking is exactly two canonical items
+ * claiming the same FacilityResource for overlapping occupancy windows.
  *
  * Returns a new array; input items are never mutated.
  */
@@ -59,7 +80,7 @@ export function detectWeekplannerConflicts(
 
   const withResources = items.map((item) => ({
     item,
-    resources: collectResourceRefs(item),
+    resources: collectOccupiedResources(item),
   }));
 
   for (let i = 0; i < withResources.length; i += 1) {
@@ -68,19 +89,14 @@ export function detectWeekplannerConflicts(
       const b = withResources[j];
       if (a.item.id === b.item.id) continue;
 
-      const overlaps = timeRangesOverlap({
-        startA: a.item.startAt,
-        endA: a.item.endAt,
-        startB: b.item.startAt,
-        endB: b.item.endAt,
-      });
-      if (!overlaps) continue;
-
       for (const resourceA of a.resources) {
         const shared = b.resources.find(
           (resourceB) => resourceB.facilityResourceId === resourceA.facilityResourceId,
         );
         if (!shared) continue;
+
+        const overlaps = resourceOccupancyWindowsOverlap(resourceA, shared);
+        if (!overlaps) continue;
 
         const conflict: WeekplannerConflict = {
           facilityResourceId: shared.facilityResourceId,

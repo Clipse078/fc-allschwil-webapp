@@ -32,7 +32,15 @@
 import { prisma } from "@/lib/db/prisma";
 import type { FacilityResourceType } from "@prisma/client";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
+import { computeResourceOccupancyWindow } from "@/lib/facilities/resource-occupancy-window";
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "@/lib/training/allocation-groups";
+import {
+  findWeekplannerPlanConflicts,
+  findWeekplannerReplacedActivities,
+  shouldExcludeCanonicalEvent,
+  shouldExcludeCanonicalTraining,
+} from "@/lib/weekplanner/availability-integration";
+import type { WeekplannerActivityType } from "@/lib/weekplanner/plan-types";
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -73,6 +81,14 @@ export type GetResourceAvailabilityInput = {
    * separate exclusion key from `excludeEventId`.
    */
   excludeTrainingSessionId?: string;
+  /** WOCHENPLAN-2.0-01H-E2 — expands the query window before event start. */
+  occupancyBeforeMinutes?: number;
+  /** WOCHENPLAN-2.0-01H-E2 — expands the query window after event end. */
+  occupancyAfterMinutes?: number;
+  /** WOCHENPLAN-2.0-01H-E2 — weekplanner plan context for effective-state resolution. */
+  weekplannerPlanId?: string;
+  excludeWeekplannerActivityType?: WeekplannerActivityType;
+  excludeWeekplannerActivityId?: string;
 };
 
 // ── Internal helpers ─────────────────────────────────────────────────────────
@@ -106,6 +122,7 @@ async function findTrainingConflicts(
   endAt: Date,
   group: AvailabilityResourceGroup,
   excludeTrainingSessionId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   const sessions = await prisma.trainingSession.findMany({
     where: {
@@ -142,6 +159,8 @@ async function findTrainingConflicts(
   const conflicts: ConflictWindow[] = [];
 
   for (const session of sessions) {
+    if (shouldExcludeCanonicalTraining(session.id, replacedActivities)) continue;
+
     const effectiveStart = session.overrideStartAt ?? session.startAt;
     const effectiveEnd = session.overrideEndAt ?? session.endAt;
 
@@ -183,6 +202,7 @@ async function findMatchConflicts(
   group: AvailabilityResourceGroup,
   resourcesByCode: Map<string, string>,
   excludeEventId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   const events = await prisma.event.findMany({
     where: {
@@ -206,6 +226,8 @@ async function findMatchConflicts(
   const conflicts: ConflictWindow[] = [];
 
   for (const event of events) {
+    if (shouldExcludeCanonicalEvent(event.id, "MATCH", replacedActivities)) continue;
+
     if (!timeRangesOverlap({ startA: startAt, endA: endAt, startB: event.startAt, endB: event.endAt })) {
       continue;
     }
@@ -239,6 +261,7 @@ async function findTournamentConflicts(
   group: AvailabilityResourceGroup,
   candidateResourceIds: string[],
   excludeEventId: string | undefined,
+  replacedActivities: ReadonlySet<string>,
 ): Promise<ConflictWindow[]> {
   if (candidateResourceIds.length === 0) return [];
 
@@ -258,6 +281,8 @@ async function findTournamentConflicts(
     });
 
     for (const row of rows) {
+      if (shouldExcludeCanonicalEvent(row.event.id, "TOURNAMENT", replacedActivities)) continue;
+
       if (!timeRangesOverlap({ startA: startAt, endA: endAt, startB: row.event.startAt, endB: row.event.endAt })) {
         continue;
       }
@@ -297,6 +322,8 @@ async function findTournamentConflicts(
 
   for (const row of rows) {
     const participant = row.tournamentParticipant;
+    if (shouldExcludeCanonicalEvent(participant.event.id, "TOURNAMENT", replacedActivities)) continue;
+
     if (!timeRangesOverlap({
       startA: startAt,
       endA: endAt,
@@ -338,9 +365,30 @@ async function findTournamentConflicts(
 export async function getResourceAvailability(
   input: GetResourceAvailabilityInput,
 ): Promise<ResourceAvailability[]> {
-  const { tenantId, group, excludeEventId, excludeTrainingSessionId } = input;
-  const startAt = toDate(input.startAt);
-  const endAt = input.endAt ? toDate(input.endAt) : startAt;
+  const {
+    tenantId,
+    group,
+    excludeEventId,
+    excludeTrainingSessionId,
+    weekplannerPlanId,
+    excludeWeekplannerActivityType,
+    excludeWeekplannerActivityId,
+  } = input;
+  const eventStartAt = toDate(input.startAt);
+  const eventEndAt = input.endAt ? toDate(input.endAt) : eventStartAt;
+  const queryWindow = computeResourceOccupancyWindow(
+    eventStartAt,
+    eventEndAt,
+    input.occupancyBeforeMinutes ?? 0,
+    input.occupancyAfterMinutes ?? 0,
+  );
+  const startAt = queryWindow.effectiveStartAt;
+  const endAt = queryWindow.effectiveEndAt;
+
+  const replacedActivities =
+    weekplannerPlanId != null
+      ? await findWeekplannerReplacedActivities(tenantId, weekplannerPlanId, group)
+      : new Set<string>();
 
   const resources = await prisma.facilityResource.findMany({
     where: {
@@ -365,14 +413,26 @@ export async function getResourceAvailability(
   const resourcesByCode = new Map(resources.map((r) => [r.code, r.id]));
   const resourceIds = resources.map((r) => r.id);
 
-  const [trainingConflicts, matchConflicts, tournamentConflicts] = await Promise.all([
-    findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId),
-    findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId),
-    findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId),
+  const [trainingConflicts, matchConflicts, tournamentConflicts, weekplannerConflicts] = await Promise.all([
+    findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId, replacedActivities),
+    findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId, replacedActivities),
+    findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId, replacedActivities),
+    weekplannerPlanId
+      ? findWeekplannerPlanConflicts(tenantId, startAt, endAt, group, {
+          weekplannerPlanId,
+          excludeActivityType: excludeWeekplannerActivityType,
+          excludeActivityId: excludeWeekplannerActivityId,
+        })
+      : Promise.resolve([]),
   ]);
 
   const conflictsByResourceId = new Map<string, ConflictWindow>();
-  for (const conflict of [...trainingConflicts, ...matchConflicts, ...tournamentConflicts]) {
+  for (const conflict of [
+    ...trainingConflicts,
+    ...matchConflicts,
+    ...tournamentConflicts,
+    ...weekplannerConflicts,
+  ]) {
     const existing = conflictsByResourceId.get(conflict.resourceId);
     if (!existing || conflict.startAt.getTime() < existing.startAt.getTime()) {
       conflictsByResourceId.set(conflict.resourceId, conflict);

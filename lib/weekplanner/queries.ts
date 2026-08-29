@@ -130,12 +130,20 @@ type FacilityResourceRow = {
   facility: { name: string };
 };
 
-function toResourceRef(row: FacilityResourceRow): WeekplannerResourceRef {
+function toResourceRef(
+  row: FacilityResourceRow,
+  occupancy: { occupancyBeforeMinutes: number; occupancyAfterMinutes: number } = {
+    occupancyBeforeMinutes: 0,
+    occupancyAfterMinutes: 0,
+  },
+): WeekplannerResourceRef {
   return {
     facilityResourceId: row.id,
     code: row.code,
     name: row.name,
     facilityName: row.facility.name,
+    occupancyBeforeMinutes: occupancy.occupancyBeforeMinutes,
+    occupancyAfterMinutes: occupancy.occupancyAfterMinutes,
   };
 }
 
@@ -183,6 +191,8 @@ async function findWeekplannerPlanOverrides(
       activityId: true,
       allocationGroup: true,
       participantId: true,
+      occupancyBeforeMinutes: true,
+      occupancyAfterMinutes: true,
       facilityResource: { select: { id: true, code: true, name: true, facility: { select: { name: true } } } },
     },
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -191,7 +201,12 @@ async function findWeekplannerPlanOverrides(
   for (const row of rows) {
     const key = planOverrideKey(row.activityType, row.activityId, row.allocationGroup, row.participantId);
     const list = map.get(key) ?? [];
-    list.push(toResourceRef(row.facilityResource));
+    list.push(
+      toResourceRef(row.facilityResource, {
+        occupancyBeforeMinutes: row.occupancyBeforeMinutes,
+        occupancyAfterMinutes: row.occupancyAfterMinutes,
+      }),
+    );
     map.set(key, list);
   }
 
@@ -337,6 +352,8 @@ function groupAllocationRows(
       code: row.facilityResource.code,
       name: row.facilityResource.name,
       facilityName: row.facilityResource.facility.name,
+      occupancyBeforeMinutes: 0,
+      occupancyAfterMinutes: 0,
     };
     const group = classifyFacilityResourceType(row.facilityResource.type);
     if (group === "PITCH_HALL") pitch.push(ref);
@@ -584,6 +601,8 @@ async function findWeekplannerHomeTournaments(
       code: allocation.facilityResourceCode,
       name: allocation.facilityResourceName,
       facilityName: allocation.facilityName,
+      occupancyBeforeMinutes: 0,
+      occupancyAfterMinutes: 0,
     }));
     const pitch = resolveEffectiveAllocation(
       overridesByKey,
@@ -616,6 +635,8 @@ async function findWeekplannerHomeTournaments(
           code: allocation.facilityResourceCode,
           name: allocation.facilityResourceName,
           facilityName: allocation.facilityName,
+          occupancyBeforeMinutes: 0,
+          occupancyAfterMinutes: 0,
         }));
         const dressingRoom = resolveEffectiveAllocation(
           overridesByKey,

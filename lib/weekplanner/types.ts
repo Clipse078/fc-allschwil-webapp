@@ -52,6 +52,10 @@ export type WeekplannerResourceRef = {
   code: string;
   name: string;
   facilityName: string;
+  /** WOCHENPLAN-2.0-01H-E2 — minutes reserved before effective event start (0 when canonical/default). */
+  occupancyBeforeMinutes: number;
+  /** WOCHENPLAN-2.0-01H-E2 — minutes reserved after effective event end (0 when canonical/default). */
+  occupancyAfterMinutes: number;
 };
 
 /** One FacilityResource this item shares an overlapping booking with — the "⚠ Doppelbelegung" signal. */

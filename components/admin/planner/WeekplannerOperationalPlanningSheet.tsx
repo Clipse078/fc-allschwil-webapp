@@ -14,6 +14,8 @@ import { Sheet } from "@/components/ui/Sheet";
 import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
+import { computeResourceOccupancyWindow } from "@/lib/facilities/resource-occupancy-window";
+import { isCanonicalAllocationGroupState } from "@/lib/weekplanner/plan-allocation-semantics";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import type { WeekplannerItem } from "@/lib/weekplanner/types";
 import type { WeekplannerActivityType } from "@/lib/weekplanner/plan-types";
@@ -101,11 +103,15 @@ async function replaceAllocationOverrides(
   activityId: string,
   allocationGroup: "PITCH_HALL" | "DRESSING_ROOM",
   participantId: string | undefined,
-  selectedResourceIds: string[],
+  selectedAllocations: {
+    facilityResourceId: string;
+    occupancyBeforeMinutes?: number;
+    occupancyAfterMinutes?: number;
+  }[],
   existingRows: WeekplannerOverrideRow[],
 ): Promise<void> {
   await deleteAllocationOverrides(planId, existingRows);
-  for (const facilityResourceId of selectedResourceIds) {
+  for (const allocation of selectedAllocations) {
     const res = await fetch(`/api/weekplanner/plans/${planId}/allocations`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -114,7 +120,9 @@ async function replaceAllocationOverrides(
         activityId,
         allocationGroup,
         participantId: participantId ?? null,
-        facilityResourceId,
+        facilityResourceId: allocation.facilityResourceId,
+        occupancyBeforeMinutes: allocation.occupancyBeforeMinutes ?? 0,
+        occupancyAfterMinutes: allocation.occupancyAfterMinutes ?? 0,
       }),
     });
     if (!res.ok) {
@@ -122,6 +130,112 @@ async function replaceAllocationOverrides(
       throw new Error(data.error ?? `Fehler: HTTP ${res.status}`);
     }
   }
+}
+
+const OCCUPANCY_PRESETS = [0, 30, 45, 60] as const;
+
+function formatOccupancyPreview(startAt: string, endAt: string, beforeMinutes: number, afterMinutes: number, locale: string, timeZone: string): string {
+  const window = computeResourceOccupancyWindow(startAt, endAt, beforeMinutes, afterMinutes);
+  const fmt = new Intl.DateTimeFormat(locale, { hour: "2-digit", minute: "2-digit", timeZone });
+  return `${fmt.format(window.effectiveStartAt)} – ${fmt.format(window.effectiveEndAt)}`;
+}
+
+function DressingRoomOccupancyControls({
+  formId,
+  beforeMinutes,
+  afterMinutes,
+  onBeforeChange,
+  onAfterChange,
+  eventStartAt,
+  eventEndAt,
+  locale,
+  timeZone,
+  disabled,
+}: {
+  formId: string;
+  beforeMinutes: number;
+  afterMinutes: number;
+  onBeforeChange: (value: number) => void;
+  onAfterChange: (value: number) => void;
+  eventStartAt: string;
+  eventEndAt: string;
+  locale: string;
+  timeZone: string;
+  disabled: boolean;
+}) {
+  const preview =
+    eventStartAt && eventEndAt
+      ? formatOccupancyPreview(eventStartAt, eventEndAt, beforeMinutes, afterMinutes, locale, timeZone)
+      : null;
+
+  return (
+    <div className="space-y-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/40 p-3" data-testid="weekplanner-dressing-occupancy">
+      <SectionLabel>Nutzungszeit</SectionLabel>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block space-y-1" htmlFor={`${formId}-occupancy-before`}>
+          <span className="fca-label">Vor Beginn</span>
+          <div className="flex items-center gap-2">
+            <input
+              id={`${formId}-occupancy-before`}
+              type="number"
+              min={0}
+              step={1}
+              value={beforeMinutes}
+              onChange={(e) => onBeforeChange(Math.max(0, Number.parseInt(e.target.value || "0", 10) || 0))}
+              className="fca-input"
+              disabled={disabled}
+            />
+            <span className="text-sm text-[var(--muted)]">Min.</span>
+          </div>
+        </label>
+        <label className="block space-y-1" htmlFor={`${formId}-occupancy-after`}>
+          <span className="fca-label">Nach Ende</span>
+          <div className="flex items-center gap-2">
+            <input
+              id={`${formId}-occupancy-after`}
+              type="number"
+              min={0}
+              step={1}
+              value={afterMinutes}
+              onChange={(e) => onAfterChange(Math.max(0, Number.parseInt(e.target.value || "0", 10) || 0))}
+              className="fca-input"
+              disabled={disabled}
+            />
+            <span className="text-sm text-[var(--muted)]">Min.</span>
+          </div>
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {OCCUPANCY_PRESETS.map((preset) => (
+          <button
+            key={`before-${preset}`}
+            type="button"
+            disabled={disabled}
+            onClick={() => onBeforeChange(preset)}
+            className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs text-[var(--muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          >
+            Vor {preset}
+          </button>
+        ))}
+        {OCCUPANCY_PRESETS.map((preset) => (
+          <button
+            key={`after-${preset}`}
+            type="button"
+            disabled={disabled}
+            onClick={() => onAfterChange(preset)}
+            className="rounded-full border border-[var(--border)] px-2.5 py-0.5 text-xs text-[var(--muted)] hover:border-[var(--primary)] hover:text-[var(--primary)]"
+          >
+            Nach {preset}
+          </button>
+        ))}
+      </div>
+      {preview && (
+        <p className="text-sm text-[var(--muted)]" data-testid="weekplanner-occupancy-preview">
+          Reserviert · {preview}
+        </p>
+      )}
+    </div>
+  );
 }
 
 async function saveTimeOverride(
@@ -170,6 +284,7 @@ function TrainingOperationalEditor({
   const router = useRouter();
   const formId = useId();
   const activityId = item.trainingSessionId;
+  const locale = "de-CH";
 
   const initStart = toTimeInputValue(item.startAt, timezone);
   const initEnd = toTimeInputValue(item.endAt, timezone);
@@ -179,11 +294,14 @@ function TrainingOperationalEditor({
   const initRoomIds = new Set(item.dressingRoomAllocations.map((r) => r.facilityResourceId));
   const canonicalPitchIds = new Set(item.canonicalPitchAllocations.map((r) => r.facilityResourceId));
   const canonicalRoomIds = new Set(item.canonicalDressingRoomAllocations.map((r) => r.facilityResourceId));
+  const initRoomRef = item.dressingRoomAllocations.find((r) => initRoomIds.has(r.facilityResourceId));
 
   const [startTime, setStartTime] = useState(initStart);
   const [endTime, setEndTime] = useState(initEnd);
   const [selectedPitchIds, setSelectedPitchIds] = useState<Set<string>>(initPitchIds);
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(initRoomIds);
+  const [roomBeforeMinutes, setRoomBeforeMinutes] = useState(initRoomRef?.occupancyBeforeMinutes ?? 0);
+  const [roomAfterMinutes, setRoomAfterMinutes] = useState(initRoomRef?.occupancyAfterMinutes ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -201,6 +319,11 @@ function TrainingOperationalEditor({
     startAt,
     endAt,
     excludeTrainingSessionId: activityId,
+    occupancyBeforeMinutes: roomBeforeMinutes,
+    occupancyAfterMinutes: roomAfterMinutes,
+    weekplannerPlanId: planId,
+    excludeWeekplannerActivityType: "TRAINING",
+    excludeWeekplannerActivityId: activityId,
   });
 
   const pitchOverrideRows =
@@ -212,7 +335,10 @@ function TrainingOperationalEditor({
   const timeChanged = startTime !== initStart || endTime !== initEnd;
   const pitchChanged = !setsEqual(selectedPitchIds, initPitchIds);
   const roomChanged = !setsEqual(selectedRoomIds, initRoomIds);
-  const hasChanges = timeChanged || pitchChanged || roomChanged;
+  const occupancyChanged =
+    roomBeforeMinutes !== (initRoomRef?.occupancyBeforeMinutes ?? 0) ||
+    roomAfterMinutes !== (initRoomRef?.occupancyAfterMinutes ?? 0);
+  const hasChanges = timeChanged || pitchChanged || roomChanged || occupancyChanged;
 
   async function handleSave() {
     if (!timesValid || !hasChanges) return;
@@ -245,14 +371,24 @@ function TrainingOperationalEditor({
             activityId,
             "PITCH_HALL",
             undefined,
-            Array.from(selectedPitchIds),
+            Array.from(selectedPitchIds).map((facilityResourceId) => ({ facilityResourceId })),
             pitchOverrideRows,
           );
         }
       }
 
-      if (roomChanged) {
-        if (setsEqual(selectedRoomIds, canonicalRoomIds)) {
+      if (roomChanged || occupancyChanged) {
+        const selectedAllocations = Array.from(selectedRoomIds).map((facilityResourceId) => ({
+          facilityResourceId,
+          occupancyBeforeMinutes: roomBeforeMinutes,
+          occupancyAfterMinutes: roomAfterMinutes,
+        }));
+        if (
+          isCanonicalAllocationGroupState({
+            selectedAllocations,
+            canonicalResourceIds: Array.from(canonicalRoomIds),
+          })
+        ) {
           await deleteAllocationOverrides(planId, roomOverrideRows);
         } else {
           await replaceAllocationOverrides(
@@ -261,7 +397,7 @@ function TrainingOperationalEditor({
             activityId,
             "DRESSING_ROOM",
             undefined,
-            Array.from(selectedRoomIds),
+            selectedAllocations,
             roomOverrideRows,
           );
         }
@@ -381,6 +517,20 @@ function TrainingOperationalEditor({
             compact
             testId="weekplanner-operational-room"
           />
+          {selectedRoomIds.size > 0 && (
+            <DressingRoomOccupancyControls
+              formId={formId}
+              beforeMinutes={roomBeforeMinutes}
+              afterMinutes={roomAfterMinutes}
+              onBeforeChange={setRoomBeforeMinutes}
+              onAfterChange={setRoomAfterMinutes}
+              eventStartAt={startAt}
+              eventEndAt={endAt}
+              locale={locale}
+              timeZone={timezone}
+              disabled={saving}
+            />
+          )}
         </div>
       </div>
     </Sheet>
@@ -401,6 +551,7 @@ function MatchOperationalEditor({
   const router = useRouter();
   const formId = useId();
   const activityId = item.eventId;
+  const locale = "de-CH";
 
   const initStart = toTimeInputValue(item.startAt, timezone);
   const initEnd = toTimeInputValue(item.endAt, timezone);
@@ -410,22 +561,36 @@ function MatchOperationalEditor({
   const initRoomIds = new Set(item.dressingRoomAllocations.map((r) => r.facilityResourceId));
   const canonicalPitchIds = new Set(item.canonicalPitchAllocations.map((r) => r.facilityResourceId));
   const canonicalRoomIds = new Set(item.canonicalDressingRoomAllocations.map((r) => r.facilityResourceId));
+  const initRoomRef = item.dressingRoomAllocations[0];
 
   const [startTime, setStartTime] = useState(initStart);
   const [endTime, setEndTime] = useState(initEnd);
   const [selectedPitchIds, setSelectedPitchIds] = useState<Set<string>>(initPitchIds);
   const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(initRoomIds);
+  const [roomBeforeMinutes, setRoomBeforeMinutes] = useState(initRoomRef?.occupancyBeforeMinutes ?? 0);
+  const [roomAfterMinutes, setRoomAfterMinutes] = useState(initRoomRef?.occupancyAfterMinutes ?? 0);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const startAt = useMemo(() => item.startAt.toISOString(), [item.startAt]);
-  const endAt = useMemo(() => item.endAt.toISOString(), [item.endAt]);
+  const startAt = useMemo(
+    () => combineTimeWithReferenceDay(startTime, item.startAt, timezone) ?? "",
+    [startTime, item.startAt, timezone],
+  );
+  const endAt = useMemo(
+    () => combineTimeWithReferenceDay(endTime, item.endAt, timezone) ?? "",
+    [endTime, item.endAt, timezone],
+  );
 
   const { pitchAvailability, dressingRoomAvailability } = useFacilityAvailability({
-    enabled: true,
+    enabled: !!startAt,
     startAt,
     endAt,
     excludeEventId: activityId,
+    occupancyBeforeMinutes: roomBeforeMinutes,
+    occupancyAfterMinutes: roomAfterMinutes,
+    weekplannerPlanId: planId,
+    excludeWeekplannerActivityType: "MATCH",
+    excludeWeekplannerActivityId: activityId,
   });
 
   const pitchOverrideRows = overridesByKey[planOverrideKey("MATCH", activityId, "PITCH_HALL")] ?? [];
@@ -435,7 +600,10 @@ function MatchOperationalEditor({
   const timeChanged = startTime !== initStart || endTime !== initEnd;
   const pitchChanged = !setsEqual(selectedPitchIds, initPitchIds);
   const roomChanged = !setsEqual(selectedRoomIds, initRoomIds);
-  const hasChanges = timeChanged || pitchChanged || roomChanged;
+  const occupancyChanged =
+    roomBeforeMinutes !== (initRoomRef?.occupancyBeforeMinutes ?? 0) ||
+    roomAfterMinutes !== (initRoomRef?.occupancyAfterMinutes ?? 0);
+  const hasChanges = timeChanged || pitchChanged || roomChanged || occupancyChanged;
 
   async function handleSave() {
     if (!timesValid || !hasChanges) return;
@@ -462,14 +630,24 @@ function MatchOperationalEditor({
             activityId,
             "PITCH_HALL",
             undefined,
-            Array.from(selectedPitchIds),
+            Array.from(selectedPitchIds).map((facilityResourceId) => ({ facilityResourceId })),
             pitchOverrideRows,
           );
         }
       }
 
-      if (roomChanged) {
-        if (setsEqual(selectedRoomIds, canonicalRoomIds)) {
+      if (roomChanged || occupancyChanged) {
+        const selectedAllocations = Array.from(selectedRoomIds).map((facilityResourceId) => ({
+          facilityResourceId,
+          occupancyBeforeMinutes: roomBeforeMinutes,
+          occupancyAfterMinutes: roomAfterMinutes,
+        }));
+        if (
+          isCanonicalAllocationGroupState({
+            selectedAllocations,
+            canonicalResourceIds: Array.from(canonicalRoomIds),
+          })
+        ) {
           await deleteAllocationOverrides(planId, roomOverrideRows);
         } else {
           await replaceAllocationOverrides(
@@ -478,7 +656,7 @@ function MatchOperationalEditor({
             activityId,
             "DRESSING_ROOM",
             undefined,
-            Array.from(selectedRoomIds),
+            selectedAllocations,
             roomOverrideRows,
           );
         }
@@ -567,6 +745,20 @@ function MatchOperationalEditor({
             compact
             testId="weekplanner-operational-match-room"
           />
+          {selectedRoomIds.size > 0 && (
+            <DressingRoomOccupancyControls
+              formId={formId}
+              beforeMinutes={roomBeforeMinutes}
+              afterMinutes={roomAfterMinutes}
+              onBeforeChange={setRoomBeforeMinutes}
+              onAfterChange={setRoomAfterMinutes}
+              eventStartAt={startAt}
+              eventEndAt={endAt}
+              locale={locale}
+              timeZone={timezone}
+              disabled={saving}
+            />
+          )}
         </div>
       </div>
     </Sheet>
@@ -643,7 +835,7 @@ function TournamentOperationalEditor({
             activityId,
             "PITCH_HALL",
             undefined,
-            Array.from(selectedPitchIds),
+            Array.from(selectedPitchIds).map((facilityResourceId) => ({ facilityResourceId })),
             pitchOverrideRows,
           );
         }

@@ -46,6 +46,7 @@ import type {
   CreateWeekplannerPlanInput,
   CreateWeekplannerPlanAllocationInput,
   SetWeekplannerPlanActivityTimeOverrideInput,
+  UpdateWeekplannerPlanAllocationInput,
 } from "./plan-types";
 import {
   WeekplannerPlanNotFoundError,
@@ -62,8 +63,10 @@ import {
   WeekplannerPlanAllocationResourceNotFoundError,
   WeekplannerPlanAllocationArchivedResourceError,
   WeekplannerPlanAllocationArchivedFacilityError,
+  WeekplannerPlanAllocationOccupancyValidationError,
   WeekplannerPlanTimeOverrideInvalidRangeError,
 } from "./plan-errors";
+import { validatePlanOccupancyMinutes } from "./plan-allocation-semantics";
 
 const MAX_NAME_LENGTH = 100;
 const WEEK_ID_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -95,6 +98,8 @@ type AllocationRow = {
   facilityResourceId: string;
   notes: string | null;
   displayOrder: number;
+  occupancyBeforeMinutes: number;
+  occupancyAfterMinutes: number;
   createdAt: Date;
   updatedAt: Date;
   facilityResource: {
@@ -152,9 +157,25 @@ function allocationToDto(row: AllocationRow): WeekplannerPlanAllocationDto {
     facilityName: row.facilityResource.facility.name,
     notes: row.notes,
     displayOrder: row.displayOrder,
+    occupancyBeforeMinutes: row.occupancyBeforeMinutes,
+    occupancyAfterMinutes: row.occupancyAfterMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function parseOccupancyFields(
+  input: { occupancyBeforeMinutes?: number | null; occupancyAfterMinutes?: number | null },
+): { occupancyBeforeMinutes: number; occupancyAfterMinutes: number } {
+  try {
+    return {
+      occupancyBeforeMinutes: validatePlanOccupancyMinutes(input.occupancyBeforeMinutes, "occupancyBeforeMinutes"),
+      occupancyAfterMinutes: validatePlanOccupancyMinutes(input.occupancyAfterMinutes, "occupancyAfterMinutes"),
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new WeekplannerPlanAllocationOccupancyValidationError(message);
+  }
 }
 
 // ── Validation helpers ────────────────────────────────────────────────────
@@ -612,6 +633,7 @@ export async function createWeekplannerPlanAllocation(
 ): Promise<WeekplannerPlanAllocationDto> {
   const { weekplannerPlanId, activityType, activityId, allocationGroup, facilityResourceId, notes, displayOrder } =
     input;
+  const occupancy = parseOccupancyFields(input);
 
   await requireActivePlan(tenantId, weekplannerPlanId);
   await requireActivityInTenant(tenantId, activityType, activityId);
@@ -669,6 +691,8 @@ export async function createWeekplannerPlanAllocation(
         facilityResourceId,
         notes: notes ?? null,
         displayOrder: order,
+        occupancyBeforeMinutes: occupancy.occupancyBeforeMinutes,
+        occupancyAfterMinutes: occupancy.occupancyAfterMinutes,
       },
       include: allocationInclude,
     });
@@ -690,6 +714,47 @@ export async function createWeekplannerPlanAllocation(
 export async function deleteWeekplannerPlanAllocation(tenantId: string, allocationId: string): Promise<void> {
   await requireAllocation(tenantId, allocationId);
   await prisma.weekplannerPlanAllocation.delete({ where: { id: allocationId } });
+}
+
+export async function updateWeekplannerPlanAllocation(
+  tenantId: string,
+  allocationId: string,
+  input: UpdateWeekplannerPlanAllocationInput,
+): Promise<WeekplannerPlanAllocationDto> {
+  const existing = await requireAllocation(tenantId, allocationId);
+  await requireActivePlan(tenantId, existing.weekplannerPlanId);
+
+  const data: {
+    notes?: string | null;
+    displayOrder?: number;
+    occupancyBeforeMinutes?: number;
+    occupancyAfterMinutes?: number;
+  } = {};
+
+  if (input.notes !== undefined) data.notes = input.notes ?? null;
+  if (input.displayOrder !== undefined) data.displayOrder = input.displayOrder;
+
+  if (input.occupancyBeforeMinutes !== undefined || input.occupancyAfterMinutes !== undefined) {
+    const occupancy = parseOccupancyFields({
+      occupancyBeforeMinutes:
+        input.occupancyBeforeMinutes !== undefined
+          ? input.occupancyBeforeMinutes
+          : existing.occupancyBeforeMinutes,
+      occupancyAfterMinutes:
+        input.occupancyAfterMinutes !== undefined
+          ? input.occupancyAfterMinutes
+          : existing.occupancyAfterMinutes,
+    });
+    data.occupancyBeforeMinutes = occupancy.occupancyBeforeMinutes;
+    data.occupancyAfterMinutes = occupancy.occupancyAfterMinutes;
+  }
+
+  const allocation = await prisma.weekplannerPlanAllocation.update({
+    where: { id: allocationId },
+    data,
+    include: allocationInclude,
+  });
+  return allocationToDto(allocation as unknown as AllocationRow);
 }
 
 // ── Public API — WeekplannerPlanActivityOverride (WEEKPLANNER-01D time overrides) ──

@@ -47,6 +47,8 @@ export type WeekplannerOverrideRow = {
   facilityResourceId: string;
   facilityResourceName: string;
   facilityResourceCode: string;
+  occupancyBeforeMinutes: number;
+  occupancyAfterMinutes: number;
 };
 
 type Props = {
@@ -147,7 +149,14 @@ export function WeekplannerAllocationOverrideEditor({
       }
 
       const data = (await res.json()) as {
-        allocation: { id: string; facilityResourceId: string; facilityResourceName: string; facilityResourceCode: string };
+        allocation: {
+          id: string;
+          facilityResourceId: string;
+          facilityResourceName: string;
+          facilityResourceCode: string;
+          occupancyBeforeMinutes: number;
+          occupancyAfterMinutes: number;
+        };
       };
       setOverrides((prev) => [
         ...prev,
@@ -156,6 +165,8 @@ export function WeekplannerAllocationOverrideEditor({
           facilityResourceId: data.allocation.facilityResourceId,
           facilityResourceName: data.allocation.facilityResourceName,
           facilityResourceCode: data.allocation.facilityResourceCode,
+          occupancyBeforeMinutes: data.allocation.occupancyBeforeMinutes ?? 0,
+          occupancyAfterMinutes: data.allocation.occupancyAfterMinutes ?? 0,
         },
       ]);
       startTransition(() => router.refresh());
