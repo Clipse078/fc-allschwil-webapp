@@ -3894,6 +3894,12 @@ model TenantSfvConfig {
   @@index([enabled])
 }
 
+// CLUB-LOGO-CONTRAST-01A — canonical crest contrast metadata for dark surfaces.
+enum LogoContrastMode {
+  NORMAL
+  INVERT_ON_DARK
+}
+
 // ═════════════════════════════════════════════════════════════════════════════
 // CLUB-DIRECTORY-01 — Canonical external club/team directory
 //
@@ -3945,6 +3951,10 @@ model ExternalClub {
   /// set manually; may also be populated from a provider sync (see
   /// ExternalClubProviderMapping.providerLogoUrl) when no tenant override exists.
   logoUrl         String?
+  /// CLUB-LOGO-CONTRAST-01A — how dark crests should render on dark surfaces
+  /// (e.g. Infoboard Screen 1). Does not modify the stored logo file; consumers
+  /// apply presentation (e.g. CSS invert) when INVERT_ON_DARK.
+  logoContrastMode LogoContrastMode @default(NORMAL)
   /// Free-form provenance note (e.g. "Erstellt via SFV-Sync", "Manuell erfasst").
   notes           String?
   /// How this record originated. "MANUAL" (Club Admin) or "SFV" (first seen via

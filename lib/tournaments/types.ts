@@ -8,6 +8,8 @@
  * columns as a second source of truth.
  */
 
+import type { LogoContrastMode } from "@/lib/club-directory/logo-contrast-mode";
+
 export type TournamentStatus =
   | "DRAFT"
   | "SCHEDULED"
@@ -48,6 +50,8 @@ export type TournamentExternalClubReference = {
   shortName: string | null;
   /** Canonical Club Directory crest when available. */
   logoUrl: string | null;
+  /** CLUB-LOGO-CONTRAST-01A — dark-surface presentation hint for the crest. */
+  logoContrastMode: LogoContrastMode;
 };
 
 export type TournamentExternalTeamReference = {

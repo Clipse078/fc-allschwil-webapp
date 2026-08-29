@@ -71,6 +71,7 @@ type TournamentParticipantRow = {
     readonly name: string;
     readonly shortName: string | null;
     readonly logoUrl: string | null;
+    readonly logoContrastMode: string;
   } | null;
   readonly externalTeam: {
     readonly name: string;
@@ -80,6 +81,7 @@ type TournamentParticipantRow = {
     readonly externalClub: {
       readonly name: string;
       readonly logoUrl: string | null;
+      readonly logoContrastMode: string;
     };
   } | null;
   readonly dressingRoomAllocations: readonly DressingRoomAllocationRow[];
@@ -117,6 +119,7 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
       name: true,
       shortName: true,
       logoUrl: true,
+      logoContrastMode: true,
     },
   },
   externalTeam: {
@@ -129,6 +132,7 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
         select: {
           name: true,
           logoUrl: true,
+          logoContrastMode: true,
         },
       },
     },

@@ -19,6 +19,7 @@ const clubListSelect = {
   shortName: true,
   alternativeName: true,
   logoUrl: true,
+  logoContrastMode: true,
   source: true,
   archivedAt: true,
   createdAt: true,

@@ -7,6 +7,7 @@
  */
 
 import type { ExternalTeamCompetitionContext } from "./competition-context";
+import type { LogoContrastMode } from "./logo-contrast-mode";
 
 // ── Provider mapping DTOs ──────────────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export type ExternalClubSummaryDto = {
   shortName: string | null;
   alternativeName: string | null;
   logoUrl: string | null;
+  logoContrastMode: LogoContrastMode;
   source: string;
   archivedAt: Date | null;
   createdAt: Date;

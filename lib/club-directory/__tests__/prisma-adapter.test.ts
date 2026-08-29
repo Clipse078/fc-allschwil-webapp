@@ -32,6 +32,7 @@ describe("createClubDirectoryQueryDatabase", () => {
       expect.objectContaining({
         where: expect.objectContaining({ tenantId: "tenant-1" }),
         select: expect.objectContaining({
+          logoContrastMode: true,
           _count: { select: { externalTeams: true, providerMappings: true } },
         }),
       }),

@@ -29,6 +29,11 @@ import {
   type ProviderClubSyncPayload,
   type ProviderTeamSyncPayload,
 } from "./provider-sync";
+import {
+  DEFAULT_LOGO_CONTRAST_MODE,
+  isValidLogoContrastMode,
+  type LogoContrastMode,
+} from "./logo-contrast-mode";
 
 // ── Row shapes (structural — match Prisma's shape) ─────────────────────────────
 
@@ -41,6 +46,7 @@ export type ExternalClubRow = {
   website: string | null;
   location: string | null;
   logoUrl: string | null;
+  logoContrastMode: LogoContrastMode;
   notes: string | null;
   source: string;
   archivedAt: Date | null;
@@ -234,6 +240,7 @@ export type CreateExternalClubInput = {
   website?: string | null;
   location?: string | null;
   notes?: string | null;
+  logoContrastMode?: LogoContrastMode;
 };
 
 export async function createExternalClub(
@@ -242,6 +249,10 @@ export async function createExternalClub(
 ): Promise<ExternalClubRow> {
   const tenantId = requireIdentifier(input.tenantId, "tenantId");
   const name = requireIdentifier(input.name, "name");
+
+  if (input.logoContrastMode !== undefined && !isValidLogoContrastMode(input.logoContrastMode)) {
+    throw new ClubDirectoryValidationError("logoContrastMode must be NORMAL or INVERT_ON_DARK.");
+  }
 
   return database.externalClub.create({
     data: {
@@ -252,6 +263,7 @@ export async function createExternalClub(
       website: normalizeOptionalString(input.website),
       location: normalizeOptionalString(input.location),
       notes: normalizeOptionalString(input.notes),
+      logoContrastMode: input.logoContrastMode ?? DEFAULT_LOGO_CONTRAST_MODE,
       // Manual creation is the only path that reaches this function — provider
       // sync never calls createExternalClub (see linkExternalClubProvider,
       // which links a provider identity to an already-existing, possibly
@@ -271,6 +283,7 @@ export type UpdateExternalClubInput = {
   location?: string | null;
   notes?: string | null;
   logoUrl?: string | null;
+  logoContrastMode?: LogoContrastMode;
 };
 
 async function requireExternalClub(
@@ -296,6 +309,9 @@ export async function updateExternalClub(
   if (input.name !== undefined) {
     requireIdentifier(input.name, "name");
   }
+  if (input.logoContrastMode !== undefined && !isValidLogoContrastMode(input.logoContrastMode)) {
+    throw new ClubDirectoryValidationError("logoContrastMode must be NORMAL or INVERT_ON_DARK.");
+  }
 
   return database.externalClub.update({
     where: { id },
@@ -313,6 +329,9 @@ export async function updateExternalClub(
         : {}),
       ...(input.notes !== undefined ? { notes: normalizeOptionalString(input.notes) } : {}),
       ...(input.logoUrl !== undefined ? { logoUrl: normalizeOptionalString(input.logoUrl) } : {}),
+      ...(input.logoContrastMode !== undefined
+        ? { logoContrastMode: input.logoContrastMode }
+        : {}),
     },
   });
 }

@@ -41,6 +41,7 @@ import {
   TournamentParticipantTenantMismatchError,
 } from "./errors";
 import { resolveTournamentParticipantLogoUrl } from "./club-identity";
+import { normalizeLogoContrastMode } from "@/lib/club-directory/logo-contrast-mode";
 
 // TOURNAMENTCENTER-UX-03: canonical external-participant identity for NEW
 // participants is a Club-Directory ExternalClub (+ tournament-specific
@@ -68,11 +69,11 @@ const participantInclude = {
       shortName: true,
       categoryLabel: true,
       logoUrl: true,
-      externalClub: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      externalClub: { select: { id: true, name: true, shortName: true, logoUrl: true, logoContrastMode: true } },
     },
   },
   externalClub: {
-    select: { id: true, name: true, shortName: true, logoUrl: true },
+    select: { id: true, name: true, shortName: true, logoUrl: true, logoContrastMode: true },
   },
   dressingRoomAllocations: {
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -122,9 +123,15 @@ type ParticipantRow = {
     shortName: string | null;
     categoryLabel: string | null;
     logoUrl: string | null;
-    externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null };
+    externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null; logoContrastMode: string };
   } | null;
-  externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+  externalClub: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    logoUrl: string | null;
+    logoContrastMode: string;
+  } | null;
   dressingRoomAllocations: Array<{
     id: string;
     notes: string | null;
@@ -189,6 +196,7 @@ function toDto(row: ParticipantRow, tenantLogoUrl: string | null = null): Tourna
           name: row.externalClub.name,
           shortName: row.externalClub.shortName,
           logoUrl: row.externalClub.logoUrl,
+          logoContrastMode: normalizeLogoContrastMode(row.externalClub.logoContrastMode),
         },
         rawDisplayName,
       },
@@ -220,6 +228,9 @@ function toDto(row: ParticipantRow, tenantLogoUrl: string | null = null): Tourna
           name: row.externalTeam.externalClub.name,
           shortName: row.externalTeam.externalClub.shortName,
           logoUrl: row.externalTeam.externalClub.logoUrl,
+          logoContrastMode: normalizeLogoContrastMode(
+            row.externalTeam.externalClub.logoContrastMode,
+          ),
         },
       },
       externalClub: null,

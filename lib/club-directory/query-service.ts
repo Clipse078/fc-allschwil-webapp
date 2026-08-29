@@ -24,6 +24,7 @@ import type {
   ProviderClubIdentityLookupInput,
   ProviderIdentityLookupInput,
 } from "./types";
+import { normalizeLogoContrastMode } from "./logo-contrast-mode";
 import { resolveExternalTeamCompetitionContext } from "./competition-context";
 
 export const CLUB_DIRECTORY_DEFAULT_LIMIT = 50;
@@ -64,6 +65,7 @@ interface ExternalClubListRecord {
   shortName: string | null;
   alternativeName: string | null;
   logoUrl: string | null;
+  logoContrastMode: string;
   source: string;
   archivedAt: Date | null;
   createdAt: Date;
@@ -214,6 +216,7 @@ function toClubSummaryDto(record: ExternalClubListRecord): ExternalClubSummaryDt
     shortName: record.shortName,
     alternativeName: record.alternativeName,
     logoUrl: record.logoUrl,
+    logoContrastMode: normalizeLogoContrastMode(record.logoContrastMode),
     source: record.source,
     archivedAt: record.archivedAt,
     createdAt: record.createdAt,

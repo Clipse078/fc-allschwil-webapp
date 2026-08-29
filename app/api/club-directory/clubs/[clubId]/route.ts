@@ -80,6 +80,9 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
       ...(body?.website !== undefined ? { website: body.website } : {}),
       ...(body?.location !== undefined ? { location: body.location } : {}),
       ...(body?.notes !== undefined ? { notes: body.notes } : {}),
+      ...(body?.logoContrastMode !== undefined
+        ? { logoContrastMode: body.logoContrastMode }
+        : {}),
     });
 
     revalidatePath("/dashboard/vereine");

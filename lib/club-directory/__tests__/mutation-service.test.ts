@@ -21,6 +21,7 @@ import {
   type ExternalTeamProviderMappingRow,
   type ExternalTeamRow,
 } from "../mutation-service";
+import { LOGO_CONTRAST_MODES } from "../logo-contrast-mode";
 
 // ── In-memory fake database ─────────────────────────────────────────────────────
 //
@@ -49,6 +50,7 @@ function seedClub(overrides: Partial<ExternalClubRow> = {}): ExternalClubRow {
     website: null,
     location: null,
     logoUrl: null,
+    logoContrastMode: LOGO_CONTRAST_MODES.NORMAL,
     notes: null,
     source: "MANUAL",
     archivedAt: null,
@@ -99,6 +101,7 @@ function createFakeDatabase(): ClubDirectoryMutationDatabase {
           website: null,
           location: null,
           logoUrl: null,
+          logoContrastMode: LOGO_CONTRAST_MODES.NORMAL,
           notes: null,
           shortName: null,
           alternativeName: null,
@@ -357,6 +360,21 @@ describe("createExternalClub — manual creation", () => {
     // ExternalClub creation cannot create a canonical tenant Team.
     expect("team" in db).toBe(false);
     await createExternalClub(db, { tenantId: "tenant-1", name: "SV Muttenz" });
+  });
+
+  it("defaults logoContrastMode to NORMAL", async () => {
+    const club = await createExternalClub(db, { tenantId: "tenant-1", name: "FC Black Stars" });
+    expect(club.logoContrastMode).toBe(LOGO_CONTRAST_MODES.NORMAL);
+  });
+
+  it("rejects an invalid logoContrastMode on create", async () => {
+    await expect(
+      createExternalClub(db, {
+        tenantId: "tenant-1",
+        name: "FC Black Stars",
+        logoContrastMode: "invert" as never,
+      }),
+    ).rejects.toThrow(/logoContrastMode/);
   });
 });
 
@@ -691,6 +709,34 @@ describe("updateExternalClub — tenant-managed fields", () => {
     await expect(
       updateExternalClub(db, { tenantId: "tenant-1", id: club.id, name: "   " }),
     ).rejects.toThrow(ClubDirectoryValidationError);
+  });
+
+  it("round-trips logoContrastMode NORMAL → INVERT_ON_DARK → NORMAL", async () => {
+    const club = seedClub();
+    const inverted = await updateExternalClub(db, {
+      tenantId: "tenant-1",
+      id: club.id,
+      logoContrastMode: LOGO_CONTRAST_MODES.INVERT_ON_DARK,
+    });
+    expect(inverted.logoContrastMode).toBe(LOGO_CONTRAST_MODES.INVERT_ON_DARK);
+
+    const restored = await updateExternalClub(db, {
+      tenantId: "tenant-1",
+      id: club.id,
+      logoContrastMode: LOGO_CONTRAST_MODES.NORMAL,
+    });
+    expect(restored.logoContrastMode).toBe(LOGO_CONTRAST_MODES.NORMAL);
+  });
+
+  it("rejects an invalid logoContrastMode on update", async () => {
+    const club = seedClub();
+    await expect(
+      updateExternalClub(db, {
+        tenantId: "tenant-1",
+        id: club.id,
+        logoContrastMode: "bogus" as never,
+      }),
+    ).rejects.toThrow(/logoContrastMode/);
   });
 });
 

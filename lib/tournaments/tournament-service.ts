@@ -28,6 +28,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { normalizeLogoContrastMode } from "@/lib/club-directory/logo-contrast-mode";
 import {
   findTournamentEventById,
   findAllTournamentEvents,
@@ -119,6 +120,7 @@ function toParticipantDto(
           name: row.externalClub.name,
           shortName: row.externalClub.shortName,
           logoUrl: row.externalClub.logoUrl,
+          logoContrastMode: normalizeLogoContrastMode(row.externalClub.logoContrastMode),
         },
         rawDisplayName,
       },
@@ -149,6 +151,9 @@ function toParticipantDto(
           name: row.externalTeam.externalClub.name,
           shortName: row.externalTeam.externalClub.shortName,
           logoUrl: row.externalTeam.externalClub.logoUrl,
+          logoContrastMode: normalizeLogoContrastMode(
+            row.externalTeam.externalClub.logoContrastMode,
+          ),
         },
       },
       externalClub: null,
