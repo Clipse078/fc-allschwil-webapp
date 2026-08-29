@@ -24,6 +24,10 @@ import {
   type CanonicalTrainingSessionPolicyRow,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { getActiveWochenplanPlan } from "./plan-service";
+import {
+  collectProviderClubIdsFromEventPolicies,
+  loadCanonicalClubLogoIndex,
+} from "@/lib/club-directory/canonical-logo-resolution";
 import { resolvePublicCurrentWeekWindow } from "./public-current-week";
 import { resolvePublicWeekplannerPlan } from "./public-plan-resolution";
 import {
@@ -281,6 +285,12 @@ export async function buildPublicCurrentWeekFeed(
     loadTrainingPolicyBySessionId(input.tenantId, allItems),
   ]);
 
+  const eventPolicies = [...eventPolicyByEventId.values()];
+  const canonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
+    input.tenantId,
+    collectProviderClubIdsFromEventPolicies(eventPolicies),
+  );
+
   const tournamentIds = allItems
     .filter((item) => item.type === "TOURNAMENT")
     .map((item) => item.eventId);
@@ -294,6 +304,7 @@ export async function buildPublicCurrentWeekFeed(
     tournamentByEventId,
     tenantClubName: input.tenantName,
     tenantLogoUrl: branding.logoUrl,
+    canonicalLogoByProviderClubId,
   };
 
   let teamLabel: string | null = null;

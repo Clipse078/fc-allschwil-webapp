@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeProviderLogoUrl,
   resolveExternalClubLogoUrl,
+  resolveExternalTeamCanonicalLogoUrl,
   resolveExternalTeamLogoUrl,
 } from "../logo";
 
@@ -42,6 +43,40 @@ describe("resolveExternalTeamLogoUrl", () => {
     expect(
       resolveExternalTeamLogoUrl({ logoUrl: undefined }, { logoUrl: undefined }),
     ).toBeNull();
+  });
+});
+
+describe("resolveExternalTeamCanonicalLogoUrl", () => {
+  const CANONICAL_LOGO = "https://example.test/fc-black-stars.png";
+
+  it("falls back to canonical Verein logo when team and direct club have none", () => {
+    expect(
+      resolveExternalTeamCanonicalLogoUrl(
+        { logoUrl: null },
+        { logoUrl: null },
+        { logoUrl: CANONICAL_LOGO },
+      ),
+    ).toBe(CANONICAL_LOGO);
+  });
+
+  it("prefers direct club logo over canonical Verein logo", () => {
+    expect(
+      resolveExternalTeamCanonicalLogoUrl(
+        { logoUrl: null },
+        { logoUrl: "https://cdn.example.com/direct.png" },
+        { logoUrl: CANONICAL_LOGO },
+      ),
+    ).toBe("https://cdn.example.com/direct.png");
+  });
+
+  it("prefers team override over canonical Verein logo", () => {
+    expect(
+      resolveExternalTeamCanonicalLogoUrl(
+        { logoUrl: "https://cdn.example.com/team.png" },
+        { logoUrl: null },
+        { logoUrl: CANONICAL_LOGO },
+      ),
+    ).toBe("https://cdn.example.com/team.png");
   });
 });
 

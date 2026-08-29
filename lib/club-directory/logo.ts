@@ -35,6 +35,29 @@ export function resolveExternalTeamLogoUrl(
 }
 
 /**
+ * Resolves the effective logo URL for an ExternalTeam with an optional
+ * canonical Verein / parent ExternalClub fallback (via providerClubId →
+ * ExternalClubProviderMapping). Precedence:
+ *   1. team-level override
+ *   2. direct parent ExternalClub.logoUrl
+ *   3. canonical Verein / mapped parent club logoUrl
+ *   4. null (initials fallback in UI)
+ */
+export function resolveExternalTeamCanonicalLogoUrl(
+  team: LogoSource,
+  directClub: LogoSource,
+  canonicalClub: LogoSource | null | undefined,
+): string | null {
+  const teamLogo = team.logoUrl?.trim() || null;
+  if (teamLogo !== null) return teamLogo;
+
+  const directClubLogo = directClub.logoUrl?.trim() || null;
+  if (directClubLogo !== null) return directClubLogo;
+
+  return canonicalClub?.logoUrl?.trim() || null;
+}
+
+/**
  * Resolves the effective logo URL for an ExternalClub. Trivial today (no
  * further fallback chain exists above club level) but kept as a named
  * function so consumers never read `.logoUrl` directly and so a future
