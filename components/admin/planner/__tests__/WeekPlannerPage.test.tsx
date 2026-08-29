@@ -363,13 +363,13 @@ describe("WeekPlannerPage — WEEKPLANNER-01D time override indicator", () => {
   });
 });
 
-describe("WeekPlannerPage — Doppelbelegung visibility", () => {
-  it("renders a conflict badge on the affected item and a week-level summary count", () => {
+describe("WeekPlannerPage — shared occupancy visibility", () => {
+  it("renders a shared-occupancy badge on the affected item and a week-level summary count", () => {
     const week = makeWeek([{ dayKey: "2026-08-10", items: [TRAINING_ITEM] }]);
     render(<WeekPlannerPage week={week} todayParam="2026-08-10" plans={[]} activePlanId={null} canManagePlans={false} />);
 
-    expect(screen.getByTestId("weekplanner-conflict-badge")).toHaveTextContent("Doppelbelegung");
-    expect(screen.getByTestId("weekplanner-conflict-summary")).toHaveTextContent("1 Eintrag mit Doppelbelegung");
+    expect(screen.getByTestId("weekplanner-conflict-badge")).toHaveTextContent("Geteilte Belegung");
+    expect(screen.getByTestId("weekplanner-conflict-summary")).toHaveTextContent("1 Eintrag mit geteilter Ressourcenbelegung");
   });
 
   it("shows no conflict summary when the week has zero conflicts", () => {

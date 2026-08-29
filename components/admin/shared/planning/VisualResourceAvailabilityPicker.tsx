@@ -20,7 +20,7 @@
  *   conflict signal. The picker renders them consistently without a second pass.
  */
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useEffect } from "react";
 import { Check, Star } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { PitchVisual, type PitchVisualState } from "./PitchVisual";
@@ -167,16 +167,35 @@ function ResourceCard({
   testId,
   compact = false,
 }: ResourceCardProps) {
+  const [pendingOccupiedConfirm, setPendingOccupiedConfirm] = useState(false);
   const state = availabilityState(annotation, isSelected);
   const isFree = annotation?.status === "FREE";
   const isOccupied = annotation?.status === "OCCUPIED";
   const isNeutral = !annotation;
+  const isSharedSelection = isSelected && isOccupied;
+
+  useEffect(() => {
+    if (isSelected || !isOccupied) setPendingOccupiedConfirm(false);
+  }, [isSelected, isOccupied, resourceId]);
 
   const handleClick = useCallback(() => {
-    if (disabled || isOccupied) return;
-    if (isSelected) onDeselect();
-    else onSelect();
+    if (disabled) return;
+    if (isSelected) {
+      onDeselect();
+      setPendingOccupiedConfirm(false);
+      return;
+    }
+    if (isOccupied) {
+      setPendingOccupiedConfirm(true);
+      return;
+    }
+    onSelect();
   }, [disabled, isOccupied, isSelected, onSelect, onDeselect]);
+
+  const handleConfirmOccupiedAssign = useCallback(() => {
+    onSelect();
+    setPendingOccupiedConfirm(false);
+  }, [onSelect]);
 
   const conflictTime =
     annotation?.conflictStartAt && annotation?.conflictEndAt
@@ -189,46 +208,114 @@ function ResourceCard({
     ? rawLabel.slice(0, 30) + "…"
     : rawLabel;
 
-  const borderClass = isSelected
-    ? "border-[var(--sce-primary)] ring-1 ring-[var(--sce-primary)]"
-    : isFree
-      ? "border-emerald-300 hover:border-emerald-400"
+  const borderClass = isSharedSelection
+    ? "border-amber-400 ring-1 ring-amber-300"
+    : isSelected
+      ? "border-[var(--sce-primary)] ring-1 ring-[var(--sce-primary)]"
+      : isFree
+        ? "border-emerald-300 hover:border-emerald-400"
+        : isOccupied
+          ? pendingOccupiedConfirm
+            ? "border-amber-300 ring-1 ring-amber-200"
+            : "border-rose-200 hover:border-amber-300"
+          : "border-[var(--border)]";
+
+  const bgClass = isSharedSelection
+    ? "bg-amber-50/70"
+    : isSelected
+      ? "bg-blue-50"
       : isOccupied
-        ? "border-rose-200"
-        : "border-[var(--border)]";
+        ? pendingOccupiedConfirm
+          ? "bg-amber-50/60"
+          : "bg-rose-50/40"
+        : "bg-[var(--surface)]";
 
-  const bgClass = isSelected
-    ? "bg-blue-50"
-    : isOccupied
-      ? "bg-rose-50/40"
-      : "bg-[var(--surface)]";
+  const isClickable = !disabled;
 
-  const isClickable = !disabled && !isOccupied;
-
-  // Occupied cards: compact horizontal layout — no large pitch visual
+  // Occupied cards: compact horizontal layout — selectable with lightweight confirm
   if (isOccupied) {
     return (
-      <div
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled}
         data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
+        aria-pressed={isSelected}
+        aria-label={`${resourceName} Belegt`}
+        title={rawLabel ?? undefined}
         className={cn(
-          "relative flex w-full items-start gap-2 rounded-lg border px-2.5 py-2",
+          "relative flex w-full items-start gap-2 rounded-lg border px-2.5 py-2 text-left transition-all",
           borderClass,
           bgClass,
+          isClickable
+            ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1"
+            : "cursor-default opacity-50",
         )}
-        title={rawLabel ?? undefined}
       >
-        <span className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-rose-500 inline-block" />
+        <span
+          className={cn(
+            "mt-0.5 h-2 w-2 shrink-0 rounded-full inline-block",
+            isSharedSelection ? "bg-amber-500" : "bg-rose-500",
+          )}
+        />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold leading-tight text-[var(--foreground)] truncate">{resourceName}</p>
-          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600">Belegt</span>
+          {isSharedSelection ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-amber-700">
+              Mehrfachbelegung
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-rose-600">Belegt</span>
+          )}
           {conflictLabel && (
-            <p className="text-[10px] leading-tight text-rose-700 truncate">{conflictLabel}</p>
+            <p
+              className={cn(
+                "text-[10px] leading-tight truncate",
+                isSharedSelection ? "text-amber-800" : "text-rose-700",
+              )}
+            >
+              {conflictLabel}
+            </p>
           )}
           {conflictTime && (
-            <p className="text-[10px] text-rose-600">{conflictTime}</p>
+            <p className={cn("text-[10px]", isSharedSelection ? "text-amber-700" : "text-rose-600")}>
+              {conflictTime}
+            </p>
+          )}
+          {pendingOccupiedConfirm && !isSelected && (
+            <div className="mt-1.5 space-y-1" data-testid={testId ? `${testId}-occupied-confirm-${resourceId}` : undefined}>
+              <p className="text-[10px] leading-tight text-amber-800">
+                {resourceName} ist in diesem Zeitraum bereits belegt.
+              </p>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleConfirmOccupiedAssign();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleConfirmOccupiedAssign();
+                  }
+                }}
+                className="inline-flex text-[10px] font-semibold text-[var(--sce-primary)] underline underline-offset-2 hover:text-[var(--sce-primary)]"
+                data-testid={testId ? `${testId}-assign-anyway-${resourceId}` : undefined}
+              >
+                Trotzdem zuweisen
+              </span>
+            </div>
+          )}
+          {isSharedSelection && (
+            <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-medium text-[var(--sce-primary)]">
+              <Check className="h-2.5 w-2.5" />
+              Ausgewählt
+            </span>
           )}
         </div>
-      </div>
+      </button>
     );
   }
 

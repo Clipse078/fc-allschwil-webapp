@@ -159,7 +159,7 @@ describe("VisualResourceAvailabilityPicker — selection", () => {
     expect(screen.getByText("Ausgewählt")).toBeInTheDocument();
   });
 
-  it("does not call onSelect when an occupied resource card is clicked", () => {
+  it("shows occupied confirm flow and allows assign via Trotzdem zuweisen", () => {
     const onSelect = vi.fn();
     render(
       <VisualResourceAvailabilityPicker
@@ -174,6 +174,25 @@ describe("VisualResourceAvailabilityPicker — selection", () => {
 
     fireEvent.click(screen.getByTestId("picker-card-res-pitch-b"));
     expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId("picker-occupied-confirm-res-pitch-b")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("picker-assign-anyway-res-pitch-b"));
+    expect(onSelect).toHaveBeenCalledWith("res-pitch-b");
+  });
+
+  it("shows Mehrfachbelegung when an occupied resource is selected", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-b"])}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        testId="picker"
+      />,
+    );
+
+    expect(screen.getByText("Mehrfachbelegung")).toBeInTheDocument();
   });
 });
 

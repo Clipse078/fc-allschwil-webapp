@@ -182,11 +182,11 @@ describe("DayPlannerPage — VIEW vs MANAGE (Standardplan safety)", () => {
   });
 });
 
-describe("DayPlannerPage — Doppelbelegung visibility", () => {
-  it("renders a conflict badge and a day-level summary count", () => {
+describe("DayPlannerPage — shared occupancy visibility", () => {
+  it("renders a shared-occupancy badge and a day-level summary count", () => {
     render(<DayPlannerPage day={makeDay([TRAINING_ITEM])} {...BASE_PROPS} plans={[]} activePlanId={null} canManagePlans={false} />);
-    expect(screen.getByTestId("dayplanner-conflict-badge")).toHaveTextContent("Doppelbelegung");
-    expect(screen.getByTestId("dayplanner-conflict-summary")).toHaveTextContent("1 Eintrag mit Doppelbelegung");
+    expect(screen.getByTestId("dayplanner-conflict-badge")).toHaveTextContent("Geteilte Belegung");
+    expect(screen.getByTestId("dayplanner-conflict-summary")).toHaveTextContent("1 Eintrag mit geteilter Ressourcenbelegung");
   });
 
   it("shows no conflict summary when the day has zero conflicts", () => {

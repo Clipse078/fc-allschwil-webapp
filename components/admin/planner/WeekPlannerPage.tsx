@@ -217,12 +217,12 @@ function ConflictBadge({ item }: { item: WeekplannerItem }) {
 
   return (
     <div
-      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-[11px] font-semibold text-rose-700"
-      title={`Doppelbelegung: ${resourceNames}`}
+      className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800"
+      title={`Geteilte Belegung: ${resourceNames}`}
       data-testid="weekplanner-conflict-badge"
     >
-      <AlertTriangle className="h-3.5 w-3.5" />
-      Doppelbelegung · {resourceNames}
+      <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+      Geteilte Belegung · {resourceNames}
     </div>
   );
 }
@@ -782,14 +782,14 @@ export default function WeekPlannerPage({
         </div>
       </SectionCard>
 
-      {/* PLANNING-UX-C3 — RED: Doppelbelegung. Semantically distinct from AMBER below. */}
+      {/* PLANNING-UX-C3 — AMBER: shared resource occupancy (informational, not a hard error). */}
       {conflictCount > 0 && (
         <div
-          className="flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-700"
+          className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm font-medium text-amber-800"
           data-testid="weekplanner-conflict-summary"
         >
-          <AlertTriangle className="h-4 w-4" />
-          {conflictCount} {conflictCount === 1 ? "Eintrag" : "Einträge"} mit Doppelbelegung diese Woche
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          {conflictCount} {conflictCount === 1 ? "Eintrag" : "Einträge"} mit geteilter Ressourcenbelegung diese Woche
         </div>
       )}
 
