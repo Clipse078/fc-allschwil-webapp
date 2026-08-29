@@ -79,6 +79,26 @@ describe("deleteWochenplanPlan", () => {
 
     expect(result).toEqual({ id: PLAN_LEGACY_DEFAULT, name: "Wochenplan" });
     expect(prisma.$transaction).toHaveBeenCalled();
+    const tx = vi.mocked(prisma.$transaction).mock.calls[0][0] as (tx: {
+      wochenplanPlan: { updateMany: ReturnType<typeof vi.fn> };
+    }) => Promise<unknown>;
+    const txMock = {
+      wochenplanPlan: {
+        findFirst: vi.fn().mockResolvedValue(planRow({ id: PLAN_ACTIVE, name: "Standardplan", isActive: true, isDefault: false })),
+        updateMany: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+      weekplannerPlan: {
+        findMany: vi.fn().mockResolvedValue([]),
+        delete: vi.fn(),
+      },
+    };
+    await tx(txMock as never);
+    expect(txMock.wochenplanPlan.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT, isDefault: true, archivedAt: null },
+      data: { isDefault: false },
+    });
   });
 
   it("rejects deleting the active plan", async () => {
