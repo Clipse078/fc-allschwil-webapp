@@ -20,7 +20,7 @@ vi.mock("@/lib/weekplanner/plan-copy", () => ({
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    wochenplanPlan: { findFirst: vi.fn(), delete: vi.fn() },
+    wochenplanPlan: { findFirst: vi.fn(), delete: vi.fn(), update: vi.fn() },
     weekplannerPlan: { delete: vi.fn() },
   },
 }));
@@ -30,6 +30,7 @@ import { materializeLinkedWeekplannerPlan } from "../plan-materialization";
 import { copyWeekplannerOperationalState } from "@/lib/weekplanner/plan-copy";
 import { prisma } from "@/lib/db/prisma";
 import { createWochenplanPlanWithWeek } from "../plan-creation";
+import { WOCHEPLAN_EMPTY_BASELINE_MARKER } from "../plan-baseline";
 import { WochenplanPlanArchivedError, WochenplanPlanValidationError } from "../plan-errors";
 
 const TENANT_A = "tenant-a";
@@ -80,7 +81,7 @@ describe("createWochenplanPlanWithWeek", () => {
 
     expect(createWochenplanPlan).toHaveBeenCalledWith(TENANT_A, {
       name: "Schlechtwetterplan",
-      description: undefined,
+      description: WOCHEPLAN_EMPTY_BASELINE_MARKER,
     });
     expect(materializeLinkedWeekplannerPlan).toHaveBeenCalledWith(
       TENANT_A,

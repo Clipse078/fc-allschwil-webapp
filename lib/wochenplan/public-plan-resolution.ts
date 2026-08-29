@@ -1,8 +1,8 @@
 /**
  * lib/wochenplan/public-plan-resolution.ts
  *
- * WOCHENPLAN-2.0-01C/01E — bridges tenant-level WochenplanPlan (public/active)
- * to week-scoped WeekplannerPlan effective state for a requested week.
+ * WOCHENPLAN-2.0-01C/01E/01H-D — bridges tenant-level WochenplanPlan (canonical
+ * active plan) to week-scoped WeekplannerPlan effective state for a requested week.
  *
  * Canonical identity is ID-based via WeekplannerPlan.wochenplanPlanId.
  * Human-readable plan names are display metadata only and MUST NOT be used

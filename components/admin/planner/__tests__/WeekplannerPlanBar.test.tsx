@@ -3,7 +3,7 @@
  *
  * components/admin/planner/__tests__/WeekplannerPlanBar.test.tsx
  *
- * WOCHENPLAN-2.0-01H-C — plan bar tests aligned with tenant-level WochenplanPlan selector.
+ * WOCHENPLAN-2.0-01H-D — plan bar tests for draft/active semantics.
  */
 
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -61,8 +61,8 @@ beforeEach(() => {
   refreshMock.mockClear();
 });
 
-describe("WeekplannerPlanBar — selector and state banners", () => {
-  it("shows the default plan selected and public/operational banners", () => {
+describe("WeekplannerPlanBar — selector and status", () => {
+  it("shows active plan status when viewing the active plan", () => {
     render(
       <WeekplannerPlanBar
         weekParam="2026-08-25"
@@ -76,11 +76,11 @@ describe("WeekplannerPlanBar — selector and state banners", () => {
 
     const select = screen.getByTestId("weekplanner-plan-select") as HTMLSelectElement;
     expect(select.value).toBe("wcp-default");
-    expect(screen.getByTestId("weekplanner-public-plan-banner")).toHaveTextContent("Standardplan");
-    expect(screen.getByTestId("weekplanner-operational-plan-banner")).toHaveTextContent("Betriebsplan · Standardplan");
+    expect(screen.getByTestId("weekplanner-active-plan-banner")).toHaveTextContent("Aktiver Plan · Standardplan");
+    expect(screen.queryByTestId("weekplanner-draft-plan-banner")).not.toBeInTheDocument();
   });
 
-  it("shows Ansicht banner when viewing a non-public alternative", () => {
+  it("shows draft status and current active reference when viewing a draft", () => {
     render(
       <WeekplannerPlanBar
         weekParam="2026-08-25"
@@ -95,8 +95,29 @@ describe("WeekplannerPlanBar — selector and state banners", () => {
       />,
     );
 
-    expect(screen.getByTestId("weekplanner-viewed-plan-banner")).toHaveTextContent("Ansicht · Schlechtwetterplan");
-    expect(screen.getByTestId("weekplanner-public-plan-banner")).toHaveTextContent("Öffentlicher Plan · Standardplan");
+    expect(screen.getByTestId("weekplanner-draft-plan-banner")).toHaveTextContent("Entwurf · Schlechtwetterplan");
+    expect(screen.getByTestId("weekplanner-current-active-reference")).toHaveTextContent("Aktuell aktiv: Standardplan");
+    expect(screen.queryByTestId("weekplanner-public-plan-banner")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("weekplanner-operational-plan-banner")).not.toBeInTheDocument();
+  });
+
+  it("labels plans as Aktiv or Entwurf in the selector", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-25"
+        wochenplanPlans={[
+          wochenplanPlan(),
+          wochenplanPlan({ id: "wcp-alt", name: "Schlechtwetterplan", isDefault: false, isActive: false }),
+        ]}
+        weekplannerPlans={[]}
+        selectedPlanParam={null}
+        materializedWeekplannerPlanId={null}
+        canManage
+      />,
+    );
+
+    expect(screen.getByRole("option", { name: "Standardplan — Aktiv" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Schlechtwetterplan — Entwurf" })).toBeInTheDocument();
   });
 });
 
@@ -195,9 +216,9 @@ describe("WeekplannerPlanBar — create plan dialog", () => {
   });
 });
 
-describe("WeekplannerPlanBar — operational activation", () => {
-  it("activates the materialized alternative as Betriebsplan", async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ plan: weekplannerPlan({ isActive: true }) }, 200));
+describe("WeekplannerPlanBar — activation", () => {
+  it("activates the viewed draft via tenant-level WochenplanPlan API after confirmation", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ plan: wochenplanPlan({ id: "wcp-alt", isActive: true }) }, 200));
     vi.stubGlobal("fetch", fetchMock);
 
     render(
@@ -212,10 +233,11 @@ describe("WeekplannerPlanBar — operational activation", () => {
     );
 
     fireEvent.click(screen.getByTestId("weekplanner-plan-activate-button"));
+    fireEvent.click(screen.getByRole("button", { name: "Aktivieren" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/weekplanner/plans/wp-schlechtwetter",
+        "/api/wochenplan/plans/wcp-alt",
         expect.objectContaining({ method: "PATCH", body: JSON.stringify({ active: true }) }),
       ),
     );

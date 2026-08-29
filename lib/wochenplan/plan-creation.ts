@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { buildEmptyBaselineDescription } from "./plan-baseline";
 import { createWochenplanPlan } from "./plan-service";
 import { materializeLinkedWeekplannerPlan } from "./plan-materialization";
 import type { WochenplanPlanDto } from "./plan-types";
@@ -76,7 +77,8 @@ async function rollbackCreatedPlan(planId: string, weekplannerPlanId: string | n
  * WeekplannerPlan for the requested week, and optionally copies sparse weekly
  * operational overrides from a source plan.
  *
- * Empty start: materialized plan has zero override rows (canonical fallback).
+ * Empty start: materialized plan has zero override rows and an empty baseline
+ * marker so the week canvas does not inherit canonical activities.
  * Copy: copies source WeekplannerPlan override rows transactionally when present.
  */
 export async function createWochenplanPlanWithWeek(
@@ -98,9 +100,12 @@ export async function createWochenplanPlanWithWeek(
   let createdWeekplannerPlanId: string | null = null;
 
   try {
-    const plan = await createWochenplanPlan(tenantId, {
+    let plan = await createWochenplanPlan(tenantId, {
       name: input.name,
-      description: input.description,
+      description:
+        mode === "empty"
+          ? buildEmptyBaselineDescription(input.description)
+          : input.description,
     });
     createdPlanId = plan.id;
 
@@ -110,12 +115,25 @@ export async function createWochenplanPlanWithWeek(
     createdWeekplannerPlanId = materialized.weekplannerPlan.id;
 
     if (mode === "copy" && input.sourceWochenplanPlanId) {
+      const sourceId = input.sourceWochenplanPlanId.trim();
       await copyWeekplannerOperationalState(
         tenantId,
         weekId,
-        input.sourceWochenplanPlanId.trim(),
+        sourceId,
         materialized.weekplannerPlan.id,
       );
+
+      const sourceDefinition = await prisma.wochenplanPlan.findFirst({
+        where: { id: sourceId, tenantId },
+        select: { description: true },
+      });
+      if (sourceDefinition?.description) {
+        await prisma.wochenplanPlan.update({
+          where: { id: plan.id },
+          data: { description: sourceDefinition.description },
+        });
+        plan = { ...plan, description: sourceDefinition.description };
+      }
     }
 
     return {

@@ -15,7 +15,7 @@ type WochenplanPublishBarProps = {
   weekId?: string;
   /** Currently active publication for this week, if any. */
   activeVariantLabel?: string | null;
-  /** WOCHENPLAN-2.0-01B — tenant's active/public plan name. */
+  /** WOCHENPLAN-2.0-01B — tenant's active plan name. */
   activePlanName?: string | null;
 };
 
@@ -50,7 +50,7 @@ export default function WochenplanPublishBar({
           <h3 className="fca-subheading mt-2">Wochenplan publizieren</h3>
           {weekId ? (
             <p className="mt-1 text-[0.75rem] text-[var(--muted)]">
-              Woche {weekId} — Öffentlicher Plan: {effectiveLabel}
+              Woche {weekId} — Aktiver Plan: {effectiveLabel}
             </p>
           ) : null}
 

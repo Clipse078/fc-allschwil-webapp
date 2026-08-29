@@ -3,13 +3,14 @@
 /**
  * components/admin/wochenplan/WochenplanPlanBar.tsx
  *
- * WOCHENPLAN-2.0-01B — tenant-level plan selector with view vs public/active
- * separation. Mirrors WeekplannerPlanBar patterns.
+ * WOCHENPLAN-2.0-01H-D — tenant-level plan selector with draft/active semantics.
  */
 
 import { useCallback, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Pencil, Plus, Power, X } from "lucide-react";
+import { Check, Loader2, Pencil, Plus, X } from "lucide-react";
+import { Dialog } from "@/components/ui/Dialog";
+import { Button } from "@/components/ui/Button";
 import type { WochenplanPlanDto } from "@/lib/wochenplan/plan-types";
 
 type Props = {
@@ -25,6 +26,11 @@ function buildWochenplanHref(weekParam: string, planId: string | null): string {
   return `/dashboard/wochenplan?${params.toString()}`;
 }
 
+function formatPlanOptionLabel(plan: WochenplanPlanDto): string {
+  const status = plan.isActive ? "Aktiv" : "Entwurf";
+  return `${plan.name} — ${status}`;
+}
+
 export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canManage }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -33,10 +39,11 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
   const [newPlanName, setNewPlanName] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  const [isActivateDialogOpen, setIsActivateDialogOpen] = useState(false);
 
   const viewedPlan = viewedPlanId ? plans.find((p) => p.id === viewedPlanId) ?? null : null;
   const selectedPlanId = viewedPlan?.id ?? plans.find((p) => p.isDefault)?.id ?? plans[0]?.id ?? null;
-  const publicPlan = plans.find((p) => p.isActive) ?? null;
+  const activePlan = plans.find((p) => p.isActive) ?? null;
 
   const handleSelect = useCallback(
     (value: string) => {
@@ -99,7 +106,7 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
   }, [viewedPlan, renameValue, router]);
 
   const handleActivate = useCallback(() => {
-    if (!viewedPlan) return;
+    if (!viewedPlan || viewedPlan.isActive) return;
     setError(null);
     startTransition(async () => {
       try {
@@ -112,6 +119,7 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
           const data = await res.json().catch(() => ({}));
           throw new Error((data as { error?: string }).error ?? `Fehler: HTTP ${res.status}`);
         }
+        setIsActivateDialogOpen(false);
         router.refresh();
       } catch (err) {
         setError(err instanceof Error ? err.message : "Fehler beim Aktivieren");
@@ -125,7 +133,7 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
     <div className="space-y-2" data-testid="wochenplan-plan-bar">
       <div className="flex flex-wrap items-center gap-2">
         <label htmlFor="wochenplan-plan-select" className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
-          Plan
+          Wochenplan
         </label>
 
         <select
@@ -133,12 +141,11 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
           data-testid="wochenplan-plan-select"
           value={selectedPlanId ?? ""}
           onChange={(e) => handleSelect(e.target.value)}
-          className="rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
+          className="min-w-[12rem] rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] focus:border-[var(--sce-primary)] focus:outline-none"
         >
           {plans.map((plan) => (
             <option key={plan.id} value={plan.id}>
-              {plan.name}
-              {plan.isActive ? " (öffentlich)" : ""}
+              {formatPlanOptionLabel(plan)}
             </option>
           ))}
         </select>
@@ -151,7 +158,7 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[var(--border-strong)] px-3 py-1.5 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
           >
             <Plus className="h-3.5 w-3.5" />
-            Plan erstellen
+            Neuer Plan
           </button>
         )}
 
@@ -172,13 +179,13 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
             {!viewedPlan.isActive && (
               <button
                 type="button"
-                onClick={() => startTransition(handleActivate)}
+                onClick={() => setIsActivateDialogOpen(true)}
                 disabled={isPending}
                 data-testid="wochenplan-plan-activate-button"
                 className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)] disabled:opacity-50"
               >
-                <Power className="h-3 w-3" />
-                Als öffentlichen Plan aktivieren
+                {isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+                Als aktiven Plan verwenden
               </button>
             )}
           </>
@@ -257,22 +264,61 @@ export default function WochenplanPlanBar({ weekParam, plans, viewedPlanId, canM
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div
-          className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
-          data-testid="wochenplan-public-plan-banner"
-        >
-          Öffentlicher Plan · {publicPlan?.name ?? "—"}
-        </div>
-        {viewedPlan && viewedPlan.id !== publicPlan?.id && (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        {viewedPlan?.isActive ? (
           <div
-            className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700"
-            data-testid="wochenplan-viewed-plan-banner"
+            className="inline-flex items-center gap-1.5 font-semibold text-emerald-700"
+            data-testid="wochenplan-active-plan-banner"
           >
-            Ansicht · {viewedPlan.name}
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            Aktiver Plan · {viewedPlan.name}
           </div>
-        )}
+        ) : viewedPlan ? (
+          <>
+            <div
+              className="inline-flex items-center gap-1.5 font-semibold text-amber-700"
+              data-testid="wochenplan-draft-plan-banner"
+            >
+              Entwurf · {viewedPlan.name}
+            </div>
+            {activePlan ? (
+              <span className="text-[var(--muted)]" data-testid="wochenplan-current-active-reference">
+                Aktuell aktiv: {activePlan.name}
+              </span>
+            ) : null}
+          </>
+        ) : activePlan ? (
+          <div
+            className="inline-flex items-center gap-1.5 font-semibold text-emerald-700"
+            data-testid="wochenplan-active-plan-banner"
+          >
+            <Check className="h-3.5 w-3.5" aria-hidden="true" />
+            Aktiver Plan · {activePlan.name}
+          </div>
+        ) : null}
       </div>
+
+      <Dialog
+        open={isActivateDialogOpen}
+        onClose={() => setIsActivateDialogOpen(false)}
+        title="Aktiven Wochenplan wechseln"
+        description={
+          viewedPlan
+            ? `${viewedPlan.name} wird zum aktiven Wochenplan. Website und Infoboard verwenden danach diesen Plan.`
+            : undefined
+        }
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setIsActivateDialogOpen(false)}>
+              Abbrechen
+            </Button>
+            <Button onClick={() => startTransition(handleActivate)} disabled={isPending}>
+              {isPending ? "Aktiviere…" : "Aktivieren"}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

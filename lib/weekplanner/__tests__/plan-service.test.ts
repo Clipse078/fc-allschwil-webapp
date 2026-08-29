@@ -16,6 +16,14 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+vi.mock("@/lib/wochenplan/plan-service", () => ({
+  getActiveWochenplanPlan: vi.fn(),
+}));
+
+vi.mock("@/lib/wochenplan/public-plan-resolution", () => ({
+  resolvePublicWeekplannerPlan: vi.fn(),
+}));
+
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     weekplannerPlan: {
@@ -51,6 +59,8 @@ vi.mock("@/lib/db/prisma", () => ({
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import { getActiveWochenplanPlan } from "@/lib/wochenplan/plan-service";
+import { resolvePublicWeekplannerPlan } from "@/lib/wochenplan/public-plan-resolution";
 import {
   listWeekplannerPlans,
   getWeekplannerPlan,
@@ -791,44 +801,84 @@ describe("H. getWeekplannerPlanActivityOverride — tenant isolation", () => {
 // ── I. WEEKPLANNER-01E — Operational Plan Activation Foundation ───────────
 
 describe("I. getOperationalWeekplannerPlan — read resolver", () => {
-  it("I1: no active alternative plan → resolver returns null (Standardplan operationally active)", async () => {
-    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+  it("I1: no linked materialized plan → resolver returns null (Standardplan operationally active)", async () => {
+    vi.mocked(getActiveWochenplanPlan).mockResolvedValue({
+      id: "wcp-default",
+      tenantId: TENANT_A,
+      name: "Standardplan",
+      description: null,
+      isDefault: true,
+      isActive: true,
+      displayOrder: 0,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      archivedAt: null,
+    });
+    vi.mocked(resolvePublicWeekplannerPlan).mockResolvedValue({
+      weekplannerPlanId: null,
+      activeWochenplanPlan: null,
+      usedStandardplanFallback: false,
+    });
 
     const result = await getOperationalWeekplannerPlan(TENANT_A, WEEK_ID);
 
     expect(result).toBeNull();
-    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith({
-      where: { tenantId: TENANT_A, weekId: WEEK_ID, isActive: true, archivedAt: null },
-    });
+    expect(getActiveWochenplanPlan).toHaveBeenCalledWith(TENANT_A);
+    expect(resolvePublicWeekplannerPlan).toHaveBeenCalledWith(TENANT_A, WEEK_ID, expect.any(Object));
   });
 
-  it("I2: returns the single active alternative plan", async () => {
-    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ isActive: true }) as never);
+  it("I2: returns the linked materialized plan for the active alternative", async () => {
+    const activePlan = {
+      id: "wcp-alt",
+      tenantId: TENANT_A,
+      name: "Schlechtwetterplan",
+      description: null,
+      isDefault: false,
+      isActive: true,
+      displayOrder: 1,
+      createdAt: "2026-08-01T00:00:00.000Z",
+      updatedAt: "2026-08-01T00:00:00.000Z",
+      archivedAt: null,
+    };
+    vi.mocked(getActiveWochenplanPlan).mockResolvedValue(activePlan);
+    vi.mocked(resolvePublicWeekplannerPlan).mockResolvedValue({
+      weekplannerPlanId: PLAN_ID,
+      activeWochenplanPlan: activePlan,
+      usedStandardplanFallback: false,
+    });
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(planRow({ isActive: false }) as never);
 
     const result = await getOperationalWeekplannerPlan(TENANT_A, WEEK_ID);
 
     expect(result?.id).toBe(PLAN_ID);
-    expect(result?.isActive).toBe(true);
+    expect(resolvePublicWeekplannerPlan).toHaveBeenCalledWith(TENANT_A, WEEK_ID, activePlan);
   });
 
   it("I3: different weeks resolve independently (query is scoped by weekId)", async () => {
-    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+    vi.mocked(getActiveWochenplanPlan).mockResolvedValue(null);
+    vi.mocked(resolvePublicWeekplannerPlan).mockResolvedValue({
+      weekplannerPlanId: null,
+      activeWochenplanPlan: null,
+      usedStandardplanFallback: false,
+    });
 
     await getOperationalWeekplannerPlan(TENANT_A, "2026-08-17");
 
-    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ weekId: "2026-08-17" }) }),
-    );
+    expect(resolvePublicWeekplannerPlan).toHaveBeenCalledWith(TENANT_A, "2026-08-17", null);
   });
 
   it("I4: different tenants resolve independently (query is scoped by tenantId)", async () => {
-    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+    vi.mocked(getActiveWochenplanPlan).mockResolvedValue(null);
+    vi.mocked(resolvePublicWeekplannerPlan).mockResolvedValue({
+      weekplannerPlanId: null,
+      activeWochenplanPlan: null,
+      usedStandardplanFallback: false,
+    });
 
     await getOperationalWeekplannerPlan(TENANT_B, WEEK_ID);
 
-    expect(prisma.weekplannerPlan.findFirst).toHaveBeenCalledWith(
-      expect.objectContaining({ where: expect.objectContaining({ tenantId: TENANT_B }) }),
-    );
+    expect(getActiveWochenplanPlan).toHaveBeenCalledWith(TENANT_B);
+    expect(resolvePublicWeekplannerPlan).toHaveBeenCalledWith(TENANT_B, WEEK_ID, null);
   });
 });
 

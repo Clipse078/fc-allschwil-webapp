@@ -12,7 +12,7 @@ export type WochenplanPlanDto = {
   description: string | null;
   /** Canonical plan — allocations stored on Event fields. */
   isDefault: boolean;
-  /** Public/operational plan for this tenant. */
+  /** Canonical active plan for this tenant — drives website, Infoboard, and other consumers. */
   isActive: boolean;
   displayOrder: number;
   createdAt: string;

@@ -244,6 +244,25 @@ export async function activateWochenplanPlan(
         throw new WochenplanPlanArchivedError(planId);
       }
 
+      // Keep WeekplannerPlan.isActive synchronized as an implementation detail
+      // for legacy consumers — canonical product state is WochenplanPlan.isActive.
+      await tx.weekplannerPlan.updateMany({
+        where: { tenantId, isActive: true, archivedAt: null },
+        data: { isActive: false },
+      });
+
+      const activatedDefinition = await tx.wochenplanPlan.findFirst({
+        where: { id: planId, tenantId },
+        select: { isDefault: true },
+      });
+
+      if (activatedDefinition && !activatedDefinition.isDefault) {
+        await tx.weekplannerPlan.updateMany({
+          where: { tenantId, wochenplanPlanId: planId, archivedAt: null },
+          data: { isActive: true },
+        });
+      }
+
       return tx.wochenplanPlan.findFirst({ where: { id: planId, tenantId } });
     });
 

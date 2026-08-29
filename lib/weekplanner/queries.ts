@@ -73,6 +73,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { getWochenplanPlanBaselineMode, type WochenplanPlanBaselineMode } from "@/lib/wochenplan/plan-baseline";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import {
@@ -265,6 +266,56 @@ function resolveEffectiveTime(
   const endAt = override?.overrideEndAt ?? canonicalEndAt;
   const overridden = Boolean(override?.overrideStartAt || override?.overrideEndAt);
   return { startAt, endAt, canonicalStartAt, canonicalEndAt, overridden };
+}
+
+async function resolveWeekplannerPlanBaselineMode(
+  tenantId: string,
+  planId: string | undefined,
+): Promise<WochenplanPlanBaselineMode> {
+  if (!planId) return "canonical";
+
+  const row = await prisma.weekplannerPlan.findFirst({
+    where: { id: planId, tenantId, archivedAt: null },
+    select: { wochenplanPlanId: true },
+  });
+  if (!row?.wochenplanPlanId) return "canonical";
+
+  const definition = await prisma.wochenplanPlan.findFirst({
+    where: { id: row.wochenplanPlanId, tenantId },
+    select: { description: true },
+  });
+
+  return getWochenplanPlanBaselineMode(definition?.description);
+}
+
+function collectActivitiesWithOverrides(
+  overridesByKey: ReadonlyMap<string, WeekplannerResourceRef[]>,
+  timeOverridesByKey: ReadonlyMap<string, TimeOverrideEntry>,
+): Set<string> {
+  const present = new Set<string>();
+
+  for (const key of overridesByKey.keys()) {
+    const [activityType, activityId] = key.split(":");
+    if (activityType && activityId) {
+      present.add(`${activityType}:${activityId}`);
+    }
+  }
+
+  for (const key of timeOverridesByKey.keys()) {
+    present.add(key);
+  }
+
+  return present;
+}
+
+function filterItemsForEmptyBaseline(
+  items: WeekplannerItem[],
+  activitiesWithOverrides: Set<string>,
+): WeekplannerItem[] {
+  return items.filter((item) => {
+    const activityId = item.type === "TRAINING" ? item.trainingSessionId : item.eventId;
+    return activitiesWithOverrides.has(`${item.type}:${activityId}`);
+  });
 }
 
 // ── TrainingSession → WeekplannerTrainingItem ───────────────────────────────
@@ -605,10 +656,11 @@ export async function getWeekplannerWeek(
   window: WeekplannerWindow,
   planId?: string,
 ): Promise<WeekplannerWeek> {
-  const [resourceByCode, overridesByKey, timeOverridesByKey] = await Promise.all([
+  const [resourceByCode, overridesByKey, timeOverridesByKey, baselineMode] = await Promise.all([
     findFacilityResourceCodeMap(tenantId),
     findWeekplannerPlanOverrides(tenantId, planId),
     findWeekplannerPlanTimeOverrides(tenantId, planId),
+    resolveWeekplannerPlanBaselineMode(tenantId, planId),
   ]);
 
   const [trainingItems, matchItems, tournamentItems] = await Promise.all([
@@ -617,7 +669,12 @@ export async function getWeekplannerWeek(
     findWeekplannerHomeTournaments(tenantId, window.from, window.to, overridesByKey, timeOverridesByKey),
   ]);
 
-  const items: WeekplannerItem[] = [...trainingItems, ...matchItems, ...tournamentItems];
+  let items: WeekplannerItem[] = [...trainingItems, ...matchItems, ...tournamentItems];
+
+  if (baselineMode === "empty") {
+    const activitiesWithOverrides = collectActivitiesWithOverrides(overridesByKey, timeOverridesByKey);
+    items = filterItemsForEmptyBaseline(items, activitiesWithOverrides);
+  }
 
   return buildWeekplannerWeek({
     items,

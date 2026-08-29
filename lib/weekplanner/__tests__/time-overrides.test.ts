@@ -29,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   eventFindMany: vi.fn(),
   weekplannerPlanAllocationFindMany: vi.fn(),
   weekplannerPlanActivityOverrideFindMany: vi.fn(),
+  weekplannerPlanFindFirst: vi.fn(),
+  wochenplanPlanFindFirst: vi.fn(),
   listTournaments: vi.fn(),
 }));
 
@@ -45,6 +47,8 @@ vi.mock("@/lib/db/prisma", () => ({
     event: { findMany: mocks.eventFindMany },
     weekplannerPlanAllocation: { findMany: mocks.weekplannerPlanAllocationFindMany },
     weekplannerPlanActivityOverride: { findMany: mocks.weekplannerPlanActivityOverrideFindMany },
+    weekplannerPlan: { findFirst: mocks.weekplannerPlanFindFirst },
+    wochenplanPlan: { findFirst: mocks.wochenplanPlanFindFirst },
   },
 }));
 
@@ -227,6 +231,8 @@ beforeEach(() => {
   mocks.eventFindMany.mockResolvedValue([]);
   mocks.weekplannerPlanAllocationFindMany.mockResolvedValue([]);
   mocks.weekplannerPlanActivityOverrideFindMany.mockResolvedValue([]);
+  mocks.weekplannerPlanFindFirst.mockResolvedValue({ wochenplanPlanId: null });
+  mocks.wochenplanPlanFindFirst.mockResolvedValue(null);
   mocks.listTournaments.mockResolvedValue([]);
 });
 

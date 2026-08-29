@@ -34,6 +34,8 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
+import { getActiveWochenplanPlan } from "@/lib/wochenplan/plan-service";
+import { resolvePublicWeekplannerPlan } from "@/lib/wochenplan/public-plan-resolution";
 import type { WeekplannerActivityType, WeekplannerAllocationGroup } from "@prisma/client";
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
 import { zonedDateKey, WEEKPLANNER_DEFAULT_TIMEZONE } from "./date";
@@ -561,22 +563,25 @@ export async function deactivateWeekplannerPlan(tenantId: string, planId: string
 }
 
 /**
- * Canonical read resolver for which plan is OPERATIONALLY active for a
- * tenant+week — the contract future Infoboard/Website publication
- * consumers resolve against (not wired in this slice).
+ * Canonical read resolver for which plan is operationally active for a
+ * tenant+week. Resolves from the tenant-level active WochenplanPlan
+ * (WochenplanPlan.isActive) — the same source as the public website feed.
  *
- * Returns null when Standardplan is operationally active (no active
- * alternative plan exists), or the active WeekplannerPlan otherwise. Never
- * returns an archived plan.
+ * Returns null when Standardplan is operationally active (default active plan
+ * or no linked materialized week instance), or the linked WeekplannerPlan
+ * otherwise. Never returns an archived plan.
  */
 export async function getOperationalWeekplannerPlan(
   tenantId: string,
   weekId: string,
 ): Promise<WeekplannerPlanDto | null> {
-  const plan = await prisma.weekplannerPlan.findFirst({
-    where: { tenantId, weekId, isActive: true, archivedAt: null },
-  });
-  return plan ? planToDto(plan) : null;
+  const activeWochenplanPlan = await getActiveWochenplanPlan(tenantId);
+  const resolved = await resolvePublicWeekplannerPlan(tenantId, weekId, activeWochenplanPlan);
+  if (!resolved.weekplannerPlanId) {
+    return null;
+  }
+
+  return getWeekplannerPlan(tenantId, resolved.weekplannerPlanId);
 }
 
 // ── Public API — WeekplannerPlanAllocation (overrides) ────────────────────
