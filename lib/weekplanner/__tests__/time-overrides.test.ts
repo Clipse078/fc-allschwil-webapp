@@ -29,6 +29,11 @@ const mocks = vi.hoisted(() => ({
   eventFindMany: vi.fn(),
   weekplannerPlanAllocationFindMany: vi.fn(),
   weekplannerPlanActivityOverrideFindMany: vi.fn(),
+  listTournaments: vi.fn(),
+}));
+
+vi.mock("@/lib/tournaments/tournament-service", () => ({
+  listTournaments: mocks.listTournaments,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -152,7 +157,7 @@ function matchEventRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function tournamentEventRow(overrides: Record<string, unknown> = {}) {
+function tournamentDto(overrides: Record<string, unknown> = {}) {
   return {
     id: "event-tournament-1",
     tenantId: TENANT_A,
@@ -160,27 +165,32 @@ function tournamentEventRow(overrides: Record<string, unknown> = {}) {
     description: null,
     status: "SCHEDULED",
     source: "MANUAL",
-    reviewStage: "DRAFT",
-    startAt: new Date("2026-08-15T08:00:00.000Z"),
-    endAt: new Date("2026-08-15T16:00:00.000Z"),
+    startAt: "2026-08-15T08:00:00.000Z",
+    endAt: "2026-08-15T16:00:00.000Z",
     meetingTime: null,
     location: "Im Brüel",
     organizerName: "FC Allschwil",
+    organizerLogoUrl: null,
+    organizerExternalClubId: null,
     competitionLabel: null,
     resultLabel: null,
     remarks: null,
-    homeAway: "HOME",
-    websiteVisible: true,
-    infoboardVisible: false,
-    homepageVisible: false,
-    wochenplanVisible: true,
-    teamPageVisible: true,
-    createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
     season: { id: "season-1", key: "2026-2027", name: "2026/2027" },
     team: null,
-    tournamentParticipants: [],
-    tournamentResourceAllocations: [],
+    teamLogoUrl: null,
+    homeAway: "HOME",
+    participants: [],
+    resourceAllocations: [],
+    visibility: {
+      websiteVisible: true,
+      infoboardVisible: false,
+      homepageVisible: false,
+      wochenplanVisible: true,
+      teamPageVisible: true,
+    },
+    reviewStage: "DRAFT",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    updatedAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -217,6 +227,7 @@ beforeEach(() => {
   mocks.eventFindMany.mockResolvedValue([]);
   mocks.weekplannerPlanAllocationFindMany.mockResolvedValue([]);
   mocks.weekplannerPlanActivityOverrideFindMany.mockResolvedValue([]);
+  mocks.listTournaments.mockResolvedValue([]);
 });
 
 describe("getWeekplannerWeek — Standardplan uses canonical time (test 1)", () => {
@@ -272,10 +283,7 @@ describe("getWeekplannerWeek — alternative time override (tests 2, 3, 4)", () 
   });
 
   it("4. a plan-level time override replaces the canonical HOME TOURNAMENT start/end", async () => {
-    mocks.eventFindMany.mockImplementation((args: { where?: { type?: string } }) => {
-      if (args.where?.type === "TOURNAMENT") return Promise.resolve([tournamentEventRow()]);
-      return Promise.resolve([]);
-    });
+    mocks.listTournaments.mockResolvedValue([tournamentDto()]);
     mocks.weekplannerPlanActivityOverrideFindMany.mockResolvedValue([
       timeOverrideRow({
         activityType: "TOURNAMENT",

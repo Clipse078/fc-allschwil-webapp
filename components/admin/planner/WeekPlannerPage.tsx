@@ -24,6 +24,7 @@ import type {
   WeekplannerWeek,
 } from "@/lib/weekplanner/types";
 import type { WeekplannerPlanDto } from "@/lib/weekplanner/plan-types";
+import type { WochenplanPlanDto } from "@/lib/wochenplan/plan-types";
 import { planOverrideKey } from "@/lib/weekplanner/plan-override-key";
 import { WeekplannerPlanBar } from "./WeekplannerPlanBar";
 import {
@@ -67,7 +68,11 @@ type WeekPlannerPageProps = {
   todayParam: string;
   locale?: string;
   timezone?: string;
+  wochenplanPlans?: WochenplanPlanDto[];
   plans?: WeekplannerPlanDto[];
+  viewedWochenplanPlanId?: string | null;
+  selectedPlanParam?: string | null;
+  materializedWeekplannerPlanId?: string | null;
   activePlanId?: string | null;
   canManagePlans?: boolean;
   overrideEditing?: OverrideEditingContext;
@@ -622,7 +627,11 @@ export default function WeekPlannerPage({
   todayParam,
   locale = "de-CH",
   timezone = "Europe/Zurich",
+  wochenplanPlans = [],
   plans = [],
+  viewedWochenplanPlanId = null,
+  selectedPlanParam = null,
+  materializedWeekplannerPlanId = null,
   activePlanId = null,
   canManagePlans = false,
   overrideEditing,
@@ -670,8 +679,10 @@ export default function WeekPlannerPage({
       <SectionCard>
         <WeekplannerPlanBar
           weekParam={week.param}
-          plans={plans}
-          activePlanId={activePlanId}
+          wochenplanPlans={wochenplanPlans}
+          weekplannerPlans={plans}
+          selectedPlanParam={selectedPlanParam ?? viewedWochenplanPlanId}
+          materializedWeekplannerPlanId={materializedWeekplannerPlanId}
           canManage={canManagePlans}
         />
       </SectionCard>
@@ -697,7 +708,7 @@ export default function WeekPlannerPage({
             <Link href={CANONICAL_MODULE_HREF.TOURNAMENT.href} className="font-semibold text-[var(--sce-primary)] hover:underline">
               {CANONICAL_MODULE_HREF.TOURNAMENT.label}
             </Link>{" "}
-            — oder erstellen Sie oben einen Alternativplan, um nur für diese Woche abzuweichen.
+            — oder wählen Sie oben einen Alternativ-Wochenplan, um nur für diese Woche abzuweichen.
           </span>
         </div>
       )}

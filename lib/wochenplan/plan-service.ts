@@ -17,6 +17,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { Prisma } from "@prisma/client";
+import { syncMaterializedWeekplannerPlanNames } from "./plan-materialization";
 import type {
   WochenplanPlanDto,
   WochenplanPlanAllocationDto,
@@ -205,6 +206,7 @@ export async function renameWochenplanPlan(
       where: { id: existing.id },
       data: { name: validated },
     });
+    await syncMaterializedWeekplannerPlanNames(tenantId, planId, validated);
     return planToDto(plan);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

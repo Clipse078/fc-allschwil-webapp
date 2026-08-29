@@ -20,6 +20,7 @@ vi.mock("@/lib/db/prisma", () => ({
       findMany: vi.fn(),
       upsert: vi.fn(),
     },
+    weekplannerPlan: { updateMany: vi.fn() },
     event: { findFirst: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -111,11 +112,16 @@ describe("WochenplanPlan service", () => {
     vi.mocked(prisma.wochenplanPlan.update).mockResolvedValue(
       planRow({ name: "Hauptplan" }) as never,
     );
+    vi.mocked(prisma.weekplannerPlan.updateMany).mockResolvedValue({ count: 2 } as never);
 
     const plan = await renameWochenplanPlan(TENANT_A, PLAN_DEFAULT, "Hauptplan");
     expect(plan.name).toBe("Hauptplan");
     expect(plan.isDefault).toBe(true);
     expect(plan.isActive).toBe(true);
+    expect(prisma.weekplannerPlan.updateMany).toHaveBeenCalledWith({
+      where: { tenantId: TENANT_A, wochenplanPlanId: PLAN_DEFAULT, archivedAt: null },
+      data: { name: "Hauptplan" },
+    });
   });
 
   it("activates a plan atomically and deactivates others", async () => {
