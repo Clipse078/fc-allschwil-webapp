@@ -10,6 +10,7 @@
 --   2. Create WochenplanPlanAllocation table with foreign keys and indexes.
 --   3. Partial unique indexes for one active/default plan per tenant.
 --   4. Backfill one default+active plan per existing tenant (neutral name).
+--   5. WOCHENPLAN-2.0-01E: Add WeekplannerPlan.wochenplanPlanId stable link.
 
 -- =============================================================================
 -- 1. Create WochenplanPlan table
@@ -117,3 +118,26 @@ FROM "Tenant"
 WHERE NOT EXISTS (
     SELECT 1 FROM "WochenplanPlan" wp WHERE wp."tenantId" = "Tenant"."id"
 );
+
+-- =============================================================================
+-- 4. WOCHENPLAN-2.0-01E — stable ID link from WeekplannerPlan to WochenplanPlan
+-- =============================================================================
+--
+-- Human-readable plan names are display labels only. A week-scoped concrete
+-- plan resolves to its tenant-level definition via wochenplanPlanId, never
+-- by name equality.
+
+ALTER TABLE "WeekplannerPlan" ADD COLUMN "wochenplanPlanId" TEXT;
+
+ALTER TABLE "WeekplannerPlan"
+    ADD CONSTRAINT "WeekplannerPlan_wochenplanPlanId_fkey"
+    FOREIGN KEY ("wochenplanPlanId") REFERENCES "WochenplanPlan"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+
+CREATE INDEX "WeekplannerPlan_tenantId_weekId_wochenplanPlanId_idx"
+    ON "WeekplannerPlan"("tenantId", "weekId", "wochenplanPlanId");
+
+-- At most one non-archived concrete week plan per tenant-level definition per week.
+CREATE UNIQUE INDEX "WeekplannerPlan_tenantId_weekId_wochenplanPlanId_unique"
+    ON "WeekplannerPlan"("tenantId", "weekId", "wochenplanPlanId")
+    WHERE ("archivedAt" IS NULL AND "wochenplanPlanId" IS NOT NULL);

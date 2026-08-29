@@ -207,6 +207,7 @@ function setupDefaultMocks(items: WeekplannerWeek["days"][number]["items"] = [tr
   mocks.resolvePublicWeekplannerPlan.mockResolvedValue({
     weekplannerPlanId: null,
     activeWochenplanPlan: ACTIVE_PLAN,
+    usedStandardplanFallback: false,
   });
   mocks.getWeekplannerWeek.mockResolvedValue(buildWeek(items));
   mocks.getWochenplanPublication.mockResolvedValue({
@@ -245,14 +246,16 @@ describe("buildPublicCurrentWeekFeed", () => {
     setupDefaultMocks();
   });
 
-  it("1. exposes active plan name publicly", async () => {
+  it("1. exposes active plan name and id publicly", async () => {
     const feed = await buildPublicCurrentWeekFeed({
       tenantId: TENANT_ID,
       tenantName: TENANT_NAME,
       now: NOW,
     });
     expect(feed.activePlan.name).toBe("Standardplan");
+    expect(feed.activePlan.id).toBe("plan-active");
     expect(feed.publication?.activePlanName).toBe("Standardplan");
+    expect(feed.publication?.activePlanId).toBe("plan-active");
   });
 
   it("2. inactive plan is not exposed as active", async () => {
@@ -272,6 +275,7 @@ describe("buildPublicCurrentWeekFeed", () => {
     mocks.resolvePublicWeekplannerPlan.mockResolvedValue({
       weekplannerPlanId: "wp-winter",
       activeWochenplanPlan: winterPlan,
+      usedStandardplanFallback: false,
     });
     const feed = await buildPublicCurrentWeekFeed({
       tenantId: TENANT_ID,
@@ -592,6 +596,49 @@ describe("buildPublicCurrentWeekFeed", () => {
     });
     expect(mocks.getWeekplannerWeek.mock.calls[0][0]).toBe(TENANT_ID);
   });
+
+  it("22. passes linked weekplannerPlanId to getWeekplannerWeek for alternative plans", async () => {
+    const altPlan = { ...ACTIVE_PLAN, id: "plan-alt", name: "Schlechtwetterplan", isDefault: false };
+    mocks.getActiveWochenplanPlan.mockResolvedValue(altPlan);
+    mocks.resolvePublicWeekplannerPlan.mockResolvedValue({
+      weekplannerPlanId: "wp-alt-linked",
+      activeWochenplanPlan: altPlan,
+      usedStandardplanFallback: false,
+    });
+
+    await buildPublicCurrentWeekFeed({
+      tenantId: TENANT_ID,
+      tenantName: TENANT_NAME,
+      now: NOW,
+    });
+
+    expect(mocks.getWeekplannerWeek.mock.calls[0][2]).toBe("wp-alt-linked");
+  });
+
+  it("23. weekplanner time and allocation overrides flow through to public events", async () => {
+    const overriddenTraining = trainingItem({
+      startAt: new Date("2026-08-26T18:00:00.000Z"),
+      endAt: new Date("2026-08-26T19:00:00.000Z"),
+      timeOverridden: true,
+      pitchOverridden: true,
+      pitchAllocations: [
+        { facilityResourceId: "r-alt", code: "KR1", name: "Kunstrasen 1", facilityName: "Im Brüel" },
+      ],
+    });
+    setupDefaultMocks([overriddenTraining]);
+
+    const feed = await buildPublicCurrentWeekFeed({
+      tenantId: TENANT_ID,
+      tenantName: TENANT_NAME,
+      now: NOW,
+    });
+
+    const training = feed.days
+      .flatMap((day) => day.events)
+      .find((event) => event.kind === "TRAINING");
+    expect(training?.startAt).toEqual(new Date("2026-08-26T18:00:00.000Z"));
+    expect(training?.pitch?.name).toBe("Kunstrasen 1");
+  });
 });
 
 describe("public-feed-mapper sporting identity", () => {
@@ -720,7 +767,7 @@ describe("public-feed-mapper sporting identity", () => {
 });
 
 describe("Infoboard shared HOME-match semantics unchanged", () => {
-  it("23. Infoboard HOME match policy still matches shared helper", () => {
+  it("24. Infoboard HOME match policy still matches shared helper", () => {
     const event = {
       tenantId: TENANT_ID,
       type: "MATCH",

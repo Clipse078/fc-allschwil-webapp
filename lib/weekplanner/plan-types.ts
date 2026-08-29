@@ -29,6 +29,11 @@ export type WeekplannerPlanDto = {
    * see lib/weekplanner/plan-service.ts#activateWeekplannerPlan.
    */
   isActive: boolean;
+  /**
+   * WOCHENPLAN-2.0-01E — stable link to the tenant-level WochenplanPlan
+   * definition. Null for Standardplan-equivalent ad-hoc week plans.
+   */
+  wochenplanPlanId: string | null;
 };
 
 export type WeekplannerPlanAllocationDto = {
@@ -57,6 +62,8 @@ export type CreateWeekplannerPlanInput = {
   weekId: string;
   name: string;
   createdByUserId?: string | null;
+  /** WOCHENPLAN-2.0-01E — optional stable link to tenant-level WochenplanPlan. */
+  wochenplanPlanId?: string | null;
 };
 
 export type CreateWeekplannerPlanAllocationInput = {

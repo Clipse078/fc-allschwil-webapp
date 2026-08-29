@@ -2830,8 +2830,10 @@ model WochenplanPlan {
   updatedAt    DateTime  @updatedAt
   archivedAt   DateTime?
 
-  tenant      Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  allocations WochenplanPlanAllocation[]
+  tenant           Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  allocations      WochenplanPlanAllocation[]
+  /// WOCHENPLAN-2.0-01E — week-scoped concrete plans linked to this definition.
+  weekplannerPlans WeekplannerPlan[]
 
   @@index([tenantId])
   @@index([tenantId, isActive])
@@ -5131,8 +5133,14 @@ model WeekplannerPlan {
   /// the migration SQL. False for every plan == Standardplan operationally
   /// active. Never true while archivedAt is set.
   isActive        Boolean   @default(false)
+  /// WOCHENPLAN-2.0-01E — stable link to the tenant-level WochenplanPlan
+  /// definition this concrete week plan materializes. Null for legacy or
+  /// ad-hoc week plans not tied to a reusable definition. Human-readable
+  /// `name` is display-only — resolution MUST use this field.
+  wochenplanPlanId String?
 
   tenant            Tenant                            @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  wochenplanPlan    WochenplanPlan?                   @relation(fields: [wochenplanPlanId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   allocations       WeekplannerPlanAllocation[]
   activityOverrides WeekplannerPlanActivityOverride[]
 
@@ -5140,6 +5148,7 @@ model WeekplannerPlan {
   @@index([tenantId, weekId])
   @@index([tenantId, weekId, archivedAt])
   @@index([tenantId, weekId, isActive])
+  @@index([tenantId, weekId, wochenplanPlanId])
 }
 
 // ---------------------------------------------------------------------------

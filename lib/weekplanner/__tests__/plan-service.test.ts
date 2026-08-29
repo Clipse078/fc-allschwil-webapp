@@ -41,6 +41,7 @@ vi.mock("@/lib/db/prisma", () => ({
       upsert: vi.fn(),
       delete: vi.fn(),
     },
+    wochenplanPlan: { findFirst: vi.fn() },
     trainingSession: { findFirst: vi.fn() },
     event: { findFirst: vi.fn() },
     tournamentParticipant: { findFirst: vi.fn() },
@@ -104,6 +105,7 @@ function planRow(overrides: Record<string, unknown> = {}) {
     updatedAt: new Date("2026-08-01T00:00:00.000Z"),
     archivedAt: null,
     isActive: false,
+    wochenplanPlanId: null,
     ...overrides,
   };
 }
@@ -208,6 +210,68 @@ describe("A. createWeekplannerPlan", () => {
     expect(prisma.weekplannerPlan.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: expect.objectContaining({ tenantId: TENANT_A, weekId: WEEK_ID, archivedAt: null }) }),
     );
+  });
+
+  it("A6: links a week plan to a tenant-level WochenplanPlan via wochenplanPlanId", async () => {
+    const WCP_PLAN_ID = "wcp-alt-1";
+    vi.mocked(prisma.weekplannerPlan.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.wochenplanPlan.findFirst).mockResolvedValue({
+      id: WCP_PLAN_ID,
+      isDefault: false,
+    } as never);
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.weekplannerPlan.create).mockResolvedValue(
+      planRow({ wochenplanPlanId: WCP_PLAN_ID }) as never,
+    );
+
+    const plan = await createWeekplannerPlan(TENANT_A, {
+      weekId: WEEK_ID,
+      name: "Schlechtwetterplan",
+      wochenplanPlanId: WCP_PLAN_ID,
+    });
+
+    expect(plan.wochenplanPlanId).toBe(WCP_PLAN_ID);
+    expect(prisma.weekplannerPlan.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ wochenplanPlanId: WCP_PLAN_ID }),
+      }),
+    );
+  });
+
+  it("A7: rejects linking to a default WochenplanPlan", async () => {
+    vi.mocked(prisma.weekplannerPlan.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.wochenplanPlan.findFirst).mockResolvedValue({
+      id: "wcp-default",
+      isDefault: true,
+    } as never);
+
+    await expect(
+      createWeekplannerPlan(TENANT_A, {
+        weekId: WEEK_ID,
+        name: "X",
+        wochenplanPlanId: "wcp-default",
+      }),
+    ).rejects.toThrow(WeekplannerPlanValidationError);
+    expect(prisma.weekplannerPlan.create).not.toHaveBeenCalled();
+  });
+
+  it("A8: rejects duplicate wochenplanPlanId link for same tenant+week", async () => {
+    const WCP_PLAN_ID = "wcp-alt-1";
+    vi.mocked(prisma.weekplannerPlan.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.wochenplanPlan.findFirst).mockResolvedValue({
+      id: WCP_PLAN_ID,
+      isDefault: false,
+    } as never);
+    vi.mocked(prisma.weekplannerPlan.findFirst).mockResolvedValue({ id: "existing" } as never);
+
+    await expect(
+      createWeekplannerPlan(TENANT_A, {
+        weekId: WEEK_ID,
+        name: "Schlechtwetterplan",
+        wochenplanPlanId: WCP_PLAN_ID,
+      }),
+    ).rejects.toThrow(WeekplannerPlanValidationError);
+    expect(prisma.weekplannerPlan.create).not.toHaveBeenCalled();
   });
 });
 

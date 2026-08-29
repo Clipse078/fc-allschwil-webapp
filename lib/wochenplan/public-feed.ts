@@ -6,7 +6,7 @@
  *
  * Pipeline:
  *   ACTIVE WochenplanPlan (tenant public metadata)
- *     → matching WeekplannerPlan for current week (by name) or Standardplan
+ *     → linked WeekplannerPlan for current week (by wochenplanPlanId) or Standardplan
  *     → getWeekplannerWeek (canonical /dashboard/planner/week data)
  *     → publication policy (shared HOME-match semantics + websiteVisible)
  *     → optional team filter (never overrides HOME/facility rules)

@@ -78,6 +78,7 @@ type PlanRow = {
   updatedAt: Date;
   archivedAt: Date | null;
   isActive: boolean;
+  wochenplanPlanId: string | null;
   _count?: { allocations: number };
 };
 
@@ -128,6 +129,7 @@ function planToDto(row: PlanRow): WeekplannerPlanDto {
     updatedAt: row.updatedAt.toISOString(),
     archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
     isActive: row.isActive,
+    wochenplanPlanId: row.wochenplanPlanId,
   };
 }
 
@@ -292,6 +294,50 @@ async function requireNameAvailable(
   }
 }
 
+/** WOCHENPLAN-2.0-01E — validates a tenant-level WochenplanPlan link target. */
+async function requireWochenplanPlanLink(
+  tenantId: string,
+  wochenplanPlanId: string,
+): Promise<void> {
+  const definition = await prisma.wochenplanPlan.findFirst({
+    where: { id: wochenplanPlanId, tenantId, archivedAt: null },
+    select: { id: true, isDefault: true },
+  });
+  if (!definition) {
+    throw new WeekplannerPlanValidationError(
+      `WochenplanPlan "${wochenplanPlanId}" not found or archived for this tenant`,
+    );
+  }
+  if (definition.isDefault) {
+    throw new WeekplannerPlanValidationError(
+      "The default WochenplanPlan does not require a week-scoped WeekplannerPlan — use Standardplan",
+    );
+  }
+}
+
+async function requireWochenplanPlanLinkAvailable(
+  tenantId: string,
+  weekId: string,
+  wochenplanPlanId: string,
+  excludePlanId?: string,
+): Promise<void> {
+  const conflict = await prisma.weekplannerPlan.findFirst({
+    where: {
+      tenantId,
+      weekId,
+      wochenplanPlanId,
+      archivedAt: null,
+      ...(excludePlanId ? { id: { not: excludePlanId } } : {}),
+    },
+    select: { id: true },
+  });
+  if (conflict) {
+    throw new WeekplannerPlanValidationError(
+      `A week plan for WochenplanPlan "${wochenplanPlanId}" already exists for week ${weekId}`,
+    );
+  }
+}
+
 async function requireAllocation(tenantId: string, allocationId: string): Promise<AllocationRow> {
   const allocation = await prisma.weekplannerPlanAllocation.findFirst({
     where: { id: allocationId, tenantId },
@@ -328,6 +374,12 @@ export async function createWeekplannerPlan(
   const name = validatePlanName(input.name);
   await requireNameAvailable(tenantId, weekId, name);
 
+  const wochenplanPlanId = input.wochenplanPlanId?.trim() || null;
+  if (wochenplanPlanId) {
+    await requireWochenplanPlanLink(tenantId, wochenplanPlanId);
+    await requireWochenplanPlanLinkAvailable(tenantId, weekId, wochenplanPlanId);
+  }
+
   try {
     const plan = await prisma.weekplannerPlan.create({
       data: {
@@ -335,12 +387,18 @@ export async function createWeekplannerPlan(
         weekId,
         name,
         createdByUserId: input.createdByUserId ?? null,
+        wochenplanPlanId,
       },
     });
     return planToDto(plan);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("unique") || message.includes("Unique")) {
+      if (wochenplanPlanId) {
+        throw new WeekplannerPlanValidationError(
+          `A week plan for WochenplanPlan "${wochenplanPlanId}" already exists for week ${weekId}`,
+        );
+      }
       throw new WeekplannerPlanNameConflictError(name);
     }
     throw err;
