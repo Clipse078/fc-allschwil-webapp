@@ -263,6 +263,67 @@ describe("WeekplannerPlanBar — create plan dialog", () => {
   });
 });
 
+describe("WeekplannerPlanBar — plan name readability", () => {
+  it("renders full Schlechtwetterplan names without truncation class on option rows", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-25"
+        wochenplanPlans={[
+          wochenplanPlan(),
+          wochenplanPlan({ id: "wcp-alt", name: "Schlechtwetterplan", isDefault: false, isActive: false }),
+          wochenplanPlan({ id: "wcp-test", name: "Schlechtwetterplan Test", isDefault: false, isActive: false }),
+        ]}
+        weekplannerPlans={[]}
+        selectedPlanParam={null}
+        materializedWeekplannerPlanId={null}
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("weekplanner-plan-switcher"));
+    const altName = screen.getByTestId("weekplanner-plan-option-name-wcp-alt");
+    const testName = screen.getByTestId("weekplanner-plan-option-name-wcp-test");
+    expect(altName).toHaveTextContent("Schlechtwetterplan");
+    expect(testName).toHaveTextContent("Schlechtwetterplan Test");
+    expect(altName.className).not.toMatch(/\btruncate\b/);
+    expect(testName.className).not.toMatch(/\btruncate\b/);
+  });
+
+  it("uses a wider popover workspace than the anchor for long plan names", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-25"
+        wochenplanPlans={[wochenplanPlan(), wochenplanPlan({ id: "wcp-alt", name: "Schlechtwetterplan Test", isDefault: false, isActive: false })]}
+        weekplannerPlans={[]}
+        selectedPlanParam={null}
+        materializedWeekplannerPlanId={null}
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("weekplanner-plan-switcher"));
+    const popover = document.querySelector("[data-floating-ui-portal]") ?? document.body;
+    const widePanel = popover.querySelector(".max-w-\\[28rem\\]");
+    expect(widePanel).toBeTruthy();
+  });
+
+  it("keeps draft overflow actions available", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-25"
+        wochenplanPlans={[wochenplanPlan(), wochenplanPlan({ id: "wcp-alt", name: "Schlechtwetterplan", isDefault: false, isActive: false })]}
+        weekplannerPlans={[]}
+        selectedPlanParam="wcp-alt"
+        materializedWeekplannerPlanId={null}
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("weekplanner-plan-switcher"));
+    expect(screen.getByTestId("weekplanner-plan-overflow-wcp-alt")).toBeInTheDocument();
+  });
+});
+
 describe("WeekplannerPlanBar — read-only", () => {
   it("hides management actions for read-only viewers", () => {
     render(

@@ -454,18 +454,39 @@ export async function getResourceAvailability(
   if (resources.length === 0) return [];
 
   const resourcesByCode = new Map(resources.map((r) => [r.code, r.id]));
+  const resourceRefsByCode = new Map(
+    resources.map((r) => [
+      r.code,
+      {
+        facilityResourceId: r.id,
+        code: r.code,
+        name: r.name,
+        facilityName: r.facility.name,
+        occupancyBeforeMinutes: 0,
+        occupancyAfterMinutes: 0,
+      },
+    ]),
+  );
   const resourceIds = resources.map((r) => r.id);
 
+  const useEffectivePlanOccupancy = weekplannerPlanId != null;
+
   const [trainingConflicts, matchConflicts, tournamentConflicts, weekplannerConflicts] = await Promise.all([
-    findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId, replacedActivities),
-    findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId, replacedActivities),
-    findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId, replacedActivities),
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findTrainingConflicts(tenantId, startAt, endAt, group, excludeTrainingSessionId, replacedActivities),
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findMatchConflicts(tenantId, startAt, endAt, group, resourcesByCode, excludeEventId, replacedActivities),
+    useEffectivePlanOccupancy
+      ? Promise.resolve([])
+      : findTournamentConflicts(tenantId, startAt, endAt, group, resourceIds, excludeEventId, replacedActivities),
     weekplannerPlanId
       ? findWeekplannerPlanConflicts(tenantId, startAt, endAt, group, {
           weekplannerPlanId,
           excludeActivityType: excludeWeekplannerActivityType,
           excludeActivityId: excludeWeekplannerActivityId,
-        }, resourcesByCode)
+        }, resourceRefsByCode)
       : Promise.resolve([]),
   ]);
 

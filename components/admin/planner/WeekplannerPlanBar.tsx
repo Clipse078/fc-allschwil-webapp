@@ -154,14 +154,20 @@ export function WeekplannerPlanBar({
           type="button"
           data-testid="weekplanner-plan-switcher"
           onClick={() => setSwitcherOpen((open) => !open)}
-          className="inline-flex min-w-[12rem] items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
+          className="inline-flex min-w-[14rem] max-w-[min(100vw-2rem,28rem)] items-center justify-between gap-2 rounded-lg border border-[var(--border)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]"
           aria-haspopup="listbox"
           aria-expanded={switcherOpen}
         >
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 flex-1 items-center gap-2">
             {isViewingActive ? <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" aria-hidden="true" /> : null}
-            <span className="truncate">{viewedPlan?.name ?? "Plan wählen"}</span>
-            {viewedWochenplanPlan ? <PlanStatusBadge isActive={viewedWochenplanPlan.isActive} /> : null}
+            <span className="min-w-0 flex-1 text-left leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden">
+              {viewedPlan?.name ?? "Plan wählen"}
+            </span>
+            {viewedWochenplanPlan ? (
+              <span className="shrink-0">
+                <PlanStatusBadge isActive={viewedWochenplanPlan.isActive} />
+              </span>
+            ) : null}
           </span>
           <ChevronDown className="h-4 w-4 shrink-0 text-[var(--muted)]" aria-hidden="true" />
         </button>
@@ -196,9 +202,9 @@ export function WeekplannerPlanBar({
         open={switcherOpen}
         onOpenChange={setSwitcherOpen}
         anchorRef={switcherAnchorRef}
-        matchAnchorWidth
+        matchAnchorWidth={false}
         maxHeight={360}
-        className="p-0"
+        className="w-[min(100vw-2rem,28rem)] max-w-[28rem] p-0"
       >
         <div className="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]">
           Plan auswählen
@@ -388,55 +394,65 @@ function PlanSwitcherRow({
   const showOverflow = canManage && !plan.isActive && !plan.isDefault;
 
   return (
-    <div className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)]">
+    <div className="flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)]">
       <button
         type="button"
         role="option"
         aria-selected={selected}
         data-testid={`weekplanner-plan-option-${plan.id}`}
         onClick={onSelect}
-        className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-2 text-left text-sm"
+        className="flex min-w-0 flex-1 items-start gap-2 rounded-md px-2 py-2 text-left text-sm"
       >
-        {selected ? <Check className="h-3.5 w-3.5 shrink-0 text-[var(--sce-primary)]" /> : <span className="w-3.5" />}
-        <span className="min-w-0 flex-1 truncate font-medium">{plan.name}</span>
-        <PlanStatusBadge isActive={plan.isActive} />
+        <span className="mt-0.5 shrink-0">
+          {selected ? <Check className="h-3.5 w-3.5 text-[var(--sce-primary)]" /> : <span className="inline-block w-3.5" />}
+        </span>
+        <span
+          className="min-w-0 flex-1 font-medium leading-snug [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical] overflow-hidden"
+          data-testid={`weekplanner-plan-option-name-${plan.id}`}
+        >
+          {plan.name}
+        </span>
       </button>
 
-      {showOverflow ? (
-        <>
-          <button
-            ref={localOverflowRef}
-            type="button"
-            aria-label={`Aktionen für ${plan.name}`}
-            data-testid={`weekplanner-plan-overflow-${plan.id}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onOverflowToggle(!overflowOpen);
-            }}
-            className="rounded-md p-1.5 text-[var(--muted)] transition hover:bg-white hover:text-[var(--foreground)]"
-          >
-            <MoreHorizontal className="h-4 w-4" />
-          </button>
-          <PopoverContent
-            open={overflowOpen}
-            onOpenChange={onOverflowToggle}
-            anchorRef={localOverflowRef}
-            matchAnchorWidth={false}
-            maxHeight={120}
-            className="min-w-[12rem] p-1"
-          >
+      <div className="flex shrink-0 items-center gap-0.5 self-center">
+        <PlanStatusBadge isActive={plan.isActive} />
+
+        {showOverflow ? (
+          <>
             <button
+              ref={localOverflowRef}
               type="button"
-              onClick={onDelete}
-              data-testid={`weekplanner-plan-delete-${plan.id}`}
-              className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-rose-700 transition hover:bg-rose-50"
+              aria-label={`Aktionen für ${plan.name}`}
+              data-testid={`weekplanner-plan-overflow-${plan.id}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOverflowToggle(!overflowOpen);
+              }}
+              className="rounded-md p-1.5 text-[var(--muted)] transition hover:bg-white hover:text-[var(--foreground)]"
             >
-              <Trash2 className="h-4 w-4" />
-              Plan endgültig löschen
+              <MoreHorizontal className="h-4 w-4" />
             </button>
-          </PopoverContent>
-        </>
-      ) : null}
+            <PopoverContent
+              open={overflowOpen}
+              onOpenChange={onOverflowToggle}
+              anchorRef={localOverflowRef}
+              matchAnchorWidth={false}
+              maxHeight={120}
+              className="min-w-[12rem] p-1"
+            >
+              <button
+                type="button"
+                onClick={onDelete}
+                data-testid={`weekplanner-plan-delete-${plan.id}`}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-rose-700 transition hover:bg-rose-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Plan endgültig löschen
+              </button>
+            </PopoverContent>
+          </>
+        ) : null}
+      </div>
     </div>
   );
 }
