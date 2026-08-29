@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   canEditPlanningRecord: vi.fn(),
   eventFindFirst: vi.fn(),
+  tenantFindUnique: vi.fn(),
   updateTournament: vi.fn(),
   cancelTournament: vi.fn(),
   restoreTournament: vi.fn(),
@@ -47,6 +48,7 @@ vi.mock("next/cache", () => ({
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     event: { findFirst: mocks.eventFindFirst },
+    tenant: { findUnique: mocks.tenantFindUnique },
   },
 }));
 
@@ -94,6 +96,7 @@ describe("PATCH /api/tournaments/[tournamentId]", () => {
     mocks.auth.mockResolvedValue(VALID_AUTH_SESSION);
     mocks.canEditPlanningRecord.mockResolvedValue(true);
     mocks.eventFindFirst.mockResolvedValue(VALID_EVENT_ROW);
+    mocks.tenantFindUnique.mockResolvedValue({ timezone: "Europe/Zurich" });
     mocks.updateTournament.mockResolvedValue(VALID_TOURNAMENT);
     mocks.cancelTournament.mockResolvedValue({ ...VALID_TOURNAMENT, status: "CANCELLED" });
     mocks.restoreTournament.mockResolvedValue({ ...VALID_TOURNAMENT, status: "SCHEDULED" });
@@ -132,6 +135,14 @@ describe("PATCH /api/tournaments/[tournamentId]", () => {
       "tournament-test-1",
       expect.objectContaining({ title: "Neuer Titel" }),
     );
+  });
+
+  it("parses datetime-local startAt in tenant timezone (summer 13:30 → 11:30Z)", async () => {
+    await PATCH(makeRequest({ startAt: "2026-08-30T13:30" }), makeContext());
+
+    const call = mocks.updateTournament.mock.calls[0]![2];
+    expect(call.startAt).toBeInstanceOf(Date);
+    expect(call.startAt.toISOString()).toBe("2026-08-30T11:30:00.000Z");
   });
 
   it("parses date fields to Date instances", async () => {

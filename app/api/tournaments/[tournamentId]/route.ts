@@ -89,6 +89,10 @@ import {
   TournamentInvalidTransitionError,
 } from "@/lib/tournaments/errors";
 import type { UpdateTournamentInput } from "@/lib/tournaments/types";
+import {
+  parseTenantLocalDateTimeInput,
+  resolveTenantEventTimezone,
+} from "@/lib/events/tenant-local-datetime";
 
 type RouteContext = { params: Promise<{ tournamentId: string }> };
 
@@ -116,15 +120,18 @@ const BOOLEAN_KEYS = [
   "teamPageVisible",
 ] as const;
 
-function parseDateOrNull(value: unknown): { ok: true; value: Date | null } | { ok: false } {
+function parseDateOrNull(
+  value: unknown,
+  timeZone: string,
+): { ok: true; value: Date | null } | { ok: false } {
   if (value === null || value === undefined || value === "") {
     return { ok: true, value: null };
   }
   if (typeof value !== "string") {
     return { ok: false };
   }
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
+  const parsed = parseTenantLocalDateTimeInput(value, timeZone);
+  if (!parsed || Number.isNaN(parsed.getTime())) {
     return { ok: false };
   }
   return { ok: true, value: parsed };
@@ -151,6 +158,12 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (!tournamentId?.trim()) {
     return NextResponse.json({ error: "tournamentId is required." }, { status: 400 });
   }
+
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { timezone: true },
+  });
+  const tenantTimeZone = resolveTenantEventTimezone(tenant?.timezone);
 
   // ORG-ACCESS-03: load the tournament for scope check before processing body.
   const existingTournament = await prisma.event.findFirst({
@@ -234,8 +247,8 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       if (typeof body.startAt !== "string") {
         return NextResponse.json({ error: "startAt muss ein String sein." }, { status: 400 });
       }
-      const parsed = new Date(body.startAt);
-      if (Number.isNaN(parsed.getTime())) {
+      const parsed = parseTenantLocalDateTimeInput(body.startAt, tenantTimeZone);
+      if (!parsed || Number.isNaN(parsed.getTime())) {
         return NextResponse.json({ error: "startAt ist ungültig." }, { status: 400 });
       }
       data.startAt = parsed;
@@ -243,7 +256,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
     for (const key of DATE_OR_NULL_KEYS) {
       if (key in body) {
-        const parsed = parseDateOrNull(body[key]);
+        const parsed = parseDateOrNull(body[key], tenantTimeZone);
         if (!parsed.ok) {
           return NextResponse.json({ error: `${key} ist ungültig.` }, { status: 400 });
         }

@@ -14,6 +14,9 @@ import TournamentResourceAllocationEditor from "@/components/admin/tournamentcen
 import { useFacilityAvailability } from "@/hooks/use-facility-availability";
 import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
 import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
+import {
+  utcInstantToDateTimeLocalValue,
+} from "@/lib/events/tenant-local-datetime";
 
 type DeletionImpact = { key: string; label: string; count: number };
 
@@ -25,9 +28,8 @@ type TeamItem = {
   isActive: boolean;
 };
 
-function toDateTimeLocalValue(iso: string | null): string {
-  if (!iso) return "";
-  return iso.slice(0, 16);
+function toDateTimeLocalValue(iso: string | null, timezone: string): string {
+  return utcInstantToDateTimeLocalValue(iso, timezone);
 }
 
 function formatTeamLabel(team: TeamItem): string {
@@ -55,6 +57,8 @@ type TournamentEditFormProps = {
    */
   isCoordinatorForPlanning?: boolean;
   isProtectedSource?: boolean;
+  /** Tenant IANA timezone for datetime-local round-trip (e.g. Europe/Zurich). */
+  timezone: string;
 };
 
 export default function TournamentEditForm({
@@ -65,6 +69,7 @@ export default function TournamentEditForm({
   dressingRoomFacilityGroups,
   isCoordinatorForPlanning = false,
   isProtectedSource = false,
+  timezone,
 }: TournamentEditFormProps) {
   const router = useRouter();
   const { toast } = useToast();
@@ -73,9 +78,9 @@ export default function TournamentEditForm({
   const [organizerName, setOrganizerName] = useState(tournament.organizerName ?? "");
   const [competitionLabel, setCompetitionLabel] = useState(tournament.competitionLabel ?? "");
   const [location, setLocation] = useState(tournament.location ?? "");
-  const [startAt, setStartAt] = useState(toDateTimeLocalValue(tournament.startAt));
-  const [endAt, setEndAt] = useState(toDateTimeLocalValue(tournament.endAt));
-  const [meetingTime, setMeetingTime] = useState(toDateTimeLocalValue(tournament.meetingTime));
+  const [startAt, setStartAt] = useState(toDateTimeLocalValue(tournament.startAt, timezone));
+  const [endAt, setEndAt] = useState(toDateTimeLocalValue(tournament.endAt, timezone));
+  const [meetingTime, setMeetingTime] = useState(toDateTimeLocalValue(tournament.meetingTime, timezone));
   const [description, setDescription] = useState(tournament.description ?? "");
   const [resultLabel, setResultLabel] = useState(tournament.resultLabel ?? "");
   const [remarks, setRemarks] = useState(tournament.remarks ?? "");
@@ -158,9 +163,9 @@ export default function TournamentEditForm({
           organizerName: organizerName.trim() || null,
           competitionLabel: competitionLabel.trim() || null,
           location: location.trim() || null,
-          startAt: new Date(startAt).toISOString(),
-          endAt: endAt ? new Date(endAt).toISOString() : null,
-          meetingTime: meetingTime ? new Date(meetingTime).toISOString() : null,
+          startAt,
+          endAt: endAt || null,
+          meetingTime: meetingTime || null,
           description: description.trim() || null,
           resultLabel: resultLabel.trim() || null,
           remarks: remarks.trim() || null,
