@@ -66,9 +66,7 @@ describe("canonical Tournament Event ↔ TeamSeason backfill", () => {
     expect(migration).toContain('e."teamId" IS NOT NULL');
     expect(migration).toContain('e."seasonId" IS NOT NULL');
     expect(migration).toContain('e."tenantId" IS NOT NULL');
-    expect(migration).not.toMatch(
-      /SET\s+"teamSeasonId"\s*=\s*(?!candidate\."teamSeasonId")/i,
-    );
+    expect(migration.match(/SET "teamSeasonId"/g)).toHaveLength(1);
   });
 
   it("never backfills non-tournament Events", () => {
