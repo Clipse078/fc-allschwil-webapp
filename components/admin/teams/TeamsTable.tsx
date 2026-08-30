@@ -113,7 +113,7 @@ export default function TeamsTable({ initialTeams }: TeamsTableProps) {
                   {team.ageGroup ?? "FCA"}
                 </div>
               }
-              title={team.activeSeason?.displayName ?? team.name}
+              title={team.name}
               subtitle={[
                 getCategoryLabel(team.category),
                 team.genderGroup ?? null,

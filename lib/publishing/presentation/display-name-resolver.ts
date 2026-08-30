@@ -107,11 +107,16 @@ export type TeamDisplayNameInput = {
  *   TeamSeason.displayName / TeamSeason.shortName are intentionally excluded —
  *   seasonal overrides must not substitute for tenant-managed Team fields.
  *
- * WEBSITE — richer displays prefer the full season context name:
- *   1. displayName (TeamSeason.displayName — season-scoped full name)
- *   2. name        (Team.name — primary identifier)
+ * WEBSITE — canonical tenant-managed Team identity (TEAM-IDENTITY-01 /
+ * TEAMCENTER-UX-01B), aligned with resolveLongTeamName():
+ *   1. name        (Team.name — canonical tenant-managed long name)
+ *   2. displayName (TeamSeason.displayName — seasonal fallback only)
  *   3. shortName   (TeamSeason.shortName — abbreviated, last resort)
  *   4. fallbackName (explicit source-event fallback)
+ *
+ * TeamSeason.displayName must never override a present Team.name — stale
+ * seasonal rows (e.g. after a rename or provider drift) must not leak E4
+ * when the canonical Team identity is E2.
  *
  * Note: No infoboardName or websiteName field exists on Team or TeamSeason.
  * The priority reflects the reduced verified field set.
@@ -134,8 +139,8 @@ export function resolveTeamDisplayName(
   }
 
   return firstMeaningful([
-    input.displayName,
     input.name,
+    input.displayName,
     input.shortName,
     input.fallbackName,
   ]);

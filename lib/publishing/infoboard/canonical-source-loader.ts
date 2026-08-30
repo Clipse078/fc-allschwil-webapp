@@ -180,6 +180,7 @@ export type CanonicalTrainingSessionPolicyRow = {
   readonly id: string;
   readonly status: string;
   readonly teamSeason: {
+    readonly displayName: string;
     readonly season: { readonly key: string };
     readonly team: CanonicalInfoboardTeamDisplayNameRow;
   };
@@ -308,6 +309,7 @@ export const CANONICAL_TRAINING_SESSION_POLICY_SELECT = {
   status: true,
   teamSeason: {
     select: {
+      displayName: true,
       season: { select: { key: true } },
       team: {
         select: CANONICAL_INFOBOARD_TEAM_DISPLAY_NAME_SELECT,

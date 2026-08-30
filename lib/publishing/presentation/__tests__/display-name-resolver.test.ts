@@ -225,12 +225,26 @@ describe("resolveTeamDisplayName — INFOBOARD", () => {
 // ── Team — WEBSITE ────────────────────────────────────────────────────────────
 
 describe("resolveTeamDisplayName — WEBSITE", () => {
-  it("returns displayName when available (priority 1)", () => {
+  it("returns Team.name when it conflicts with a stale TeamSeason.displayName (TEAM-IDENTITY-01)", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          displayName: "FC Allschwil Junioren E4",
+          name: "FC Allschwil Junioren E2",
+          shortName: "E2",
+          fallbackName: "Fallback",
+        },
+        "WEBSITE",
+      ),
+    ).toBe("FC Allschwil Junioren E2");
+  });
+
+  it("falls back to displayName when Team.name is blank", () => {
     expect(
       resolveTeamDisplayName(
         {
           displayName: "U12a Junioren",
-          name: "FC Allschwil",
+          name: "  ",
           shortName: "U12a",
           fallbackName: "Fallback",
         },

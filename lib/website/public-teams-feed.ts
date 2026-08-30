@@ -13,7 +13,8 @@
  * - Private/admin-only fields are never returned: personId, email, phone,
  *   dateOfBirth, remarks, isActive, websiteVisible, infoboardVisible,
  *   orgUnitId, sortOrder, tenantId, createdAt, updatedAt.
- * - displayName falls back to team.name when no active TeamSeason is found.
+ * - displayName uses the canonical Team naming contract (Team.name wins over
+ *   stale TeamSeason.displayName); falls back to team.name when no season row exists.
  * - Season is resolved by active season flag when seasonKey is not supplied.
  * - Squad/trainer visibility is gated by TeamSeason.squadWebsiteVisible /
  *   TeamSeason.trainerTeamWebsiteVisible.
@@ -23,6 +24,7 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
+import { resolveLongTeamName } from "@/lib/teams/team-naming";
 import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/team-match-query-service";
 import { findNextTournamentEventForTeamSeason } from "@/lib/tournaments/queries";
 import { listTournamentsByIds } from "@/lib/tournaments/tournament-service";
@@ -200,7 +202,10 @@ export async function getPublicTeams(
       category: team.category,
       genderGroup: team.genderGroup,
       ageGroup: team.ageGroup,
-      displayName: activeSeason?.displayName ?? team.name,
+      displayName: resolveLongTeamName({
+        teamName: team.name,
+        teamSeasonDisplayName: activeSeason?.displayName ?? null,
+      }) ?? team.name,
       shortName: activeSeason?.shortName ?? null,
       season: activeSeason?.season ?? null,
       orgUnit,
@@ -679,7 +684,11 @@ export async function getPublicTeamDetail(
 
   return {
     name: team.name,
-    displayName: teamSeason?.displayName ?? team.name,
+    displayName:
+      resolveLongTeamName({
+        teamName: team.name,
+        teamSeasonDisplayName: teamSeason?.displayName ?? null,
+      }) ?? team.name,
     slug: team.slug,
     category: team.category,
     ageGroup: team.ageGroup ?? null,
