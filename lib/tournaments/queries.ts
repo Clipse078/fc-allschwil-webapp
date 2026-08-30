@@ -37,6 +37,9 @@ const facilityResourceReferenceSelect = {
 export const tournamentEventSelect = {
   id: true,
   tenantId: true,
+  seasonId: true,
+  teamId: true,
+  teamSeasonId: true,
   title: true,
   description: true,
   status: true,
@@ -149,6 +152,33 @@ export function findAllTournamentEvents(
       ...(filter.status && filter.status.length > 0
         ? { status: { in: filter.status } }
         : {}),
+    },
+    orderBy: [{ startAt: "asc" }, { id: "asc" }],
+    select: tournamentEventSelect,
+  });
+}
+
+/**
+ * Canonical foundation for future public-team next-tournament controls.
+ * This does not expose a public API; it returns the earliest public-safe
+ * future tournament owned by the exact tenant + TeamSeason pair.
+ */
+export function findNextTournamentEventForTeamSeason(
+  tenantId: string,
+  teamSeasonId: string,
+  now: Date = new Date(),
+) {
+  return prisma.event.findFirst({
+    where: {
+      tenantId,
+      teamSeasonId,
+      teamSeason: { team: { tenantId } },
+      type: "TOURNAMENT",
+      websiteVisible: true,
+      status: {
+        in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"],
+      },
+      startAt: { gte: now },
     },
     orderBy: [{ startAt: "asc" }, { id: "asc" }],
     select: tournamentEventSelect,
