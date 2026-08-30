@@ -17,11 +17,14 @@
  * Intentionally small — mirrors lib/matchcenter/club-identity.ts semantics.
  */
 
+import { normalizeClubNameForLookup } from "@/lib/club-directory/club-name-normalization";
 import {
   resolveExternalClubLogoUrl,
   resolveExternalTeamLogoUrl,
 } from "@/lib/club-directory/logo";
 import type { TournamentHomeAway } from "./types";
+
+export { normalizeClubNameForLookup };
 
 export type TournamentParticipantLogoSource = {
   readonly team: object | null;
@@ -36,19 +39,6 @@ export type ResolvedOrganizerClub = {
   readonly id: string;
   readonly logoUrl: string | null;
 };
-
-/**
- * Normalizes a club/organizer name for tenant-scoped directory lookup.
- * Collapses hyphen/slash variants and repeated whitespace so that e.g.
- * "FC Diegten-Eptingen" matches "FC Diegten Eptingen".
- */
-export function normalizeClubNameForLookup(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[-/]/g, " ")
-    .replace(/\s+/g, " ");
-}
 
 function namesMatchForLookup(left: string, right: string): boolean {
   return normalizeClubNameForLookup(left) === normalizeClubNameForLookup(right);

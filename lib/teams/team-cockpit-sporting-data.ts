@@ -26,7 +26,11 @@ import {
   filterPublicTeamResults,
   resolvePublicTeamResultPerspective,
 } from "@/lib/website/public-team-matches-mapper";
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import {
+  buildStandingsClubEnrichmentByProviderTeamId,
+  type StandingsClubEnrichment,
+  type StandingsClubEnrichmentDatabase,
+} from "@/lib/club-directory/standings-club-enrichment";
 import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 
 export const TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT = 5;
@@ -119,22 +123,7 @@ export type GetTeamCockpitSportingDataInput = {
   identityDatabase?: TeamCockpitIdentityDatabase;
 };
 
-type TeamCockpitStandingExternalTeamRecord = {
-  shortName: string | null;
-  logoUrl: string | null;
-  providerMappings: Array<{
-    providerTeamId: number;
-  }>;
-  externalClub: {
-    logoUrl: string | null;
-  };
-};
-
-export interface TeamCockpitIdentityDatabase {
-  externalTeam: {
-    findMany(args: object): Promise<TeamCockpitStandingExternalTeamRecord[]>;
-  };
-}
+export type TeamCockpitIdentityDatabase = StandingsClubEnrichmentDatabase;
 
 function meaningful(value: string | null | undefined): string | null {
   if (value == null) {
@@ -288,67 +277,24 @@ export async function getTeamCockpitSportingData(
       });
 
       if (standingsCompetitionDisplay) {
-        const opponentProviderTeamIds = [
-          ...new Set(
-            standingsTable.rows
-              .map((row) => row.externalTeamId)
-              .filter(
-                (providerTeamId) =>
-                  providerTeamId !== input.sfvMapping!.externalTeamId,
-              ),
-          ),
-        ];
-        let standingsExternalTeams: TeamCockpitStandingExternalTeamRecord[] = [];
-        if (opponentProviderTeamIds.length > 0) {
-          try {
-            standingsExternalTeams = await identityDatabase.externalTeam.findMany({
-              where: {
-                tenantId: input.tenantId,
-                providerMappings: {
-                  some: {
-                    provider: SFV_PROVIDER,
-                    providerTeamId: { in: opponentProviderTeamIds },
-                  },
-                },
-              },
-              select: {
-                shortName: true,
-                logoUrl: true,
-                providerMappings: {
-                  where: {
-                    provider: SFV_PROVIDER,
-                    providerTeamId: { in: opponentProviderTeamIds },
-                  },
-                  select: { providerTeamId: true },
-                },
-                externalClub: {
-                  select: { logoUrl: true },
-                },
-              },
-            });
-          } catch {
-            // Identity enrichment is additive. Valid provider standings must
-            // still render when the club-directory lookup is unavailable.
-            standingsExternalTeams = [];
-          }
-        }
-        const externalTeamByProviderId = new Map<
+        let standingsEnrichmentByProviderTeamId = new Map<
           number,
-          { shortName: string | null; logoUrl: string | null }
+          StandingsClubEnrichment
         >();
 
-        for (const externalTeam of standingsExternalTeams) {
-          const logoUrl = resolveExternalTeamLogoUrl(
-            externalTeam,
-            externalTeam.externalClub,
-          );
-
-          for (const providerMapping of externalTeam.providerMappings) {
-            externalTeamByProviderId.set(providerMapping.providerTeamId, {
-              shortName: externalTeam.shortName,
-              logoUrl,
+        try {
+          standingsEnrichmentByProviderTeamId =
+            await buildStandingsClubEnrichmentByProviderTeamId({
+              tenantId: input.tenantId,
+              rows: standingsTable.rows.map((row) => ({
+                providerTeamId: row.externalTeamId,
+                providerTeamName: row.teamName,
+              })),
+              database: identityDatabase,
             });
-          }
+        } catch {
+          // Identity enrichment is additive. Valid provider standings must
+          // still render when the club-directory lookup is unavailable.
         }
 
         standings = {
@@ -356,7 +302,7 @@ export async function getTeamCockpitSportingData(
           rows: standingsTable.rows.map((row) => {
             const isCurrentTeam =
               row.externalTeamId === input.sfvMapping!.externalTeamId;
-            const externalTeam = externalTeamByProviderId.get(
+            const enrichment = standingsEnrichmentByProviderTeamId.get(
               row.externalTeamId,
             );
 
@@ -365,12 +311,12 @@ export async function getTeamCockpitSportingData(
               teamName: row.teamName,
               shortName: isCurrentTeam
                 ? input.teamShortName ?? row.shortName
-                : externalTeam?.shortName ?? row.shortName,
+                : enrichment?.shortName ?? row.shortName,
               isCurrentTeam,
               logoUrl: resolveClubIdentityLogoUrl(
                 {
                   isOwnTeam: isCurrentTeam,
-                  externalLogoUrl: externalTeam?.logoUrl ?? null,
+                  externalLogoUrl: enrichment?.logoUrl ?? null,
                 },
                 input.tenantLogoUrl,
               ),

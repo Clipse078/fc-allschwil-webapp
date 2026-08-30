@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   matchEventFindMany: vi.fn(),
   teamExternalMappingFindFirst: vi.fn(),
   fetchTeamStandingsForMapping: vi.fn(),
+  buildStandingsClubEnrichmentByProviderTeamId: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -52,6 +53,11 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
   fetchTeamStandingsForMapping: mocks.fetchTeamStandingsForMapping,
+}));
+
+vi.mock("@/lib/club-directory/standings-club-enrichment", () => ({
+  buildStandingsClubEnrichmentByProviderTeamId:
+    mocks.buildStandingsClubEnrichmentByProviderTeamId,
 }));
 
 const TENANT_ID = "tenant-fca";
@@ -148,6 +154,7 @@ describe("getPublicTeamDetail — standings", () => {
       providerLeagueId: 10,
     });
     mocks.fetchTeamStandingsForMapping.mockResolvedValue(createStandingsTable());
+    mocks.buildStandingsClubEnrichmentByProviderTeamId.mockResolvedValue(new Map());
   });
 
   it("includes nextMatches, results, and standings", async () => {
@@ -238,5 +245,68 @@ describe("getPublicTeamDetail — standings", () => {
         }),
       }),
     );
+  });
+
+  it("exposes auto-resolved canonical logos in standings rows", async () => {
+    mocks.fetchTeamStandingsForMapping.mockResolvedValue({
+      competition: {
+        name: "Junioren E",
+        divisionName: "Division 1",
+        groupName: "Gruppe A",
+      },
+      rows: [
+        {
+          position: 1,
+          externalTeamId: 100,
+          teamName: "FC Example E1",
+          shortName: null,
+          played: 10,
+          won: 8,
+          drawn: 1,
+          lost: 1,
+          goalsFor: 25,
+          goalsAgainst: 8,
+          points: 25,
+          penaltyPoints: 0,
+        },
+        {
+          position: 2,
+          externalTeamId: 200,
+          teamName: "FC Black Stars D7a",
+          shortName: null,
+          played: 10,
+          won: 7,
+          drawn: 2,
+          lost: 1,
+          goalsFor: 20,
+          goalsAgainst: 10,
+          points: 23,
+          penaltyPoints: 0,
+        },
+      ],
+    });
+    mocks.buildStandingsClubEnrichmentByProviderTeamId.mockResolvedValue(
+      new Map([
+        [
+          200,
+          {
+            canonicalClubId: "club-black-stars",
+            shortName: "Black Stars",
+            logoUrl: "https://cdn.example.com/fc-black-stars.png",
+            resolutionSource: "prefix_name_match",
+          },
+        ],
+      ]),
+    );
+
+    const detail = await getPublicTeamDetail({
+      tenantId: TENANT_ID,
+      slug: "e1",
+    });
+
+    const opponent = detail?.standings?.rows.find((row) => !row.team.isCurrentTeam);
+    expect(opponent?.team.name).toBe("FC Black Stars D7a");
+    expect(opponent?.team.logoUrl).toBe("https://cdn.example.com/fc-black-stars.png");
+    expect(opponent?.team.shortName).toBe("Black Stars");
   });
 });
