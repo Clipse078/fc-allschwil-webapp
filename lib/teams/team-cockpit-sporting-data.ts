@@ -15,10 +15,16 @@ import {
 } from "@/lib/teams/team-match-query-service";
 import {
   resolveTeamCompetitionDisplay,
-  resolveCurrentSeasonSfvMapping,
   type TeamCanonicalCompetitionContext,
   type TeamCompetitionDisplay,
 } from "@/lib/teams/team-competition-display";
+import {
+  effectiveTeamStandingsMappingSelect,
+  loadEffectiveTeamStandingsMapping,
+  resolveEffectiveTeamStandingsMapping,
+  type EffectiveTeamStandingsMapping,
+  type ResolveEffectiveTeamStandingsMappingInput,
+} from "@/lib/teams/team-standings-mapping";
 import type { SportingMatchLifecycle } from "@/lib/sporting-data/lifecycle";
 import type { TeamSeasonMatchCompetitionContext } from "@/lib/teams/team-match-query-service";
 import {
@@ -328,81 +334,22 @@ export async function getTeamCockpitSportingData(
   };
 }
 
-export type LoadCurrentSeasonSfvMappingInput = {
-  tenantId: string;
-  teamSeasonId: string;
-  seasonKey: string;
-};
+export type LoadCurrentSeasonSfvMappingInput =
+  ResolveEffectiveTeamStandingsMappingInput & { tenantId: string };
 
-export type CurrentSeasonSfvMappingData = {
-  externalTeamId: number;
-  externalSeasonId: number;
-  providerLeagueId: number | null;
-  providerLeagueName: string | null;
-  providerTeamName: string | null;
-  lastSyncedAt: Date;
-};
-
-/**
- * Tenant-safe loader for the current-season SFV mapping used by cockpit queries.
- */
-const currentSeasonSfvMappingSelect = {
-  externalTeamId: true,
-  externalSeasonId: true,
-  providerLeagueId: true,
-  providerLeagueName: true,
-  providerTeamName: true,
-  lastSyncedAt: true,
-  teamSeasonId: true,
-  provider: true,
-} as const;
+export type CurrentSeasonSfvMappingData = EffectiveTeamStandingsMapping;
 
 export function mapCurrentSeasonSfvMapping(
-  mapping: {
-    externalTeamId: number;
-    externalSeasonId: number;
-    providerLeagueId: number | null;
-    providerLeagueName: string | null;
-    providerTeamName: string | null;
-    lastSyncedAt: Date;
-    teamSeasonId: string | null;
-    provider: string;
-  } | null,
+  mapping: Parameters<typeof resolveEffectiveTeamStandingsMapping>[0],
   input: LoadCurrentSeasonSfvMappingInput,
 ): CurrentSeasonSfvMappingData | null {
-  const seasonSafeMapping = resolveCurrentSeasonSfvMapping(mapping, {
-    teamSeasonId: input.teamSeasonId,
-    seasonKey: input.seasonKey,
-  });
-
-  if (!seasonSafeMapping) {
-    return null;
-  }
-
-  return {
-    externalTeamId: seasonSafeMapping.externalTeamId,
-    externalSeasonId: seasonSafeMapping.externalSeasonId,
-    providerLeagueId: seasonSafeMapping.providerLeagueId,
-    providerLeagueName: seasonSafeMapping.providerLeagueName,
-    providerTeamName: mapping?.providerTeamName ?? null,
-    lastSyncedAt: mapping!.lastSyncedAt,
-  };
+  return resolveEffectiveTeamStandingsMapping(mapping, input);
 }
 
 export async function loadCurrentSeasonSfvMapping(
   input: LoadCurrentSeasonSfvMappingInput,
 ): Promise<CurrentSeasonSfvMappingData | null> {
-  const mapping = await prisma.teamExternalMapping.findFirst({
-    where: {
-      tenantId: input.tenantId,
-      teamSeasonId: input.teamSeasonId,
-      provider: SFV_PROVIDER,
-      providerIsActive: true,
-    },
-    select: currentSeasonSfvMappingSelect,
-  });
-
-  return mapCurrentSeasonSfvMapping(mapping, input);
+  return loadEffectiveTeamStandingsMapping(input);
 }
 
 export type LoadCurrentSeasonSfvMappingsForListInput = {
@@ -434,7 +381,7 @@ export async function loadCurrentSeasonSfvMappingsForList(
       provider: SFV_PROVIDER,
       providerIsActive: true,
     },
-    select: currentSeasonSfvMappingSelect,
+    select: effectiveTeamStandingsMappingSelect,
   });
 
   const mappingsByTeamSeasonId = new Map(

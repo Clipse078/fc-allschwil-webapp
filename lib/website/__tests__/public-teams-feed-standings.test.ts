@@ -152,6 +152,12 @@ describe("getPublicTeamDetail — standings", () => {
       externalTeamId: 100,
       externalSeasonId: 2027,
       providerLeagueId: 10,
+      providerLeagueName: "Junioren E",
+      providerTeamName: "FC Example E1",
+      lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+      teamSeasonId: TEAM_SEASON_ID,
+      provider: "SFV",
+      providerIsActive: true,
     });
     mocks.fetchTeamStandingsForMapping.mockResolvedValue(createStandingsTable());
     mocks.buildStandingsClubEnrichmentByProviderTeamId.mockResolvedValue(new Map());
@@ -175,6 +181,12 @@ describe("getPublicTeamDetail — standings", () => {
       },
     });
     expect(detail?.standings?.rows).toHaveLength(1);
+    expect(mocks.fetchTeamStandingsForMapping).toHaveBeenCalledWith({
+      tenantId: TENANT_ID,
+      externalTeamId: 100,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+    });
   });
 
   it("returns standings null when no mapping exists", async () => {
@@ -206,6 +218,12 @@ describe("getPublicTeamDetail — standings", () => {
       externalTeamId: 100,
       externalSeasonId: 2026,
       providerLeagueId: 10,
+      providerLeagueName: "Junioren E",
+      providerTeamName: "FC Example E1",
+      lastSyncedAt: new Date("2025-08-01T00:00:00.000Z"),
+      teamSeasonId: TEAM_SEASON_ID,
+      provider: "SFV",
+      providerIsActive: true,
     });
 
     const detail = await getPublicTeamDetail({

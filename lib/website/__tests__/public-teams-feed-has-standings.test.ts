@@ -106,6 +106,27 @@ describe("getPublicTeams — hasStandings", () => {
     expect(teams[0]?.hasStandings).toBe(false);
   });
 
+  it("does not treat a league id without valid league identity as standings-capable", async () => {
+    mocks.teamFindMany.mockResolvedValue([makeTeamRow()]);
+    mocks.teamExternalMappingFindMany.mockResolvedValue([
+      {
+        externalTeamId: 100,
+        externalSeasonId: 2027,
+        providerLeagueId: 42,
+        providerLeagueName: " ",
+        providerTeamName: "FC Allschwil Juniorinnen FF-14",
+        lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
+        teamSeasonId: "team-season-ff14",
+        provider: "SFV",
+        providerIsActive: true,
+      },
+    ]);
+
+    const teams = await getPublicTeams({ tenantId: TENANT_ID });
+
+    expect(teams[0]?.hasStandings).toBe(false);
+  });
+
   it("does not require live standings fetches to resolve hasStandings", async () => {
     mocks.teamFindMany.mockResolvedValue([makeTeamRow()]);
     mocks.teamExternalMappingFindMany.mockResolvedValue([

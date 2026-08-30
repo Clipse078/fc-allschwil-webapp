@@ -187,4 +187,74 @@ describe("cockpit/public standings logo parity", () => {
       cockpitRows.map((row) => row.teamName),
     );
   });
+
+  it("preserves representative provider qualifiers with identical canonical logos", () => {
+    const representatives = [
+      ["FC Black Stars D7a", "black-stars"],
+      ["FC Amicitia Riehen D7a", "amicitia-riehen"],
+      ["SV Muttenz Scorpions", "muttenz"],
+      ["FC Aesch D7-1", "aesch"],
+      ["FC Nordstern BS D7 weiss", "nordstern"],
+      ["Basel Internationaler FC", "basel-international"],
+    ] as const;
+    const rows = representatives.map(([teamName], index) => ({
+      position: index + 1,
+      externalTeamId: index + 200,
+      teamName,
+      shortName: null,
+      played: 1,
+      won: 0,
+      drawn: 0,
+      lost: 1,
+      goalsFor: 0,
+      goalsAgainst: 1,
+      points: 0,
+      penaltyPoints: 0,
+    }));
+    const table: SportingStandingsTable = {
+      competition: {
+        name: "Junioren D-7",
+        divisionName: null,
+        groupName: "Gruppe 1",
+      },
+      rows,
+    };
+    const enrichment = new Map<number, StandingsClubEnrichment>(
+      representatives.map(([, clubKey], index) => [
+        index + 200,
+        {
+          canonicalClubId: `club-${clubKey}`,
+          shortName: null,
+          logoUrl: `https://cdn.example.com/${clubKey}.png`,
+          resolutionSource:
+            clubKey === "basel-international"
+              ? "exact_name_match"
+              : "prefix_name_match",
+        },
+      ]),
+    );
+    const sharedInput = {
+      rows,
+      currentExternalTeamId: 100,
+      currentTeamShortName: "FCA",
+      tenantLogoUrl: TENANT_LOGO,
+      enrichmentByProviderTeamId: enrichment,
+    };
+
+    const cockpitRows = presentStandingsRows(sharedInput);
+    const publicRows = mapPublicTeamStandings(table, {
+      currentExternalTeamId: 100,
+      currentTeamName: "FC Allschwil",
+      currentTeamShortName: "FCA",
+      tenantLogoUrl: TENANT_LOGO,
+      enrichmentByProviderTeamId: enrichment,
+    }).rows;
+
+    expect(publicRows.map((row) => row.team.name)).toEqual(
+      representatives.map(([providerName]) => providerName),
+    );
+    expect(publicRows.map((row) => row.team.logoUrl)).toEqual(
+      cockpitRows.map((row) => row.logoUrl),
+    );
+  });
 });

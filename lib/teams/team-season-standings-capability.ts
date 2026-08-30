@@ -14,25 +14,14 @@
 import { prisma } from "@/lib/db/prisma";
 import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 import {
-  resolveCurrentSeasonSfvMapping,
-  type CurrentSeasonSfvMappingRecord,
-} from "@/lib/teams/team-competition-display";
-import {
-  mapCurrentSeasonSfvMapping,
   type LoadCurrentSeasonSfvMappingsForListInput,
 } from "@/lib/teams/team-cockpit-sporting-data";
-
-const standingsCapabilityMappingSelect = {
-  externalTeamId: true,
-  externalSeasonId: true,
-  providerLeagueId: true,
-  providerLeagueName: true,
-  providerTeamName: true,
-  lastSyncedAt: true,
-  teamSeasonId: true,
-  provider: true,
-  providerIsActive: true,
-} as const;
+import {
+  effectiveTeamStandingsMappingSelect,
+  isEffectiveMappingStandingsCapable,
+  resolveEffectiveTeamStandingsMapping,
+  type EffectiveTeamStandingsMappingRecord,
+} from "@/lib/teams/team-standings-mapping";
 
 export type TeamSeasonStandingsCapabilityInput = {
   readonly teamSeasonId: string;
@@ -48,15 +37,12 @@ export type TeamSeasonStandingsCapabilityInput = {
  * groups that may still have an SFV team link but no league table).
  */
 export function resolveTeamSeasonHasStandings(
-  mapping: CurrentSeasonSfvMappingRecord | null | undefined,
+  mapping: EffectiveTeamStandingsMappingRecord | null | undefined,
   input: TeamSeasonStandingsCapabilityInput,
 ): boolean {
-  const seasonSafeMapping = resolveCurrentSeasonSfvMapping(mapping, input);
-  if (!seasonSafeMapping) {
-    return false;
-  }
-
-  return seasonSafeMapping.providerLeagueId != null;
+  return isEffectiveMappingStandingsCapable(
+    resolveEffectiveTeamStandingsMapping(mapping, input),
+  );
 }
 
 /**
@@ -80,7 +66,7 @@ export async function loadTeamSeasonHasStandingsForList(
       provider: SFV_PROVIDER,
       providerIsActive: true,
     },
-    select: standingsCapabilityMappingSelect,
+    select: effectiveTeamStandingsMappingSelect,
   });
 
   const mappingsByTeamSeasonId = new Map(
@@ -93,19 +79,15 @@ export async function loadTeamSeasonHasStandingsForList(
   );
 
   for (const entry of input.entries) {
-    const mapping = mapCurrentSeasonSfvMapping(
+    const mapping = resolveEffectiveTeamStandingsMapping(
       mappingsByTeamSeasonId.get(entry.teamSeasonId) ?? null,
       {
-        tenantId: input.tenantId,
         teamSeasonId: entry.teamSeasonId,
         seasonKey: entry.seasonKey,
       },
     );
 
-    result.set(
-      entry.teamSeasonId,
-      mapping != null && mapping.providerLeagueId != null,
-    );
+    result.set(entry.teamSeasonId, isEffectiveMappingStandingsCapable(mapping));
   }
 
   return result;

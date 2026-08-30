@@ -990,6 +990,7 @@ describe("TEAM-COCKPIT-PREMIUM-01C — loadCurrentSeasonSfvMapping", () => {
       lastSyncedAt: new Date("2024-01-01T00:00:00.000Z"),
       teamSeasonId: TEAM_SEASON_ID,
       provider: "SFV",
+      providerIsActive: true,
     });
 
     const mapping = await loadCurrentSeasonSfvMapping({
@@ -1011,6 +1012,7 @@ describe("TEAM-COCKPIT-PREMIUM-01C — loadCurrentSeasonSfvMapping", () => {
       lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
       teamSeasonId: TEAM_SEASON_ID,
       provider: "SFV",
+      providerIsActive: true,
     });
 
     const mapping = await loadCurrentSeasonSfvMapping({
@@ -1066,6 +1068,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E2 — loadCurrentSeasonSfvMappingsForList", ()
         lastSyncedAt: new Date("2026-08-01T00:00:00.000Z"),
         teamSeasonId: "ts-a",
         provider: "SFV",
+        providerIsActive: true,
       },
       {
         externalTeamId: 456,
@@ -1076,6 +1079,7 @@ describe("TEAM-COCKPIT-PREMIUM-01E2 — loadCurrentSeasonSfvMappingsForList", ()
         lastSyncedAt: new Date("2024-01-01T00:00:00.000Z"),
         teamSeasonId: "ts-b",
         provider: "SFV",
+        providerIsActive: true,
       },
     ]);
 

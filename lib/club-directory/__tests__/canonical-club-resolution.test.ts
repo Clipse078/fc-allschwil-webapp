@@ -55,6 +55,13 @@ function buildTestIndexes() {
       logoUrl: "https://cdn.example.com/fc-nordstern.png",
     },
     {
+      id: "club-bifc",
+      name: "Basel Internationaler FC",
+      shortName: null,
+      alternativeName: null,
+      logoUrl: "https://cdn.example.com/basel-internationaler-fc.png",
+    },
+    {
       id: "club-basel",
       name: "FC Basel",
       shortName: null,
@@ -134,6 +141,18 @@ describe("resolveCanonicalClubFromProviderTeamName", () => {
     ).toMatchObject({
       id: "club-nordstern",
       source: "prefix_name_match",
+    });
+  });
+
+  it("resolves Basel Internationaler FC", () => {
+    expect(
+      resolveCanonicalClubFromProviderTeamName(
+        "Basel Internationaler FC",
+        indexes,
+      ),
+    ).toMatchObject({
+      id: "club-bifc",
+      source: "exact_name_match",
     });
   });
 

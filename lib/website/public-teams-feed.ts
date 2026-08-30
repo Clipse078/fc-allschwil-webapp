@@ -36,10 +36,7 @@ import {
   CANONICAL_EXTERNAL_TEAM_PROVIDER_MAPPING_SELECT,
 } from "@/lib/club-directory/canonical-logo-resolution";
 import { fetchTeamStandingsForMapping } from "@/lib/integrations/sfv/standings-provider";
-import {
-  getSeasonKeyLookupCandidatesFromSfvExternalSeasonId,
-  SFV_PROVIDER,
-} from "@/lib/integrations/sfv/season-bridge";
+import { loadEffectiveTeamStandingsMapping } from "@/lib/teams/team-standings-mapping";
 import {
   mapPublicTeamMatches,
   mapPublicTeamResults,
@@ -640,57 +637,42 @@ export async function getPublicTeamDetail(
     results = mapPublicTeamResults(completed, identityContext);
 
     // ── Phase 6: Standings (best-effort) ─────────────────────────────────
-    const mapping = await prisma.teamExternalMapping.findFirst({
-      where: {
-        tenantId: input.tenantId,
-        teamSeasonId: teamSeason.id,
-        provider: SFV_PROVIDER,
-        providerIsActive: true,
-      },
-      select: {
-        externalTeamId: true,
-        externalSeasonId: true,
-        providerLeagueId: true,
-      },
+    const mapping = await loadEffectiveTeamStandingsMapping({
+      tenantId: input.tenantId,
+      teamSeasonId: teamSeason.id,
+      seasonKey: teamSeason.season.key,
     });
 
     if (mapping) {
-      const seasonCandidates = getSeasonKeyLookupCandidatesFromSfvExternalSeasonId(
-        mapping.externalSeasonId,
-      );
-      const seasonAligned = seasonCandidates.includes(teamSeason.season.key);
+      const standingsTable = await fetchTeamStandingsForMapping({
+        tenantId: input.tenantId,
+        externalTeamId: mapping.externalTeamId,
+        externalSeasonId: mapping.externalSeasonId,
+        providerLeagueId: mapping.providerLeagueId,
+      });
 
-      if (seasonAligned) {
-        const standingsTable = await fetchTeamStandingsForMapping({
-          tenantId: input.tenantId,
-          externalTeamId: mapping.externalTeamId,
-          externalSeasonId: mapping.externalSeasonId,
-          providerLeagueId: mapping.providerLeagueId,
-        });
+      if (standingsTable) {
+        const standingsEnrichmentByProviderTeamId =
+          await buildStandingsClubEnrichmentByProviderTeamId({
+            tenantId: input.tenantId,
+            rows: standingsTable.rows.map((row) => ({
+              providerTeamId: row.externalTeamId,
+              providerTeamName: row.teamName,
+            })),
+          });
 
-        if (standingsTable) {
-          const standingsEnrichmentByProviderTeamId =
-            await buildStandingsClubEnrichmentByProviderTeamId({
-              tenantId: input.tenantId,
-              rows: standingsTable.rows.map((row) => ({
-                providerTeamId: row.externalTeamId,
-                providerTeamName: row.teamName,
-              })),
-            });
+        const standingsIdentityContext: PublicTeamStandingsIdentityContext = {
+          currentExternalTeamId: mapping.externalTeamId,
+          currentTeamName: teamSeason.displayName,
+          currentTeamShortName: teamSeason.shortName,
+          tenantLogoUrl: tenant?.logoUrl ?? null,
+          enrichmentByProviderTeamId: standingsEnrichmentByProviderTeamId,
+        };
 
-          const standingsIdentityContext: PublicTeamStandingsIdentityContext = {
-            currentExternalTeamId: mapping.externalTeamId,
-            currentTeamName: teamSeason.displayName,
-            currentTeamShortName: teamSeason.shortName,
-            tenantLogoUrl: tenant?.logoUrl ?? null,
-            enrichmentByProviderTeamId: standingsEnrichmentByProviderTeamId,
-          };
-
-          standings = mapPublicTeamStandings(
-            standingsTable,
-            standingsIdentityContext,
-          );
-        }
+        standings = mapPublicTeamStandings(
+          standingsTable,
+          standingsIdentityContext,
+        );
       }
     }
   }
