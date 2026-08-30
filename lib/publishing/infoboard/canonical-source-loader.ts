@@ -97,7 +97,12 @@ import { WEEKPLANNER_DEFAULT_TIMEZONE, zonedDateKey, parseDayKey } from "@/lib/w
 import { resolveTrainingDayWindow, resolveTrainingWeekWindow } from "@/lib/training/date-range";
 import { getWeekplannerDay } from "@/lib/weekplanner/queries";
 import { getOperationalWeekplannerPlan } from "@/lib/weekplanner/plan-service";
-import { resolveExternalClubLogoUrl, resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveExternalClubLogoUrl } from "@/lib/club-directory/logo";
+import {
+  collectProviderClubIdsFromEventPolicies,
+  loadCanonicalClubLogoIndex,
+  resolveExternalTeamLogoWithCanonicalFallback,
+} from "@/lib/club-directory/canonical-logo-resolution";
 import type { InfoboardMatchIdentity } from "../presentation/infoboard-match-presentation";
 import type {
   WeekplannerItem,
@@ -149,6 +154,9 @@ export type CanonicalEventPolicyRow = {
         readonly shortName: string | null;
         readonly logoUrl: string | null;
       };
+      readonly providerMappings?: ReadonlyArray<{
+        readonly providerClubId: number | null;
+      }>;
     } | null;
     readonly awayExternalTeam: {
       readonly name: string;
@@ -160,6 +168,9 @@ export type CanonicalEventPolicyRow = {
         readonly shortName: string | null;
         readonly logoUrl: string | null;
       };
+      readonly providerMappings?: ReadonlyArray<{
+        readonly providerClubId: number | null;
+      }>;
     } | null;
   } | null;
 };
@@ -263,6 +274,10 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
               logoUrl: true,
             },
           },
+          providerMappings: {
+            where: { provider: "SFV" },
+            select: { providerClubId: true },
+          },
         },
       },
       awayExternalTeam: {
@@ -277,6 +292,10 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
               shortName: true,
               logoUrl: true,
             },
+          },
+          providerMappings: {
+            where: { provider: "SFV" },
+            select: { providerClubId: true },
           },
         },
       },
@@ -485,6 +504,7 @@ function buildExternalClubSideIdentity(
 function buildExternalSideIdentity(
   externalTeam: ExternalTeamPolicyRow | null,
   fallbackDisplayName: string | null,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>,
 ): InfoboardMatchIdentity["home"] {
   if (!externalTeam) {
     return {
@@ -500,13 +520,19 @@ function buildExternalSideIdentity(
     };
   }
 
+  const clubLogoUrl = resolveExternalTeamLogoWithCanonicalFallback(
+    {
+      team: externalTeam,
+      directClub: externalTeam.externalClub,
+      providerMappings: externalTeam.providerMappings,
+    },
+    canonicalLogoByProviderClubId,
+  );
+
   return {
     isOwnTeam: false,
     clubName: externalTeam.externalClub.name,
-    clubLogoUrl: resolveExternalTeamLogoUrl(
-      externalTeam,
-      externalTeam.externalClub,
-    ),
+    clubLogoUrl,
     teamName: externalTeam.name,
     teamShortName: externalTeam.shortName,
     teamAlternativeName: externalTeam.alternativeName,
@@ -550,6 +576,7 @@ function buildOwnTeamSideIdentity(
 function buildMatchIdentity(
   policy: CanonicalEventPolicyRow | undefined,
   item: WeekplannerMatchItem,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>,
 ): InfoboardMatchIdentity {
   const mapping = policy?.matchExternalMapping ?? null;
   const eventTeam = policy?.team ?? null;
@@ -571,6 +598,7 @@ function buildMatchIdentity(
         : buildExternalSideIdentity(
             homeExternal,
             ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
+            canonicalLogoByProviderClubId,
           ),
       away: awayTeam
         ? buildOwnTeamSideIdentity(
@@ -580,6 +608,7 @@ function buildMatchIdentity(
         : buildExternalSideIdentity(
             awayExternal,
             ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
+            canonicalLogoByProviderClubId,
           ),
     };
   }
@@ -590,7 +619,7 @@ function buildMatchIdentity(
     return {
       home: opponentClub
         ? buildExternalClubSideIdentity(opponentClub, item.opponentName)
-        : buildExternalSideIdentity(null, item.opponentName),
+        : buildExternalSideIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
       away: buildOwnTeamSideIdentity(eventTeam, item.teamNames[0] ?? null),
     };
   }
@@ -599,7 +628,7 @@ function buildMatchIdentity(
     home: buildOwnTeamSideIdentity(eventTeam, item.teamNames[0] ?? null),
     away: opponentClub
       ? buildExternalClubSideIdentity(opponentClub, item.opponentName)
-      : buildExternalSideIdentity(null, item.opponentName),
+      : buildExternalSideIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
   };
 }
 
@@ -651,6 +680,7 @@ function mapTrainingItem(
 function mapMatchItem(
   item: WeekplannerMatchItem,
   policy: CanonicalEventPolicyRow | undefined,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>,
 ): Screen1SourceEvent {
   const homeAway = (policy?.homeAway ?? "HOME").trim().toUpperCase();
   const ownTeamIsAway = homeAway === "AWAY";
@@ -659,12 +689,26 @@ function mapMatchItem(
   const opponentExternalClub = policy?.opponentExternalClub ?? null;
   const opponentLogoUrl = ownTeamIsAway
     ? homeExternalTeam
-      ? resolveExternalTeamLogoUrl(homeExternalTeam, homeExternalTeam.externalClub)
+      ? resolveExternalTeamLogoWithCanonicalFallback(
+          {
+            team: homeExternalTeam,
+            directClub: homeExternalTeam.externalClub,
+            providerMappings: homeExternalTeam.providerMappings,
+          },
+          canonicalLogoByProviderClubId,
+        )
       : opponentExternalClub
         ? resolveExternalClubLogoUrl(opponentExternalClub)
         : null
     : awayExternalTeam
-      ? resolveExternalTeamLogoUrl(awayExternalTeam, awayExternalTeam.externalClub)
+      ? resolveExternalTeamLogoWithCanonicalFallback(
+          {
+            team: awayExternalTeam,
+            directClub: awayExternalTeam.externalClub,
+            providerMappings: awayExternalTeam.providerMappings,
+          },
+          canonicalLogoByProviderClubId,
+        )
       : opponentExternalClub
         ? resolveExternalClubLogoUrl(opponentExternalClub)
         : null;
@@ -689,7 +733,7 @@ function mapMatchItem(
     opponent: null,
     opponentFallbackName: item.opponentName,
     opponentLogoUrl,
-    matchIdentity: buildMatchIdentity(policy, item),
+    matchIdentity: buildMatchIdentity(policy, item, canonicalLogoByProviderClubId),
     organizerName: policy?.organizerName ?? null,
     competitionLabel: policy?.competitionLabel ?? null,
     meetingTime: policy?.meetingTime ?? null,
@@ -750,13 +794,18 @@ function mapWeekplannerItem(
   policy: {
     eventPolicyByEventId: ReadonlyMap<string, CanonicalEventPolicyRow>;
     trainingPolicyBySessionId: ReadonlyMap<string, CanonicalTrainingSessionPolicyRow>;
+    canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>;
   },
 ): Screen1SourceEvent {
   switch (item.type) {
     case "TRAINING":
       return mapTrainingItem(item, policy.trainingPolicyBySessionId.get(item.trainingSessionId));
     case "MATCH":
-      return mapMatchItem(item, policy.eventPolicyByEventId.get(item.eventId));
+      return mapMatchItem(
+        item,
+        policy.eventPolicyByEventId.get(item.eventId),
+        policy.canonicalLogoByProviderClubId,
+      );
     case "TOURNAMENT":
       return mapTournamentItem(item, policy.eventPolicyByEventId.get(item.eventId));
   }
@@ -794,8 +843,18 @@ export function createCanonicalInfoboardSourceLoader(
       loadTrainingPolicyBySessionId(database, input.tenantId, items),
     ]);
 
+    const eventPolicies = [...eventPolicyByEventId.values()];
+    const canonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
+      input.tenantId,
+      collectProviderClubIdsFromEventPolicies(eventPolicies),
+    );
+
     const mapped = items.map((item) =>
-      mapWeekplannerItem(item, { eventPolicyByEventId, trainingPolicyBySessionId }),
+      mapWeekplannerItem(item, {
+        eventPolicyByEventId,
+        trainingPolicyBySessionId,
+        canonicalLogoByProviderClubId,
+      }),
     );
 
     if (!input.seasonKey) return mapped;

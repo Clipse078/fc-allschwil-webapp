@@ -24,7 +24,12 @@
 import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/team-match-query-service";
-import { resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import {
+  collectProviderClubIdsFromExternalTeams,
+  loadCanonicalClubLogoIndex,
+  resolveExternalTeamLogoWithCanonicalFallback,
+  CANONICAL_EXTERNAL_TEAM_PROVIDER_MAPPING_SELECT,
+} from "@/lib/club-directory/canonical-logo-resolution";
 import { fetchTeamStandingsForMapping } from "@/lib/integrations/sfv/standings-provider";
 import {
   getSeasonKeyLookupCandidatesFromSfvExternalSeasonId,
@@ -520,6 +525,7 @@ export async function getPublicTeamDetail(
               id: true,
               shortName: true,
               logoUrl: true,
+              providerMappings: CANONICAL_EXTERNAL_TEAM_PROVIDER_MAPPING_SELECT,
               externalClub: {
                 select: {
                   name: true,
@@ -531,6 +537,11 @@ export async function getPublicTeamDetail(
         : Promise.resolve([]),
     ]);
 
+    const canonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
+      input.tenantId,
+      collectProviderClubIdsFromExternalTeams(externalTeams),
+    );
+
     const teamById = new Map<string, PublicTeamMatchTeamRecord>(
       teams.map((team) => [team.id, team]),
     );
@@ -540,9 +551,13 @@ export async function getPublicTeamDetail(
         {
           id: externalTeam.id,
           shortName: externalTeam.shortName,
-          logoUrl: resolveExternalTeamLogoUrl(
-            externalTeam,
-            externalTeam.externalClub,
+          logoUrl: resolveExternalTeamLogoWithCanonicalFallback(
+            {
+              team: externalTeam,
+              directClub: externalTeam.externalClub,
+              providerMappings: externalTeam.providerMappings,
+            },
+            canonicalLogoByProviderClubId,
           ),
           clubName: externalTeam.externalClub.name,
         },
@@ -615,7 +630,7 @@ export async function getPublicTeamDetail(
                     logoUrl: true,
                     providerMappings: {
                       where: { provider: SFV_PROVIDER },
-                      select: { providerTeamId: true },
+                      select: { providerTeamId: true, providerClubId: true },
                     },
                     externalClub: {
                       select: { logoUrl: true },
@@ -624,15 +639,24 @@ export async function getPublicTeamDetail(
                 })
               : [];
 
+          const standingsCanonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
+            input.tenantId,
+            collectProviderClubIdsFromExternalTeams(standingsExternalTeams),
+          );
+
           const externalTeamByProviderId = new Map<
             number,
             PublicTeamStandingsExternalTeamRecord
           >();
 
           for (const externalTeam of standingsExternalTeams) {
-            const logoUrl = resolveExternalTeamLogoUrl(
-              externalTeam,
-              externalTeam.externalClub,
+            const logoUrl = resolveExternalTeamLogoWithCanonicalFallback(
+              {
+                team: externalTeam,
+                directClub: externalTeam.externalClub,
+                providerMappings: externalTeam.providerMappings,
+              },
+              standingsCanonicalLogoByProviderClubId,
             );
 
             for (const providerMapping of externalTeam.providerMappings) {

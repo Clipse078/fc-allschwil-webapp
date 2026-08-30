@@ -33,7 +33,6 @@ import {
   WochenplanPlanAllocationEventNotFoundError,
   WochenplanPlanDeleteActiveForbiddenError,
   WochenplanPlanDeleteLastPlanForbiddenError,
-  WochenplanPlanDeleteDefaultForbiddenError,
 } from "./plan-errors";
 
 const MAX_NAME_LENGTH = 100;
@@ -356,9 +355,6 @@ export async function deleteWochenplanPlan(
   if (plan.isActive) {
     throw new WochenplanPlanDeleteActiveForbiddenError(planId);
   }
-  if (plan.isDefault) {
-    throw new WochenplanPlanDeleteDefaultForbiddenError(planId);
-  }
 
   const remainingPlans = await prisma.wochenplanPlan.count({
     where: { tenantId, archivedAt: null },
@@ -368,6 +364,27 @@ export async function deleteWochenplanPlan(
   }
 
   await prisma.$transaction(async (tx) => {
+    if (plan.isDefault) {
+      const successor = await tx.wochenplanPlan.findFirst({
+        where: { tenantId, archivedAt: null, NOT: { id: planId } },
+        orderBy: [{ isActive: "desc" }, { displayOrder: "asc" }, { createdAt: "asc" }],
+      });
+      if (!successor) {
+        throw new WochenplanPlanDeleteLastPlanForbiddenError(planId);
+      }
+      // Clear every default flag (including the plan being deleted) before
+      // promoting the successor — otherwise the deleted row still has
+      // isDefault=true and violates WochenplanPlan_tenantId_isDefault_unique.
+      await tx.wochenplanPlan.updateMany({
+        where: { tenantId, isDefault: true, archivedAt: null },
+        data: { isDefault: false },
+      });
+      await tx.wochenplanPlan.update({
+        where: { id: successor.id },
+        data: { isDefault: true },
+      });
+    }
+
     const linkedWeekplannerPlans = await tx.weekplannerPlan.findMany({
       where: { tenantId, wochenplanPlanId: planId },
       select: { id: true },

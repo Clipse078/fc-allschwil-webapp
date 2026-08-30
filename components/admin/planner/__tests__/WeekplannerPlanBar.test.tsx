@@ -188,6 +188,30 @@ describe("WeekplannerPlanBar — hard delete", () => {
     expect(screen.getByTestId("weekplanner-plan-delete-confirm")).toBeInTheDocument();
   });
 
+  it("shows delete for inactive legacy default Wochenplan when another plan remains", () => {
+    render(
+      <WeekplannerPlanBar
+        weekParam="2026-08-25"
+        wochenplanPlans={[
+          wochenplanPlan(),
+          wochenplanPlan({
+            id: "wcp-legacy",
+            name: "Wochenplan",
+            isDefault: true,
+            isActive: false,
+          }),
+        ]}
+        weekplannerPlans={[]}
+        selectedPlanParam="wcp-legacy"
+        materializedWeekplannerPlanId={null}
+        canManage
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("weekplanner-plan-switcher"));
+    expect(screen.getByTestId("weekplanner-plan-overflow-wcp-legacy")).toBeInTheDocument();
+  });
+
   it("hard deletes a draft via DELETE API", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse({ deleted: { id: "wcp-alt", name: "Schlechtwetterplan" } }));
     vi.stubGlobal("fetch", fetchMock);

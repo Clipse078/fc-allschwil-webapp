@@ -497,7 +497,7 @@ export type TeamDetailData = {
 //
 // Grouped by calendar day. Events use PublicWochenplanEventItem (extends the
 // legacy PublicWebsiteEventItem for backward compatibility).
-// Intentionally omits: pitch/dressing-room allocation codes, board grid keys.
+// Intentionally omits: internal allocation codes, board grid keys.
 // ---------------------------------------------------------------------------
 
 /** Canonical club/team identity for public Wochenplan match/tournament cards. */
@@ -518,6 +518,25 @@ export type PublicWochenplanPitch = {
   facilityName: string | null;
 };
 
+/** Canonical dressing-room role — aligned with Infoboard DressingRoomAssignmentRole where applicable. */
+export type PublicWochenplanDressingRoomRole =
+  | "HOME"
+  | "AWAY"
+  | "TRAINING"
+  | "TOURNAMENT_PARTICIPANT";
+
+/**
+ * Structured canonical Garderobe allocation for public Wochenplan consumers.
+ * Internal facility-resource codes are intentionally omitted (same invariant as pitch).
+ */
+export type PublicWochenplanDressingRoom = {
+  name: string;
+  facilityName: string | null;
+  role: PublicWochenplanDressingRoomRole;
+  /** Participant/team label when role is TOURNAMENT_PARTICIPANT; null otherwise. */
+  participantLabel?: string | null;
+};
+
 /**
  * Discriminated public Wochenplan event — TRAINING | MATCH | TOURNAMENT.
  * Extends PublicWebsiteEventItem so legacy consumers (WeekplanTeaserRenderer)
@@ -530,6 +549,8 @@ export type PublicWochenplanEventItem = PublicWebsiteEventItem & {
   organizer?: PublicWebsiteTournamentOrganizer | null;
   participants?: PublicWebsiteTournamentParticipant[];
   pitch?: PublicWochenplanPitch | null;
+  /** Canonical Garderobe allocations; null when none exist. */
+  dressingRooms?: PublicWochenplanDressingRoom[] | null;
 };
 
 export type PublicWochenplanDay = {

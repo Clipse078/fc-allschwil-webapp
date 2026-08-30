@@ -9,12 +9,17 @@
  * logo tables or filename guessing.
  */
 
-import { resolveExternalClubLogoUrl, resolveExternalTeamLogoUrl } from "@/lib/club-directory/logo";
+import { resolveExternalClubLogoUrl } from "@/lib/club-directory/logo";
+import {
+  resolveExternalTeamLogoWithCanonicalFallback,
+} from "@/lib/club-directory/canonical-logo-resolution";
 import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 import { resolvePitchDisplay } from "@/lib/publishing/presentation/allocation-display-resolver";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import type {
   PublicWochenplanClubIdentity,
+  PublicWochenplanDressingRoom,
+  PublicWochenplanDressingRoomRole,
   PublicWochenplanEventItem,
   PublicWochenplanMatchIdentity,
   PublicWochenplanPitch,
@@ -133,6 +138,80 @@ function toPublicPitch(ref: WeekplannerResourceRef | undefined): PublicWochenpla
   };
 }
 
+function toPublicDressingRoom(
+  ref: WeekplannerResourceRef,
+  role: PublicWochenplanDressingRoomRole,
+  participantLabel: string | null = null,
+): PublicWochenplanDressingRoom {
+  return {
+    name: ref.name,
+    facilityName: meaningful(ref.facilityName),
+    role,
+    ...(role === "TOURNAMENT_PARTICIPANT" ? { participantLabel } : {}),
+  };
+}
+
+function dedupeDressingRooms(
+  rooms: readonly PublicWochenplanDressingRoom[],
+): PublicWochenplanDressingRoom[] {
+  const seen = new Set<string>();
+  const deduped: PublicWochenplanDressingRoom[] = [];
+  for (const room of rooms) {
+    const key = [
+      room.role,
+      room.name,
+      room.facilityName ?? "",
+      room.participantLabel ?? "",
+    ].join("\0");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(room);
+  }
+  return deduped;
+}
+
+function mapResourceRefsToDressingRooms(
+  refs: readonly WeekplannerResourceRef[],
+  role: PublicWochenplanDressingRoomRole,
+  participantLabel: string | null = null,
+): PublicWochenplanDressingRoom[] {
+  return refs.map((ref) => toPublicDressingRoom(ref, role, participantLabel));
+}
+
+export function mapTrainingDressingRooms(
+  item: WeekplannerTrainingItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms(
+    mapResourceRefsToDressingRooms(item.dressingRoomAllocations, "TRAINING"),
+  );
+  return rooms.length > 0 ? rooms : null;
+}
+
+export function mapMatchDressingRooms(
+  item: WeekplannerMatchItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms([
+    ...mapResourceRefsToDressingRooms(item.dressingRoomAllocations, "HOME"),
+    ...mapResourceRefsToDressingRooms(item.awayDressingRoomAllocations, "AWAY"),
+  ]);
+  return rooms.length > 0 ? rooms : null;
+}
+
+export function mapTournamentDressingRooms(
+  item: WeekplannerTournamentItem,
+): PublicWochenplanDressingRoom[] | null {
+  const rooms = dedupeDressingRooms(
+    item.participantAllocations.flatMap((participant) =>
+      mapResourceRefsToDressingRooms(
+        participant.dressingRoomAllocations,
+        "TOURNAMENT_PARTICIPANT",
+        participant.participantLabel,
+      ),
+    ),
+  );
+  return rooms.length > 0 ? rooms : null;
+}
+
 function buildOwnClubIdentity(
   team: CanonicalInfoboardTeamDisplayNameRow | null | undefined,
   tenantClubName: string,
@@ -171,6 +250,7 @@ function buildExternalClubIdentity(
 function buildExternalTeamIdentity(
   externalTeam: ExternalTeamPolicyRow | null,
   fallbackDisplayName: string | null,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>,
 ): PublicWochenplanClubIdentity {
   if (!externalTeam) {
     return {
@@ -187,7 +267,14 @@ function buildExternalTeamIdentity(
       meaningful(externalTeam.externalClub.name) ??
       meaningful(fallbackDisplayName) ??
       "",
-    logoUrl: resolveExternalTeamLogoUrl(externalTeam, externalTeam.externalClub),
+    logoUrl: resolveExternalTeamLogoWithCanonicalFallback(
+      {
+        team: externalTeam,
+        directClub: externalTeam.externalClub,
+        providerMappings: externalTeam.providerMappings,
+      },
+      canonicalLogoByProviderClubId,
+    ),
     teamId: null,
     externalClubId: null,
   };
@@ -198,6 +285,7 @@ export function buildPublicMatchIdentity(
   item: WeekplannerMatchItem,
   tenantClubName: string,
   tenantLogoUrl: string | null,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null> = new Map(),
 ): PublicWochenplanMatchIdentity {
   const mapping = policy?.matchExternalMapping ?? null;
   const eventTeam = policy?.team ?? null;
@@ -216,6 +304,7 @@ export function buildPublicMatchIdentity(
         : buildExternalTeamIdentity(
             mapping.homeExternalTeam,
             ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
+            canonicalLogoByProviderClubId,
           ),
       away: mapping.awayTeam
         ? buildOwnClubIdentity(
@@ -227,6 +316,7 @@ export function buildPublicMatchIdentity(
         : buildExternalTeamIdentity(
             mapping.awayExternalTeam,
             ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
+            canonicalLogoByProviderClubId,
           ),
     };
   }
@@ -237,7 +327,7 @@ export function buildPublicMatchIdentity(
     return {
       home: opponentClub
         ? buildExternalClubIdentity(opponentClub, item.opponentName)
-        : buildExternalTeamIdentity(null, item.opponentName),
+        : buildExternalTeamIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
       away: buildOwnClubIdentity(eventTeam, tenantClubName, tenantLogoUrl, item.teamNames[0] ?? null),
     };
   }
@@ -246,7 +336,7 @@ export function buildPublicMatchIdentity(
     home: buildOwnClubIdentity(eventTeam, tenantClubName, tenantLogoUrl, item.teamNames[0] ?? null),
     away: opponentClub
       ? buildExternalClubIdentity(opponentClub, item.opponentName)
-      : buildExternalTeamIdentity(null, item.opponentName),
+      : buildExternalTeamIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
   };
 }
 
@@ -337,6 +427,7 @@ export function mapTrainingToPublicEvent(
     ...base,
     kind: "TRAINING",
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms: mapTrainingDressingRooms(item),
   };
 }
 
@@ -346,6 +437,7 @@ export function mapMatchToPublicEvent(
   teamContext: WochenplanItemTeamContext,
   tenantClubName: string,
   tenantLogoUrl: string | null,
+  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null> = new Map(),
 ): PublicWochenplanEventItem {
   const location = resolvePitchLocation(item.pitchAllocations[0]);
   const base = toPublicWebsiteEventBase({
@@ -369,8 +461,15 @@ export function mapMatchToPublicEvent(
   return {
     ...base,
     kind: "MATCH",
-    matchIdentity: buildPublicMatchIdentity(policy, item, tenantClubName, tenantLogoUrl),
+    matchIdentity: buildPublicMatchIdentity(
+      policy,
+      item,
+      tenantClubName,
+      tenantLogoUrl,
+      canonicalLogoByProviderClubId,
+    ),
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms: mapMatchDressingRooms(item),
   };
 }
 
@@ -422,6 +521,8 @@ export function mapTournamentToPublicEvent(
     meetingTime: policy?.meetingTime ?? null,
   });
 
+  const dressingRooms = mapTournamentDressingRooms(item);
+
   if (tournament) {
     return {
       ...baseEvent,
@@ -429,6 +530,7 @@ export function mapTournamentToPublicEvent(
       organizer: toPublicOrganizer(tournament),
       participants: tournament.participants.map(toPublicParticipant),
       pitch: toPublicPitch(item.pitchAllocations[0]),
+      dressingRooms,
     };
   }
 
@@ -440,6 +542,7 @@ export function mapTournamentToPublicEvent(
       : null,
     participants: [],
     pitch: toPublicPitch(item.pitchAllocations[0]),
+    dressingRooms,
   };
 }
 
@@ -474,8 +577,10 @@ export function mapWeekplannerItemToPublic(
     tournamentByEventId: ReadonlyMap<string, TournamentDto>;
     tenantClubName: string;
     tenantLogoUrl: string | null;
+    canonicalLogoByProviderClubId?: ReadonlyMap<number, string | null>;
   },
 ): PublicWochenplanEventItem {
+  const canonicalLogoByProviderClubId = context.canonicalLogoByProviderClubId ?? new Map();
   switch (item.type) {
     case "TRAINING": {
       const policy = context.trainingPolicyBySessionId.get(item.trainingSessionId);
@@ -491,6 +596,7 @@ export function mapWeekplannerItemToPublic(
         teamContext,
         context.tenantClubName,
         context.tenantLogoUrl,
+        canonicalLogoByProviderClubId,
       );
     }
     case "TOURNAMENT": {

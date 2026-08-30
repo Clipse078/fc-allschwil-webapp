@@ -24,6 +24,10 @@ import {
   type CanonicalTrainingSessionPolicyRow,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { getActiveWochenplanPlan } from "./plan-service";
+import {
+  collectProviderClubIdsFromEventPolicies,
+  loadCanonicalClubLogoIndex,
+} from "@/lib/club-directory/canonical-logo-resolution";
 import { resolvePublicCurrentWeekWindow } from "./public-current-week";
 import { resolvePublicWeekplannerPlan } from "./public-plan-resolution";
 import {
@@ -251,12 +255,15 @@ export async function buildPublicCurrentWeekFeed(
   const timeZone = input.timeZone?.trim() || branding.timeZone;
   const weekWindow = resolvePublicCurrentWeekWindow({ timeZone, now: input.now });
 
-  const activePlan = await getActiveWochenplanPlan(input.tenantId);
+  const activeWochenplanPlan = await getActiveWochenplanPlan(input.tenantId);
   const planResolution = await resolvePublicWeekplannerPlan(
     input.tenantId,
     weekWindow.weekId,
-    activePlan,
+    activeWochenplanPlan,
   );
+  // Canonical public identity always comes from WochenplanPlan.isActive via resolution —
+  // never from WeekplannerPlan.isActive, publication.variantLabel, or legacy defaults.
+  const resolvedActivePlan = planResolution.activeWochenplanPlan;
 
   const week = await getWeekplannerWeek(
     input.tenantId,
@@ -278,6 +285,12 @@ export async function buildPublicCurrentWeekFeed(
     loadTrainingPolicyBySessionId(input.tenantId, allItems),
   ]);
 
+  const eventPolicies = [...eventPolicyByEventId.values()];
+  const canonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
+    input.tenantId,
+    collectProviderClubIdsFromEventPolicies(eventPolicies),
+  );
+
   const tournamentIds = allItems
     .filter((item) => item.type === "TOURNAMENT")
     .map((item) => item.eventId);
@@ -291,6 +304,7 @@ export async function buildPublicCurrentWeekFeed(
     tournamentByEventId,
     tenantClubName: input.tenantName,
     tenantLogoUrl: branding.logoUrl,
+    canonicalLogoByProviderClubId,
   };
 
   let teamLabel: string | null = null;
@@ -330,7 +344,7 @@ export async function buildPublicCurrentWeekFeed(
   const flatEvents = days.flatMap((day) => day.events);
   const summary = buildSummary(flatEvents, teamLabel);
 
-  const activePlanName = activePlan?.name ?? "Wochenplan";
+  const activePlanName = resolvedActivePlan?.name ?? "";
   const pub = await getWochenplanPublication(input.tenantId, weekWindow.weekId);
 
   const publication = pub?.isPublished
@@ -340,7 +354,7 @@ export async function buildPublicCurrentWeekFeed(
         variantBadge: formatWochenplanVariantBadge(pub.weekId, activePlanName),
         isPublished: pub.isPublished,
         publishedAt: pub.publishedAt,
-        activePlanId: activePlan?.id ?? null,
+        activePlanId: resolvedActivePlan?.id ?? null,
         activePlanName,
       }
     : null;
@@ -348,7 +362,7 @@ export async function buildPublicCurrentWeekFeed(
   return {
     publication,
     activePlan: {
-      id: activePlan?.id ?? "",
+      id: resolvedActivePlan?.id ?? "",
       name: activePlanName,
     },
     currentWeek: {

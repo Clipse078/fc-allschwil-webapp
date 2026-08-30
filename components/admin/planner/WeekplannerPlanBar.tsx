@@ -217,6 +217,7 @@ export function WeekplannerPlanBar({
               plan={activePlan}
               selected={viewedWochenplanPlan?.id === activePlan.id}
               canManage={canManage}
+              canDelete={false}
               onSelect={() => handleSelect(activePlan.id)}
               onDelete={() => {
                 setSwitcherOpen(false);
@@ -238,6 +239,7 @@ export function WeekplannerPlanBar({
                 plan={plan}
                 selected={viewedWochenplanPlan?.id === plan.id}
                 canManage={canManage}
+                canDelete={canManage && wochenplanPlans.length > 1}
                 onSelect={() => handleSelect(plan.id)}
                 onDelete={() => {
                   setSwitcherOpen(false);
@@ -377,6 +379,7 @@ function PlanSwitcherRow({
   plan,
   selected,
   canManage,
+  canDelete,
   onSelect,
   onDelete,
   onOverflowToggle,
@@ -385,13 +388,14 @@ function PlanSwitcherRow({
   plan: WochenplanPlanDto;
   selected: boolean;
   canManage: boolean;
+  canDelete: boolean;
   onSelect: () => void;
   onDelete: () => void;
   onOverflowToggle: (open: boolean) => void;
   overflowOpen: boolean;
 }) {
   const localOverflowRef = useRef<HTMLButtonElement>(null);
-  const showOverflow = canManage && !plan.isActive && !plan.isDefault;
+  const showOverflow = canManage && canDelete && !plan.isActive;
 
   return (
     <div className="flex items-start gap-1 rounded-md px-1 py-0.5 hover:bg-[var(--surface-2)]">

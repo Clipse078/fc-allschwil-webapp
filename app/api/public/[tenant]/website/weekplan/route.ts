@@ -45,6 +45,11 @@ import type {
 
 type RouteParams = { params: Promise<{ tenant: string }> };
 
+/** Active plan identity must reflect WochenplanPlan.isActive on every request. */
+export const dynamic = "force-dynamic";
+
+const WEEKPLAN_CACHE_CONTROL = "private, no-cache, no-store, must-revalidate";
+
 function parseLimit(value: string | null): number | null {
   if (!value) return null;
   const parsed = Number(value);
@@ -140,6 +145,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           countEvents,
           season: activeSeason,
         }),
+        { headers: { "Cache-Control": WEEKPLAN_CACHE_CONTROL } },
       );
     }
 
@@ -186,6 +192,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           teamSlug,
         },
       }),
+      { headers: { "Cache-Control": WEEKPLAN_CACHE_CONTROL } },
     );
   } catch (error) {
     console.error("[public/[tenant]/website/weekplan] GET failed:", error);
