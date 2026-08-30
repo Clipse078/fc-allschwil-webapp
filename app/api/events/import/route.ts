@@ -21,6 +21,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant context required" }, { status: 403 });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file");
 
@@ -61,47 +66,73 @@ export async function POST(req: NextRequest) {
     const teamSeasons = await prisma.teamSeason.findMany({
       where: {
         seasonId: activeSeason.id,
+        team: { tenantId },
       },
       include: {
         team: true,
       },
     });
 
-    const teamMap = new Map<string, { teamId: string; teamName: string }>();
+    type TeamSeasonCandidate = {
+      teamId: string;
+      teamSeasonId: string;
+      teamName: string;
+    };
+    const teamMap = new Map<string, TeamSeasonCandidate[]>();
+
+    function addTeamCandidate(label: string, candidate: TeamSeasonCandidate) {
+      const key = normalize(label);
+      const existing = teamMap.get(key) ?? [];
+      if (!existing.some((item) => item.teamSeasonId === candidate.teamSeasonId)) {
+        existing.push(candidate);
+      }
+      teamMap.set(key, existing);
+    }
 
     for (const ts of teamSeasons) {
-      teamMap.set(normalize(ts.team.name), {
+      const candidate = {
         teamId: ts.teamId,
+        teamSeasonId: ts.id,
         teamName: ts.team.name,
-      });
-
-      teamMap.set(normalize("FC Allschwil " + ts.team.name), {
-        teamId: ts.teamId,
-        teamName: ts.team.name,
-      });
+      };
+      addTeamCandidate(ts.team.name, candidate);
+      addTeamCandidate("FC Allschwil " + ts.team.name, candidate);
     }
 
     let created = 0;
 
     for (const event of parsedEvents) {
       let teamId: string | null = null;
+      let teamSeasonId: string | null = null;
 
       if (event.teamName) {
-        const matchedTeam = teamMap.get(normalize(event.teamName));
+        const candidates = teamMap.get(normalize(event.teamName)) ?? [];
 
-        if (!matchedTeam) {
+        if (candidates.length === 0) {
           throw new Error(
             "Team '" + event.teamName + "' existiert nicht in der aktiven Saison."
           );
         }
 
+        if (candidates.length > 1) {
+          throw new Error(
+            "Team '" + event.teamName + "' ist in der aktiven Saison nicht eindeutig."
+          );
+        }
+
+        const matchedTeam = candidates[0]!;
         teamId = matchedTeam.teamId;
+        if (event.type === "TOURNAMENT") {
+          teamSeasonId = matchedTeam.teamSeasonId;
+        }
       }
 
       await prisma.event.create({
         data: {
           seasonId: activeSeason.id,
           teamId,
+          teamSeasonId,
+          tenantId,
           type: event.type,
           source: EventSource.CSV_EXCEL_IMPORT,
           status: EventStatus.SCHEDULED,
