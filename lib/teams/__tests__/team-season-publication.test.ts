@@ -34,13 +34,10 @@ function teamSeason(
 beforeEach(() => {
   vi.clearAllMocks();
   findUnique.mockResolvedValue(teamSeason() as never);
-  update.mockImplementation(async (args) => ({
-    showNextMatch:
-      (args.data as { showNextMatch?: boolean }).showNextMatch ?? true,
-    showNextTournament:
-      (args.data as { showNextTournament?: boolean }).showNextTournament ??
-      false,
-  }) as never);
+  update.mockResolvedValue({
+    showNextMatch: false,
+    showNextTournament: false,
+  } as never);
 });
 
 describe("updateTeamSeasonPublication", () => {

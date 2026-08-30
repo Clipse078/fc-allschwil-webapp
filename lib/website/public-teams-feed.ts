@@ -219,7 +219,13 @@ export async function getPublicTeams(
     return a.name.localeCompare(b.name, "de");
   });
 
-  return mapped.map(({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => item);
+  return mapped.map(
+    ({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => {
+      void _o;
+      void _t;
+      return item;
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------

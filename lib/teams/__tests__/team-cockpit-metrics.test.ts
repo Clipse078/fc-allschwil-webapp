@@ -34,6 +34,11 @@ function makeTeamDetail(overrides: Partial<TeamDetailData> = {}): TeamDetailData
     compactName: "Test",
     currentTeamSeasonId: "ts-current",
     currentParticipationType: "COMPETITION",
+    currentSeasonPublication: {
+      seasonName: "Saison 2025/26",
+      showNextMatch: true,
+      showNextTournament: false,
+    },
     currentSeasonOrgUnit: { id: "ou-1", name: "Junioren", key: "junioren", type: "DIVISION" },
     competition: { id: "comp-1", name: "2. Liga", shortName: "2L" },
     providerMapping: null,
@@ -48,6 +53,8 @@ function makeTeamDetail(overrides: Partial<TeamDetailData> = {}): TeamDetailData
         infoboardVisible: true,
         squadWebsiteVisible: true,
         trainerTeamWebsiteVisible: true,
+        showNextMatch: true,
+        showNextTournament: false,
         season: {
           id: "season-1",
           key: "2025-2026",
