@@ -24,12 +24,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   tenantFindFirst: vi.fn(),
   teamFindMany: vi.fn(),
+  teamExternalMappingFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     tenant: { findFirst: mocks.tenantFindFirst },
     team: { findMany: mocks.teamFindMany },
+    teamExternalMapping: { findMany: mocks.teamExternalMappingFindMany },
   },
 }));
 
@@ -69,6 +71,7 @@ function makeTeamRow(overrides: Record<string, unknown> = {}) {
     sortOrder: 0,
     teamSeasons: [
       {
+        id: "team-season-1",
         displayName: "1. Mannschaft 2025/26",
         shortName: "1M",
         season: { key: "2025-26", name: "Saison 2025/26" },
@@ -97,6 +100,7 @@ describe("GET /api/public/[tenant]/website/teams — OrgUnit grouping", () => {
     vi.clearAllMocks();
     mocks.tenantFindFirst.mockResolvedValue(ACTIVE_TENANT);
     mocks.teamFindMany.mockResolvedValue([]);
+    mocks.teamExternalMappingFindMany.mockResolvedValue([]);
   });
 
   // 1. Basic happy path

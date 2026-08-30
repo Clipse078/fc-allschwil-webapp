@@ -49,9 +49,9 @@ import {
 } from "@/lib/website/public-team-matches-mapper";
 import {
   mapPublicTeamStandings,
-  type PublicTeamStandingsExternalTeamRecord,
   type PublicTeamStandingsIdentityContext,
 } from "@/lib/website/public-team-standings-mapper";
+import { loadTeamSeasonHasStandingsForList } from "@/lib/teams/team-season-standings-capability";
 import { resolvePublicTeamNextEvent } from "@/lib/website/public-team-next-event";
 import { toPublicWebsiteTournamentFromDto } from "@/lib/website/public-tournaments-mapper";
 import type {
@@ -83,6 +83,7 @@ type OrgUnitRow = {
 };
 
 type TeamSeasonRow = {
+  id: string;
   displayName: string;
   shortName: string | null;
   season: { key: string; name: string };
@@ -155,6 +156,7 @@ export async function getPublicTeams(
         orderBy: { createdAt: "desc" },
         take: 1,
         select: {
+          id: true,
           displayName: true,
           shortName: true,
           season: { select: { key: true, name: true } },
@@ -205,10 +207,21 @@ export async function getPublicTeams(
       shortName: activeSeason?.shortName ?? null,
       season: activeSeason?.season ?? null,
       orgUnit,
+      _teamSeasonId: activeSeason?.id ?? null,
+      _seasonKey: activeSeason?.season.key ?? null,
       // Keep _sortKey for application-level secondary sort; dropped before return
       _orgUnitSortOrder: orgUnit?.sortOrder ?? Number.MAX_SAFE_INTEGER,
       _teamSortOrder: team.sortOrder,
     };
+  });
+
+  const standingsCapabilityByTeamSeasonId = await loadTeamSeasonHasStandingsForList({
+    tenantId: input.tenantId,
+    entries: mapped.flatMap((team) =>
+      team._teamSeasonId && team._seasonKey
+        ? [{ teamSeasonId: team._teamSeasonId, seasonKey: team._seasonKey }]
+        : [],
+    ),
   });
 
   // Sort by OrgUnit.sortOrder (canonical grouping order), then team.sortOrder, then name
@@ -223,10 +236,22 @@ export async function getPublicTeams(
   });
 
   return mapped.map(
-    ({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => {
+    ({
+      _orgUnitSortOrder: _o,
+      _teamSortOrder: _t,
+      _teamSeasonId,
+      _seasonKey,
+      ...item
+    }) => {
       void _o;
       void _t;
-      return item;
+      void _seasonKey;
+      return {
+        ...item,
+        hasStandings: _teamSeasonId
+          ? (standingsCapabilityByTeamSeasonId.get(_teamSeasonId) ?? false)
+          : false,
+      };
     },
   );
 }
@@ -653,24 +678,12 @@ export async function getPublicTeamDetail(
               })),
             });
 
-          const externalTeamByProviderId = new Map<
-            number,
-            PublicTeamStandingsExternalTeamRecord
-          >();
-
-          for (const [providerTeamId, enrichment] of standingsEnrichmentByProviderTeamId) {
-            externalTeamByProviderId.set(providerTeamId, {
-              shortName: enrichment.shortName,
-              logoUrl: enrichment.logoUrl,
-            });
-          }
-
           const standingsIdentityContext: PublicTeamStandingsIdentityContext = {
             currentExternalTeamId: mapping.externalTeamId,
             currentTeamName: teamSeason.displayName,
             currentTeamShortName: teamSeason.shortName,
             tenantLogoUrl: tenant?.logoUrl ?? null,
-            externalTeamByProviderId,
+            enrichmentByProviderTeamId: standingsEnrichmentByProviderTeamId,
           };
 
           standings = mapPublicTeamStandings(

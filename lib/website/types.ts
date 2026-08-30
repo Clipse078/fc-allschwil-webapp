@@ -265,6 +265,15 @@ export type PublicTeamListItem = {
    * Do NOT infer grouping from `category` or team name patterns.
    */
   orgUnit: PublicTeamOrgUnit | null;
+  /**
+   * Stable metadata: the active TeamSeason is configured for league standings
+   * via a season-aligned SFV mapping with a provider league assignment.
+   *
+   * Derived from canonical provider configuration — never from a live standings
+   * fetch. Teams remain selectable when upstream standings are temporarily
+   * unavailable.
+   */
+  hasStandings: boolean;
 };
 
 export type TeamsData = {
