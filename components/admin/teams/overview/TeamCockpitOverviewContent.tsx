@@ -58,6 +58,11 @@ type Team = {
   currentTeamSeasonId?: string | null;
   currentParticipationType?: string | null;
   currentSeasonOrgUnit?: OrgUnitOption | null;
+  currentSeasonPublication?: {
+    seasonName: string;
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  } | null;
 };
 
 type Props = {

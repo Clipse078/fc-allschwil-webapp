@@ -38,6 +38,17 @@ function toPublicParticipant(
   };
 }
 
+function withPublicTournamentIdentity(
+  event: Omit<PublicWebsiteTournamentItem, "organizer" | "participants">,
+  tournament: TournamentDto,
+): PublicWebsiteTournamentItem {
+  return {
+    ...event,
+    organizer: toPublicOrganizer(tournament),
+    participants: tournament.participants.map(toPublicParticipant),
+  };
+}
+
 /**
  * Enriches a public event feed row with canonical tournament club identity.
  */
@@ -45,11 +56,42 @@ export function toPublicWebsiteTournament(
   event: PublicEventItem,
   tournament: TournamentDto,
 ): PublicWebsiteTournamentItem {
-  return {
-    ...toPublicWebsiteEvent(event),
-    organizer: toPublicOrganizer(tournament),
-    participants: tournament.participants.map(toPublicParticipant),
-  };
+  return withPublicTournamentIdentity(toPublicWebsiteEvent(event), tournament);
+}
+
+/**
+ * Builds the same public tournament renderer DTO directly from the canonical
+ * Tournament service DTO. Used when a caller already resolved one tournament
+ * through the TeamSeason ownership query rather than the general event feed.
+ */
+export function toPublicWebsiteTournamentFromDto(
+  tournament: TournamentDto,
+): PublicWebsiteTournamentItem {
+  return withPublicTournamentIdentity(
+    {
+      id: tournament.id,
+      title: tournament.title,
+      type: "TOURNAMENT",
+      status: tournament.status,
+      startAt: new Date(tournament.startAt),
+      endAt: tournament.endAt ? new Date(tournament.endAt) : null,
+      location: tournament.location,
+      description: tournament.description,
+      opponentName: null,
+      organizerName: tournament.organizerName,
+      competitionLabel: tournament.competitionLabel,
+      homeAway: tournament.homeAway,
+      resultLabel: tournament.resultLabel,
+      meetingTime: tournament.meetingTime
+        ? new Date(tournament.meetingTime)
+        : null,
+      team: tournament.team,
+      season: tournament.season
+        ? { key: tournament.season.key, name: tournament.season.name }
+        : null,
+    },
+    tournament,
+  );
 }
 
 /**

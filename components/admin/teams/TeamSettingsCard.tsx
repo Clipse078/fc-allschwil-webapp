@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SectionCard } from "@/components/ui/page";
+import { SwitchToggle } from "@/components/ui/SwitchToggle";
 import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 
 type OrgUnitOption = {
@@ -77,6 +78,11 @@ type Props = {
    * Null when no primary OrgUnit is assigned for the current season.
    */
   currentSeasonOrgUnit: OrgUnitOption | null;
+  currentSeasonPublication: {
+    seasonName: string;
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  } | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
   onCancelEdit?: () => void;
@@ -132,6 +138,7 @@ export default function TeamSettingsCard({
   currentTeamSeasonId,
   currentParticipationType,
   currentSeasonOrgUnit,
+  currentSeasonPublication,
   canManage,
   onSaved,
   onCancelEdit,
@@ -152,6 +159,27 @@ export default function TeamSettingsCard({
   const [seasonOrgUnitSaving, setSeasonOrgUnitSaving] = useState(false);
   const [seasonOrgUnitMessage, setSeasonOrgUnitMessage] = useState<string | null>(null);
   const [seasonOrgUnitError, setSeasonOrgUnitError] = useState<string | null>(null);
+
+  const [showNextMatch, setShowNextMatch] = useState(
+    currentSeasonPublication?.showNextMatch ?? true,
+  );
+  const [showNextTournament, setShowNextTournament] = useState(
+    currentSeasonPublication?.showNextTournament ?? false,
+  );
+  const [publicationSaving, setPublicationSaving] = useState<
+    "showNextMatch" | "showNextTournament" | null
+  >(null);
+  const [publicationMessage, setPublicationMessage] = useState<string | null>(null);
+  const [publicationError, setPublicationError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setShowNextMatch(currentSeasonPublication?.showNextMatch ?? true);
+    setShowNextTournament(
+      currentSeasonPublication?.showNextTournament ?? false,
+    );
+    setPublicationMessage(null);
+    setPublicationError(null);
+  }, [currentTeamSeasonId, currentSeasonPublication]);
 
   const genderGroupOptions =
     form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
@@ -269,6 +297,55 @@ export default function TeamSettingsCard({
       );
     } finally {
       setSeasonOrgUnitSaving(false);
+    }
+  }
+
+  async function handlePublicationChange(
+    field: "showNextMatch" | "showNextTournament",
+    nextValue: boolean,
+  ) {
+    if (!canManage || !currentTeamSeasonId || !currentSeasonPublication) {
+      return;
+    }
+
+    const previousValue =
+      field === "showNextMatch" ? showNextMatch : showNextTournament;
+    const setValue =
+      field === "showNextMatch" ? setShowNextMatch : setShowNextTournament;
+
+    setValue(nextValue);
+    setPublicationSaving(field);
+    setPublicationMessage(null);
+    setPublicationError(null);
+
+    try {
+      const response = await fetch(
+        `/api/teams/${form.id}/team-seasons/${currentTeamSeasonId}/publication`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ [field]: nextValue }),
+        },
+      );
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ?? "Website-Veröffentlichung konnte nicht gespeichert werden.",
+        );
+      }
+
+      setPublicationMessage(
+        data?.message ?? "Website-Veröffentlichung wurde gespeichert.",
+      );
+      router.refresh();
+    } catch (err) {
+      setValue(previousValue);
+      setPublicationError(
+        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.",
+      );
+    } finally {
+      setPublicationSaving(null);
     }
   }
 
@@ -688,6 +765,60 @@ export default function TeamSettingsCard({
                 )}
               </p>
             )}
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Website-Veröffentlichung"
+          description={
+            currentSeasonPublication
+              ? `Einstellungen für ${currentSeasonPublication.seasonName}. Wenn beide aktiviert sind, wird zuerst das nächste Spiel angezeigt. Ist kein kommendes Spiel vorhanden, wird das nächste Turnier angezeigt.`
+              : "Keine aktuelle Saison — Veröffentlichung kann erst nach Saisonzuordnung gepflegt werden."
+          }
+        >
+          <div
+            className="space-y-3 md:col-span-2"
+            data-testid="team-season-next-event-controls"
+          >
+            <SwitchToggle
+              id="show-next-match"
+              label="Nächstes Spiel anzeigen"
+              checked={showNextMatch}
+              onChange={(checked) =>
+                handlePublicationChange("showNextMatch", checked)
+              }
+              disabled={
+                !canManage ||
+                !currentSeasonPublication ||
+                publicationSaving !== null
+              }
+            />
+            <SwitchToggle
+              id="show-next-tournament"
+              label="Nächstes Turnier anzeigen"
+              checked={showNextTournament}
+              onChange={(checked) =>
+                handlePublicationChange("showNextTournament", checked)
+              }
+              disabled={
+                !canManage ||
+                !currentSeasonPublication ||
+                publicationSaving !== null
+              }
+            />
+            {publicationSaving ? (
+              <p className="text-xs text-[var(--muted)]">Speichern...</p>
+            ) : null}
+            {publicationMessage ? (
+              <p className="text-xs font-medium text-emerald-600">
+                {publicationMessage}
+              </p>
+            ) : null}
+            {publicationError ? (
+              <p className="text-xs font-medium text-[var(--sce-danger)]">
+                {publicationError}
+              </p>
+            ) : null}
           </div>
         </FormSection>
 

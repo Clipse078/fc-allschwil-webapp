@@ -687,6 +687,128 @@ export async function setTeamSeasonOrgUnit(
   return { ok: true, orgUnit };
 }
 
+// ---------------------------------------------------------------------------
+// TeamSeason public next-event presentation settings
+// ---------------------------------------------------------------------------
+
+export type UpdateTeamSeasonPublicationInput = {
+  /** Tenant context. Always sourced from the trusted session. */
+  tenantId: string;
+  /** Permanent Team identity that must own teamSeasonId. */
+  teamId: string;
+  /** Seasonal configuration record to update. */
+  teamSeasonId: string;
+  showNextMatch?: boolean;
+  showNextTournament?: boolean;
+};
+
+export type TeamSeasonPublicationSettings = {
+  showNextMatch: boolean;
+  showNextTournament: boolean;
+};
+
+export type UpdateTeamSeasonPublicationResult =
+  | {
+      ok: true;
+      before: TeamSeasonPublicationSettings;
+      publication: TeamSeasonPublicationSettings;
+    }
+  | {
+      ok: false;
+      code:
+        | "TEAM_SEASON_NOT_FOUND"
+        | "TEAM_SEASON_TENANT_MISMATCH"
+        | "NO_FIELDS_SUPPLIED"
+        | "UNKNOWN_ERROR";
+      message: string;
+    };
+
+/**
+ * Updates only explicitly supplied TeamSeason publication controls.
+ *
+ * The owning Team and its tenant are validated before writing. These flags
+ * affect only the public team page's resolved next-event position; canonical
+ * match and tournament records remain untouched.
+ */
+export async function updateTeamSeasonPublication(
+  input: UpdateTeamSeasonPublicationInput,
+): Promise<UpdateTeamSeasonPublicationResult> {
+  const teamSeason = await prisma.teamSeason.findUnique({
+    where: { id: input.teamSeasonId },
+    select: {
+      teamId: true,
+      showNextMatch: true,
+      showNextTournament: true,
+      team: { select: { tenantId: true } },
+    },
+  });
+
+  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_NOT_FOUND",
+      message: "Team-Saison nicht gefunden.",
+    };
+  }
+
+  if (teamSeason.team.tenantId !== input.tenantId) {
+    return {
+      ok: false,
+      code: "TEAM_SEASON_TENANT_MISMATCH",
+      message: "Die Team-Saison gehört nicht zum aktiven Mandanten.",
+    };
+  }
+
+  const data: {
+    showNextMatch?: boolean;
+    showNextTournament?: boolean;
+  } = {};
+
+  if (input.showNextMatch !== undefined) {
+    data.showNextMatch = input.showNextMatch;
+  }
+  if (input.showNextTournament !== undefined) {
+    data.showNextTournament = input.showNextTournament;
+  }
+
+  if (Object.keys(data).length === 0) {
+    return {
+      ok: false,
+      code: "NO_FIELDS_SUPPLIED",
+      message: "Mindestens eine Veröffentlichungseinstellung ist erforderlich.",
+    };
+  }
+
+  try {
+    const publication = await prisma.teamSeason.update({
+      where: { id: input.teamSeasonId },
+      data,
+      select: {
+        showNextMatch: true,
+        showNextTournament: true,
+      },
+    });
+
+    return {
+      ok: true,
+      before: {
+        showNextMatch: teamSeason.showNextMatch,
+        showNextTournament: teamSeason.showNextTournament,
+      },
+      publication,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      code: "UNKNOWN_ERROR",
+      message:
+        error instanceof Error
+          ? error.message
+          : "Veröffentlichungseinstellungen konnten nicht gespeichert werden.",
+    };
+  }
+}
+
 /**
  * Validates that a TeamExternalMapping's teamSeasonId is consistent with
  * its teamId.

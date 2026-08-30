@@ -428,6 +428,22 @@ export type PublicTeamStandings = {
   rows: PublicTeamStandingRow[];
 };
 
+export type PublicTeamPublication = {
+  showNextMatch: boolean;
+  showNextTournament: boolean;
+};
+
+export type PublicTeamNextEvent =
+  | {
+      type: "MATCH";
+      match: PublicTeamMatch;
+    }
+  | {
+      type: "TOURNAMENT";
+      tournament: PublicWebsiteTournamentItem;
+    }
+  | null;
+
 // ---------------------------------------------------------------------------
 // Public team detail — full team shape
 //
@@ -471,6 +487,8 @@ export type PublicTeamDetail = {
    * Ordered by startTime ascending.
    */
   training: PublicTeamTrainingSession[];
+  /** Seasonal eligibility controls for the single public team-page next-event position. */
+  publication: PublicTeamPublication;
   /**
    * Next website-visible MATCH fixtures for the current team season.
    * Includes home and away fixtures, ordered by startAt ascending (max 5).
@@ -486,6 +504,10 @@ export type PublicTeamDetail = {
    * Null when no SFV mapping exists, SFV is disabled, or provider data is unavailable.
    */
   standings: PublicTeamStandings | null;
+  /** Canonical next website-visible tournament owned by this TeamSeason. */
+  nextTournament: PublicWebsiteTournamentItem | null;
+  /** Resolved single next-event position. Match has configured priority. */
+  nextEvent: PublicTeamNextEvent;
 };
 
 export type TeamDetailData = {
