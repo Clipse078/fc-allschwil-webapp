@@ -52,12 +52,14 @@ describe("mapPublicTeamStandings", () => {
       currentTeamName: "Own Team",
       currentTeamShortName: "OWN",
       tenantLogoUrl: "https://cdn.example.com/tenant.png",
-      externalTeamByProviderId: new Map([
+      enrichmentByProviderTeamId: new Map([
         [
           200,
           {
+            canonicalClubId: "club-opponent",
             shortName: "OPP",
             logoUrl: "https://cdn.example.com/opponent.png",
+            resolutionSource: "exact_name_match",
           },
         ],
       ]),
@@ -84,7 +86,7 @@ describe("mapPublicTeamStandings", () => {
       currentTeamName: "Own Team",
       currentTeamShortName: "OWN",
       tenantLogoUrl: null,
-      externalTeamByProviderId: new Map(),
+      enrichmentByProviderTeamId: new Map(),
     });
 
     expect(mapped.rows.filter((row) => row.team.isCurrentTeam)).toHaveLength(1);
@@ -99,7 +101,7 @@ describe("mapPublicTeamStandings", () => {
       currentTeamName: "Own Team",
       currentTeamShortName: "OWN",
       tenantLogoUrl: "https://cdn.example.com/tenant.png",
-      externalTeamByProviderId: new Map(),
+      enrichmentByProviderTeamId: new Map(),
     });
 
     expect(
@@ -107,18 +109,20 @@ describe("mapPublicTeamStandings", () => {
     ).toBe("https://cdn.example.com/tenant.png");
   });
 
-  it("reuses external logo resolution for opponents", () => {
+  it("reuses canonical enrichment for opponents", () => {
     const mapped = mapPublicTeamStandings(TABLE, {
       currentExternalTeamId: 100,
       currentTeamName: "Own Team",
       currentTeamShortName: "OWN",
       tenantLogoUrl: "https://cdn.example.com/tenant.png",
-      externalTeamByProviderId: new Map([
+      enrichmentByProviderTeamId: new Map([
         [
           200,
           {
+            canonicalClubId: "club-opponent",
             shortName: "OPP",
             logoUrl: "https://cdn.example.com/opponent.png",
+            resolutionSource: "exact_name_match",
           },
         ],
       ]),
@@ -136,7 +140,7 @@ describe("mapPublicTeamStandings", () => {
       currentTeamName: "Own Team",
       currentTeamShortName: null,
       tenantLogoUrl: null,
-      externalTeamByProviderId: new Map(),
+      enrichmentByProviderTeamId: new Map(),
     });
 
     expect(mapped.rows.every((row) => row.team.logoUrl === null)).toBe(true);

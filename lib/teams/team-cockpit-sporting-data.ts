@@ -31,6 +31,7 @@ import {
   type StandingsClubEnrichment,
   type StandingsClubEnrichmentDatabase,
 } from "@/lib/club-directory/standings-club-enrichment";
+import { presentStandingsRows } from "@/lib/sporting-data/standings-row-presentation";
 import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
 
 export const TEAM_COCKPIT_NEXT_MATCHES_DEFAULT_LIMIT = 5;
@@ -299,37 +300,12 @@ export async function getTeamCockpitSportingData(
 
         standings = {
           competition: standingsCompetitionDisplay,
-          rows: standingsTable.rows.map((row) => {
-            const isCurrentTeam =
-              row.externalTeamId === input.sfvMapping!.externalTeamId;
-            const enrichment = standingsEnrichmentByProviderTeamId.get(
-              row.externalTeamId,
-            );
-
-            return {
-              position: row.position,
-              teamName: row.teamName,
-              shortName: isCurrentTeam
-                ? input.teamShortName ?? row.shortName
-                : enrichment?.shortName ?? row.shortName,
-              isCurrentTeam,
-              logoUrl: resolveClubIdentityLogoUrl(
-                {
-                  isOwnTeam: isCurrentTeam,
-                  externalLogoUrl: enrichment?.logoUrl ?? null,
-                },
-                input.tenantLogoUrl,
-              ),
-              played: row.played,
-              won: row.won,
-              drawn: row.drawn,
-              lost: row.lost,
-              goalsFor: row.goalsFor,
-              goalsAgainst: row.goalsAgainst,
-              goalDifference: row.goalsFor - row.goalsAgainst,
-              points: row.points,
-              penaltyPoints: row.penaltyPoints,
-            };
+          rows: presentStandingsRows({
+            rows: standingsTable.rows,
+            currentExternalTeamId: input.sfvMapping.externalTeamId,
+            currentTeamShortName: input.teamShortName ?? null,
+            tenantLogoUrl: input.tenantLogoUrl ?? null,
+            enrichmentByProviderTeamId: standingsEnrichmentByProviderTeamId,
           }),
         };
       }
@@ -381,7 +357,7 @@ const currentSeasonSfvMappingSelect = {
   provider: true,
 } as const;
 
-function mapCurrentSeasonSfvMapping(
+export function mapCurrentSeasonSfvMapping(
   mapping: {
     externalTeamId: number;
     externalSeasonId: number;
