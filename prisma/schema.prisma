@@ -429,6 +429,26 @@ enum TeamSeasonStatus {
   ARCHIVED
 }
 
+/// Canonical delivery destinations for season-scoped Team publication.
+/// MOBILE_APP is intentionally modeled before a Mobile consumer exists.
+enum TeamPublicationChannel {
+  WEBSITE
+  MOBILE_APP
+  INFOBOARD
+}
+
+/// Canonical TeamSeason content concepts. Overall publication is represented
+/// by TeamSeasonPublicationChannel, not by a synthetic TEAM_PAGE content key.
+enum TeamPublicationContent {
+  TRAINING_TIMES
+  NEXT_MATCH
+  NEXT_TOURNAMENT
+  TRAINER_TEAM
+  SQUAD
+  TEAM_PHOTO
+  STANDINGS
+}
+
 // ---------------------------------------------------------------------------
 // ParticipationType — canonical classification of how a TeamSeason participates
 // in a given season.
@@ -1766,6 +1786,9 @@ model TeamSeason {
   participationResponses ParticipationResponse[] @relation("TeamSeasonParticipationResponses")
   // TEAM-PUBLIC-NEXT-EVENT-01A: canonical owning TeamSeason for tournament Events.
   tournamentEvents        Event[]                 @relation("TournamentTeamSeason")
+  // TEAM-CHANNEL-PUBLICATION-01B: canonical season-scoped channel/content settings.
+  publicationChannels     TeamSeasonPublicationChannel[]
+  publicationContents     TeamSeasonPublicationContent[]
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -1773,6 +1796,41 @@ model TeamSeason {
   @@index([participationType])
   @@index([squadWebsiteVisible])
   @@index([trainerTeamWebsiteVisible])
+}
+
+/// Season-scoped channel master. Tenant ownership is resolved through
+/// TeamSeason -> Team -> tenantId; tenantId is intentionally not duplicated.
+model TeamSeasonPublicationChannel {
+  id           String                 @id @default(cuid())
+  teamSeasonId String
+  channel      TeamPublicationChannel
+  enabled      Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  teamSeason TeamSeason @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([teamSeasonId, channel])
+  @@index([teamSeasonId])
+  @@index([channel, enabled])
+}
+
+/// Season-scoped content eligibility for one delivery channel. Content
+/// eligibility remains independent from whether publishable data exists.
+model TeamSeasonPublicationContent {
+  id           String                 @id @default(cuid())
+  teamSeasonId String
+  channel      TeamPublicationChannel
+  content      TeamPublicationContent
+  enabled      Boolean                @default(false)
+  createdAt    DateTime               @default(now())
+  updatedAt    DateTime               @updatedAt
+
+  teamSeason TeamSeason @relation(fields: [teamSeasonId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([teamSeasonId, channel, content])
+  @@index([teamSeasonId, channel])
+  @@index([channel, content, enabled])
 }
 
 // ---------------------------------------------------------------------------
