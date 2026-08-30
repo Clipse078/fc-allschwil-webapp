@@ -13,7 +13,7 @@ import { resolveCurrentSeasonSfvMapping } from "@/lib/teams/team-competition-dis
 export type EffectiveTeamStandingsMapping = {
   readonly externalTeamId: number;
   readonly externalSeasonId: number;
-  readonly providerLeagueId: number | null;
+  readonly providerLeagueId: number;
   readonly providerLeagueName: string | null;
   readonly providerTeamName: string | null;
   readonly lastSyncedAt: Date;
@@ -65,7 +65,10 @@ export function resolveEffectiveTeamStandingsMapping(
     mapping.provider !== SFV_PROVIDER ||
     !mapping.providerIsActive ||
     !isPositiveInteger(mapping.externalTeamId) ||
-    !isPositiveInteger(mapping.externalSeasonId)
+    !isPositiveInteger(mapping.externalSeasonId) ||
+    mapping.providerLeagueId == null ||
+    !isPositiveInteger(mapping.providerLeagueId) ||
+    !mapping.providerLeagueName?.trim()
   ) {
     return null;
   }
@@ -92,15 +95,7 @@ export function resolveEffectiveTeamStandingsMapping(
 export function isEffectiveMappingStandingsCapable(
   mapping: EffectiveTeamStandingsMapping | null | undefined,
 ): boolean {
-  if (!mapping) {
-    return false;
-  }
-
-  return (
-    mapping.providerLeagueId != null &&
-    isPositiveInteger(mapping.providerLeagueId) &&
-    Boolean(mapping.providerLeagueName?.trim())
-  );
+  return mapping != null;
 }
 
 export async function loadEffectiveTeamStandingsMapping(input: {
