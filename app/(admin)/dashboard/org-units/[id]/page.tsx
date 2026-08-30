@@ -433,7 +433,7 @@ export default async function OrgUnitDetailPage({ params }: PageProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-semibold text-[var(--foreground)]">
-                        {activeSeason?.displayName ?? team.name}
+                        {team.name}
                       </p>
                       {activeSeason ? (
                         <p className="text-xs text-[var(--muted)]">

@@ -59,6 +59,7 @@ const PUBLIC_TRAINING_POLICY_SELECT = {
   status: true,
   teamSeason: {
     select: {
+      displayName: true,
       season: { select: { key: true } },
       team: {
         select: {

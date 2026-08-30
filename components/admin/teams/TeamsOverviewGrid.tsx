@@ -231,8 +231,7 @@ export default function TeamsOverviewGrid({
               // TEAM-IDENTITY-01: canonical long-name fallback — prefer the
               // value already resolved by getTeamsListData; fall back inline
               // for callers that don't yet supply it (e.g. older tests).
-              const displayName =
-                team.displayName ?? team.activeSeason?.displayName ?? team.name;
+              const displayName = team.displayName ?? team.name;
               const compactName =
                 team.compactName ?? team.shortName ?? null;
 

@@ -39,6 +39,7 @@ import type {
   CanonicalInfoboardTeamDisplayNameRow,
   CanonicalTrainingSessionPolicyRow,
 } from "@/lib/publishing/infoboard/canonical-source-loader";
+import { resolveLongTeamName } from "@/lib/teams/team-naming";
 import { getIsoWeekNumber } from "@/lib/weekplanner/date";
 
 export type WochenplanTeamAssociation = {
@@ -60,11 +61,20 @@ function meaningful(value: string | null | undefined): string | null {
 
 function toTeamAssociation(
   team: CanonicalInfoboardTeamDisplayNameRow & { id: string; slug: string },
+  teamSeasonDisplayName?: string | null,
 ): WochenplanTeamAssociation {
+  const teamName =
+    resolveLongTeamName({
+      teamName: team.name,
+      teamShortName: team.shortName,
+      teamAlternativeName: team.alternativeName,
+      teamSeasonDisplayName,
+    }) ?? team.name;
+
   return {
     teamId: team.id,
     teamSlug: team.slug,
-    teamName: team.name,
+    teamName,
   };
 }
 
@@ -77,6 +87,7 @@ export function resolveTrainingTeamContext(
   }
   const association = toTeamAssociation(
     team as CanonicalInfoboardTeamDisplayNameRow & { id: string; slug: string },
+    policy?.teamSeason.displayName,
   );
   return { primaryTeam: association, allTeams: [association] };
 }
@@ -217,9 +228,20 @@ function buildOwnClubIdentity(
   tenantClubName: string,
   tenantLogoUrl: string | null,
   fallbackDisplayName: string | null,
+  teamSeasonDisplayName?: string | null,
 ): PublicWochenplanClubIdentity {
+  const resolvedTeamName = team
+    ? resolveLongTeamName({
+        teamName: team.name,
+        teamShortName: team.shortName,
+        teamAlternativeName: team.alternativeName,
+        teamSeasonDisplayName,
+      })
+    : null;
+
   return {
     displayName:
+      meaningful(resolvedTeamName) ??
       meaningful(team?.name) ??
       meaningful(fallbackDisplayName) ??
       tenantClubName,
