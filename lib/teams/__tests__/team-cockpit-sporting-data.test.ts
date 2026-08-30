@@ -20,6 +20,16 @@ vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
   fetchTeamStandingsForMapping: vi.fn(),
 }));
 
+vi.mock("@/lib/club-directory/canonical-logo-resolution", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/club-directory/canonical-logo-resolution")>(
+    "@/lib/club-directory/canonical-logo-resolution",
+  );
+  return {
+    ...actual,
+    loadCanonicalClubLogoIndex: vi.fn().mockResolvedValue(new Map()),
+  };
+});
+
 vi.mock("../team-match-query-service", async () => {
   const actual = await vi.importActual<typeof import("../team-match-query-service")>(
     "../team-match-query-service",
@@ -745,26 +755,42 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
         },
       ],
     });
-    const findMany = vi.fn().mockResolvedValue([
+    const externalTeamFindMany = vi.fn().mockResolvedValue([
       {
         shortName: "Override",
         logoUrl: "/team-override.svg",
-        providerMappings: [{ providerTeamId: 200 }],
-        externalClub: { logoUrl: "/club-ignored.svg" },
+        externalClub: {
+          id: "club-override",
+          name: "External Team Override",
+          shortName: null,
+          logoUrl: "/club-ignored.svg",
+        },
+        providerMappings: [{ providerTeamId: 200, providerClubId: null }],
       },
       {
         shortName: "Fallback",
         logoUrl: null,
-        providerMappings: [{ providerTeamId: 300 }],
-        externalClub: { logoUrl: "/club-fallback.svg" },
+        externalClub: {
+          id: "club-fallback",
+          name: "External Club Fallback",
+          shortName: null,
+          logoUrl: "/club-fallback.svg",
+        },
+        providerMappings: [{ providerTeamId: 300, providerClubId: null }],
       },
       {
         shortName: null,
         logoUrl: null,
-        providerMappings: [{ providerTeamId: 400 }],
-        externalClub: { logoUrl: null },
+        externalClub: {
+          id: "club-missing",
+          name: "External Missing",
+          shortName: null,
+          logoUrl: null,
+        },
+        providerMappings: [{ providerTeamId: 400, providerClubId: null }],
       },
     ]);
+    const externalClubFindMany = vi.fn().mockResolvedValue([]);
 
     const data = await getTeamCockpitSportingData({
       tenantId: TENANT_ID,
@@ -781,19 +807,22 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
         providerLeagueName: "2. Liga interregional",
       },
       database: {} as TeamMatchQueryDatabase,
-      identityDatabase: { externalTeam: { findMany } },
+      identityDatabase: {
+        externalTeam: { findMany: externalTeamFindMany },
+        externalClub: { findMany: externalClubFindMany },
+      },
       now: NOW,
     });
 
-    expect(findMany).toHaveBeenCalledTimes(1);
-    expect(findMany).toHaveBeenCalledWith(
+    expect(externalTeamFindMany).toHaveBeenCalledTimes(1);
+    expect(externalTeamFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           tenantId: TENANT_ID,
           providerMappings: {
             some: {
               provider: "SFV",
-              providerTeamId: { in: [200, 300, 400] },
+              providerTeamId: { in: [200, 123, 300, 400] },
             },
           },
         },
@@ -849,7 +878,10 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
         },
       ],
     });
-    const findMany = vi.fn().mockRejectedValue(new Error("club directory unavailable"));
+    const externalTeamFindMany = vi
+      .fn()
+      .mockRejectedValue(new Error("club directory unavailable"));
+    const externalClubFindMany = vi.fn();
 
     const data = await getTeamCockpitSportingData({
       tenantId: TENANT_ID,
@@ -866,11 +898,14 @@ describe("TEAM-COCKPIT-PREMIUM-01C — getTeamCockpitSportingData", () => {
         providerLeagueName: "2. Liga interregional",
       },
       database: {} as TeamMatchQueryDatabase,
-      identityDatabase: { externalTeam: { findMany } },
+      identityDatabase: {
+        externalTeam: { findMany: externalTeamFindMany },
+        externalClub: { findMany: externalClubFindMany },
+      },
       now: NOW,
     });
 
-    expect(findMany).toHaveBeenCalledTimes(1);
+    expect(externalTeamFindMany).toHaveBeenCalledTimes(1);
     expect(data.standings?.rows).toHaveLength(2);
     expect(data.standings?.rows[0]).toMatchObject({
       teamName: "Opponent FC",

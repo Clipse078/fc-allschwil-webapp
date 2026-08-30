@@ -27,6 +27,9 @@ import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/
 import { findNextTournamentEventForTeamSeason } from "@/lib/tournaments/queries";
 import { listTournamentsByIds } from "@/lib/tournaments/tournament-service";
 import {
+  buildStandingsClubEnrichmentByProviderTeamId,
+} from "@/lib/club-directory/standings-club-enrichment";
+import {
   collectProviderClubIdsFromExternalTeams,
   loadCanonicalClubLogoIndex,
   resolveExternalTeamLogoWithCanonicalFallback,
@@ -641,66 +644,25 @@ export async function getPublicTeamDetail(
         });
 
         if (standingsTable) {
-          const opponentProviderTeamIds = [
-            ...new Set(
-              standingsTable.rows
-                .map((row) => row.externalTeamId)
-                .filter((providerTeamId) => providerTeamId !== mapping.externalTeamId),
-            ),
-          ];
-
-          const standingsExternalTeams =
-            opponentProviderTeamIds.length > 0
-              ? await prisma.externalTeam.findMany({
-                  where: {
-                    tenantId: input.tenantId,
-                    providerMappings: {
-                      some: {
-                        provider: SFV_PROVIDER,
-                        providerTeamId: { in: opponentProviderTeamIds },
-                      },
-                    },
-                  },
-                  select: {
-                    shortName: true,
-                    logoUrl: true,
-                    providerMappings: {
-                      where: { provider: SFV_PROVIDER },
-                      select: { providerTeamId: true, providerClubId: true },
-                    },
-                    externalClub: {
-                      select: { logoUrl: true },
-                    },
-                  },
-                })
-              : [];
-
-          const standingsCanonicalLogoByProviderClubId = await loadCanonicalClubLogoIndex(
-            input.tenantId,
-            collectProviderClubIdsFromExternalTeams(standingsExternalTeams),
-          );
+          const standingsEnrichmentByProviderTeamId =
+            await buildStandingsClubEnrichmentByProviderTeamId({
+              tenantId: input.tenantId,
+              rows: standingsTable.rows.map((row) => ({
+                providerTeamId: row.externalTeamId,
+                providerTeamName: row.teamName,
+              })),
+            });
 
           const externalTeamByProviderId = new Map<
             number,
             PublicTeamStandingsExternalTeamRecord
           >();
 
-          for (const externalTeam of standingsExternalTeams) {
-            const logoUrl = resolveExternalTeamLogoWithCanonicalFallback(
-              {
-                team: externalTeam,
-                directClub: externalTeam.externalClub,
-                providerMappings: externalTeam.providerMappings,
-              },
-              standingsCanonicalLogoByProviderClubId,
-            );
-
-            for (const providerMapping of externalTeam.providerMappings) {
-              externalTeamByProviderId.set(providerMapping.providerTeamId, {
-                shortName: externalTeam.shortName,
-                logoUrl,
-              });
-            }
+          for (const [providerTeamId, enrichment] of standingsEnrichmentByProviderTeamId) {
+            externalTeamByProviderId.set(providerTeamId, {
+              shortName: enrichment.shortName,
+              logoUrl: enrichment.logoUrl,
+            });
           }
 
           const standingsIdentityContext: PublicTeamStandingsIdentityContext = {
