@@ -113,6 +113,33 @@ describe("PATCH TeamSeason publication", () => {
     });
   });
 
+  it("preserves explicit false when tournament-only OFF/ON is saved together", async () => {
+    mocks.updateTeamSeasonPublication.mockResolvedValueOnce({
+      ok: true,
+      before: { showNextMatch: true, showNextTournament: false },
+      publication: { showNextMatch: false, showNextTournament: true },
+    });
+
+    const response = await PATCH(
+      request({ showNextMatch: false, showNextTournament: true }),
+      context,
+    );
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(mocks.updateTeamSeasonPublication).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      showNextMatch: false,
+      showNextTournament: true,
+    });
+    expect(body.publication).toEqual({
+      showNextMatch: false,
+      showNextTournament: true,
+    });
+  });
+
   it("rejects invalid or empty publication payloads", async () => {
     const wrongType = await PATCH(request({ showNextMatch: "yes" }), context);
     const empty = await PATCH(request({}), context);

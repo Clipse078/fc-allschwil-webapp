@@ -114,6 +114,24 @@ export default function TeamOverviewSettingsSection({
     }));
   }
 
+  function handlePublicationSaved(publication: {
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  }) {
+    setTeam((current) =>
+      current.currentSeasonPublication
+        ? {
+            ...current,
+            currentSeasonPublication: {
+              ...current.currentSeasonPublication,
+              showNextMatch: publication.showNextMatch,
+              showNextTournament: publication.showNextTournament,
+            },
+          }
+        : current,
+    );
+  }
+
   return (
     <div className="space-y-4" data-testid="team-overview-settings">
       <div className="flex justify-end">
@@ -171,6 +189,7 @@ export default function TeamOverviewSettingsSection({
             currentSeasonPublication={team.currentSeasonPublication ?? null}
             canManage={canManage}
             onSaved={handleTeamSaved}
+            onPublicationSaved={handlePublicationSaved}
             onCancelEdit={() => setIsEditingSettings(false)}
           />
         </div>

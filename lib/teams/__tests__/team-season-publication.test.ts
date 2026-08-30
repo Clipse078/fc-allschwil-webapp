@@ -73,6 +73,40 @@ describe("updateTeamSeasonPublication", () => {
     });
   });
 
+  it("persists tournament-only OFF/ON in one update and preserves explicit false", async () => {
+    update.mockResolvedValueOnce({
+      showNextMatch: false,
+      showNextTournament: true,
+    } as never);
+
+    const result = await updateTeamSeasonPublication({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      showNextMatch: false,
+      showNextTournament: true,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "season-a" },
+      data: {
+        showNextMatch: false,
+        showNextTournament: true,
+      },
+      select: {
+        showNextMatch: true,
+        showNextTournament: true,
+      },
+    });
+    if (result.ok) {
+      expect(result.publication).toEqual({
+        showNextMatch: false,
+        showNextTournament: true,
+      });
+    }
+  });
+
   it("updates only the addressed TeamSeason, so A cannot affect B", async () => {
     await updateTeamSeasonPublication({
       tenantId: "tenant-a",

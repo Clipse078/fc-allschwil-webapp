@@ -85,6 +85,7 @@ type Props = {
   } | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
+  onPublicationSaved?: (publication: PublicationValues) => void;
   onCancelEdit?: () => void;
 };
 
@@ -140,8 +141,35 @@ function getPublicationValues(
   publication: Props["currentSeasonPublication"],
 ): PublicationValues {
   return {
-    showNextMatch: publication?.showNextMatch ?? true,
-    showNextTournament: publication?.showNextTournament ?? false,
+    showNextMatch:
+      typeof publication?.showNextMatch === "boolean"
+        ? publication.showNextMatch
+        : true,
+    showNextTournament:
+      typeof publication?.showNextTournament === "boolean"
+        ? publication.showNextTournament
+        : false,
+  };
+}
+
+function parseSavedPublication(
+  value: unknown,
+): PublicationValues | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.showNextMatch !== "boolean" ||
+    typeof record.showNextTournament !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    showNextMatch: record.showNextMatch,
+    showNextTournament: record.showNextTournament,
   };
 }
 
@@ -155,6 +183,7 @@ export default function TeamSettingsCard({
   currentSeasonPublication,
   canManage,
   onSaved,
+  onPublicationSaved,
   onCancelEdit,
 }: Props) {
   const router = useRouter();
@@ -181,11 +210,20 @@ export default function TeamSettingsCard({
     () => getPublicationValues(currentSeasonPublication),
   );
 
+  const canonicalShowNextMatch = currentSeasonPublication?.showNextMatch;
+  const canonicalShowNextTournament = currentSeasonPublication?.showNextTournament;
+
   useEffect(() => {
     const nextPublication = getPublicationValues(currentSeasonPublication);
     setPublicationBaseline(nextPublication);
     setPublicationDraft(nextPublication);
-  }, [currentTeamSeasonId, currentSeasonPublication]);
+  // Intentionally keyed on canonical booleans, not object identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on value changes only
+  }, [
+    currentTeamSeasonId,
+    canonicalShowNextMatch,
+    canonicalShowNextTournament,
+  ]);
 
   const genderGroupOptions =
     form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
@@ -418,15 +456,14 @@ export default function TeamSettingsCard({
           );
         }
 
-        const savedPublication: PublicationValues = {
-          showNextMatch:
-            publicationBody.showNextMatch ?? publicationBaseline.showNextMatch,
-          showNextTournament:
-            publicationBody.showNextTournament ??
-            publicationBaseline.showNextTournament,
-        };
+        const savedPublication: PublicationValues =
+          parseSavedPublication(publicationData?.publication) ?? {
+            showNextMatch: publicationDraft.showNextMatch,
+            showNextTournament: publicationDraft.showNextTournament,
+          };
         setPublicationBaseline(savedPublication);
         setPublicationDraft(savedPublication);
+        onPublicationSaved?.(savedPublication);
       }
 
       router.refresh();
