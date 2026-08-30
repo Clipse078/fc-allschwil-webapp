@@ -131,6 +131,20 @@ function FormSection({
   );
 }
 
+type PublicationValues = {
+  showNextMatch: boolean;
+  showNextTournament: boolean;
+};
+
+function getPublicationValues(
+  publication: Props["currentSeasonPublication"],
+): PublicationValues {
+  return {
+    showNextMatch: publication?.showNextMatch ?? true,
+    showNextTournament: publication?.showNextTournament ?? false,
+  };
+}
+
 export default function TeamSettingsCard({
   team,
   availableOrgUnits,
@@ -160,18 +174,17 @@ export default function TeamSettingsCard({
   const [seasonOrgUnitMessage, setSeasonOrgUnitMessage] = useState<string | null>(null);
   const [seasonOrgUnitError, setSeasonOrgUnitError] = useState<string | null>(null);
 
-  const [showNextMatch, setShowNextMatch] = useState(
-    currentSeasonPublication?.showNextMatch ?? true,
+  const [publicationBaseline, setPublicationBaseline] = useState<PublicationValues>(
+    () => getPublicationValues(currentSeasonPublication),
   );
-  const [showNextTournament, setShowNextTournament] = useState(
-    currentSeasonPublication?.showNextTournament ?? false,
+  const [publicationDraft, setPublicationDraft] = useState<PublicationValues>(
+    () => getPublicationValues(currentSeasonPublication),
   );
 
   useEffect(() => {
-    setShowNextMatch(currentSeasonPublication?.showNextMatch ?? true);
-    setShowNextTournament(
-      currentSeasonPublication?.showNextTournament ?? false,
-    );
+    const nextPublication = getPublicationValues(currentSeasonPublication);
+    setPublicationBaseline(nextPublication);
+    setPublicationDraft(nextPublication);
   }, [currentTeamSeasonId, currentSeasonPublication]);
 
   const genderGroupOptions =
@@ -301,12 +314,10 @@ export default function TeamSettingsCard({
       return;
     }
 
-    if (field === "showNextMatch") {
-      setShowNextMatch(nextValue);
-      return;
-    }
-
-    setShowNextTournament(nextValue);
+    setPublicationDraft((current) => ({
+      ...current,
+      [field]: nextValue,
+    }));
   }
 
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
@@ -380,11 +391,14 @@ export default function TeamSettingsCard({
           showNextTournament?: boolean;
         } = {};
 
-        if (showNextMatch !== currentSeasonPublication.showNextMatch) {
-          publicationBody.showNextMatch = showNextMatch;
+        if (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch) {
+          publicationBody.showNextMatch = publicationDraft.showNextMatch;
         }
-        if (showNextTournament !== currentSeasonPublication.showNextTournament) {
-          publicationBody.showNextTournament = showNextTournament;
+        if (
+          publicationDraft.showNextTournament !==
+          publicationBaseline.showNextTournament
+        ) {
+          publicationBody.showNextTournament = publicationDraft.showNextTournament;
         }
 
         const publicationResponse = await fetch(
@@ -403,6 +417,16 @@ export default function TeamSettingsCard({
               "Website-Veröffentlichung konnte nicht gespeichert werden.",
           );
         }
+
+        const savedPublication: PublicationValues = {
+          showNextMatch:
+            publicationBody.showNextMatch ?? publicationBaseline.showNextMatch,
+          showNextTournament:
+            publicationBody.showNextTournament ??
+            publicationBaseline.showNextTournament,
+        };
+        setPublicationBaseline(savedPublication);
+        setPublicationDraft(savedPublication);
       }
 
       router.refresh();
@@ -434,8 +458,8 @@ export default function TeamSettingsCard({
 
   const isPublicationDirty =
     currentSeasonPublication !== null &&
-    (showNextMatch !== currentSeasonPublication.showNextMatch ||
-      showNextTournament !== currentSeasonPublication.showNextTournament);
+    (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch ||
+      publicationDraft.showNextTournament !== publicationBaseline.showNextTournament);
 
   const isDirty = isTeamDirty || isPublicationDirty;
 
@@ -789,7 +813,7 @@ export default function TeamSettingsCard({
             <SwitchToggle
               id="show-next-match"
               label="Nächstes Spiel anzeigen"
-              checked={showNextMatch}
+              checked={publicationDraft.showNextMatch}
               onChange={(checked) =>
                 updatePublicationField("showNextMatch", checked)
               }
@@ -798,7 +822,7 @@ export default function TeamSettingsCard({
             <SwitchToggle
               id="show-next-tournament"
               label="Nächstes Turnier anzeigen"
-              checked={showNextTournament}
+              checked={publicationDraft.showNextTournament}
               onChange={(checked) =>
                 updatePublicationField("showNextTournament", checked)
               }

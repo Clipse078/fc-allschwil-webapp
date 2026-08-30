@@ -44,12 +44,18 @@ const publication = {
   showNextTournament: false,
 };
 
-function renderCard(
+function publicationPatchCalls() {
+  return fetchMock.mock.calls.filter(([url]) =>
+    String(url).includes("/publication"),
+  );
+}
+
+function renderCardElement(
   overrides: {
     publication?: typeof publication | null;
   } = {},
 ) {
-  return render(
+  return (
     <TeamSettingsCard
       team={team}
       availableOrgUnits={[]}
@@ -61,8 +67,16 @@ function renderCard(
         overrides.publication === undefined ? publication : overrides.publication
       }
       canManage
-    />,
+    />
   );
+}
+
+function renderCard(
+  overrides: {
+    publication?: typeof publication | null;
+  } = {},
+) {
+  return render(renderCardElement(overrides));
 }
 
 function saveButtons() {
@@ -250,6 +264,127 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
     );
     expect(toggle).toHaveAttribute("aria-checked", "true");
     expect(saveButtons()[0]).toBeEnabled();
+  });
+
+  it("does not PATCH publication before Team speichern and remount restores canonical values", async () => {
+    const view = renderCard();
+
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Spiel anzeigen" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Turnier anzeigen" }),
+    ).toHaveAttribute("aria-checked", "false");
+    expect(saveButtons()[0]).toBeDisabled();
+
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Nächstes Spiel anzeigen" }),
+    );
+
+    expect(saveButtons()[0]).toBeEnabled();
+    expect(publicationPatchCalls()).toHaveLength(0);
+
+    view.unmount();
+    const remounted = renderCard();
+
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Spiel anzeigen" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Turnier anzeigen" }),
+    ).toHaveAttribute("aria-checked", "false");
+    expect(saveButtons()[0]).toBeDisabled();
+    expect(publicationPatchCalls()).toHaveLength(0);
+
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Nächstes Turnier anzeigen" }),
+    );
+    expect(saveButtons()[0]).toBeEnabled();
+    await userEvent.click(saveButtons()[0]);
+
+    await waitFor(() => expect(publicationPatchCalls()).toHaveLength(1));
+    expect(publicationPatchCalls()[0]).toEqual([
+      "/api/teams/team-a/team-seasons/season-a/publication",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ showNextTournament: true }),
+      }),
+    ]);
+    expect(saveButtons()[0]).toBeDisabled();
+
+    remounted.rerender(
+      renderCardElement({
+        publication: {
+          seasonName: "Saison 2026/27",
+          showNextMatch: true,
+          showNextTournament: true,
+        },
+      }),
+    );
+
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Turnier anzeigen" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(saveButtons()[0]).toBeDisabled();
+  });
+
+  it("discards unsaved publication edits when canonical props are refetched unchanged", async () => {
+    const view = renderCard();
+
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Nächstes Spiel anzeigen" }),
+    );
+    expect(saveButtons()[0]).toBeEnabled();
+    expect(publicationPatchCalls()).toHaveLength(0);
+
+    view.rerender(
+      renderCardElement({
+        publication: {
+          seasonName: publication.seasonName,
+          showNextMatch: publication.showNextMatch,
+          showNextTournament: publication.showNextTournament,
+        },
+      }),
+    );
+
+    expect(
+      screen.getByRole("switch", { name: "Nächstes Spiel anzeigen" }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(saveButtons()[0]).toBeDisabled();
+    expect(publicationPatchCalls()).toHaveLength(0);
+  });
+
+  it("saves publication and normal Team fields through their respective endpoints", async () => {
+    renderCard();
+
+    await userEvent.clear(screen.getByPlaceholderText("z. B. FC Allschwil Junioren B2"));
+    await userEvent.type(
+      screen.getByPlaceholderText("z. B. FC Allschwil Junioren B2"),
+      "Team A Updated",
+    );
+    await userEvent.click(
+      screen.getByRole("switch", { name: "Nächstes Turnier anzeigen" }),
+    );
+    await userEvent.click(saveButtons()[0]);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "/api/teams/team-a",
+      expect.objectContaining({
+        method: "PATCH",
+        body: expect.stringContaining("Team A Updated"),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/teams/team-a/team-seasons/season-a/publication",
+      expect.objectContaining({
+        method: "PATCH",
+        body: JSON.stringify({ showNextTournament: true }),
+      }),
+    );
+    expect(saveButtons()[0]).toBeDisabled();
   });
 
   it("does not regress normal Team save behaviour", async () => {
