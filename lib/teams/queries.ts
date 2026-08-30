@@ -268,6 +268,8 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           infoboardVisible: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
+          showNextMatch: true,
+          showNextTournament: true,
           season: {
             select: {
               id: true,
@@ -451,6 +453,13 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
     // TRAINING/DEVELOPMENT/... TeamSeason must not be offered a competition
     // picker that silently no-ops or 400s on save.
     currentParticipationType: activeSeasonEntry?.participationType ?? null,
+    currentSeasonPublication: activeSeasonEntry
+      ? {
+          seasonName: activeSeasonEntry.season.name,
+          showNextMatch: activeSeasonEntry.showNextMatch,
+          showNextTournament: activeSeasonEntry.showNextTournament,
+        }
+      : null,
     // TEAM-SEASON-ORGUNIT-01: primary OrgUnit for the current season.
     currentSeasonOrgUnit: currentSeasonOrgUnit
       ? { id: currentSeasonOrgUnit.id, name: currentSeasonOrgUnit.name, key: currentSeasonOrgUnit.key, type: currentSeasonOrgUnit.type }

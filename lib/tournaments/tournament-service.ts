@@ -45,6 +45,7 @@ import {
   TournamentValidationError,
   TournamentInvalidTransitionError,
 } from "./errors";
+import { resolveTournamentTeamSeasonId } from "./team-season-resolution";
 import type {
   TournamentDto,
   TournamentParticipantDto,
@@ -435,16 +436,6 @@ export async function updateTournament(
     throw new TournamentNotFoundError(tournamentId);
   }
 
-  if (input.teamId !== undefined && input.teamId !== null) {
-    const team = await prisma.team.findFirst({
-      where: { id: input.teamId, tenantId },
-      select: { id: true },
-    });
-    if (!team) {
-      throw new TournamentValidationError("teamId does not belong to this tenant");
-    }
-  }
-
   const data: Record<string, unknown> = {};
 
   if (input.title !== undefined) data.title = input.title.trim();
@@ -457,7 +448,17 @@ export async function updateTournament(
   if (input.competitionLabel !== undefined) data.competitionLabel = input.competitionLabel?.trim() || null;
   if (input.resultLabel !== undefined) data.resultLabel = input.resultLabel?.trim() || null;
   if (input.remarks !== undefined) data.remarks = input.remarks?.trim() || null;
-  if (input.teamId !== undefined) data.teamId = input.teamId;
+  if (input.teamId !== undefined) {
+    data.teamId = input.teamId;
+    data.teamSeasonId =
+      input.teamId === null
+        ? null
+        : await resolveTournamentTeamSeasonId(
+            tenantId,
+            input.teamId,
+            existing.seasonId,
+          );
+  }
   if (input.homeAway !== undefined) data.homeAway = input.homeAway;
   if (input.websiteVisible !== undefined) data.websiteVisible = input.websiteVisible;
   if (input.infoboardVisible !== undefined) data.infoboardVisible = input.infoboardVisible;

@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   canCreateForTeam: vi.fn(),
   seasonFindUnique: vi.fn(),
   teamFindUnique: vi.fn(),
+  teamSeasonFindMany: vi.fn(),
   externalClubFindFirst: vi.fn(),
   eventCreate: vi.fn(),
   auditLogCreate: vi.fn(),
@@ -54,6 +55,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     season: { findUnique: mocks.seasonFindUnique },
     team: { findUnique: mocks.teamFindUnique },
+    teamSeason: { findMany: mocks.teamSeasonFindMany },
     externalClub: { findFirst: mocks.externalClubFindFirst },
     event: { create: mocks.eventCreate },
     tenant: { findUnique: mocks.tenantFindUnique },
@@ -116,6 +118,7 @@ describe("POST /api/events", () => {
     });
     mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
     mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
+    mocks.teamSeasonFindMany.mockResolvedValue([{ id: "team-season-1" }]);
     mocks.tenantFindUnique.mockResolvedValue({ timezone: "Europe/Zurich" });
     mocks.eventCreate.mockResolvedValue({
       id: "event-1",
@@ -128,6 +131,7 @@ describe("POST /api/events", () => {
       reviewedAt: new Date(),
       seasonId: "season-1",
       teamId: "team-1",
+      teamSeasonId: "team-season-1",
       startAt: new Date("2026-09-05T10:00:00.000Z"),
       endAt: null,
       meetingTime: null,
@@ -147,6 +151,50 @@ describe("POST /api/events", () => {
 
     const call = mocks.eventCreate.mock.calls[0]![0] as { data: Record<string, unknown> };
     expect(call.data.tenantId).toBe("tenant-1");
+  });
+
+  it("writes the exact TeamSeason for a new tournament", async () => {
+    const res = await POST(makeRequest(VALID_BODY));
+    expect(res.status).toBe(201);
+
+    expect(mocks.teamSeasonFindMany).toHaveBeenCalledWith({
+      where: {
+        teamId: "team-1",
+        seasonId: "season-1",
+        team: { tenantId: "tenant-1" },
+      },
+      select: { id: true },
+      take: 2,
+    });
+    const call = mocks.eventCreate.mock.calls[0]![0] as {
+      data: Record<string, unknown>;
+    };
+    expect(call.data).toMatchObject({
+      teamId: "team-1",
+      teamSeasonId: "team-season-1",
+    });
+  });
+
+  it("rejects a cross-tenant TeamSeason assignment", async () => {
+    mocks.teamSeasonFindMany.mockResolvedValue([]);
+
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, teamId: "other-tenant-team" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
+  });
+
+  it("rejects a team that has no TeamSeason in the selected season", async () => {
+    mocks.teamSeasonFindMany.mockResolvedValue([]);
+
+    const res = await POST(
+      makeRequest({ ...VALID_BODY, seasonId: "season-without-team" }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(mocks.eventCreate).not.toHaveBeenCalled();
   });
 
   it("parses tournament datetime-local startAt in tenant timezone (summer 13:30 → 11:30Z)", async () => {

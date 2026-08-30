@@ -1,8 +1,9 @@
 ﻿"use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { SectionCard } from "@/components/ui/page";
+import { SwitchToggle } from "@/components/ui/SwitchToggle";
 import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 
 type OrgUnitOption = {
@@ -77,8 +78,14 @@ type Props = {
    * Null when no primary OrgUnit is assigned for the current season.
    */
   currentSeasonOrgUnit: OrgUnitOption | null;
+  currentSeasonPublication: {
+    seasonName: string;
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  } | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
+  onPublicationSaved?: (publication: PublicationValues) => void;
   onCancelEdit?: () => void;
 };
 
@@ -125,6 +132,47 @@ function FormSection({
   );
 }
 
+type PublicationValues = {
+  showNextMatch: boolean;
+  showNextTournament: boolean;
+};
+
+function getPublicationValues(
+  publication: Props["currentSeasonPublication"],
+): PublicationValues {
+  return {
+    showNextMatch:
+      typeof publication?.showNextMatch === "boolean"
+        ? publication.showNextMatch
+        : true,
+    showNextTournament:
+      typeof publication?.showNextTournament === "boolean"
+        ? publication.showNextTournament
+        : false,
+  };
+}
+
+function parseSavedPublication(
+  value: unknown,
+): PublicationValues | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.showNextMatch !== "boolean" ||
+    typeof record.showNextTournament !== "boolean"
+  ) {
+    return null;
+  }
+
+  return {
+    showNextMatch: record.showNextMatch,
+    showNextTournament: record.showNextTournament,
+  };
+}
+
 export default function TeamSettingsCard({
   team,
   availableOrgUnits,
@@ -132,8 +180,10 @@ export default function TeamSettingsCard({
   currentTeamSeasonId,
   currentParticipationType,
   currentSeasonOrgUnit,
+  currentSeasonPublication,
   canManage,
   onSaved,
+  onPublicationSaved,
   onCancelEdit,
 }: Props) {
   const router = useRouter();
@@ -152,6 +202,28 @@ export default function TeamSettingsCard({
   const [seasonOrgUnitSaving, setSeasonOrgUnitSaving] = useState(false);
   const [seasonOrgUnitMessage, setSeasonOrgUnitMessage] = useState<string | null>(null);
   const [seasonOrgUnitError, setSeasonOrgUnitError] = useState<string | null>(null);
+
+  const [publicationBaseline, setPublicationBaseline] = useState<PublicationValues>(
+    () => getPublicationValues(currentSeasonPublication),
+  );
+  const [publicationDraft, setPublicationDraft] = useState<PublicationValues>(
+    () => getPublicationValues(currentSeasonPublication),
+  );
+
+  const canonicalShowNextMatch = currentSeasonPublication?.showNextMatch;
+  const canonicalShowNextTournament = currentSeasonPublication?.showNextTournament;
+
+  useEffect(() => {
+    const nextPublication = getPublicationValues(currentSeasonPublication);
+    setPublicationBaseline(nextPublication);
+    setPublicationDraft(nextPublication);
+  // Intentionally keyed on canonical booleans, not object identity.
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync on value changes only
+  }, [
+    currentTeamSeasonId,
+    canonicalShowNextMatch,
+    canonicalShowNextTournament,
+  ]);
 
   const genderGroupOptions =
     form.genderGroup && !GENDER_GROUP_OPTIONS.includes(form.genderGroup)
@@ -272,6 +344,20 @@ export default function TeamSettingsCard({
     }
   }
 
+  function updatePublicationField(
+    field: "showNextMatch" | "showNextTournament",
+    nextValue: boolean,
+  ) {
+    if (!canManage || !currentSeasonPublication) {
+      return;
+    }
+
+    setPublicationDraft((current) => ({
+      ...current,
+      [field]: nextValue,
+    }));
+  }
+
   function updateField<K extends keyof Team>(field: K, value: Team[K]) {
     if (!canManage) {
       return;
@@ -293,48 +379,99 @@ export default function TeamSettingsCard({
     setError(null);
 
     try {
-      const response = await fetch("/api/teams/" + form.id, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: form.name,
-          shortName: form.shortName,
-          alternativeName: form.alternativeName,
-          infoboardDisplayName: form.infoboardDisplayName,
-          infoboardTrainingDisplayName: form.infoboardTrainingDisplayName,
-          infoboardMatchDisplayName: form.infoboardMatchDisplayName,
-          infoboardTournamentDisplayName: form.infoboardTournamentDisplayName,
-          category: form.category,
-          genderGroup: form.genderGroup,
-          // TEAMCENTER-UX-01B (F): Teamstufe (ageGroup) is no longer editable
-          // in this UX — its stored value is preserved as-is, never cleared
-          // or overwritten by a settings save.
-          ageGroup: form.ageGroup,
-          sortOrder: form.sortOrder,
-          isActive: form.isActive,
-          websiteVisible: form.websiteVisible,
-          infoboardVisible: form.infoboardVisible,
-          orgUnitId: form.orgUnitId,
-        }),
-      });
+      if (isTeamDirty) {
+        const response = await fetch("/api/teams/" + form.id, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: form.name,
+            shortName: form.shortName,
+            alternativeName: form.alternativeName,
+            infoboardDisplayName: form.infoboardDisplayName,
+            infoboardTrainingDisplayName: form.infoboardTrainingDisplayName,
+            infoboardMatchDisplayName: form.infoboardMatchDisplayName,
+            infoboardTournamentDisplayName: form.infoboardTournamentDisplayName,
+            category: form.category,
+            genderGroup: form.genderGroup,
+            // TEAMCENTER-UX-01B (F): Teamstufe (ageGroup) is no longer editable
+            // in this UX — its stored value is preserved as-is, never cleared
+            // or overwritten by a settings save.
+            ageGroup: form.ageGroup,
+            sortOrder: form.sortOrder,
+            isActive: form.isActive,
+            websiteVisible: form.websiteVisible,
+            infoboardVisible: form.infoboardVisible,
+            orgUnitId: form.orgUnitId,
+          }),
+        });
 
-      const data = await response.json().catch(() => null);
+        const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        throw new Error(data?.error ?? "Team konnte nicht gespeichert werden.");
+        if (!response.ok) {
+          throw new Error(data?.error ?? "Team konnte nicht gespeichert werden.");
+        }
+
+        const updatedTeam = (data?.team as Team | undefined) ?? form;
+
+        setForm((current) => ({
+          ...current,
+          ...updatedTeam,
+        }));
+
+        onSaved?.(updatedTeam);
       }
 
-      const updatedTeam = (data?.team as Team | undefined) ?? form;
+      if (isPublicationDirty && currentTeamSeasonId && currentSeasonPublication) {
+        const publicationBody: {
+          showNextMatch?: boolean;
+          showNextTournament?: boolean;
+        } = {};
 
-      setForm((current) => ({
-        ...current,
-        ...updatedTeam,
-      }));
+        if (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch) {
+          publicationBody.showNextMatch = publicationDraft.showNextMatch;
+        }
+        if (
+          publicationDraft.showNextTournament !==
+          publicationBaseline.showNextTournament
+        ) {
+          publicationBody.showNextTournament = publicationDraft.showNextTournament;
+        }
 
-      onSaved?.(updatedTeam);
-      setMessage(data?.message ?? "Team erfolgreich gespeichert.");
+        const publicationResponse = await fetch(
+          `/api/teams/${form.id}/team-seasons/${currentTeamSeasonId}/publication`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(publicationBody),
+          },
+        );
+        const publicationData = await publicationResponse.json().catch(() => null);
+
+        if (!publicationResponse.ok) {
+          throw new Error(
+            publicationData?.error ??
+              "Website-Veröffentlichung konnte nicht gespeichert werden.",
+          );
+        }
+
+        const savedPublication: PublicationValues =
+          parseSavedPublication(publicationData?.publication) ?? {
+            showNextMatch: publicationDraft.showNextMatch,
+            showNextTournament: publicationDraft.showNextTournament,
+          };
+        setPublicationBaseline(savedPublication);
+        setPublicationDraft(savedPublication);
+        onPublicationSaved?.(savedPublication);
+      }
+
+      router.refresh();
+      setMessage(
+        isPublicationDirty && !isTeamDirty
+          ? "Website-Veröffentlichung wurde gespeichert."
+          : "Team erfolgreich gespeichert.",
+      );
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Ein Fehler ist aufgetreten."
@@ -344,7 +481,7 @@ export default function TeamSettingsCard({
     }
   }
 
-  const isDirty =
+  const isTeamDirty =
     form.name !== team.name ||
     form.shortName !== team.shortName ||
     form.alternativeName !== team.alternativeName ||
@@ -355,6 +492,13 @@ export default function TeamSettingsCard({
     form.category !== team.category ||
     form.genderGroup !== team.genderGroup ||
     form.sortOrder !== team.sortOrder;
+
+  const isPublicationDirty =
+    currentSeasonPublication !== null &&
+    (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch ||
+      publicationDraft.showNextTournament !== publicationBaseline.showNextTournament);
+
+  const isDirty = isTeamDirty || isPublicationDirty;
 
   return (
     <SectionCard
@@ -688,6 +832,39 @@ export default function TeamSettingsCard({
                 )}
               </p>
             )}
+          </div>
+        </FormSection>
+
+        <FormSection
+          title="Website-Veröffentlichung"
+          description={
+            currentSeasonPublication
+              ? `Einstellungen für ${currentSeasonPublication.seasonName}. Änderungen werden mit «Team speichern» übernommen. Wenn beide aktiviert sind, wird zuerst das nächste Spiel angezeigt. Ist kein kommendes Spiel vorhanden, wird das nächste Turnier angezeigt.`
+              : "Keine aktuelle Saison — Veröffentlichung kann erst nach Saisonzuordnung gepflegt werden."
+          }
+        >
+          <div
+            className="space-y-3 md:col-span-2"
+            data-testid="team-season-next-event-controls"
+          >
+            <SwitchToggle
+              id="show-next-match"
+              label="Nächstes Spiel anzeigen"
+              checked={publicationDraft.showNextMatch}
+              onChange={(checked) =>
+                updatePublicationField("showNextMatch", checked)
+              }
+              disabled={!canManage || !currentSeasonPublication || submitting}
+            />
+            <SwitchToggle
+              id="show-next-tournament"
+              label="Nächstes Turnier anzeigen"
+              checked={publicationDraft.showNextTournament}
+              onChange={(checked) =>
+                updatePublicationField("showNextTournament", checked)
+              }
+              disabled={!canManage || !currentSeasonPublication || submitting}
+            />
           </div>
         </FormSection>
 

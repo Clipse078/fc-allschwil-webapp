@@ -55,6 +55,10 @@ describe("GET /api/public/[tenant]/website/teams/[slug] — nextMatches", () => 
       squad: [],
       trainers: [],
       training: [],
+      publication: {
+        showNextMatch: true,
+        showNextTournament: false,
+      },
       nextMatches: [
         {
           id: "event-home",
@@ -131,6 +135,14 @@ describe("GET /api/public/[tenant]/website/teams/[slug] — nextMatches", () => 
           },
         },
       ],
+      standings: null,
+      nextTournament: null,
+      nextEvent: {
+        type: "MATCH",
+        match: {
+          id: "event-home",
+        },
+      },
     });
   });
 
@@ -142,6 +154,8 @@ describe("GET /api/public/[tenant]/website/teams/[slug] — nextMatches", () => 
     expect(body.data.team.nextMatches).toHaveLength(1);
     expect(body.data.team.results).toHaveLength(1);
     expect(body.data.team.results[0].resultPerspective).toBe("WON");
+    expect(body.data.team.publication.showNextMatch).toBe(true);
+    expect(body.data.team.nextEvent.type).toBe("MATCH");
     expect(body.data.team.name).toBe("FC Example E1");
     expect(body.data.team.squad).toEqual([]);
     expect(body.data.team.training).toEqual([]);

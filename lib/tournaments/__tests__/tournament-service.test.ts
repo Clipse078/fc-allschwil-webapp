@@ -23,6 +23,9 @@ vi.mock("@/lib/db/prisma", () => ({
     team: {
       findFirst: vi.fn(),
     },
+    teamSeason: {
+      findMany: vi.fn(),
+    },
     tenant: {
       findFirst: vi.fn(),
     },
@@ -54,6 +57,9 @@ const TEAM_ID = "team-01";
 const baseRow = {
   id: TOURNAMENT_ID,
   tenantId: TENANT_A,
+  seasonId: "season-1",
+  teamId: TEAM_ID,
+  teamSeasonId: "team-season-1",
   title: "E1 Hallenturnier",
   description: null,
   status: "SCHEDULED" as const,
@@ -101,6 +107,9 @@ beforeEach(() => {
     name: "FC Allschwil",
     logoUrl: "https://cdn.example.com/fca.png",
   } as never);
+  vi.mocked(prisma.teamSeason.findMany).mockResolvedValue([
+    { id: "team-season-1" },
+  ] as never);
   vi.mocked(prisma.externalClub.findMany).mockResolvedValue([
     {
       id: "club-aesch",
@@ -278,23 +287,46 @@ describe("C. updateTournament", () => {
     );
   });
 
-  it("validates teamId belongs to the same tenant", async () => {
-    vi.mocked(prisma.team.findFirst).mockResolvedValue(null as never);
+  it("rejects a team without an exact tenant-owned TeamSeason", async () => {
+    vi.mocked(prisma.teamSeason.findMany).mockResolvedValue([] as never);
 
     await expect(
       updateTournament(TENANT_A, TOURNAMENT_ID, { teamId: "other-tenant-team" }),
     ).rejects.toThrow(TournamentValidationError);
 
-    const call = vi.mocked(prisma.team.findFirst).mock.calls[0]![0] as { where: Record<string, unknown> };
-    expect(call.where).toMatchObject({ id: "other-tenant-team", tenantId: TENANT_A });
+    const call = vi.mocked(prisma.teamSeason.findMany).mock.calls[0]![0] as {
+      where: Record<string, unknown>;
+    };
+    expect(call.where).toMatchObject({
+      teamId: "other-tenant-team",
+      seasonId: "season-1",
+      team: { tenantId: TENANT_A },
+    });
   });
 
-  it("allows clearing teamId to null without a team lookup", async () => {
+  it("clears both legacy teamId and canonical teamSeasonId", async () => {
     await updateTournament(TENANT_A, TOURNAMENT_ID, { teamId: null });
 
-    expect(prisma.team.findFirst).not.toHaveBeenCalled();
+    expect(prisma.teamSeason.findMany).not.toHaveBeenCalled();
     const call = vi.mocked(prisma.event.update).mock.calls[0]![0] as { data: Record<string, unknown> };
     expect(call.data.teamId).toBeNull();
+    expect(call.data.teamSeasonId).toBeNull();
+  });
+
+  it("updates teamSeasonId when the legacy team association changes", async () => {
+    vi.mocked(prisma.teamSeason.findMany).mockResolvedValue([
+      { id: "team-season-2" },
+    ] as never);
+
+    await updateTournament(TENANT_A, TOURNAMENT_ID, { teamId: "team-02" });
+
+    const call = vi.mocked(prisma.event.update).mock.calls[0]![0] as {
+      data: Record<string, unknown>;
+    };
+    expect(call.data).toMatchObject({
+      teamId: "team-02",
+      teamSeasonId: "team-season-2",
+    });
   });
 
   it("persists the homeAway field", async () => {

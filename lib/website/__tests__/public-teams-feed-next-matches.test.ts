@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   matchEventFindMany: vi.fn(),
   teamExternalMappingFindFirst: vi.fn(),
   fetchTeamStandingsForMapping: vi.fn(),
+  findNextTournamentEventForTeamSeason: vi.fn(),
+  listTournamentsByIds: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -52,6 +54,15 @@ vi.mock("@/lib/db/prisma", () => ({
 
 vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
   fetchTeamStandingsForMapping: mocks.fetchTeamStandingsForMapping,
+}));
+
+vi.mock("@/lib/tournaments/queries", () => ({
+  findNextTournamentEventForTeamSeason:
+    mocks.findNextTournamentEventForTeamSeason,
+}));
+
+vi.mock("@/lib/tournaments/tournament-service", () => ({
+  listTournamentsByIds: mocks.listTournamentsByIds,
 }));
 
 const TENANT_ID = "tenant-fca";
@@ -206,6 +217,8 @@ describe("getPublicTeamDetail — nextMatches", () => {
     mocks.matchEventFindMany.mockResolvedValue([createMatchEvent()]);
     mocks.teamExternalMappingFindFirst.mockResolvedValue(null);
     mocks.fetchTeamStandingsForMapping.mockResolvedValue(null);
+    mocks.findNextTournamentEventForTeamSeason.mockResolvedValue(null);
+    mocks.listTournamentsByIds.mockResolvedValue([]);
     mocks.eventFindMany.mockImplementation(async (args: { where?: { type?: string } }) => {
       if (args.where?.type === "MATCH") {
         return mocks.matchEventFindMany();
@@ -310,5 +323,134 @@ describe("getPublicTeamDetail — nextMatches", () => {
         }),
       }),
     );
+  });
+
+  it("exposes the seasonal publication flags without changing nextMatches", async () => {
+    mocks.teamFindFirst.mockResolvedValueOnce({
+      id: TEAM_ID,
+      name: "FC Example E1",
+      slug: "e1",
+      category: "JUNIOREN",
+      genderGroup: null,
+      ageGroup: null,
+      teamSeasons: [
+        {
+          id: TEAM_SEASON_ID,
+          displayName: "FC Example E1 2026/27",
+          shortName: "E1",
+          squadWebsiteVisible: false,
+          trainerTeamWebsiteVisible: false,
+          showNextMatch: false,
+          showNextTournament: false,
+          season: { key: "2026-2027", name: "Saison 2026/27" },
+        },
+      ],
+    });
+
+    const detail = await getPublicTeamDetail({
+      tenantId: TENANT_ID,
+      slug: "e1",
+    });
+
+    expect(detail?.publication).toEqual({
+      showNextMatch: false,
+      showNextTournament: false,
+    });
+    expect(detail?.nextMatches).toHaveLength(1);
+    expect(detail?.nextEvent).toBeNull();
+  });
+
+  it("exposes the canonical next tournament with canonical club logos", async () => {
+    mocks.teamFindFirst.mockResolvedValueOnce({
+      id: TEAM_ID,
+      name: "FC Example E1",
+      slug: "e1",
+      category: "JUNIOREN",
+      genderGroup: null,
+      ageGroup: null,
+      teamSeasons: [
+        {
+          id: TEAM_SEASON_ID,
+          displayName: "FC Example E1 2026/27",
+          shortName: "E1",
+          squadWebsiteVisible: false,
+          trainerTeamWebsiteVisible: false,
+          showNextMatch: false,
+          showNextTournament: true,
+          season: { key: "2026-2027", name: "Saison 2026/27" },
+        },
+      ],
+    });
+    mocks.findNextTournamentEventForTeamSeason.mockResolvedValueOnce({
+      id: "tournament-1",
+    });
+    mocks.listTournamentsByIds.mockResolvedValueOnce([
+      {
+        id: "tournament-1",
+        tenantId: TENANT_ID,
+        title: "Herbstturnier",
+        description: null,
+        status: "SCHEDULED",
+        source: "MANUAL",
+        startAt: "2026-09-01T08:00:00.000Z",
+        endAt: "2026-09-01T16:00:00.000Z",
+        meetingTime: null,
+        location: "Im Brüel",
+        organizerName: "FC Host",
+        organizerLogoUrl: "https://cdn.example.com/host.png",
+        organizerExternalClubId: "club-host",
+        competitionLabel: null,
+        resultLabel: null,
+        remarks: null,
+        season: { id: SEASON_ID, key: "2026-2027", name: "Saison 2026/27" },
+        team: null,
+        teamLogoUrl: null,
+        homeAway: "AWAY",
+        participants: [
+          {
+            id: "participant-1",
+            displayName: "FC Guest",
+            logoUrl: "https://cdn.example.com/guest.png",
+            kind: "EXTERNAL_CLUB",
+            team: null,
+            externalClub: { club: { id: "club-guest" } },
+          },
+        ],
+        resourceAllocations: [],
+        visibility: {
+          websiteVisible: true,
+          infoboardVisible: true,
+          homepageVisible: false,
+          wochenplanVisible: true,
+          teamPageVisible: false,
+        },
+        reviewStage: "PUBLISHED",
+        createdAt: "2026-08-01T08:00:00.000Z",
+        updatedAt: "2026-08-01T08:00:00.000Z",
+      },
+    ]);
+
+    const detail = await getPublicTeamDetail({
+      tenantId: TENANT_ID,
+      slug: "e1",
+    });
+
+    expect(mocks.findNextTournamentEventForTeamSeason).toHaveBeenCalledWith(
+      TENANT_ID,
+      TEAM_SEASON_ID,
+      NOW,
+    );
+    expect(detail?.nextTournament).toMatchObject({
+      id: "tournament-1",
+      organizer: {
+        logoUrl: "https://cdn.example.com/host.png",
+      },
+      participants: [
+        {
+          logoUrl: "https://cdn.example.com/guest.png",
+        },
+      ],
+    });
+    expect(detail?.nextEvent?.type).toBe("TOURNAMENT");
   });
 });

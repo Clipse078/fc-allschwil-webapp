@@ -24,6 +24,8 @@
 import { prisma } from "@/lib/db/prisma";
 import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
 import { listTeamSeasonMatches, type TeamMatchQueryDatabase } from "@/lib/teams/team-match-query-service";
+import { findNextTournamentEventForTeamSeason } from "@/lib/tournaments/queries";
+import { listTournamentsByIds } from "@/lib/tournaments/tournament-service";
 import {
   collectProviderClubIdsFromExternalTeams,
   loadCanonicalClubLogoIndex,
@@ -47,6 +49,8 @@ import {
   type PublicTeamStandingsExternalTeamRecord,
   type PublicTeamStandingsIdentityContext,
 } from "@/lib/website/public-team-standings-mapper";
+import { resolvePublicTeamNextEvent } from "@/lib/website/public-team-next-event";
+import { toPublicWebsiteTournamentFromDto } from "@/lib/website/public-tournaments-mapper";
 import type {
   PublicTeamListItem,
   PublicTeamOrgUnit,
@@ -56,6 +60,8 @@ import type {
   PublicTeamTrainingSession,
   PublicTeamMatch,
   PublicTeamStandings,
+  PublicTeamPublication,
+  PublicWebsiteTournamentItem,
 } from "@/lib/website/types";
 
 // ---------------------------------------------------------------------------
@@ -213,7 +219,13 @@ export async function getPublicTeams(
     return a.name.localeCompare(b.name, "de");
   });
 
-  return mapped.map(({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => item);
+  return mapped.map(
+    ({ _orgUnitSortOrder: _o, _teamSortOrder: _t, ...item }) => {
+      void _o;
+      void _t;
+      return item;
+    },
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -317,6 +329,8 @@ export async function getPublicTeamDetail(
           shortName: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
+          showNextMatch: true,
+          showNextTournament: true,
           season: { select: { key: true, name: true } },
         },
       },
@@ -470,8 +484,30 @@ export async function getPublicTeamDetail(
   let nextMatches: PublicTeamMatch[] = [];
   let results: PublicTeamMatch[] = [];
   let standings: PublicTeamStandings | null = null;
+  let nextTournament: PublicWebsiteTournamentItem | null = null;
+  const publication: PublicTeamPublication = {
+    showNextMatch: teamSeason?.showNextMatch ?? true,
+    showNextTournament: teamSeason?.showNextTournament ?? false,
+  };
 
   if (teamSeason) {
+    if (publication.showNextTournament) {
+      const tournamentEvent = await findNextTournamentEventForTeamSeason(
+        input.tenantId,
+        teamSeason.id,
+        now,
+      );
+
+      if (tournamentEvent) {
+        const [tournament] = await listTournamentsByIds(input.tenantId, [
+          tournamentEvent.id,
+        ]);
+        nextTournament = tournament
+          ? toPublicWebsiteTournamentFromDto(tournament)
+          : null;
+      }
+    }
+
     const tenant = await prisma.tenant.findUnique({
       where: { id: input.tenantId },
       select: { name: true, logoUrl: true },
@@ -698,8 +734,15 @@ export async function getPublicTeamDetail(
     squad,
     trainers,
     training,
+    publication,
     nextMatches,
     results,
     standings,
+    nextTournament,
+    nextEvent: resolvePublicTeamNextEvent({
+      publication,
+      nextMatch: nextMatches[0] ?? null,
+      nextTournament,
+    }),
   };
 }

@@ -14,6 +14,8 @@ import {
   parseTenantLocalDateTimeInput,
   resolveTenantEventTimezone,
 } from "@/lib/events/tenant-local-datetime";
+import { resolveTournamentTeamSeasonId } from "@/lib/tournaments/team-season-resolution";
+import { TournamentValidationError } from "@/lib/tournaments/errors";
 
 const ALLOWED_TYPES = ["MATCH", "TOURNAMENT", "TRAINING", "OTHER"] as const;
 const ALLOWED_SOURCES = ["CLUBCORNER_FVNWS", "MANUAL", "CSV_EXCEL_IMPORT"] as const;
@@ -368,7 +370,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Saison nicht gefunden." }, { status: 404 });
     }
 
-    if (teamId) {
+    let teamSeasonId: string | null = null;
+
+    if (teamId && type === "TOURNAMENT") {
+      teamSeasonId = await resolveTournamentTeamSeasonId(
+        actorTenantId,
+        teamId,
+        seasonId,
+      );
+    } else if (teamId) {
       const team = await prisma.team.findUnique({
         where: { id: teamId },
         select: { id: true },
@@ -454,6 +464,7 @@ export async function POST(request: NextRequest) {
         reviewedAt: Date | null;
         seasonId: string | null;
         teamId: string | null;
+        teamSeasonId: string | null;
         startAt: Date;
         endAt: Date | null;
         meetingTime: Date | null;
@@ -474,6 +485,7 @@ export async function POST(request: NextRequest) {
           data: {
             seasonId,
             teamId,
+            teamSeasonId,
             tenantId: actorTenantId,
             type: type as AllowedEventType,
             source: source as AllowedEventSource,
@@ -516,6 +528,7 @@ export async function POST(request: NextRequest) {
             reviewedAt: true,
             seasonId: true,
             teamId: true,
+            teamSeasonId: true,
             startAt: true,
             endAt: true,
             meetingTime: true,
@@ -542,6 +555,7 @@ export async function POST(request: NextRequest) {
         afterJson: {
           seasonId,
           teamId,
+          teamSeasonId,
           type: type as AllowedEventType,
           source: source as AllowedEventSource,
           status: status as AllowedEventStatus,
@@ -625,6 +639,10 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Create event failed:", error);
+
+    if (error instanceof TournamentValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
 
     if (error instanceof Error) {
       return NextResponse.json(

@@ -1737,6 +1737,8 @@ model TeamSeason {
   infoboardVisible          Boolean           @default(true)
   squadWebsiteVisible       Boolean           @default(true)
   trainerTeamWebsiteVisible Boolean           @default(true)
+  showNextMatch             Boolean           @default(true)
+  showNextTournament        Boolean           @default(false)
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 
@@ -1762,6 +1764,8 @@ model TeamSeason {
   attendanceRecords      AttendanceRecord[]      @relation("TeamSeasonAttendanceRecords")
   // TEAM-COCKPIT-03A: roster-context participation responses for this TeamSeason
   participationResponses ParticipationResponse[] @relation("TeamSeasonParticipationResponses")
+  // TEAM-PUBLIC-NEXT-EVENT-01A: canonical owning TeamSeason for tournament Events.
+  tournamentEvents        Event[]                 @relation("TournamentTeamSeason")
 
   @@unique([teamId, seasonId])
   @@index([seasonId])
@@ -1874,6 +1878,10 @@ model Event {
   /// null rather than cascade-deleting canonical Event/Match/Tournament records.
   seasonId String?
   teamId   String?
+  /// Canonical seasonal owner for TOURNAMENT Events. Nullable for legacy,
+  /// non-tournament, and legitimately teamless events. Event.teamId remains
+  /// compatibility-only until a later explicit consumer migration.
+  teamSeasonId String?
   type     EventType
   source   EventSource
   status   EventStatus @default(SCHEDULED)
@@ -1942,6 +1950,7 @@ model Event {
 
   season               Season?               @relation(fields: [seasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   team                 Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  teamSeason           TeamSeason?           @relation("TournamentTeamSeason", fields: [teamSeasonId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   opponentExternalClub ExternalClub?         @relation("EventOpponentExternalClub", fields: [opponentExternalClubId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   matchExternalMapping MatchExternalMapping?
 
@@ -1974,6 +1983,7 @@ model Event {
   @@index([importBatchKey])
   @@index([pitchCode])
   @@index([opponentExternalClubId])
+  @@index([tenantId, teamSeasonId, type, startAt])
 }
 
 model EventImportRun {

@@ -54,6 +54,11 @@ type Team = {
   currentTeamSeasonId?: string | null;
   currentParticipationType?: string | null;
   currentSeasonOrgUnit?: OrgUnitOption | null;
+  currentSeasonPublication?: {
+    seasonName: string;
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  } | null;
 };
 
 type Props = {
@@ -107,6 +112,24 @@ export default function TeamOverviewSettingsSection({
       ...current,
       ...updatedTeamBase,
     }));
+  }
+
+  function handlePublicationSaved(publication: {
+    showNextMatch: boolean;
+    showNextTournament: boolean;
+  }) {
+    setTeam((current) =>
+      current.currentSeasonPublication
+        ? {
+            ...current,
+            currentSeasonPublication: {
+              ...current.currentSeasonPublication,
+              showNextMatch: publication.showNextMatch,
+              showNextTournament: publication.showNextTournament,
+            },
+          }
+        : current,
+    );
   }
 
   return (
@@ -163,8 +186,10 @@ export default function TeamOverviewSettingsSection({
             currentTeamSeasonId={team.currentTeamSeasonId ?? null}
             currentParticipationType={team.currentParticipationType ?? null}
             currentSeasonOrgUnit={team.currentSeasonOrgUnit ?? null}
+            currentSeasonPublication={team.currentSeasonPublication ?? null}
             canManage={canManage}
             onSaved={handleTeamSaved}
+            onPublicationSaved={handlePublicationSaved}
             onCancelEdit={() => setIsEditingSettings(false)}
           />
         </div>
