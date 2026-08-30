@@ -321,7 +321,10 @@ Demo FC Aktive`,
     },
   ] as const;
 
-  const createdTeams: Record<string, { id: string; name: string; slug: string }> = {};
+  const createdTeams: Record<
+    string,
+    { id: string; name: string; slug: string; teamSeasonId: string }
+  > = {};
 
   for (const teamData of teams) {
     // TEAM-CORE-02: slug uniqueness is now tenant-scoped.
@@ -357,13 +360,7 @@ Demo FC Aktive`,
       },
     });
 
-    createdTeams[team.slug] = {
-      id: team.id,
-      name: team.name,
-      slug: team.slug,
-    };
-
-    await prisma.teamSeason.upsert({
+    const teamSeason = await prisma.teamSeason.upsert({
       where: {
         teamId_seasonId: {
           teamId: team.id,
@@ -387,6 +384,13 @@ Demo FC Aktive`,
         infoboardVisible: true,
       },
     });
+
+    createdTeams[team.slug] = {
+      id: team.id,
+      name: team.name,
+      slug: team.slug,
+      teamSeasonId: teamSeason.id,
+    };
   }
 
   // ─── Demo Events ──────────────────────────────────────────────────────────────
@@ -435,6 +439,7 @@ Demo FC Aktive`,
       data: {
         seasonId: activeSeason.id,
         teamId: createdTeams["e4"].id,
+        teamSeasonId: createdTeams["e4"].teamSeasonId,
         type: EventType.TOURNAMENT,
         source: EventSource.MANUAL,
         status: EventStatus.SCHEDULED,
