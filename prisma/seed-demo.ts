@@ -14,6 +14,8 @@
 
 import "dotenv/config";
 
+import { assertDemoSeedAllowed } from "@/lib/demo/seed-guard";
+
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
   CommunicationTemplateCategory,
@@ -61,6 +63,8 @@ type RegistrationSeedRecord = {
 };
 
 async function main() {
+  assertDemoSeedAllowed();
+
   const fcAllschwilTenant = await prisma.tenant.findUnique({
     where: { key: "fc-allschwil" },
   });
