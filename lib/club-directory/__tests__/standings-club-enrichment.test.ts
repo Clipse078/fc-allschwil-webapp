@@ -37,7 +37,13 @@ describe("buildStandingsClubEnrichmentByProviderTeamId", () => {
           shortName: "Stars",
           logoUrl: EXPLICIT_LOGO,
         },
-        providerMappings: [{ providerTeamId: 100, providerClubId: 483 }],
+        providerMappings: [
+          {
+            providerTeamId: 100,
+            providerClubId: 483,
+            providerTeamName: "FC Black Stars D7a",
+          },
+        ],
       },
     ]);
     const externalClubFindMany = vi.fn().mockResolvedValue([
@@ -65,6 +71,7 @@ describe("buildStandingsClubEnrichmentByProviderTeamId", () => {
       shortName: "Explicit Short",
       logoUrl: EXPLICIT_LOGO,
       resolutionSource: "explicit_provider_mapping",
+      providerTeamName: "FC Black Stars D7a",
     });
   });
 
@@ -95,6 +102,7 @@ describe("buildStandingsClubEnrichmentByProviderTeamId", () => {
       shortName: "Black Stars",
       logoUrl: AUTO_LOGO,
       resolutionSource: "prefix_name_match",
+      providerTeamName: null,
     });
   });
 
@@ -113,6 +121,7 @@ describe("buildStandingsClubEnrichmentByProviderTeamId", () => {
       shortName: null,
       logoUrl: null,
       resolutionSource: "unresolved",
+      providerTeamName: null,
     });
   });
 

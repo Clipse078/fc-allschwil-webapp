@@ -12,7 +12,7 @@ import type { SportingStandingRow } from "@/lib/sporting-data/standings-types";
 
 export type PresentedStandingsRow = {
   readonly position: number;
-  /** Provider display team name — never rewritten by enrichment. */
+  /** Provider standings display team name — structural mapping may override ranking club aliases. */
   readonly teamName: string;
   readonly shortName: string | null;
   readonly isCurrentTeam: boolean;
@@ -39,6 +39,20 @@ export type PresentStandingsRowsInput = {
   >;
 };
 
+function resolveStandingsTeamName(
+  row: SportingStandingRow,
+  enrichment: StandingsClubEnrichment | undefined,
+): string {
+  if (enrichment?.resolutionSource === "explicit_provider_mapping") {
+    const mappedName = enrichment.providerTeamName?.trim();
+    if (mappedName) {
+      return mappedName;
+    }
+  }
+
+  return row.teamName;
+}
+
 /**
  * Maps provider standings rows to the canonical enriched presentation used by
  * both authenticated cockpit and public website consumers.
@@ -52,7 +66,7 @@ export function presentStandingsRows(
 
     return {
       position: row.position,
-      teamName: row.teamName,
+      teamName: resolveStandingsTeamName(row, enrichment),
       shortName: isCurrentTeam
         ? input.currentTeamShortName ?? row.shortName
         : enrichment?.shortName ?? row.shortName,
