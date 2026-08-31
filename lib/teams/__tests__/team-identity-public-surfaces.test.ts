@@ -12,6 +12,7 @@ import {
   mapTrainingToPublicEvent,
   resolveTrainingTeamContext,
 } from "@/lib/wochenplan/public-feed-mapper";
+import { evaluateWochenplanTrainingPublication } from "@/lib/wochenplan/publication-policy";
 import type { WeekplannerTrainingItem } from "@/lib/weekplanner/types";
 
 const STALE_SEASON_NAME = "FC Allschwil Junioren E4";
@@ -19,7 +20,9 @@ const CANONICAL_TEAM_NAME = "FC Allschwil Junioren E2";
 
 const TEAM_ROW = {
   id: "team-e2",
-  slug: "junioren-e2",
+  // A slug is routing identity, not presentation identity. This deliberately
+  // reproduces the stale persisted value diagnosed by TEAM-IDENTITY-02.
+  slug: "e4",
   name: CANONICAL_TEAM_NAME,
   shortName: "E2",
   alternativeName: "Junioren E2",
@@ -65,6 +68,7 @@ describe("canonical team identity — stale TeamSeason.displayName", () => {
 
     expect(context.primaryTeam?.teamName).toBe(CANONICAL_TEAM_NAME);
     expect(context.primaryTeam?.teamName).not.toBe(STALE_SEASON_NAME);
+    expect(context.primaryTeam?.teamSlug).toBe("e4");
   });
 
   it("public Wochenplan training event.team.name uses canonical Team.name", () => {
@@ -97,5 +101,38 @@ describe("canonical team identity — stale TeamSeason.displayName", () => {
 
     expect(event.team?.name).toBe(CANONICAL_TEAM_NAME);
     expect(event.title).toBe("Junioren E2 Training");
+  });
+
+  it("does not rewrite a legitimate canonical identity", () => {
+    expect(
+      resolveLongTeamName({
+        teamName: "Example United Junioren Q7",
+        teamSeasonDisplayName: "Example United Junioren R9",
+        teamAlternativeName: "Q7",
+      }),
+    ).toBe("Example United Junioren Q7");
+  });
+
+  it("keeps the accepted seasonal fallback when canonical Team.name is absent", () => {
+    expect(
+      resolveTeamDisplayName(
+        {
+          name: " ",
+          displayName: "Season-specific training group",
+          shortName: "Training group",
+        },
+        "WEBSITE",
+      ),
+    ).toBe("Season-specific training group");
+  });
+
+  it("keeps Wochenplan publication tenant-isolated", () => {
+    expect(
+      evaluateWochenplanTrainingPublication(
+        "tenant-request",
+        "tenant-other",
+        "SCHEDULED",
+      ),
+    ).toEqual({ eligible: false, reason: "TENANT_MISMATCH" });
   });
 });
