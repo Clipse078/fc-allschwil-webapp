@@ -4,6 +4,7 @@
  * SFV standings provider with tenant-scoped club resolution and read-through cache.
  */
 
+import type { ClubRankingEntry } from "./client";
 import type { SportingStandingsTable } from "@/lib/sporting-data/standings-types";
 import { fetchClubRanking } from "./client";
 import {
@@ -23,6 +24,41 @@ export type FetchTeamStandingsInput = {
   externalSeasonId: number;
   providerLeagueId?: number | null;
 };
+
+/** In-flight deduplication keyed by tenant + season (canonical cache scope). */
+const inflightRankingFetches = new Map<string, Promise<ClubRankingEntry[]>>();
+
+/** Test-only helper — not exposed as a public runtime API. */
+export function resetStandingsInflightForTests(): void {
+  inflightRankingFetches.clear();
+}
+
+async function fetchRankingEntriesWithInflightDedup(
+  cacheKey: string,
+  fetchRanking: () => Promise<ClubRankingEntry[]>,
+): Promise<ClubRankingEntry[]> {
+  const cached = getCachedStandingsEntries(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const inflight = inflightRankingFetches.get(cacheKey);
+  if (inflight) {
+    return inflight;
+  }
+
+  const promise = fetchRanking()
+    .then((entries) => {
+      setCachedStandingsEntries(cacheKey, entries);
+      return entries;
+    })
+    .finally(() => {
+      inflightRankingFetches.delete(cacheKey);
+    });
+
+  inflightRankingFetches.set(cacheKey, promise);
+  return promise;
+}
 
 /**
  * Fetches the authoritative standings table for a mapped SFV team.
@@ -51,17 +87,15 @@ export async function fetchTeamStandingsForMapping(
     const config = await requireEnabledSfvConfigForTenant(input.tenantId);
     const cacheKey = buildStandingsCacheKey(input.tenantId, input.externalSeasonId);
 
-    let entries = getCachedStandingsEntries(cacheKey);
-    if (!entries) {
-      entries = await fetchClubRanking({
+    const entries = await fetchRankingEntriesWithInflightDedup(cacheKey, () =>
+      fetchClubRanking({
         SeasonId: input.externalSeasonId,
         ClubId: config.clubId,
         ...(config.organisationId !== null
           ? { OrganisationId: config.organisationId }
           : {}),
-      });
-      setCachedStandingsEntries(cacheKey, entries);
-    }
+      }),
+    );
 
     return resolveStandingsTable({
       entries,
