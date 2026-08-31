@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ClubRankingEntry } from "../client";
-import { SfvAuthError } from "../errors";
+import { SfvAuthError, SfvNetworkError } from "../errors";
 import { resetStandingsCacheForTests } from "../standings-cache";
 import {
   fetchTeamStandingsForMapping,
@@ -72,6 +72,8 @@ describe("fetchTeamStandingsForMapping", () => {
     vi.clearAllMocks();
     resetStandingsCacheForTests();
     resetStandingsInflightForTests();
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(console, "warn").mockImplementation(() => {});
     mocks.isSfvEnabledForTenant.mockResolvedValue(true);
     mocks.requireEnabledSfvConfigForTenant.mockResolvedValue({
       tenantId: "tenant-a",
@@ -81,6 +83,10 @@ describe("fetchTeamStandingsForMapping", () => {
       enabled: true,
     });
     mocks.fetchClubRanking.mockResolvedValue(defaultEntries);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("fetches on first request and reuses cache on second request", async () => {
@@ -113,8 +119,60 @@ describe("fetchTeamStandingsForMapping", () => {
     expect(mocks.fetchClubRanking).not.toHaveBeenCalled();
   });
 
-  it("returns null when provider fetch fails", async () => {
-    mocks.fetchClubRanking.mockRejectedValue(new Error("provider down"));
+  it("returns null and logs a safe auth diagnostic for SfvAuthError", async () => {
+    const token = "sensitive-token-value";
+    mocks.fetchClubRanking.mockRejectedValue(
+      new SfvAuthError("SFV_UNAUTHORIZED", "SFV ranking request rejected: 401 Unauthorized."),
+    );
+
+    const result = await fetchTeamStandingsForMapping({
+      tenantId: "tenant-a",
+      externalTeamId: 100,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+    });
+
+    expect(result).toBeNull();
+    expect(console.error).toHaveBeenCalledTimes(1);
+
+    const serializedDiagnostic = String(vi.mocked(console.error).mock.calls[0]?.[0]);
+    expect(serializedDiagnostic).toContain("SFV_STANDINGS_PROVIDER_FAILURE");
+    expect(serializedDiagnostic).toContain("SFV_UNAUTHORIZED");
+    expect(serializedDiagnostic).toContain("SFV_AUTH");
+    expect(serializedDiagnostic).not.toContain(token);
+  });
+
+  it.each([
+    ["SFV_TIMEOUT", "SFV_TIMEOUT"],
+    ["SFV_UNAVAILABLE", "SFV_UNAVAILABLE"],
+  ] as const)(
+    "returns null and classifies %s network errors as %s",
+    async (errorCode, expectedCategory) => {
+      mocks.fetchClubRanking.mockRejectedValue(
+        new SfvNetworkError(errorCode, "Safe provider failure."),
+      );
+
+      const result = await fetchTeamStandingsForMapping({
+        tenantId: "tenant-a",
+        externalTeamId: 100,
+        externalSeasonId: 2027,
+      });
+
+      expect(result).toBeNull();
+      const diagnostic = JSON.parse(
+        String(vi.mocked(console.error).mock.calls[0]?.[0]),
+      ) as Record<string, unknown>;
+      expect(diagnostic).toMatchObject({
+        event: "SFV_STANDINGS_PROVIDER_FAILURE",
+        errorCode,
+        failureCategory: expectedCategory,
+      });
+    },
+  );
+
+  it("returns null and classifies unknown errors without logging their message", async () => {
+    const unsafeMessage = "provider down with sensitive-token-value";
+    mocks.fetchClubRanking.mockRejectedValue(new Error(unsafeMessage));
 
     const result = await fetchTeamStandingsForMapping({
       tenantId: "tenant-a",
@@ -123,6 +181,51 @@ describe("fetchTeamStandingsForMapping", () => {
     });
 
     expect(result).toBeNull();
+    const serializedDiagnostic = String(vi.mocked(console.error).mock.calls[0]?.[0]);
+    const diagnostic = JSON.parse(serializedDiagnostic) as Record<string, unknown>;
+    expect(diagnostic).toMatchObject({
+      event: "SFV_STANDINGS_PROVIDER_FAILURE",
+      errorName: "Error",
+      errorCode: "INTERNAL_ERROR",
+      failureCategory: "UNKNOWN",
+    });
+    expect(serializedDiagnostic).not.toContain(unsafeMessage);
+    expect(serializedDiagnostic).not.toContain("sensitive-token-value");
+  });
+
+  it("logs a separate diagnostic when fetched rankings cannot be resolved", async () => {
+    const result = await fetchTeamStandingsForMapping({
+      tenantId: "tenant-a",
+      externalTeamId: 999,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+    });
+
+    expect(result).toBeNull();
+    expect(console.error).not.toHaveBeenCalled();
+    expect(console.warn).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[0]?.[0]))).toMatchObject({
+      event: "SFV_STANDINGS_RESOLUTION_EMPTY",
+      tenantId: "tenant-a",
+      externalTeamId: 999,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+      rankingEntryCount: 2,
+      externalTeamIdPresent: false,
+    });
+  });
+
+  it("returns resolved standings without emitting diagnostics", async () => {
+    const result = await fetchTeamStandingsForMapping({
+      tenantId: "tenant-a",
+      externalTeamId: 100,
+      externalSeasonId: 2027,
+      providerLeagueId: 10,
+    });
+
+    expect(result).not.toBeNull();
+    expect(console.error).not.toHaveBeenCalled();
+    expect(console.warn).not.toHaveBeenCalled();
   });
 
   describe("inflight deduplication", () => {

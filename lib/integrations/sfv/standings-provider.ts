@@ -7,6 +7,7 @@
 import type { ClubRankingEntry } from "./client";
 import type { SportingStandingsTable } from "@/lib/sporting-data/standings-types";
 import { fetchClubRanking } from "./client";
+import { SfvError } from "./errors";
 import {
   buildStandingsCacheKey,
   getCachedStandingsEntries,
@@ -27,6 +28,55 @@ export type FetchTeamStandingsInput = {
 
 /** In-flight deduplication keyed by tenant + season (canonical cache scope). */
 const inflightRankingFetches = new Map<string, Promise<ClubRankingEntry[]>>();
+
+type StandingsFailureCategory =
+  | "SFV_AUTH"
+  | "SFV_TIMEOUT"
+  | "SFV_UNAVAILABLE"
+  | "SFV_PROVIDER_ERROR"
+  | "UNKNOWN";
+
+function classifyStandingsFailure(error: unknown): StandingsFailureCategory {
+  if (!(error instanceof SfvError)) {
+    return "UNKNOWN";
+  }
+
+  switch (error.code) {
+    case "SFV_UNAUTHORIZED":
+    case "SFV_FORBIDDEN":
+      return "SFV_AUTH";
+    case "SFV_TIMEOUT":
+      return "SFV_TIMEOUT";
+    case "SFV_UNAVAILABLE":
+    case "SFV_RATE_LIMITED":
+      return "SFV_UNAVAILABLE";
+    default:
+      return "SFV_PROVIDER_ERROR";
+  }
+}
+
+function logStandingsProviderFailure(
+  input: FetchTeamStandingsInput,
+  error: unknown,
+): void {
+  const isSfvError = error instanceof SfvError;
+
+  console.error(
+    JSON.stringify({
+      event: "SFV_STANDINGS_PROVIDER_FAILURE",
+      tenantId: input.tenantId,
+      externalTeamId: input.externalTeamId,
+      externalSeasonId: input.externalSeasonId,
+      providerLeagueId: input.providerLeagueId ?? null,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      errorCode: isSfvError ? error.code : "INTERNAL_ERROR",
+      errorMessage: isSfvError
+        ? error.message
+        : "An unexpected error occurred in the SFV standings provider.",
+      failureCategory: classifyStandingsFailure(error),
+    }),
+  );
+}
 
 /** Test-only helper — not exposed as a public runtime API. */
 export function resetStandingsInflightForTests(): void {
@@ -97,12 +147,31 @@ export async function fetchTeamStandingsForMapping(
       }),
     );
 
-    return resolveStandingsTable({
+    const standings = resolveStandingsTable({
       entries,
       externalTeamId: input.externalTeamId,
       providerLeagueId: input.providerLeagueId,
     });
-  } catch {
+
+    if (!standings) {
+      console.warn(
+        JSON.stringify({
+          event: "SFV_STANDINGS_RESOLUTION_EMPTY",
+          tenantId: input.tenantId,
+          externalTeamId: input.externalTeamId,
+          externalSeasonId: input.externalSeasonId,
+          providerLeagueId: input.providerLeagueId ?? null,
+          rankingEntryCount: entries.length,
+          externalTeamIdPresent: entries.some(
+            (entry) => entry.teamId === input.externalTeamId,
+          ),
+        }),
+      );
+    }
+
+    return standings;
+  } catch (error) {
+    logStandingsProviderFailure(input, error);
     return null;
   }
 }
