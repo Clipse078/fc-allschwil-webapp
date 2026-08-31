@@ -96,6 +96,7 @@ function buildFf14Enrichment(): Map<number, StandingsClubEnrichment> {
         shortName: "BIFC",
         logoUrl: "https://cdn.example.com/basel-internationaler-fc.png",
         resolutionSource: "prefix_name_match",
+        providerTeamName: null,
       },
     ],
     [
@@ -105,6 +106,7 @@ function buildFf14Enrichment(): Map<number, StandingsClubEnrichment> {
         shortName: "Muttenz",
         logoUrl: "https://cdn.example.com/sv-muttenz.png",
         resolutionSource: "exact_name_match",
+        providerTeamName: null,
       },
     ],
     [
@@ -114,6 +116,7 @@ function buildFf14Enrichment(): Map<number, StandingsClubEnrichment> {
         shortName: "Arlesheim",
         logoUrl: "https://cdn.example.com/fc-arlesheim.png",
         resolutionSource: "exact_name_match",
+        providerTeamName: null,
       },
     ],
     [
@@ -123,6 +126,7 @@ function buildFf14Enrichment(): Map<number, StandingsClubEnrichment> {
         shortName: "Nordstern",
         logoUrl: "https://cdn.example.com/fc-nordstern.png",
         resolutionSource: "prefix_name_match",
+        providerTeamName: null,
       },
     ],
   ]);
@@ -230,6 +234,7 @@ describe("cockpit/public standings logo parity", () => {
             clubKey === "basel-international"
               ? "exact_name_match"
               : "prefix_name_match",
+          providerTeamName: null,
         },
       ]),
     );
@@ -256,5 +261,157 @@ describe("cockpit/public standings logo parity", () => {
     expect(publicRows.map((row) => row.team.logoUrl)).toEqual(
       cockpitRows.map((row) => row.logoUrl),
     );
+  });
+});
+
+describe("STANDINGS-INTEGRITY-01 regression", () => {
+  const BASLER_ROW = {
+    position: 4,
+    externalTeamId: 61472,
+    teamName: "FC Basler V.Betriebe",
+    shortName: null,
+    played: 2,
+    won: 1,
+    drawn: 0,
+    lost: 1,
+    goalsFor: 14,
+    goalsAgainst: 10,
+    points: 3,
+    penaltyPoints: 0,
+  };
+
+  it("preserves provider identity when ranking rows surface club aliases", () => {
+    const rankingAliasRow = {
+      ...BASLER_ROW,
+      teamName: "BVB BCO Alemannia",
+    };
+    const enrichment = new Map<number, StandingsClubEnrichment>([
+      [
+        61472,
+        {
+          canonicalClubId: "club-basler-vbetriebe",
+          shortName: null,
+          logoUrl: "https://cdn.example.com/basler.png",
+          resolutionSource: "explicit_provider_mapping",
+          providerTeamName: "FC Basler V.Betriebe",
+        },
+      ],
+    ]);
+
+    const [row] = presentStandingsRows({
+      rows: [rankingAliasRow],
+      currentExternalTeamId: 47357,
+      currentTeamShortName: null,
+      tenantLogoUrl: null,
+      enrichmentByProviderTeamId: enrichment,
+    });
+
+    expect(row).toMatchObject({
+      teamName: "FC Basler V.Betriebe",
+      position: 4,
+      played: 2,
+      won: 1,
+      drawn: 0,
+      lost: 1,
+      goalsFor: 14,
+      goalsAgainst: 10,
+      goalDifference: 4,
+      points: 3,
+    });
+  });
+
+  it("never emits a wrong canonical club name from auto-resolution shortName", () => {
+    const enrichment = new Map<number, StandingsClubEnrichment>([
+      [
+        61472,
+        {
+          canonicalClubId: "club-wrong-alemannia",
+          shortName: "BCO Alemannia Basel",
+          logoUrl: "https://cdn.example.com/wrong.png",
+          resolutionSource: "prefix_name_match",
+          providerTeamName: null,
+        },
+      ],
+    ]);
+
+    const [row] = presentStandingsRows({
+      rows: [BASLER_ROW],
+      currentExternalTeamId: 47357,
+      currentTeamShortName: null,
+      tenantLogoUrl: null,
+      enrichmentByProviderTeamId: enrichment,
+    });
+
+    expect(row.teamName).toBe("FC Basler V.Betriebe");
+    expect(row.shortName).toBe("BCO Alemannia Basel");
+  });
+
+  it("keeps safe prefix auto-resolution logos without rewriting provider names", () => {
+    const enrichment = new Map<number, StandingsClubEnrichment>([
+      [
+        200,
+        {
+          canonicalClubId: "club-black-stars",
+          shortName: "Stars",
+          logoUrl: "https://cdn.example.com/black-stars.png",
+          resolutionSource: "prefix_name_match",
+          providerTeamName: null,
+        },
+      ],
+    ]);
+
+    const [row] = presentStandingsRows({
+      rows: [
+        {
+          position: 1,
+          externalTeamId: 200,
+          teamName: "FC Black Stars D7a",
+          shortName: null,
+          played: 1,
+          won: 1,
+          drawn: 0,
+          lost: 0,
+          goalsFor: 2,
+          goalsAgainst: 0,
+          points: 3,
+          penaltyPoints: 0,
+        },
+      ],
+      currentExternalTeamId: 100,
+      currentTeamShortName: null,
+      tenantLogoUrl: null,
+      enrichmentByProviderTeamId: enrichment,
+    });
+
+    expect(row.teamName).toBe("FC Black Stars D7a");
+    expect(row.shortName).toBe("Stars");
+    expect(row.logoUrl).toBe("https://cdn.example.com/black-stars.png");
+  });
+
+  it("leaves ambiguous auto-resolution without canonical shortName override", () => {
+    const enrichment = new Map<number, StandingsClubEnrichment>([
+      [
+        61472,
+        {
+          canonicalClubId: null,
+          shortName: null,
+          logoUrl: null,
+          resolutionSource: "unresolved",
+          providerTeamName: null,
+        },
+      ],
+    ]);
+
+    const [row] = presentStandingsRows({
+      rows: [BASLER_ROW],
+      currentExternalTeamId: 47357,
+      currentTeamShortName: null,
+      tenantLogoUrl: null,
+      enrichmentByProviderTeamId: enrichment,
+    });
+
+    expect(row.teamName).toBe("FC Basler V.Betriebe");
+    expect(row.shortName).toBeNull();
+    expect(row.logoUrl).toBeNull();
   });
 });

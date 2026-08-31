@@ -312,6 +312,7 @@ describe("getPublicTeamDetail — standings", () => {
             shortName: "Black Stars",
             logoUrl: "https://cdn.example.com/fc-black-stars.png",
             resolutionSource: "prefix_name_match",
+            providerTeamName: null,
           },
         ],
       ]),

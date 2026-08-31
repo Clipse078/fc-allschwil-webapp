@@ -27,9 +27,16 @@ export type StandingsProviderTeamRow = {
 
 export type StandingsClubEnrichment = {
   readonly canonicalClubId: string | null;
+  /** Compact label from ExternalTeam/ExternalClub shortName only — never a full club name. */
   readonly shortName: string | null;
   readonly logoUrl: string | null;
   readonly resolutionSource: CanonicalClubResolutionSource | "unresolved";
+  /**
+   * SFV team label from an explicit ExternalTeamProviderMapping row.
+   * When present, standings presentation prefers this over ranking teamName
+   * because ranking payloads can surface club-level aliases for the same teamId.
+   */
+  readonly providerTeamName: string | null;
 };
 
 type ExplicitStandingsExternalTeamRecord = {
@@ -44,6 +51,7 @@ type ExplicitStandingsExternalTeamRecord = {
   readonly providerMappings: ReadonlyArray<{
     readonly providerTeamId: number;
     readonly providerClubId: number | null;
+    readonly providerTeamName: string | null;
   }>;
 };
 
@@ -70,9 +78,10 @@ function toAutoResolvedEnrichment(
 ): StandingsClubEnrichment {
   return {
     canonicalClubId: resolved.id,
-    shortName: resolved.shortName ?? resolved.name,
+    shortName: resolved.shortName,
     logoUrl: resolved.logoUrl,
     resolutionSource: resolved.source,
+    providerTeamName: null,
   };
 }
 
@@ -137,6 +146,7 @@ export async function buildStandingsClubEnrichmentByProviderTeamId(
           select: {
             providerTeamId: true,
             providerClubId: true,
+            providerTeamName: true,
           },
         },
       },
@@ -183,6 +193,7 @@ export async function buildStandingsClubEnrichmentByProviderTeamId(
         shortName: externalTeam.shortName ?? externalTeam.externalClub.shortName,
         logoUrl,
         resolutionSource: "explicit_provider_mapping",
+        providerTeamName: providerMapping.providerTeamName,
       });
     }
   }
@@ -208,6 +219,7 @@ export async function buildStandingsClubEnrichmentByProviderTeamId(
             shortName: null,
             logoUrl: null,
             resolutionSource: "unresolved",
+            providerTeamName: null,
           },
     );
   }
