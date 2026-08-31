@@ -82,6 +82,8 @@ type Props = {
     seasonName: string;
     showNextMatch: boolean;
     showNextTournament: boolean;
+    squadWebsiteVisible: boolean;
+    trainerTeamWebsiteVisible: boolean;
   } | null;
   canManage: boolean;
   onSaved?: (team: Team) => void;
@@ -135,6 +137,8 @@ function FormSection({
 type PublicationValues = {
   showNextMatch: boolean;
   showNextTournament: boolean;
+  squadWebsiteVisible: boolean;
+  trainerTeamWebsiteVisible: boolean;
 };
 
 function getPublicationValues(
@@ -149,6 +153,14 @@ function getPublicationValues(
       typeof publication?.showNextTournament === "boolean"
         ? publication.showNextTournament
         : false,
+    squadWebsiteVisible:
+      typeof publication?.squadWebsiteVisible === "boolean"
+        ? publication.squadWebsiteVisible
+        : true,
+    trainerTeamWebsiteVisible:
+      typeof publication?.trainerTeamWebsiteVisible === "boolean"
+        ? publication.trainerTeamWebsiteVisible
+        : true,
   };
 }
 
@@ -162,7 +174,9 @@ function parseSavedPublication(
   const record = value as Record<string, unknown>;
   if (
     typeof record.showNextMatch !== "boolean" ||
-    typeof record.showNextTournament !== "boolean"
+    typeof record.showNextTournament !== "boolean" ||
+    typeof record.squadWebsiteVisible !== "boolean" ||
+    typeof record.trainerTeamWebsiteVisible !== "boolean"
   ) {
     return null;
   }
@@ -170,6 +184,8 @@ function parseSavedPublication(
   return {
     showNextMatch: record.showNextMatch,
     showNextTournament: record.showNextTournament,
+    squadWebsiteVisible: record.squadWebsiteVisible,
+    trainerTeamWebsiteVisible: record.trainerTeamWebsiteVisible,
   };
 }
 
@@ -212,6 +228,9 @@ export default function TeamSettingsCard({
 
   const canonicalShowNextMatch = currentSeasonPublication?.showNextMatch;
   const canonicalShowNextTournament = currentSeasonPublication?.showNextTournament;
+  const canonicalSquadWebsiteVisible = currentSeasonPublication?.squadWebsiteVisible;
+  const canonicalTrainerTeamWebsiteVisible =
+    currentSeasonPublication?.trainerTeamWebsiteVisible;
 
   useEffect(() => {
     const nextPublication = getPublicationValues(currentSeasonPublication);
@@ -223,6 +242,8 @@ export default function TeamSettingsCard({
     currentTeamSeasonId,
     canonicalShowNextMatch,
     canonicalShowNextTournament,
+    canonicalSquadWebsiteVisible,
+    canonicalTrainerTeamWebsiteVisible,
   ]);
 
   const genderGroupOptions =
@@ -345,7 +366,11 @@ export default function TeamSettingsCard({
   }
 
   function updatePublicationField(
-    field: "showNextMatch" | "showNextTournament",
+    field:
+      | "showNextMatch"
+      | "showNextTournament"
+      | "squadWebsiteVisible"
+      | "trainerTeamWebsiteVisible",
     nextValue: boolean,
   ) {
     if (!canManage || !currentSeasonPublication) {
@@ -427,6 +452,8 @@ export default function TeamSettingsCard({
         const publicationBody: {
           showNextMatch?: boolean;
           showNextTournament?: boolean;
+          squadWebsiteVisible?: boolean;
+          trainerTeamWebsiteVisible?: boolean;
         } = {};
 
         if (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch) {
@@ -437,6 +464,19 @@ export default function TeamSettingsCard({
           publicationBaseline.showNextTournament
         ) {
           publicationBody.showNextTournament = publicationDraft.showNextTournament;
+        }
+        if (
+          publicationDraft.squadWebsiteVisible !==
+          publicationBaseline.squadWebsiteVisible
+        ) {
+          publicationBody.squadWebsiteVisible = publicationDraft.squadWebsiteVisible;
+        }
+        if (
+          publicationDraft.trainerTeamWebsiteVisible !==
+          publicationBaseline.trainerTeamWebsiteVisible
+        ) {
+          publicationBody.trainerTeamWebsiteVisible =
+            publicationDraft.trainerTeamWebsiteVisible;
         }
 
         const publicationResponse = await fetch(
@@ -496,7 +536,10 @@ export default function TeamSettingsCard({
   const isPublicationDirty =
     currentSeasonPublication !== null &&
     (publicationDraft.showNextMatch !== publicationBaseline.showNextMatch ||
-      publicationDraft.showNextTournament !== publicationBaseline.showNextTournament);
+      publicationDraft.showNextTournament !== publicationBaseline.showNextTournament ||
+      publicationDraft.squadWebsiteVisible !== publicationBaseline.squadWebsiteVisible ||
+      publicationDraft.trainerTeamWebsiteVisible !==
+        publicationBaseline.trainerTeamWebsiteVisible);
 
   const isDirty = isTeamDirty || isPublicationDirty;
 
@@ -839,32 +882,56 @@ export default function TeamSettingsCard({
           title="Website-Veröffentlichung"
           description={
             currentSeasonPublication
-              ? `Einstellungen für ${currentSeasonPublication.seasonName}. Änderungen werden mit «Team speichern» übernommen. Wenn beide aktiviert sind, wird zuerst das nächste Spiel angezeigt. Ist kein kommendes Spiel vorhanden, wird das nächste Turnier angezeigt.`
+              ? `Einstellungen für ${currentSeasonPublication.seasonName}. Änderungen werden mit «Team speichern» übernommen. Wenn beide Event-Schalter aktiviert sind, wird zuerst das nächste Spiel angezeigt; ist kein kommendes Spiel vorhanden, wird das nächste Turnier angezeigt.`
               : "Keine aktuelle Saison — Veröffentlichung kann erst nach Saisonzuordnung gepflegt werden."
           }
         >
           <div
-            className="space-y-3 md:col-span-2"
+            className="space-y-5 md:col-span-2"
             data-testid="team-season-next-event-controls"
           >
-            <SwitchToggle
-              id="show-next-match"
-              label="Nächstes Spiel anzeigen"
-              checked={publicationDraft.showNextMatch}
-              onChange={(checked) =>
-                updatePublicationField("showNextMatch", checked)
-              }
-              disabled={!canManage || !currentSeasonPublication || submitting}
-            />
-            <SwitchToggle
-              id="show-next-tournament"
-              label="Nächstes Turnier anzeigen"
-              checked={publicationDraft.showNextTournament}
-              onChange={(checked) =>
-                updatePublicationField("showNextTournament", checked)
-              }
-              disabled={!canManage || !currentSeasonPublication || submitting}
-            />
+            <div className="space-y-3">
+              <p className={labelClass}>Nächstes Event</p>
+              <SwitchToggle
+                id="show-next-match"
+                label="Nächstes Spiel anzeigen"
+                checked={publicationDraft.showNextMatch}
+                onChange={(checked) =>
+                  updatePublicationField("showNextMatch", checked)
+                }
+                disabled={!canManage || !currentSeasonPublication || submitting}
+              />
+              <SwitchToggle
+                id="show-next-tournament"
+                label="Nächstes Turnier anzeigen"
+                checked={publicationDraft.showNextTournament}
+                onChange={(checked) =>
+                  updatePublicationField("showNextTournament", checked)
+                }
+                disabled={!canManage || !currentSeasonPublication || submitting}
+              />
+            </div>
+            <div className="space-y-3 border-t border-[var(--border)] pt-4">
+              <p className={labelClass}>Teamseite</p>
+              <SwitchToggle
+                id="show-squad-on-team-page"
+                label="Kader auf Teamseite anzeigen"
+                checked={publicationDraft.squadWebsiteVisible}
+                onChange={(checked) =>
+                  updatePublicationField("squadWebsiteVisible", checked)
+                }
+                disabled={!canManage || !currentSeasonPublication || submitting}
+              />
+              <SwitchToggle
+                id="show-trainer-team-on-team-page"
+                label="Trainerteam auf Teamseite anzeigen"
+                checked={publicationDraft.trainerTeamWebsiteVisible}
+                onChange={(checked) =>
+                  updatePublicationField("trainerTeamWebsiteVisible", checked)
+                }
+                disabled={!canManage || !currentSeasonPublication || submitting}
+              />
+            </div>
           </div>
         </FormSection>
 

@@ -458,6 +458,8 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           seasonName: activeSeasonEntry.season.name,
           showNextMatch: activeSeasonEntry.showNextMatch,
           showNextTournament: activeSeasonEntry.showNextTournament,
+          squadWebsiteVisible: activeSeasonEntry.squadWebsiteVisible,
+          trainerTeamWebsiteVisible: activeSeasonEntry.trainerTeamWebsiteVisible,
         }
       : null,
     // TEAM-SEASON-ORGUNIT-01: primary OrgUnit for the current season.

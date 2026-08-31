@@ -55,8 +55,18 @@ beforeEach(() => {
   });
   mocks.updateTeamSeasonPublication.mockResolvedValue({
     ok: true,
-    before: { showNextMatch: true, showNextTournament: false },
-    publication: { showNextMatch: false, showNextTournament: false },
+    before: {
+      showNextMatch: true,
+      showNextTournament: false,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
+    },
+    publication: {
+      showNextMatch: false,
+      showNextTournament: false,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
+    },
   });
 });
 
@@ -113,11 +123,39 @@ describe("PATCH TeamSeason publication", () => {
     });
   });
 
+  it("supports changing squadWebsiteVisible and trainerTeamWebsiteVisible", async () => {
+    await PATCH(
+      request({
+        squadWebsiteVisible: false,
+        trainerTeamWebsiteVisible: false,
+      }),
+      context,
+    );
+
+    expect(mocks.updateTeamSeasonPublication).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      squadWebsiteVisible: false,
+      trainerTeamWebsiteVisible: false,
+    });
+  });
+
   it("preserves explicit false when tournament-only OFF/ON is saved together", async () => {
     mocks.updateTeamSeasonPublication.mockResolvedValueOnce({
       ok: true,
-      before: { showNextMatch: true, showNextTournament: false },
-      publication: { showNextMatch: false, showNextTournament: true },
+      before: {
+        showNextMatch: true,
+        showNextTournament: false,
+        squadWebsiteVisible: true,
+        trainerTeamWebsiteVisible: true,
+      },
+      publication: {
+        showNextMatch: false,
+        showNextTournament: true,
+        squadWebsiteVisible: true,
+        trainerTeamWebsiteVisible: true,
+      },
     });
 
     const response = await PATCH(
@@ -137,6 +175,8 @@ describe("PATCH TeamSeason publication", () => {
     expect(body.publication).toEqual({
       showNextMatch: false,
       showNextTournament: true,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
     });
   });
 

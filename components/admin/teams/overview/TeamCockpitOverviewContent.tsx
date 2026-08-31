@@ -62,6 +62,8 @@ type Team = {
     seasonName: string;
     showNextMatch: boolean;
     showNextTournament: boolean;
+    squadWebsiteVisible: boolean;
+    trainerTeamWebsiteVisible: boolean;
   } | null;
 };
 

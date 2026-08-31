@@ -58,6 +58,8 @@ type Team = {
     seasonName: string;
     showNextMatch: boolean;
     showNextTournament: boolean;
+    squadWebsiteVisible: boolean;
+    trainerTeamWebsiteVisible: boolean;
   } | null;
 };
 
@@ -117,6 +119,8 @@ export default function TeamOverviewSettingsSection({
   function handlePublicationSaved(publication: {
     showNextMatch: boolean;
     showNextTournament: boolean;
+    squadWebsiteVisible: boolean;
+    trainerTeamWebsiteVisible: boolean;
   }) {
     setTeam((current) =>
       current.currentSeasonPublication
@@ -126,6 +130,8 @@ export default function TeamOverviewSettingsSection({
               ...current.currentSeasonPublication,
               showNextMatch: publication.showNextMatch,
               showNextTournament: publication.showNextTournament,
+              squadWebsiteVisible: publication.squadWebsiteVisible,
+              trainerTeamWebsiteVisible: publication.trainerTeamWebsiteVisible,
             },
           }
         : current,
