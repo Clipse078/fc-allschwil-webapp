@@ -401,22 +401,34 @@ describe("11 — Empty response body", () => {
 // ── 12. HTTP 401 ──────────────────────────────────────────────────────────────
 
 describe("12 — HTTP 401", () => {
-  it("maps HTTP 401 to SFV_UNAUTHORIZED", async () => {
-    mockFetchSequence(statusResponse(401));
+  it("maps HTTP 401 to SFV_UNAUTHORIZED after the controlled retry also fails", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401));
 
     await expect(fetchClubRanking(REQUIRED_PARAMS)).rejects.toMatchObject({
       code: "SFV_UNAUTHORIZED",
     });
   });
 
-  it("HTTP 401 error is SfvAuthError", async () => {
-    mockFetchSequence(statusResponse(401));
+  it("HTTP 401 error is SfvAuthError after retry exhaustion", async () => {
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401));
 
     await expect(fetchClubRanking(REQUIRED_PARAMS)).rejects.toBeInstanceOf(SfvAuthError);
   });
 
   it("HTTP 401 on business request evicts the cached token", async () => {
-    mockFetchSequence(statusResponse(401));
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401));
 
     try {
       await fetchClubRanking(REQUIRED_PARAMS);
@@ -439,6 +451,55 @@ describe("12 — HTTP 401", () => {
     await fetchClubRanking(REQUIRED_PARAMS);
 
     expect(freshSpy).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── 12b. Controlled retry after 401 ───────────────────────────────────────────
+
+describe("12b — Controlled retry after 401", () => {
+  it("retries the business request once after a 401 response", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(jsonResponse([SYNTHETIC_ENTRY]));
+
+    const result = await fetchClubRanking(REQUIRED_PARAMS);
+
+    expect(result).toEqual([SYNTHETIC_ENTRY]);
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
+  });
+
+  it("the retry uses a freshly acquired token after 401", async () => {
+    const FRESH_TOKEN = "refreshed-token-different";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(FRESH_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(jsonResponse([SYNTHETIC_ENTRY]));
+
+    await fetchClubRanking(REQUIRED_PARAMS);
+
+    const [, retryInit] = fetchSpy.mock.calls[3];
+    const retryHeaders = new Headers((retryInit as RequestInit).headers);
+    expect(retryHeaders.get("X-User-Token")).toBe(FRESH_TOKEN);
+  });
+
+  it("throws SFV_UNAUTHORIZED if the retry also returns 401 (no third request)", async () => {
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401));
+
+    await expect(fetchClubRanking(REQUIRED_PARAMS)).rejects.toMatchObject({
+      code: "SFV_UNAUTHORIZED",
+    });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(4);
   });
 });
 
@@ -545,7 +606,11 @@ describe("18 — Malformed response", () => {
 
 describe("19 — Token never appears in errors", () => {
   it("error message on 401 does not contain the token value", async () => {
-    mockFetchSequence(statusResponse(401));
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401))
+      .mockResolvedValueOnce(new Response(SYNTHETIC_TOKEN, { status: 200, headers: { "Content-Type": "text/plain" } }))
+      .mockResolvedValueOnce(statusResponse(401));
 
     try {
       await fetchClubRanking(REQUIRED_PARAMS);

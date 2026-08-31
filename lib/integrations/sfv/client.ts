@@ -1151,8 +1151,10 @@ async function executeClubRankingRequest(
  * Endpoint: GET /api/club/ranking
  * Documented in: SFV Club API Interface OpenAPI v26.6.15.2
  *
- * Uses the in-memory token cache from acquireToken(). On 401, the cache is
- * evicted automatically so the next call will re-authenticate.
+ * Uses the in-memory token cache from acquireToken(). On 401, the cached
+ * token is evicted and the request is retried once with a freshly acquired
+ * token (one controlled retry — no retry loop). If the retry also returns 401,
+ * throws SFV_UNAUTHORIZED.
  *
  * Returns an empty array on empty response body.
  * Never persists data to the database.
@@ -1162,7 +1164,18 @@ async function executeClubRankingRequest(
 export async function fetchClubRanking(params: ClubRankingParams): Promise<ClubRankingEntry[]> {
   const config = getSfvConfig();
   const cached = await acquireToken();
-  return executeClubRankingRequest(config, cached.token, params);
+
+  try {
+    return await executeClubRankingRequest(config, cached.token, params);
+  } catch (error) {
+    if (error instanceof SfvAuthError && error.code === "SFV_UNAUTHORIZED") {
+      // One controlled retry after 401: evict cache and re-acquire.
+      // executeClubRankingRequest already called evictCachedToken() before throwing.
+      const fresh = await acquireToken();
+      return executeClubRankingRequest(config, fresh.token, params);
+    }
+    throw error;
+  }
 }
 
 // ── Team picture types and client (Slice 3d) ─────────────────────────────────
