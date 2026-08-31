@@ -196,9 +196,9 @@ describe("fetchTeamStandingsForMapping", () => {
   it("logs a separate diagnostic when fetched rankings cannot be resolved", async () => {
     const result = await fetchTeamStandingsForMapping({
       tenantId: "tenant-a",
-      externalTeamId: 100,
+      externalTeamId: 999,
       externalSeasonId: 2027,
-      providerLeagueId: 999,
+      providerLeagueId: 10,
     });
 
     expect(result).toBeNull();
@@ -207,11 +207,11 @@ describe("fetchTeamStandingsForMapping", () => {
     expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[0]?.[0]))).toMatchObject({
       event: "SFV_STANDINGS_RESOLUTION_EMPTY",
       tenantId: "tenant-a",
-      externalTeamId: 100,
+      externalTeamId: 999,
       externalSeasonId: 2027,
-      providerLeagueId: 999,
+      providerLeagueId: 10,
       rankingEntryCount: 2,
-      externalTeamIdPresent: true,
+      externalTeamIdPresent: false,
     });
   });
 
