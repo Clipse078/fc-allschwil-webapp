@@ -42,6 +42,8 @@ const publication = {
   seasonName: "Saison 2026/27",
   showNextMatch: true,
   showNextTournament: false,
+  squadWebsiteVisible: true,
+  trainerTeamWebsiteVisible: true,
 };
 
 function publicationPatchCalls() {
@@ -102,6 +104,14 @@ beforeEach(() => {
               typeof body.showNextTournament === "boolean"
                 ? body.showNextTournament
                 : publication.showNextTournament,
+            squadWebsiteVisible:
+              typeof body.squadWebsiteVisible === "boolean"
+                ? body.squadWebsiteVisible
+                : publication.squadWebsiteVisible,
+            trainerTeamWebsiteVisible:
+              typeof body.trainerTeamWebsiteVisible === "boolean"
+                ? body.trainerTeamWebsiteVisible
+                : publication.trainerTeamWebsiteVisible,
           },
         }),
       };
@@ -266,6 +276,8 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
     expect(onPublicationSaved).toHaveBeenCalledWith({
       showNextMatch: false,
       showNextTournament: true,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
     });
     expect(saveButtons()[0]).toBeDisabled();
 
@@ -275,6 +287,8 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           seasonName: "Saison 2026/27",
           showNextMatch: false,
           showNextTournament: true,
+          squadWebsiteVisible: true,
+          trainerTeamWebsiteVisible: true,
         },
       }),
     );
@@ -304,6 +318,8 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           seasonName: publication.seasonName,
           showNextMatch: publication.showNextMatch,
           showNextTournament: publication.showNextTournament,
+          squadWebsiteVisible: publication.squadWebsiteVisible,
+          trainerTeamWebsiteVisible: publication.trainerTeamWebsiteVisible,
         },
       }),
     );
@@ -405,6 +421,8 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           seasonName: "Saison 2026/27",
           showNextMatch: true,
           showNextTournament: true,
+          squadWebsiteVisible: true,
+          trainerTeamWebsiteVisible: true,
         }}
         canManage
       />,
@@ -591,5 +609,82 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
       expect.anything(),
     );
     expect(screen.getByText("Team erfolgreich gespeichert.")).toBeVisible();
+  });
+
+  it("renders persisted squad and trainer team visibility for the current season", () => {
+    renderCard({
+      publication: {
+        seasonName: "Saison 2026/27",
+        showNextMatch: true,
+        showNextTournament: false,
+        squadWebsiteVisible: false,
+        trainerTeamWebsiteVisible: true,
+      },
+    });
+
+    expect(
+      screen.getByRole("switch", { name: "Kader auf Teamseite anzeigen" }),
+    ).toHaveAttribute("aria-checked", "false");
+    expect(
+      screen.getByRole("switch", { name: "Trainerteam auf Teamseite anzeigen" }),
+    ).toHaveAttribute("aria-checked", "true");
+  });
+
+  it.each([
+    {
+      label: "squadWebsiteVisible true → false",
+      toggleName: "Kader auf Teamseite anzeigen",
+      field: "squadWebsiteVisible",
+      initial: true,
+      next: false,
+    },
+    {
+      label: "squadWebsiteVisible false → true",
+      toggleName: "Kader auf Teamseite anzeigen",
+      field: "squadWebsiteVisible",
+      initial: false,
+      next: true,
+    },
+    {
+      label: "trainerTeamWebsiteVisible true → false",
+      toggleName: "Trainerteam auf Teamseite anzeigen",
+      field: "trainerTeamWebsiteVisible",
+      initial: true,
+      next: false,
+    },
+    {
+      label: "trainerTeamWebsiteVisible false → true",
+      toggleName: "Trainerteam auf Teamseite anzeigen",
+      field: "trainerTeamWebsiteVisible",
+      initial: false,
+      next: true,
+    },
+  ])("persists $label via Team speichern", async ({ toggleName, field, initial, next }) => {
+    renderCard({
+      publication: {
+        seasonName: "Saison 2026/27",
+        showNextMatch: true,
+        showNextTournament: false,
+        squadWebsiteVisible:
+          field === "squadWebsiteVisible" ? initial : publication.squadWebsiteVisible,
+        trainerTeamWebsiteVisible:
+          field === "trainerTeamWebsiteVisible"
+            ? initial
+            : publication.trainerTeamWebsiteVisible,
+      },
+    });
+
+    await userEvent.click(screen.getByRole("switch", { name: toggleName }));
+    await userEvent.click(saveButtons()[0]);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/teams/team-a/team-seasons/season-a/publication",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ [field]: next }),
+        }),
+      ),
+    );
   });
 });

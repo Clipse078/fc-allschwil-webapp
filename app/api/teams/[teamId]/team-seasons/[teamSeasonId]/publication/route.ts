@@ -16,12 +16,16 @@ const publicationUpdateSchema = z
   .object({
     showNextMatch: z.boolean().optional(),
     showNextTournament: z.boolean().optional(),
+    squadWebsiteVisible: z.boolean().optional(),
+    trainerTeamWebsiteVisible: z.boolean().optional(),
   })
   .strict()
   .refine(
     (value) =>
       value.showNextMatch !== undefined ||
-      value.showNextTournament !== undefined,
+      value.showNextTournament !== undefined ||
+      value.squadWebsiteVisible !== undefined ||
+      value.trainerTeamWebsiteVisible !== undefined,
     { message: "Mindestens eine Veröffentlichungseinstellung ist erforderlich." },
   );
 
@@ -38,7 +42,7 @@ const ERROR_STATUS: Record<
 /**
  * PATCH /api/teams/[teamId]/team-seasons/[teamSeasonId]/publication
  *
- * Updates only supplied, seasonal public team-page next-event controls.
+ * Updates only supplied, seasonal public team-page publication controls.
  * Requires teams.manage and derives the tenant exclusively from the session.
  */
 export async function PATCH(request: NextRequest, { params }: Context) {

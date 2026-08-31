@@ -700,11 +700,15 @@ export type UpdateTeamSeasonPublicationInput = {
   teamSeasonId: string;
   showNextMatch?: boolean;
   showNextTournament?: boolean;
+  squadWebsiteVisible?: boolean;
+  trainerTeamWebsiteVisible?: boolean;
 };
 
 export type TeamSeasonPublicationSettings = {
   showNextMatch: boolean;
   showNextTournament: boolean;
+  squadWebsiteVisible: boolean;
+  trainerTeamWebsiteVisible: boolean;
 };
 
 export type UpdateTeamSeasonPublicationResult =
@@ -727,8 +731,8 @@ export type UpdateTeamSeasonPublicationResult =
  * Updates only explicitly supplied TeamSeason publication controls.
  *
  * The owning Team and its tenant are validated before writing. These flags
- * affect only the public team page's resolved next-event position; canonical
- * match and tournament records remain untouched.
+ * affect only the public team page presentation; canonical match, tournament,
+ * squad, and trainer records remain untouched.
  */
 export async function updateTeamSeasonPublication(
   input: UpdateTeamSeasonPublicationInput,
@@ -739,6 +743,8 @@ export async function updateTeamSeasonPublication(
       teamId: true,
       showNextMatch: true,
       showNextTournament: true,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
       team: { select: { tenantId: true } },
     },
   });
@@ -762,6 +768,8 @@ export async function updateTeamSeasonPublication(
   const data: {
     showNextMatch?: boolean;
     showNextTournament?: boolean;
+    squadWebsiteVisible?: boolean;
+    trainerTeamWebsiteVisible?: boolean;
   } = {};
 
   if (input.showNextMatch !== undefined) {
@@ -769,6 +777,12 @@ export async function updateTeamSeasonPublication(
   }
   if (input.showNextTournament !== undefined) {
     data.showNextTournament = input.showNextTournament;
+  }
+  if (input.squadWebsiteVisible !== undefined) {
+    data.squadWebsiteVisible = input.squadWebsiteVisible;
+  }
+  if (input.trainerTeamWebsiteVisible !== undefined) {
+    data.trainerTeamWebsiteVisible = input.trainerTeamWebsiteVisible;
   }
 
   if (Object.keys(data).length === 0) {
@@ -786,6 +800,8 @@ export async function updateTeamSeasonPublication(
       select: {
         showNextMatch: true,
         showNextTournament: true,
+        squadWebsiteVisible: true,
+        trainerTeamWebsiteVisible: true,
       },
     });
 
@@ -794,6 +810,8 @@ export async function updateTeamSeasonPublication(
       before: {
         showNextMatch: teamSeason.showNextMatch,
         showNextTournament: teamSeason.showNextTournament,
+        squadWebsiteVisible: teamSeason.squadWebsiteVisible,
+        trainerTeamWebsiteVisible: teamSeason.trainerTeamWebsiteVisible,
       },
       publication,
     };

@@ -38,6 +38,8 @@ function makeTeamDetail(overrides: Partial<TeamDetailData> = {}): TeamDetailData
       seasonName: "Saison 2025/26",
       showNextMatch: true,
       showNextTournament: false,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
     },
     currentSeasonOrgUnit: { id: "ou-1", name: "Junioren", key: "junioren", type: "DIVISION" },
     competition: { id: "comp-1", name: "2. Liga", shortName: "2L" },
