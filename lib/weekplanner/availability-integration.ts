@@ -20,7 +20,10 @@ import {
   resourceOccupancyWindowsOverlap,
 } from "@/lib/facilities/resource-occupancy-window";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
-import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import {
+  resolveTrainingOccurrenceAllocations,
+  type TrainingAllocationResourceRow,
+} from "@/lib/training/effective-training-allocation-resolution";
 import { getWochenplanPlanBaselineMode } from "@/lib/wochenplan/plan-baseline";
 import {
   listMatchcenterMatches,
@@ -139,29 +142,20 @@ function pushAllocationConflicts(
   }
 }
 
-type AllocationResourceRow = {
-  facilityResource: { id: string; code: string; name: string; type: string; facility: { name: string } };
+type AllocationResourceRow = TrainingAllocationResourceRow & {
   occupancyBeforeMinutes?: number;
   occupancyAfterMinutes?: number;
 };
 
-function groupAllocationRows(
+function toOccurrenceResourceRefs(
   rows: readonly AllocationResourceRow[],
-): { pitch: WeekplannerResourceRef[]; dressingRoom: WeekplannerResourceRef[] } {
-  const pitch: WeekplannerResourceRef[] = [];
-  const dressingRoom: WeekplannerResourceRef[] = [];
-
-  for (const row of rows) {
-    const ref = toResourceRef(row.facilityResource, {
+): WeekplannerResourceRef[] {
+  return rows.map((row) =>
+    toResourceRef(row.facilityResource, {
       occupancyBeforeMinutes: row.occupancyBeforeMinutes ?? 0,
       occupancyAfterMinutes: row.occupancyAfterMinutes ?? 0,
-    });
-    const resourceGroup = classifyFacilityResourceType(row.facilityResource.type);
-    if (resourceGroup === "PITCH_HALL") pitch.push(ref);
-    else if (resourceGroup === "DRESSING_ROOM") dressingRoom.push(ref);
-  }
-
-  return { pitch, dressingRoom };
+    }),
+  );
 }
 
 async function buildPlanOverrideMaps(
@@ -265,6 +259,7 @@ async function collectTrainingOccupants(
     },
     select: {
       id: true,
+      weekday: true,
       startAt: true,
       endAt: true,
       overrideStartAt: true,
@@ -284,33 +279,47 @@ async function collectTrainingOccupants(
       where: { tenantId, trainingSeriesId: { in: seriesIds } },
       select: {
         trainingSeriesId: true,
+        displayOrder: true,
+        createdAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
       },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     }),
     prisma.trainingSessionAllocation.findMany({
       where: { tenantId, trainingSessionId: { in: sessionIds } },
       select: {
         trainingSessionId: true,
+        displayOrder: true,
+        createdAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
       },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
 
   const seriesAllocMap = new Map<string, AllocationResourceRow[]>();
   for (const row of seriesAllocationRows) {
     const list = seriesAllocMap.get(row.trainingSeriesId) ?? [];
-    list.push({ facilityResource: row.facilityResource });
+    list.push({
+      displayOrder: row.displayOrder,
+      createdAt: row.createdAt,
+      facilityResource: row.facilityResource,
+    });
     seriesAllocMap.set(row.trainingSeriesId, list);
   }
 
   const sessionAllocMap = new Map<string, AllocationResourceRow[]>();
   for (const row of sessionOverrideRows) {
     const list = sessionAllocMap.get(row.trainingSessionId) ?? [];
-    list.push({ facilityResource: row.facilityResource });
+    list.push({
+      displayOrder: row.displayOrder,
+      createdAt: row.createdAt,
+      facilityResource: row.facilityResource,
+    });
     sessionAllocMap.set(row.trainingSessionId, list);
   }
 
@@ -320,12 +329,14 @@ async function collectTrainingOccupants(
     const identity = activityIdentityKey("TRAINING", session.id);
     if (baselineMode === "empty" && !activitiesWithOverrides.has(identity)) continue;
 
-    const seriesGroups = groupAllocationRows(seriesAllocMap.get(session.trainingSeriesId) ?? []);
-    const overrideGroups = groupAllocationRows(sessionAllocMap.get(session.id) ?? []);
-    const standardplanPitch =
-      overrideGroups.pitch.length > 0 ? overrideGroups.pitch : seriesGroups.pitch;
-    const standardplanDressingRoom =
-      overrideGroups.dressingRoom.length > 0 ? overrideGroups.dressingRoom : seriesGroups.dressingRoom;
+    const seriesRows = seriesAllocMap.get(session.trainingSeriesId) ?? [];
+    const overrideRows = sessionAllocMap.get(session.id) ?? [];
+    const occurrenceAllocations = resolveTrainingOccurrenceAllocations({
+      seriesRows,
+      sessionOverrideRows: overrideRows,
+    });
+    const standardplanPitch = toOccurrenceResourceRefs(occurrenceAllocations.pitch);
+    const standardplanDressingRoom = toOccurrenceResourceRefs(occurrenceAllocations.dressingRoom);
 
     const pitch = resolveEffectiveAllocation(
       overridesByKey,

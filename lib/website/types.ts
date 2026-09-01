@@ -592,6 +592,8 @@ export type PublicWochenplanDressingRoom = {
 export type PublicWochenplanEventItem = PublicWebsiteEventItem & {
   /** Discriminator aligned with WeekplannerItemType. */
   kind: "TRAINING" | "MATCH" | "TOURNAMENT";
+  /** Canonical training-series display label (same semantic as team-detail seriesDisplayName). */
+  seriesDisplayName?: string | null;
   matchIdentity?: PublicWochenplanMatchIdentity;
   organizer?: PublicWebsiteTournamentOrganizer | null;
   participants?: PublicWebsiteTournamentParticipant[];

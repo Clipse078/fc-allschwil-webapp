@@ -76,7 +76,10 @@ import { prisma } from "@/lib/db/prisma";
 import { isMeaningfulEventInterval } from "@/lib/facilities/resource-occupancy-window";
 import { getWochenplanPlanBaselineMode, type WochenplanPlanBaselineMode } from "@/lib/wochenplan/plan-baseline";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
-import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import {
+  resolveTrainingOccurrenceAllocations,
+  type TrainingAllocationResourceRow,
+} from "@/lib/training/effective-training-allocation-resolution";
 import {
   listMatchcenterMatches,
   type MatchcenterQueryDatabase,
@@ -336,32 +339,19 @@ function filterItemsForEmptyBaseline(
 
 // ── TrainingSession → WeekplannerTrainingItem ───────────────────────────────
 
-type AllocationResourceRow = {
-  facilityResource: { id: string; code: string; name: string; type: string; facility: { name: string } };
-};
+type AllocationResourceRow = TrainingAllocationResourceRow;
 
-/** Splits a flat allocation-row list into the two Weekplanner-relevant groups (Spielfeld/Halle, Garderobe). */
-function groupAllocationRows(
+function toWeekplannerResourceRefs(
   rows: readonly AllocationResourceRow[],
-): { pitch: WeekplannerResourceRef[]; dressingRoom: WeekplannerResourceRef[] } {
-  const pitch: WeekplannerResourceRef[] = [];
-  const dressingRoom: WeekplannerResourceRef[] = [];
-
-  for (const row of rows) {
-    const ref: WeekplannerResourceRef = {
-      facilityResourceId: row.facilityResource.id,
-      code: row.facilityResource.code,
-      name: row.facilityResource.name,
-      facilityName: row.facilityResource.facility.name,
-      occupancyBeforeMinutes: 0,
-      occupancyAfterMinutes: 0,
-    };
-    const group = classifyFacilityResourceType(row.facilityResource.type);
-    if (group === "PITCH_HALL") pitch.push(ref);
-    else if (group === "DRESSING_ROOM") dressingRoom.push(ref);
-  }
-
-  return { pitch, dressingRoom };
+): WeekplannerResourceRef[] {
+  return rows.map((row) => ({
+    facilityResourceId: row.facilityResource.id,
+    code: row.facilityResource.code,
+    name: row.facilityResource.name,
+    facilityName: row.facilityResource.facility.name,
+    occupancyBeforeMinutes: 0,
+    occupancyAfterMinutes: 0,
+  }));
 }
 
 async function findWeekplannerTrainingItems(
@@ -392,19 +382,25 @@ async function findWeekplannerTrainingItems(
       where: { tenantId, trainingSeriesId: { in: seriesIds } },
       select: {
         trainingSeriesId: true,
+        displayOrder: true,
+        createdAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
       },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     }),
     prisma.trainingSessionAllocation.findMany({
       where: { tenantId, trainingSessionId: { in: sessionIds } },
       select: {
         trainingSessionId: true,
+        displayOrder: true,
+        createdAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
       },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
     }),
   ]);
 
@@ -423,19 +419,20 @@ async function findWeekplannerTrainingItems(
   }
 
   return sessions.map((session) => {
-    const seriesGroups = groupAllocationRows(seriesAllocationsById.get(session.trainingSeriesId) ?? []);
+    const seriesRows = seriesAllocationsById.get(session.trainingSeriesId) ?? [];
     const overrideRows = sessionOverridesById.get(session.id) ?? [];
-    const overrideGroups = groupAllocationRows(overrideRows);
+    const occurrenceAllocations = resolveTrainingOccurrenceAllocations({
+      seriesRows,
+      sessionOverrideRows: overrideRows,
+    });
 
     // TRAININGCENTER-02 override-by-presence-per-group: any TrainingSessionAllocation
     // override row for a group supersedes that group's series-level default for this
     // occurrence only (see lib/training/session-allocation-service.ts). This
     // resolved value is the Standardplan default the WEEKPLANNER-01B plan
     // override (if any) is layered on top of below.
-    const standardplanPitch =
-      overrideGroups.pitch.length > 0 ? overrideGroups.pitch : seriesGroups.pitch;
-    const standardplanDressingRoom =
-      overrideGroups.dressingRoom.length > 0 ? overrideGroups.dressingRoom : seriesGroups.dressingRoom;
+    const standardplanPitch = toWeekplannerResourceRefs(occurrenceAllocations.pitch);
+    const standardplanDressingRoom = toWeekplannerResourceRefs(occurrenceAllocations.dressingRoom);
 
     const pitch = resolveEffectiveAllocation(
       overridesByKey,

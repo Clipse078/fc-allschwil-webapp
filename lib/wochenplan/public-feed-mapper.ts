@@ -448,6 +448,7 @@ export function mapTrainingToPublicEvent(
   return {
     ...base,
     kind: "TRAINING",
+    seriesDisplayName: item.title,
     pitch: toPublicPitch(item.pitchAllocations[0]),
     dressingRooms: mapTrainingDressingRooms(item),
   };
