@@ -3,7 +3,7 @@
  *
  * components/admin/training/__tests__/TrainingSeriesCockpitRow.test.tsx
  *
- * TRAININGCENTER-EDIT-01B — Serie bearbeiten navigation + exception indicator.
+ * TRAININGCENTER-EDIT-01C — Serie bearbeiten navigation + exception indicator.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -71,7 +71,7 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
     refreshMock.mockReset();
   });
 
-  it("navigates to the existing series edit route from the overflow menu", () => {
+  it("navigates to the existing series edit route from the overflow menu on pointer activation", () => {
     render(
       <TrainingSeriesCockpitRow
         row={makeRow()}
@@ -84,8 +84,30 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
     );
 
     fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-1:WEDNESDAY"));
-    fireEvent.click(screen.getByTestId("training-series-cockpit-edit-series-1:WEDNESDAY"));
+    fireEvent.mouseDown(screen.getByTestId("training-series-cockpit-edit-series-1:WEDNESDAY"));
 
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-1/edit");
+  });
+
+  it("navigates to the existing series edit route from the overflow menu on keyboard activation", () => {
+    render(
+      <TrainingSeriesCockpitRow
+        row={makeRow()}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-1:WEDNESDAY"));
+    fireEvent.keyDown(screen.getByTestId("training-series-cockpit-edit-series-1:WEDNESDAY"), {
+      key: "Enter",
+    });
+
+    expect(pushMock).toHaveBeenCalledTimes(1);
     expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-1/edit");
   });
 });

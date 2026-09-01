@@ -280,11 +280,6 @@ function SeriesOccurrenceExceptionsIndicator({
   const [open, setOpen] = useState(false);
   const { occurrenceExceptionCount, exceptions } = row.occurrenceExceptions;
 
-  if (occurrenceExceptionCount === 0) return null;
-
-  const label =
-    occurrenceExceptionCount === 1 ? "1 Ausnahme" : `${occurrenceExceptionCount} Ausnahmen`;
-
   const openSession = useCallback(
     (sessionId: string) => {
       setOpen(false);
@@ -292,6 +287,11 @@ function SeriesOccurrenceExceptionsIndicator({
     },
     [router],
   );
+
+  if (occurrenceExceptionCount === 0) return null;
+
+  const label =
+    occurrenceExceptionCount === 1 ? "1 Ausnahme" : `${occurrenceExceptionCount} Ausnahmen`;
 
   return (
     <>
@@ -366,6 +366,12 @@ export default function TrainingSeriesCockpitRow({
   const editable = canManage && row.status !== "ARCHIVED";
   const validFrom = formatDate(row.validFrom);
   const validUntil = formatDate(row.validUntil);
+  const seriesEditHref = `/dashboard/training/series/${row.seriesId}/edit`;
+
+  const navigateToSeriesEdit = useCallback(() => {
+    router.push(seriesEditHref);
+    setMenuOpen(false);
+  }, [router, seriesEditHref]);
 
   return (
     <article
@@ -441,9 +447,15 @@ export default function TrainingSeriesCockpitRow({
                   <>
                     <button
                       type="button"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        router.push(`/dashboard/training/series/${row.seriesId}/edit`);
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        navigateToSeriesEdit();
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          navigateToSeriesEdit();
+                        }
                       }}
                       className="block w-full px-3 py-2 text-left text-xs hover:bg-[var(--surface-2)]"
                       data-testid={`training-series-cockpit-edit-${row.rowKey}`}
