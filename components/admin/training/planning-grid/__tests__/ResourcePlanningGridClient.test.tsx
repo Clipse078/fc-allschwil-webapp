@@ -42,6 +42,23 @@ describe("ResourcePlanningGridClient", () => {
     teams: [{ id: "team-a", name: "Team Alpha" }],
   });
 
+  it("requires ToastProvider — missing provider crashes at render (regression)", () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    expect(() =>
+      render(
+        <ResourcePlanningGridClient
+          viewModel={viewModel}
+          dayLabel="Mittwoch, 2. September 2026"
+          dayParam="2026-09-02"
+          previousDayParam="2026-09-01"
+          nextDayParam="2026-09-03"
+          canManage
+        />,
+      ),
+    ).toThrow(/useToast must be used inside <ToastProvider>/);
+    consoleError.mockRestore();
+  });
+
   it("renders toolbar and resource lanes", () => {
     render(
       <ToastProvider>

@@ -28,6 +28,7 @@ import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingCenterOverview from "@/components/admin/training/TrainingCenterOverview";
 import ResourcePlanningGridClient from "@/components/admin/training/planning-grid/ResourcePlanningGridClient";
 import TrainingSeriesListView from "@/components/admin/training/TrainingSeriesListView";
+import { ToastProvider } from "@/components/ui/ToastProvider";
 import { fetchPlanningGridData, normalizePlanningGridFilters } from "@/lib/training/planning-grid/data-service";
 import type { PlanningResourceCategoryKey } from "@/lib/training/planning-grid/types";
 import { cn } from "@/lib/cn";
@@ -117,16 +118,18 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
           }
         />
         <TopTabs active={tab} />
-        <ResourcePlanningGridClient
-          viewModel={planningData.viewModel}
-          dayLabel={formatTrainingDayLabel(planningData.viewModel.date, locale, timezone)}
-          dayParam={planningData.dayWindow.param}
-          previousDayParam={planningData.dayWindow.previousParam}
-          nextDayParam={planningData.dayWindow.nextParam}
-          canManage={canManage}
-          locale={locale}
-          timezone={timezone}
-        />
+        <ToastProvider>
+          <ResourcePlanningGridClient
+            viewModel={planningData.viewModel}
+            dayLabel={formatTrainingDayLabel(planningData.viewModel.date, locale, timezone)}
+            dayParam={planningData.dayWindow.param}
+            previousDayParam={planningData.dayWindow.previousParam}
+            nextDayParam={planningData.dayWindow.nextParam}
+            canManage={canManage}
+            locale={locale}
+            timezone={timezone}
+          />
+        </ToastProvider>
       </div>
     );
   }
