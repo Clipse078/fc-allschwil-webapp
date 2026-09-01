@@ -77,6 +77,7 @@ import {
 import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
 import TeamSeasonSearchablePicker from "@/components/admin/shared/TeamSeasonSearchablePicker";
+import { cn } from "@/lib/cn";
 import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
 
@@ -400,19 +401,17 @@ export default function TrainingSeriesCreateForm({
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ seriesId: string; generation: GenerationResult } | null>(null);
 
-  // PLANNING-CREATION-UX-01B: compact, always-visible "Noch N Angaben
-  // fehlen" nudge — not a wizard/gate, every section stays reachable and
-  // editable regardless of this list; it only nudges.
+  // PLANNING-CREATION-UX-01B: compact, always-visible completeness nudge.
   const missingItems = useMemo(() => {
     const items: string[] = [];
-    if (!teamSeasonId) items.push("Team auswählen");
-    if (!title.trim()) items.push("Titel angeben");
-    if (!date) items.push("Tag auswählen");
-    if (!timesValid) items.push("Start-/Endzeit angeben (Start vor Ende)");
-    if (isRecurring && !validUntil) items.push("Enddatum der Wiederholung angeben");
+    if (!teamSeasonId) items.push("Team");
+    if (!title.trim()) items.push("Trainingsname");
+    if (!date) items.push("Datum");
+    if (!timesValid) items.push("Start-/Endzeit");
+    if (isRecurring && !validUntil) items.push("Wiederholung bis");
     if (date && timesValid) {
-      if (resources.length === 0) items.push("Spielfeld / Halle zuweisen");
-      if (dressingRooms.length === 0) items.push("Garderobe zuweisen");
+      if (resources.length === 0) items.push("Spielfeld / Halle");
+      if (dressingRooms.length === 0) items.push("Garderobe");
     }
     return items;
   }, [teamSeasonId, title, date, timesValid, isRecurring, validUntil, resources.length, dressingRooms.length]);
@@ -486,24 +485,27 @@ export default function TrainingSeriesCreateForm({
     }
   }
 
-  const submitLabel = canValidateDirectly ? "Freigeben & Trainingsserie erstellen" : "Zur Freigabe einreichen";
+  const submitLabel = canValidateDirectly ? "Trainingsserie erstellen" : "Zur Freigabe einreichen";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5" data-testid="training-create-form">
       {missingItems.length > 0 ? (
-        <div className="fca-status-box fca-status-box-muted text-sm" data-testid="training-create-guided-progress">
-          <p className="font-semibold">
+        <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-sm" data-testid="training-create-guided-progress">
+          <p className="text-xs text-[var(--text-2)]">
             Noch {missingItems.length} {missingItems.length === 1 ? "Angabe fehlt" : "Angaben fehlen"}
           </p>
-          <ul className="mt-1.5 list-inside list-disc space-y-0.5" data-testid="training-create-guided-progress-list">
-            {missingItems.map((item, i) => (
-              <li key={i}>{item}</li>
+          <ul className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-medium text-[var(--foreground)]" data-testid="training-create-guided-progress-list">
+            {missingItems.map((item) => (
+              <li key={item} className="flex items-center gap-1">
+                <span className="text-[var(--muted)]" aria-hidden>•</span>
+                {item}
+              </li>
             ))}
           </ul>
         </div>
       ) : (
-        <div className="fca-status-box fca-status-box-success text-sm" data-testid="training-create-guided-progress">
-          Alle Angaben vollständig — bereit zum Einreichen.
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 text-sm text-emerald-800" data-testid="training-create-guided-progress">
+          Bereit zum Erstellen
         </div>
       )}
 
@@ -518,8 +520,8 @@ export default function TrainingSeriesCreateForm({
           onExpand={() => setTeamCollapsed(false)}
           onBlurCapture={(e) => handleStepBlur(e, teamStepComplete, () => setTeamCollapsed(true))}
         >
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="block space-y-1 md:col-span-2">
+          <div className="grid gap-3">
+            <label className="block space-y-1">
               <span className="fca-label">Team / Saison</span>
               {teamSeasons.length === 0 ? (
                 <p className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-400">
@@ -536,21 +538,23 @@ export default function TrainingSeriesCreateForm({
               )}
             </label>
 
-            <label className="block space-y-1 md:col-span-2">
-              <span className="fca-label">Name der Trainingsserie</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  setTitleTouched(true);
-                }}
-                placeholder="z. B. E1 Dienstagstraining"
-                className="fca-input"
-                required
-                data-testid="training-create-title"
-              />
-            </label>
+            {selectedTeamSeason ? (
+              <label className="block space-y-1">
+                <span className="fca-label">Name der Trainingsserie</span>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setTitleTouched(true);
+                  }}
+                  placeholder="z. B. Junioren D-7 D1 Training"
+                  className="fca-input"
+                  required
+                  data-testid="training-create-title"
+                />
+              </label>
+            ) : null}
           </div>
         </GuidedStep>
 
@@ -568,8 +572,8 @@ export default function TrainingSeriesCreateForm({
           onExpand={() => setTerminCollapsed(false)}
           onBlurCapture={(e) => handleStepBlur(e, terminStepComplete, () => setTerminCollapsed(true))}
         >
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="block space-y-1">
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block min-w-[10rem] flex-1 space-y-1">
               <span className="fca-label">Datum</span>
               <input
                 type="date"
@@ -580,7 +584,7 @@ export default function TrainingSeriesCreateForm({
                 data-testid="training-create-date"
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block w-28 space-y-1">
               <span className="fca-label">Start</span>
               <input
                 type="time"
@@ -591,7 +595,7 @@ export default function TrainingSeriesCreateForm({
                 data-testid="training-create-starts-at"
               />
             </label>
-            <label className="block space-y-1">
+            <label className="block w-28 space-y-1">
               <span className="fca-label">Ende</span>
               <input
                 type="time"
@@ -602,16 +606,16 @@ export default function TrainingSeriesCreateForm({
                 data-testid="training-create-ends-at"
               />
             </label>
+            {derivedWeekday ? (
+              <p
+                className="flex items-center gap-1.5 pb-2 text-xs text-[var(--text-2)]"
+                data-testid="training-create-weekday-label"
+              >
+                <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+                {WEEKDAY_LABELS[derivedWeekday]}
+              </p>
+            ) : null}
           </div>
-          {date ? (
-            <p
-              className="mt-2 flex items-center gap-1.5 text-xs text-[var(--text-2)]"
-              data-testid="training-create-weekday-label"
-            >
-              <CalendarDays className="h-3.5 w-3.5" aria-hidden />
-              Wochentag: {derivedWeekday ? WEEKDAY_LABELS[derivedWeekday] : "—"}
-            </p>
-          ) : null}
           {date && !timesValid ? <p className="mt-1 text-xs text-rose-600">Start muss vor Ende liegen.</p> : null}
         </GuidedStep>
 
@@ -625,24 +629,34 @@ export default function TrainingSeriesCreateForm({
                 <Repeat className="h-3.5 w-3.5 text-[var(--sce-primary)]" aria-hidden />
                 Wiederholung
               </div>
-              <div className="flex gap-1.5" role="radiogroup" aria-label="Wiederholung">
+              <div className="flex gap-1 rounded-lg border border-[var(--border)] p-0.5" role="radiogroup" aria-label="Wiederholung">
                 <button
                   type="button"
                   onClick={() => setIsRecurring(false)}
                   aria-pressed={!isRecurring}
                   data-testid="training-create-recurrence-no"
-                  className={!isRecurring ? "fca-button-primary text-xs" : "fca-button-secondary text-xs"}
+                  className={cn(
+                    "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                    !isRecurring
+                      ? "bg-[var(--sce-primary)] text-white"
+                      : "text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  )}
                 >
-                  Nein
+                  Einmalig
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsRecurring(true)}
                   aria-pressed={isRecurring}
                   data-testid="training-create-recurrence-yes"
-                  className={isRecurring ? "fca-button-primary text-xs" : "fca-button-secondary text-xs"}
+                  className={cn(
+                    "flex-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                    isRecurring
+                      ? "bg-[var(--sce-primary)] text-white"
+                      : "text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  )}
                 >
-                  Ja
+                  Wiederkehrend
                 </button>
               </div>
             </div>
@@ -693,6 +707,9 @@ export default function TrainingSeriesCreateForm({
                 if (row) removeResourceDraft(row.localId);
               }}
               availabilityByResourceId={pitchAvailability}
+              layout="aggregated"
+              availableLabel="Freie Spielfelder & Hallen"
+              occupiedLabel="Belegte Spielfelder & Hallen"
               testId="training-create-resource"
             />
           </div>
@@ -718,6 +735,9 @@ export default function TrainingSeriesCreateForm({
                 if (row) removeDressingRoomDraft(row.localId);
               }}
               availabilityByResourceId={dressingRoomAvailability}
+              layout="aggregated"
+              availableLabel="Freie Garderoben"
+              occupiedLabel="Belegte Garderoben"
               testId="training-create-dressing-room"
             />
           </div>
@@ -791,7 +811,7 @@ export default function TrainingSeriesCreateForm({
 
       {error ? <div className="fca-status-box fca-status-box-error">{error}</div> : null}
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="sticky bottom-0 -mx-1 flex flex-wrap items-center gap-3 border-t border-[var(--border)] bg-[var(--background)]/95 px-1 py-3 backdrop-blur-sm">
         <button
           type="submit"
           disabled={!canSubmit}

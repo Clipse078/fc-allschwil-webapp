@@ -49,9 +49,8 @@ const DRESSING_ROOM_GROUPS: FacilityGroup[] = [
 ];
 
 function selectTeamSeason(value = "ts-1") {
-  fireEvent.change(screen.getByTestId("training-create-team-season-select-select"), {
-    target: { value },
-  });
+  fireEvent.click(screen.getByTestId("training-create-team-season-select-search"));
+  fireEvent.click(screen.getByTestId(`training-create-team-season-select-option-${value}`));
 }
 
 function jsonResponse(data: unknown, status = 200): Response {
@@ -111,21 +110,22 @@ describe("TrainingSeriesCreateForm — guided-progress nudge summary", () => {
     );
 
     const progress = screen.getByTestId("training-create-guided-progress");
-    expect(progress).toHaveTextContent("Team auswählen");
-    expect(progress).toHaveTextContent("Tag auswählen");
+    expect(progress).toHaveTextContent("Team");
+    expect(progress).toHaveTextContent("Datum");
 
-    fireEvent.change(screen.getByTestId("training-create-team-season-select-select"), { target: { value: "ts-1" } });
+    fireEvent.click(screen.getByTestId("training-create-team-season-select-search"));
+    fireEvent.click(screen.getByTestId("training-create-team-season-select-option-ts-1"));
     await waitFor(() =>
-      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent("Team auswählen"),
+      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent("Team"),
     );
 
     fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
     await waitFor(() =>
-      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent("Tag auswählen"),
+      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent("Datum"),
     );
 
-    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent("Spielfeld / Halle zuweisen");
-    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent("Garderobe zuweisen");
+    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent("Spielfeld / Halle");
+    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent("Garderobe");
   });
 
   it("derives and displays the weekday from the chosen date", async () => {
@@ -224,8 +224,8 @@ describe("TrainingSeriesCreateForm — live Spielfeld/Halle + Garderobe availabi
   });
 });
 
-describe("TrainingSeriesCreateForm — recurrence (Wiederholung Ja/Nein)", () => {
-  it("defaults to 'Nein' (single occurrence) and hides the recurrence end date", () => {
+describe("TrainingSeriesCreateForm — recurrence (Einmalig / Wiederkehrend)", () => {
+  it("defaults to 'Einmalig' and hides the recurrence end date", () => {
     installFetchMock();
     render(
       <TrainingSeriesCreateForm
@@ -240,7 +240,7 @@ describe("TrainingSeriesCreateForm — recurrence (Wiederholung Ja/Nein)", () =>
     expect(screen.queryByTestId("training-create-valid-until")).not.toBeInTheDocument();
   });
 
-  it("'Ja' reveals a required recurrence end date and adds it to the missing-state nudge until filled", async () => {
+  it("'Wiederkehrend' reveals a required recurrence end date and adds it to the missing-state nudge until filled", async () => {
     installFetchMock();
     render(
       <TrainingSeriesCreateForm
@@ -255,15 +255,11 @@ describe("TrainingSeriesCreateForm — recurrence (Wiederholung Ja/Nein)", () =>
     fireEvent.click(screen.getByTestId("training-create-recurrence-yes"));
 
     expect(screen.getByTestId("training-create-valid-until")).toBeInTheDocument();
-    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent(
-      "Enddatum der Wiederholung angeben",
-    );
+    expect(screen.getByTestId("training-create-guided-progress")).toHaveTextContent("Wiederholung bis");
 
     fireEvent.change(screen.getByTestId("training-create-valid-until"), { target: { value: "2026-12-15" } });
     await waitFor(() =>
-      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent(
-        "Enddatum der Wiederholung angeben",
-      ),
+      expect(screen.getByTestId("training-create-guided-progress")).not.toHaveTextContent("Wiederholung bis"),
     );
   });
 
@@ -278,7 +274,7 @@ describe("TrainingSeriesCreateForm — recurrence (Wiederholung Ja/Nein)", () =>
       />,
     );
 
-    fireEvent.change(screen.getByTestId("training-create-team-season-select-select"), { target: { value: "ts-1" } });
+    selectTeamSeason();
     fireEvent.change(screen.getByTestId("training-create-title"), { target: { value: "E1 Training" } });
     fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
 
@@ -296,7 +292,7 @@ describe("TrainingSeriesCreateForm — recurrence (Wiederholung Ja/Nein)", () =>
 });
 
 describe("TrainingSeriesCreateForm — validation right wiring", () => {
-  it("with validation right (trainings.manage): submit label reads 'Freigeben' and calls the create API", async () => {
+  it("with validation right (trainings.manage): submit label reads 'Trainingsserie erstellen' and calls the create API", async () => {
     const { fetchMock } = installFetchMock();
     render(
       <TrainingSeriesCreateForm
@@ -307,9 +303,9 @@ describe("TrainingSeriesCreateForm — validation right wiring", () => {
       />,
     );
 
-    expect(screen.getByTestId("training-create-submit")).toHaveTextContent("Freigeben");
+    expect(screen.getByTestId("training-create-submit")).toHaveTextContent("Trainingsserie erstellen");
 
-    fireEvent.change(screen.getByTestId("training-create-team-season-select-select"), { target: { value: "ts-1" } });
+    selectTeamSeason();
     fireEvent.change(screen.getByTestId("training-create-title"), { target: { value: "E1 Training" } });
     fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
 
@@ -333,7 +329,7 @@ describe("TrainingSeriesCreateForm — validation right wiring", () => {
     expect(screen.getByTestId("training-create-submit")).toHaveTextContent("Zur Freigabe einreichen");
     expect(screen.getByTestId("training-create-no-validation-right")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("training-create-team-season-select-select"), { target: { value: "ts-1" } });
+    selectTeamSeason();
     fireEvent.change(screen.getByTestId("training-create-title"), { target: { value: "E1 Training" } });
     fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
 

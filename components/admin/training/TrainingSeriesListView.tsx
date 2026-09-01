@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Archive, Dumbbell, Plus } from "lucide-react";
+import { Archive, Dumbbell } from "lucide-react";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import TrainingSeriesCockpitRow from "./TrainingSeriesCockpitRow";
 import type { TrainingSeriesCockpitRow as CockpitRow } from "@/lib/training/series-cockpit";
@@ -53,12 +53,6 @@ export default function TrainingSeriesListView({
               {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
             </Link>
           ) : null}
-          {canManage ? (
-            <Link href="/dashboard/training/new" className="fca-button-primary inline-flex items-center gap-1.5 text-sm">
-              <Plus className="h-3.5 w-3.5" />
-              Neue Trainingsserie
-            </Link>
-          ) : null}
         </div>
       </div>
 
@@ -74,12 +68,6 @@ export default function TrainingSeriesListView({
                 ? "Es wurden noch keine Trainingsserien erstellt."
                 : "Alle Trainingsserien sind archiviert oder es wurden noch keine erstellt."}
             </p>
-            {canManage ? (
-              <Link href="/dashboard/training/new" className="fca-button-primary mt-2 inline-flex items-center gap-1.5 text-sm">
-                <Plus className="h-3.5 w-3.5" />
-                Neue Trainingsserie
-              </Link>
-            ) : null}
           </div>
         </div>
       ) : (

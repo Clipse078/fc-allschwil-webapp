@@ -77,7 +77,7 @@ export default async function NewTrainingSeriesPage() {
       <AdminSectionHeader
         eyebrow="TrainingCenter"
         title="Neue Trainingsserie"
-        description="Geführte Erstellung: Team, Tag & Zeit, Wiederholung sowie Spielfeld/Halle und Garderobe werden direkt erfasst. Nach dem Erstellen wird der erste Trainingstermin automatisch generiert."
+        description="Team, Termin und Ressourcen in einem geführten Ablauf erfassen."
       />
 
       <TrainingSeriesCreateForm

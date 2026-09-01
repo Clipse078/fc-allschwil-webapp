@@ -211,3 +211,61 @@ describe("VisualResourceAvailabilityPicker — empty state", () => {
     expect(screen.getByText("Keine Spielfelder konfiguriert.")).toBeInTheDocument();
   });
 });
+
+describe("VisualResourceAvailabilityPicker — aggregated layout", () => {
+  it("shows all free resources in the available section and occupied in the occupied section", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    const available = screen.getByTestId("picker-available");
+    const occupied = screen.getByTestId("picker-occupied");
+
+    expect(available).toHaveTextContent("Kunstrasen 2");
+    expect(available).not.toHaveTextContent("Kunstrasen 3 A");
+    expect(occupied).toHaveTextContent("Kunstrasen 3 A");
+    expect(occupied).toHaveTextContent("Belegt");
+    expect(occupied).toHaveTextContent("Training E2");
+  });
+
+  it("shows selected resource summary with availability status", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-a"])}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={FREE_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    expect(screen.getByTestId("picker-selected-summary")).toHaveTextContent("Kunstrasen 2");
+    expect(screen.getByTestId("picker-selected-summary")).toHaveTextContent("verfügbar");
+  });
+
+  it("does not place free resources in the occupied section", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    expect(screen.getByTestId("picker-occupied")).not.toHaveTextContent("Kunstrasen 2");
+  });
+});
