@@ -321,6 +321,12 @@ export type PublicTrainerMember = {
 // pitchCode (internal allocation code) is NEVER exposed.
 // ---------------------------------------------------------------------------
 
+export type PublicTeamTrainingResource = {
+  id: string;
+  name: string;
+  displayName: string;
+};
+
 export type PublicTeamTrainingSession = {
   /** Day of week in German (e.g. "Dienstag"). */
   weekday: string;
@@ -328,9 +334,18 @@ export type PublicTeamTrainingSession = {
   startTime: string;
   /** ISO 8601 UTC timestamp representing the recurring end time. */
   endTime: string | null;
+  /** Canonical tenant club display name (e.g. "FC Allschwil"). */
+  clubName: string | null;
+  /** Canonical team display name without club prefix reconstruction. */
+  teamDisplayName: string | null;
+  /** Canonical TrainingSeries presentation title. */
+  seriesDisplayName: string | null;
+  /** @deprecated Use pitch.displayName — retained for backward-compatible consumers. */
   location: string | null;
-  /** Human-readable pitch name from facility registry, null when unresolvable. */
+  /** @deprecated Use pitch.displayName — retained for backward-compatible consumers. */
   pitchName: string | null;
+  pitch: PublicTeamTrainingResource | null;
+  dressingRoom: PublicTeamTrainingResource | null;
 };
 
 // ---------------------------------------------------------------------------

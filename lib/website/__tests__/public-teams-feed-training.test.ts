@@ -132,6 +132,11 @@ describe("getPublicTeamDetail — training visibility", () => {
         weekdayLabel: "Dienstag",
         startsAt: "17:15",
         endsAt: "18:45",
+        clubName: "FC Example",
+        teamDisplayName: "FC Example E1",
+        seriesDisplayName: "E1 Training",
+        pitch: { id: "res-pitch", name: "Kunstrasen 2", displayName: "Kunstrasen 2" },
+        dressingRoom: null,
         locationLabel: "Kunstrasen 2",
         seriesId: "series-1",
         seriesTitle: "E1 Training",
@@ -157,17 +162,22 @@ describe("getPublicTeamDetail — training visibility", () => {
       slug: "e1",
     });
 
-    expect(mocks.getTeamTrainingSchedule).toHaveBeenCalledWith(
-      TENANT_ID,
-      TEAM_SEASON_ID,
-    );
+    expect(mocks.getTeamTrainingSchedule).toHaveBeenCalledWith(TENANT_ID, TEAM_SEASON_ID, {
+      clubName: "FC Example",
+      teamDisplayName: "FC Example E1",
+    });
     expect(detail?.training).toEqual([
       {
         weekday: "Dienstag",
         startTime: "2026-01-06T16:15:00.000Z",
         endTime: "2026-01-06T17:45:00.000Z",
+        clubName: "FC Example",
+        teamDisplayName: "FC Example E1",
+        seriesDisplayName: "E1 Training",
         location: "Kunstrasen 2",
         pitchName: "Kunstrasen 2",
+        pitch: { id: "res-pitch", name: "Kunstrasen 2", displayName: "Kunstrasen 2" },
+        dressingRoom: null,
       },
     ]);
   });
