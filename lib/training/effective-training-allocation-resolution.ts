@@ -17,11 +17,9 @@
  *     which deletes prior group rows before creating the next override.
  *   - Series defaults: lowest displayOrder (then oldest createdAt) — the
  *     canonical primary allocation for the recurring series.
- *   - Cross-layer tie-break: when both tiers have a candidate, the row with
- *     the newer updatedAt (then createdAt) wins. A stale occurrence override
- *     left behind after the series canonical row was updated must not block
- *     the current series default (e.g. old O4 session row vs. newer E3
- *     series row).
+ *
+ * Timestamps MUST NOT determine cross-layer precedence between series and
+ * occurrence tiers.
  */
 
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "./allocation-groups";
@@ -43,10 +41,6 @@ export type ResolvedTrainingAllocationGroup = {
   pitch: TrainingAllocationResourceRow[];
   dressingRoom: TrainingAllocationResourceRow[];
 };
-
-function rowAuthorityTimestamp(row: TrainingAllocationResourceRow): number {
-  return row.updatedAt?.getTime() ?? row.createdAt?.getTime() ?? 0;
-}
 
 function compareSeriesAllocationRows(
   a: TrainingAllocationResourceRow,
@@ -86,26 +80,10 @@ function pickCanonicalSessionOverrideRow(
   return [sorted[0]!];
 }
 
-function resolveCrossLayerAllocation(
-  seriesCanonical: readonly TrainingAllocationResourceRow[],
-  sessionCanonical: readonly TrainingAllocationResourceRow[],
-): TrainingAllocationResourceRow[] {
-  if (sessionCanonical.length === 0) return [...seriesCanonical];
-  if (seriesCanonical.length === 0) return [...sessionCanonical];
-
-  const sessionRow = sessionCanonical[0]!;
-  const seriesRow = seriesCanonical[0]!;
-  const sessionAuthority = rowAuthorityTimestamp(sessionRow);
-  const seriesAuthority = rowAuthorityTimestamp(seriesRow);
-
-  return sessionAuthority > seriesAuthority ? [sessionRow] : [seriesRow];
-}
-
 /**
  * Resolves the canonical Standardplan allocation for one training occurrence
- * and allocation group. Session-level overrides win independently per group
- * when they are the more recently authored assignment; otherwise the series
- * canonical row applies.
+ * and allocation group. Explicit occurrence allocation wins; otherwise the
+ * series canonical row applies.
  */
 export function resolveTrainingOccurrenceAllocationGroup(
   group: Extract<TrainingAllocationGroupKey, "PITCH_HALL" | "DRESSING_ROOM">,
@@ -115,17 +93,14 @@ export function resolveTrainingOccurrenceAllocationGroup(
   const overridesForGroup = sessionOverrideRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
+  if (overridesForGroup.length > 0) {
+    return pickCanonicalSessionOverrideRow(overridesForGroup);
+  }
+
   const seriesForGroup = seriesRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
-
-  const seriesCanonical = pickCanonicalSeriesRow(seriesForGroup);
-  if (overridesForGroup.length === 0) {
-    return seriesCanonical;
-  }
-
-  const sessionCanonical = pickCanonicalSessionOverrideRow(overridesForGroup);
-  return resolveCrossLayerAllocation(seriesCanonical, sessionCanonical);
+  return pickCanonicalSeriesRow(seriesForGroup);
 }
 
 /**

@@ -303,7 +303,7 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     ]);
   });
 
-  it("D9-D1 Wednesday production shape: stale lone O4 session row defers to newer series E3", async () => {
+  it("D9-D1 Wednesday production shape: occurrence dressing-room O4 wins over series E3", async () => {
     mocks.listTrainingSessions.mockResolvedValue([
       trainingSessionDto({
         id: "session-d9-wed",
@@ -376,10 +376,10 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     if (wednesday?.type !== "TRAINING") throw new Error("expected TRAINING");
     expect(wednesday.pitchAllocations[0]?.name).toBe("Kunstrasen 3 A");
     expect(wednesday.dressingRoomAllocations).toEqual([
-      expect.objectContaining({ code: "E3", name: "Garderobe E3" }),
+      expect.objectContaining({ code: "O4", name: "Garderobe O4" }),
     ]);
     expect(wednesday.dressingRoomAllocations).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: "O4" })]),
+      expect.arrayContaining([expect.objectContaining({ code: "E3" })]),
     );
   });
 

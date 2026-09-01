@@ -97,11 +97,11 @@ describe("public feed training occurrence serialization", () => {
     expect(mapTrainingDressingRooms(trainingItem({ dressingRoomAllocations: [] }))).toBeNull();
   });
 
-  it("serializes only the effective occurrence dressing room when stale defaults were resolved upstream", () => {
+  it("serializes the effective occurrence dressing room resolved upstream", () => {
     const mapped = mapTrainingToPublicEvent(
       trainingItem({
         pitchAllocations: [room("KR3A", "Kunstrasen 3 A")],
-        dressingRoomAllocations: [room("E3", "Garderobe E3")],
+        dressingRoomAllocations: [room("O4", "Garderobe O4")],
       }),
       undefined,
       resolveTrainingTeamContext(undefined),
@@ -110,13 +110,13 @@ describe("public feed training occurrence serialization", () => {
     expect(mapped.pitch?.name).toBe("Kunstrasen 3 A");
     expect(mapped.dressingRooms).toEqual([
       {
-        name: "Garderobe E3",
+        name: "Garderobe O4",
         facilityName: "Garderobentrakt",
         role: "TRAINING",
       },
     ]);
     expect(mapped.dressingRooms).not.toEqual(
-      expect.arrayContaining([expect.objectContaining({ name: "Garderobe O4" })]),
+      expect.arrayContaining([expect.objectContaining({ name: "Garderobe E3" })]),
     );
   });
 });
