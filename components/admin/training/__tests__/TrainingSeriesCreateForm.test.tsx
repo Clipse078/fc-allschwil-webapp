@@ -338,3 +338,94 @@ describe("TrainingSeriesCreateForm — validation right wiring", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/training-series", expect.anything());
   });
 });
+
+describe("TrainingSeriesCreateForm — reversible resource selection (TRAINING-CENTER-PREMIUM-02B)", () => {
+  async function setupFormWithAvailability() {
+    const mocks = installFetchMock();
+    render(
+      <TrainingSeriesCreateForm
+        teamSeasons={TEAM_SEASONS}
+        pitchHallFacilityGroups={PITCH_HALL_GROUPS}
+        dressingRoomFacilityGroups={DRESSING_ROOM_GROUPS}
+        canValidateDirectly
+      />,
+    );
+
+    selectTeamSeason();
+    fireEvent.change(screen.getByTestId("training-create-title"), { target: { value: "E1 Training" } });
+    fireEvent.change(screen.getByTestId("training-create-date"), { target: { value: "2026-09-22" } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("training-create-resource-card-res-pitch-a")).toBeInTheDocument();
+    });
+
+    return mocks;
+  }
+
+  it("selects and deselects a free pitch without mutating unrelated form state", async () => {
+    await setupFormWithAvailability();
+
+    fireEvent.click(screen.getByTestId("training-create-resource-card-res-pitch-a"));
+    expect(screen.getByTestId("training-create-resource-selected-summary")).toHaveTextContent("Kunstrasen 2");
+
+    fireEvent.click(screen.getByTestId("training-create-resource-remove-res-pitch-a"));
+    expect(screen.queryByTestId("training-create-resource-selected-summary")).not.toBeInTheDocument();
+
+    expect(screen.getByTestId("training-create-title")).toHaveValue("E1 Training");
+    expect(screen.getByTestId("training-create-date")).toHaveValue("2026-09-22");
+    expect(screen.getByTestId("training-create-team-season-select-value")).toHaveValue("ts-1");
+  });
+
+  it("selects an occupied pitch via override and deselects it again", async () => {
+    await setupFormWithAvailability();
+
+    fireEvent.click(screen.getByTestId("training-create-resource-card-res-pitch-b"));
+    fireEvent.click(screen.getByTestId("training-create-resource-assign-anyway-res-pitch-b"));
+    expect(screen.getByTestId("training-create-resource-selected-summary")).toHaveTextContent("Kunstrasen 3 A");
+    expect(screen.getByTestId("training-create-resource-selected-summary")).toHaveTextContent("Mehrfachbelegung");
+
+    fireEvent.click(screen.getByTestId("training-create-resource-remove-res-pitch-b"));
+    expect(screen.queryByTestId("training-create-resource-selected-summary")).not.toBeInTheDocument();
+  });
+
+  it("selects and deselects a dressing room without persistence calls", async () => {
+    const { fetchMock } = await setupFormWithAvailability();
+
+    fireEvent.click(screen.getByTestId("training-create-dressing-room-card-res-dressing-1"));
+    expect(screen.getByTestId("training-create-dressing-room-selected-summary")).toHaveTextContent("E1");
+
+    fireEvent.click(screen.getByTestId("training-create-dressing-room-remove-res-dressing-1"));
+    expect(screen.queryByTestId("training-create-dressing-room-selected-summary")).not.toBeInTheDocument();
+
+    const createCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/training-series");
+    expect(createCalls).toHaveLength(0);
+  });
+
+  it("does not call the create API when selecting or deselecting resources", async () => {
+    const { fetchMock } = await setupFormWithAvailability();
+
+    fireEvent.click(screen.getByTestId("training-create-resource-card-res-pitch-a"));
+    fireEvent.click(screen.getByTestId("training-create-resource-remove-res-pitch-a"));
+    fireEvent.click(screen.getByTestId("training-create-dressing-room-card-res-dressing-1"));
+    fireEvent.click(screen.getByTestId("training-create-dressing-room-remove-res-dressing-1"));
+
+    const createCalls = fetchMock.mock.calls.filter(([url]) => url === "/api/training-series");
+    expect(createCalls).toHaveLength(0);
+  });
+
+  it("submits facilityResourceIds only on final create, not during selection", async () => {
+    const { fetchMock } = await setupFormWithAvailability();
+
+    fireEvent.click(screen.getByTestId("training-create-resource-card-res-pitch-a"));
+    fireEvent.click(screen.getByTestId("training-create-dressing-room-card-res-dressing-1"));
+
+    await waitFor(() => expect(screen.getByTestId("training-create-submit")).not.toBeDisabled());
+    fireEvent.click(screen.getByTestId("training-create-submit"));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith("/api/training-series", expect.anything()));
+
+    const call = fetchMock.mock.calls.find(([url]) => url === "/api/training-series");
+    const body = JSON.parse((call?.[1] as RequestInit).body as string);
+    expect(body.facilityResourceIds).toEqual(["res-pitch-a", "res-dressing-1"]);
+  });
+});

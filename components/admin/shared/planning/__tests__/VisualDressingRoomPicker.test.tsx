@@ -76,3 +76,115 @@ describe("VisualDressingRoomPicker — aggregated layout", () => {
     expect(onSelect).toHaveBeenCalledWith("room-free");
   });
 });
+
+describe("VisualDressingRoomPicker — reversible selection (TRAINING-CENTER-PREMIUM-02B)", () => {
+  it("deselects a free dressing room via summary remove action", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["room-free"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-remove-room-free"));
+    expect(onDeselect).toHaveBeenCalledWith("room-free");
+  });
+
+  it("deselects a free dressing room when the card is clicked again", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["room-free"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-card-room-free"));
+    expect(onDeselect).toHaveBeenCalledWith("room-free");
+  });
+
+  it("does not select an occupied dressing room without confirm", () => {
+    const onSelect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={onSelect}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-card-room-occupied"));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId("dressing-picker-occupied-confirm-room-occupied")).toBeInTheDocument();
+  });
+
+  it("selects an occupied dressing room via Trotzdem zuweisen", () => {
+    const onSelect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={onSelect}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-card-room-occupied"));
+    fireEvent.click(screen.getByTestId("dressing-picker-assign-anyway-room-occupied"));
+    expect(onSelect).toHaveBeenCalledWith("room-occupied");
+  });
+
+  it("deselects an occupied override via summary remove action", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["room-occupied"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-remove-room-occupied"));
+    expect(onDeselect).toHaveBeenCalledWith("room-occupied");
+  });
+
+  it("deselects an occupied override when the selected chip is clicked again", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualDressingRoomPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["room-occupied"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="dressing-picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("dressing-picker-card-room-occupied"));
+    expect(onDeselect).toHaveBeenCalledWith("room-occupied");
+  });
+});

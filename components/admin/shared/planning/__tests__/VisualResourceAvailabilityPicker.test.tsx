@@ -269,3 +269,111 @@ describe("VisualResourceAvailabilityPicker — aggregated layout", () => {
     expect(screen.getByTestId("picker-occupied")).not.toHaveTextContent("Kunstrasen 2");
   });
 });
+
+describe("VisualResourceAvailabilityPicker — reversible selection (TRAINING-CENTER-PREMIUM-02B)", () => {
+  it("deselects a free resource via summary remove action", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-a"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={FREE_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-remove-res-pitch-a"));
+    expect(onDeselect).toHaveBeenCalledWith("res-pitch-a");
+  });
+
+  it("deselects an occupied override via summary remove action", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-b"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-remove-res-pitch-b"));
+    expect(onDeselect).toHaveBeenCalledWith("res-pitch-b");
+  });
+
+  it("deselects an occupied override when the selected card is clicked again", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-b"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-card-res-pitch-b"));
+    expect(onDeselect).toHaveBeenCalledWith("res-pitch-b");
+  });
+
+  it("does not call onSelect when an occupied resource is clicked without confirm", () => {
+    const onSelect = vi.fn();
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={onSelect}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-card-res-pitch-b"));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it("deselects a free resource in aggregated layout when the card is clicked again", () => {
+    const onDeselect = vi.fn();
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-a"])}
+        onSelect={vi.fn()}
+        onDeselect={onDeselect}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("picker-card-res-pitch-a"));
+    expect(onDeselect).toHaveBeenCalledWith("res-pitch-a");
+  });
+
+  it("exposes an accessible remove label on the summary action", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set(["res-pitch-a"])}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={FREE_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    expect(screen.getByLabelText("Kunstrasen 2 entfernen")).toBeInTheDocument();
+  });
+});
