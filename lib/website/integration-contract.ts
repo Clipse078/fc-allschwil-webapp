@@ -674,3 +674,17 @@ export type WebsitePageLayoutData = {
 export type WebsiteDesignSystemData = {
   designSystem: import("@/lib/website/design-system-types").ResolvedDesignSystem;
 };
+
+// ---------------------------------------------------------------------------
+// Cache revalidation — SCE-CANONICAL-PUBLISHING-01
+// ---------------------------------------------------------------------------
+//
+// When SCE canonical public data changes, external tenant websites should
+// invalidate tagged ISR caches. SCE sends signed POST requests to configured
+// tenant endpoints after mutations.
+//
+// Tag format: sce:{tenantSlug}:{domain} — see lib/website/public-cache-tags.ts
+// Full contract: docs/public-website-cache-revalidation.md
+//
+// Website follow-up: implement POST /api/revalidate with HMAC verification
+// and revalidateTag() for each tag in the payload.

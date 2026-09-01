@@ -22,6 +22,8 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { PUBLIC_CACHE_DOMAINS } from "@/lib/website/public-cache-tags";
+import { scheduleTenantPublicWebsiteCacheNotificationByTenantId } from "@/lib/website/public-cache-notification";
 import type {
   TrainingAllocationDto,
   CreateTrainingAllocationInput,
@@ -186,6 +188,10 @@ export async function createTrainingAllocation(
       include: allocationInclude,
     });
 
+    void scheduleTenantPublicWebsiteCacheNotificationByTenantId(tenantId, [
+      PUBLIC_CACHE_DOMAINS.WEEKPLAN,
+    ]);
+
     return allocationToDto(allocation as unknown as AllocationRow);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -216,6 +222,10 @@ export async function updateTrainingAllocation(
     include: allocationInclude,
   });
 
+  void scheduleTenantPublicWebsiteCacheNotificationByTenantId(tenantId, [
+    PUBLIC_CACHE_DOMAINS.WEEKPLAN,
+  ]);
+
   return allocationToDto(allocation as unknown as AllocationRow);
 }
 
@@ -228,6 +238,9 @@ export async function deleteTrainingAllocation(
 ): Promise<void> {
   await requireAllocation(tenantId, allocationId);
   await prisma.trainingAllocation.delete({ where: { id: allocationId } });
+  void scheduleTenantPublicWebsiteCacheNotificationByTenantId(tenantId, [
+    PUBLIC_CACHE_DOMAINS.WEEKPLAN,
+  ]);
 }
 
 /**
