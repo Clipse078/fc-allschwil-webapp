@@ -1,10 +1,13 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Info } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTrainingSeries } from "@/lib/training/training-service";
 import { findTeamSeasonPickerRow } from "@/lib/training/queries";
 import { TrainingSeriesNotFoundError } from "@/lib/training/errors";
+import { countSeriesOccurrenceAllocationExceptions } from "@/lib/training/series-cockpit-exception-data";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingSeriesForm from "@/components/admin/training/TrainingSeriesForm";
 import TrainingSeriesDeleteControl from "@/components/admin/training/TrainingSeriesDeleteControl";
@@ -44,11 +47,14 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
     throw err;
   }
 
-  // TEAMCENTER-UX-01C: the team/season assignment is immutable on edit, and
-  // findTeamSeasonsForTenant now intentionally scopes to the current season
-  // only (see lib/training/queries.ts) — so a series created in a prior
-  // season must still resolve its own TeamSeason for display here.
-  const teamSeasonRow = await findTeamSeasonPickerRow(tenantId, series.teamSeasonId);
+  const [teamSeasonRow, occurrenceExceptionCount] = await Promise.all([
+    // TEAMCENTER-UX-01C: the team/season assignment is immutable on edit, and
+    // findTeamSeasonsForTenant now intentionally scopes to the current season
+    // only (see lib/training/queries.ts) — so a series created in a prior
+    // season must still resolve its own TeamSeason for display here.
+    findTeamSeasonPickerRow(tenantId, series.teamSeasonId),
+    countSeriesOccurrenceAllocationExceptions(tenantId, seriesId, series.timezone),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -57,6 +63,32 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
         title={`Bearbeiten: ${series.title}`}
         description="Änderungen an Wochentagen, Zeiten oder Zeitraum werden beim Speichern sofort in generierte Termine übernommen. Bereits generierte Termine werden nicht dupliziert."
       />
+
+      {occurrenceExceptionCount > 0 ? (
+        <div
+          className="flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900"
+          data-testid="training-series-edit-exception-notice"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden />
+          <div className="space-y-1">
+            <p>
+              Diese Serie hat{" "}
+              <span className="font-semibold">
+                {occurrenceExceptionCount === 1
+                  ? "1 Einzeltermin-Ausnahme"
+                  : `${occurrenceExceptionCount} Einzeltermin-Ausnahmen`}
+              </span>
+              . Änderungen an der Serie wirken sich nicht automatisch auf bereits abweichend zugewiesene Einzeltermine aus.
+            </p>
+            <Link
+              href={`/dashboard/training?tab=serien`}
+              className="inline-flex text-xs font-semibold text-blue-800 underline-offset-2 hover:underline"
+            >
+              Ausnahmen im Serien-Cockpit ansehen
+            </Link>
+          </div>
+        </div>
+      ) : null}
 
       <TrainingSeriesForm
         mode="edit"

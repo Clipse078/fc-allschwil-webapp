@@ -190,6 +190,15 @@ function GroupSection({
         </ul>
       )}
 
+      {isOverridden && seriesRows.length > 0 ? (
+        <p
+          className="mt-2 text-xs text-gray-500"
+          data-testid={`training-session-allocations-${testIdSuffix}-series-default`}
+        >
+          Serien-Standard: {seriesRows.map((row) => row.facilityResourceName).join(", ")}
+        </p>
+      ) : null}
+
       {canManage && (
         <div className="mt-2 space-y-2">
           <FacilityResourceSelector

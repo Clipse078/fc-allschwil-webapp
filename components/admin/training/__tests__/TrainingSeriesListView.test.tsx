@@ -38,6 +38,7 @@ function makeRow(overrides: Partial<TrainingSeriesCockpitRow> = {}): TrainingSer
     dressingRoomAllocationId: "alloc-room",
     pitchResourceId: "res-pitch",
     dressingRoomResourceId: "res-room",
+    occurrenceExceptions: { occurrenceExceptionCount: 0, exceptions: [] },
     ...overrides,
   };
 }

@@ -8,6 +8,8 @@
  */
 
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import type { SeriesCockpitExceptionSummary, SeriesCockpitOccurrenceException } from "@/lib/training/series-cockpit-exceptions";
+import { summarizeOccurrenceExceptions } from "@/lib/training/series-cockpit-exceptions";
 import type { TrainingAllocationDto, TrainingSeriesDto, TrainingSeriesStatus, Weekday, WeekdayScheduleDto } from "@/lib/training/types";
 
 export const COCKPIT_WEEKDAY_ORDER: Weekday[] = [
@@ -62,6 +64,7 @@ export type TrainingSeriesCockpitRow = {
   dressingRoomAllocationId: string | null;
   pitchResourceId: string | null;
   dressingRoomResourceId: string | null;
+  occurrenceExceptions: SeriesCockpitExceptionSummary;
 };
 
 export function resolveSeriesAllocationDisplay(
@@ -88,6 +91,7 @@ export function buildTrainingSeriesCockpitRows(input: {
   series: readonly TrainingSeriesDto[];
   teamDisplayNameByTeamSeasonId: ReadonlyMap<string, string>;
   allocationsBySeriesId: ReadonlyMap<string, readonly TrainingAllocationDto[]>;
+  occurrenceExceptionsByRowKey?: ReadonlyMap<string, readonly SeriesCockpitOccurrenceException[]>;
 }): TrainingSeriesCockpitRow[] {
   const rows: TrainingSeriesCockpitRow[] = [];
 
@@ -115,6 +119,9 @@ export function buildTrainingSeriesCockpitRows(input: {
         seriesWeekdaySchedules: series.weekdaySchedules,
         sessionCount: series.sessionCount,
         ...allocationDisplay,
+        occurrenceExceptions: summarizeOccurrenceExceptions(
+          input.occurrenceExceptionsByRowKey?.get(`${series.id}:${schedule.weekday}`),
+        ),
       });
     }
   }

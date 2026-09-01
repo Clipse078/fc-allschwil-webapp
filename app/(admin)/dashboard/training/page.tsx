@@ -143,7 +143,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
     const archivedCount = allSeries.filter((series) => series.status === "ARCHIVED").length;
 
     const [cockpitRows, facilities] = await Promise.all([
-      buildTrainingSeriesCockpitViewModel(tenantContext.id, displayedSeries),
+      buildTrainingSeriesCockpitViewModel(tenantContext.id, displayedSeries, timezone),
       getFacilitiesForTenant(tenantContext.id),
     ]);
 
