@@ -21,7 +21,7 @@
  */
 
 import { useMemo, useCallback, useState, useEffect } from "react";
-import { Check, Star } from "lucide-react";
+import { Check, Star, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { PitchVisual, type PitchVisualState } from "./PitchVisual";
 import type { FacilityResourceType } from "@prisma/client";
@@ -584,11 +584,13 @@ function SelectedResourceSummary({
   facilityGroups,
   selectedResourceIds,
   availabilityByResourceId,
+  onDeselect,
   testId,
 }: {
   facilityGroups: FacilityGroup[];
   selectedResourceIds: Set<string>;
   availabilityByResourceId: Map<string, ResourceAvailabilityAnnotation>;
+  onDeselect: (resourceId: string) => void;
   testId?: string;
 }) {
   const selected = flattenFacilityResources(facilityGroups).filter((r) => selectedResourceIds.has(r.id));
@@ -604,10 +606,21 @@ function SelectedResourceSummary({
         const isFree = annotation?.status === "FREE";
         const isOccupied = annotation?.status === "OCCUPIED";
         return (
-          <div key={entry.id} className="flex items-center gap-2 text-sm">
-            <Check className="h-3.5 w-3.5 shrink-0 text-[var(--sce-primary)]" aria-hidden />
+          <div key={entry.id} className="flex items-start gap-2 text-sm">
+            <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--sce-primary)]" aria-hidden />
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-[var(--foreground)]">{entry.name}</p>
+              <div className="flex items-center gap-2">
+                <p className="min-w-0 flex-1 truncate font-semibold text-[var(--foreground)]">{entry.name}</p>
+                <button
+                  type="button"
+                  onClick={() => onDeselect(entry.id)}
+                  aria-label={`${entry.name} entfernen`}
+                  data-testid={testId ? `${testId}-remove-${entry.id}` : undefined}
+                  className="shrink-0 rounded p-0.5 text-[var(--muted)] transition-colors hover:bg-rose-50 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden />
+                </button>
+              </div>
               <p className="text-xs text-[var(--text-2)]">
                 {isFree ? "verfügbar" : isOccupied ? "Mehrfachbelegung" : "ausgewählt"}
               </p>
@@ -657,6 +670,7 @@ function AggregatedLayout({
         facilityGroups={facilityGroups}
         selectedResourceIds={selectedResourceIds}
         availabilityByResourceId={availabilityByResourceId}
+        onDeselect={onDeselect}
         testId={testId}
       />
 
