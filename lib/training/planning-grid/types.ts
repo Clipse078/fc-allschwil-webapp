@@ -8,6 +8,7 @@
 
 import type { TrainingAllocationGroupKey } from "@/lib/training/allocation-groups";
 import type { TrainingSessionDto } from "@/lib/training/types";
+import type { DaySegmentKey } from "./day-segments";
 
 /** Which allocatable resource category the grid is showing as vertical lanes. */
 export type PlanningResourceCategoryKey = TrainingAllocationGroupKey;
@@ -90,6 +91,8 @@ export type PlanningGridViewModel = {
   period: PlanningGridPeriod;
   category: PlanningResourceCategoryKey;
   timeline: PlanningGridTimeline;
+  /** Client default when no explicit daypart URL param is present. */
+  suggestedDaySegment: DaySegmentKey;
   resourceGroups: ResourceGroup[];
   lanes: ResourceLane[];
   blocks: ScheduledActivityBlock[];

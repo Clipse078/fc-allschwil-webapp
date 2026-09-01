@@ -46,6 +46,7 @@ type TrainingPageSearchParams = {
   team?: string;
   conflicts?: string;
   unallocated?: string;
+  daypart?: string;
 };
 
 type Props = {
@@ -128,6 +129,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
             canManage={canManage}
             locale={locale}
             timezone={timezone}
+            daypartParam={params.daypart ?? null}
           />
         </ToastProvider>
       </div>

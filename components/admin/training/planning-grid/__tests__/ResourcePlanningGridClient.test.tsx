@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "@/components/ui/ToastProvider";
@@ -59,7 +59,7 @@ describe("ResourcePlanningGridClient", () => {
     consoleError.mockRestore();
   });
 
-  it("renders toolbar and resource lanes", () => {
+  it("renders toolbar, day segments, and resource lanes", () => {
     render(
       <ToastProvider>
         <ResourcePlanningGridClient
@@ -73,9 +73,38 @@ describe("ResourcePlanningGridClient", () => {
       </ToastProvider>,
     );
 
-    expect(screen.getByTestId("planning-grid-toolbar")).toBeInTheDocument();
+    const toolbar = screen.getByTestId("planning-grid-toolbar");
+    expect(toolbar).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-switcher")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-08-12")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-12-16")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-16-20")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-20-00")).toBeInTheDocument();
+    expect(within(toolbar).getByTestId("day-segment-16-20")).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("resource-lane-resource-a")).toBeInTheDocument();
     expect(screen.getByTestId("activity-block-session-1")).toBeInTheDocument();
+    expect(screen.getByTestId("segment-timeline-axis")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-major-16:00")).toBeInTheDocument();
+    expect(screen.getByTestId("timeline-major-20:00")).toBeInTheDocument();
+  });
+
+  it("shows exactly one conflict indicator in the toolbar", () => {
+    const conflictModel = { ...viewModel, conflictCount: 3 };
+
+    render(
+      <ToastProvider>
+        <ResourcePlanningGridClient
+          viewModel={conflictModel}
+          dayLabel="Mittwoch, 2. September 2026"
+          dayParam="2026-09-02"
+          previousDayParam="2026-09-01"
+          nextDayParam="2026-09-03"
+          canManage
+        />
+      </ToastProvider>,
+    );
+
+    expect(screen.getAllByTestId("planning-conflict-count")).toHaveLength(1);
   });
 
   it("supports keyboard-accessible resource change without dragging", async () => {

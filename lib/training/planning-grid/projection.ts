@@ -10,6 +10,7 @@ import {
   type TrainingAllocationGroupKey,
 } from "@/lib/training/allocation-groups";
 import type { TrainingAllocationDto, TrainingSessionAllocationDto, TrainingSessionDto } from "@/lib/training/types";
+import { buildDaySegmentTimeline, resolveDefaultDaySegment } from "./day-segments";
 import { attachConflictsToBlocks, detectResourceConflicts, type ConflictOccupancy } from "./conflicts";
 import { resourceMatchesCategory, type FacilityLike } from "./resource-categories";
 import type {
@@ -33,7 +34,7 @@ export type AllocationInput = {
   sessionOverridesBySession: ReadonlyMap<string, readonly TrainingSessionAllocationDto[]>;
 };
 
-function parseTimeToMinutes(iso: string, timeZone = "Europe/Zurich"): number {
+export function parseTimeToMinutes(iso: string, timeZone = "Europe/Zurich"): number {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone,
     hour: "2-digit",
@@ -233,7 +234,6 @@ export function buildPlanningGridViewModel(input: BuildPlanningGridInput): Plann
     : daySessions;
 
   const { lanes, resourceGroups } = buildResourceLanes(input.facilities, input.category, input.filters);
-  const timeline = resolveTimeline(filteredByTeam, DEFAULT_SLOT_MINUTES, input.timeZone ?? "Europe/Zurich");
 
   let blocks = buildScheduledActivityBlocks(filteredByTeam, input.category, input.allocations);
 
@@ -267,12 +267,21 @@ export function buildPlanningGridViewModel(input: BuildPlanningGridInput): Plann
 
   const activeFacilities = input.facilities.filter((f) => f.status !== "ARCHIVED");
   const showFacilityFilter = activeFacilities.length > 1;
+  const timeZone = input.timeZone ?? "Europe/Zurich";
+  const allVisibleBlocks = [...visibleBlocks, ...unplannedBlocks];
+  const suggestedDaySegment = resolveDefaultDaySegment({
+    date: input.date,
+    blocks: allVisibleBlocks,
+    timeZone,
+  });
+  const timeline = buildDaySegmentTimeline(suggestedDaySegment);
 
   return {
     date: input.date,
     period: input.period,
     category: input.category,
     timeline,
+    suggestedDaySegment,
     resourceGroups,
     lanes,
     blocks: input.filters.unallocatedOnly ? [] : visibleBlocks,

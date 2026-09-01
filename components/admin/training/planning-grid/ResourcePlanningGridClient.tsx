@@ -11,10 +11,17 @@ import { Sheet } from "@/components/ui/Sheet";
 import { useToast } from "@/hooks/use-toast";
 import { timeRangesOverlap } from "@/lib/facilities/allocation-rules";
 import {
-  blockPositionStyle,
-  buildTimelineTicks,
+  activityOverlapsSegment,
+  blockSegmentFragment,
+  buildDaySegmentTimeline,
+  buildMajorTimelineTicks,
+  buildMinorTimelineMarkers,
   formatTimelineLabel,
-} from "@/lib/training/planning-grid/projection";
+  listAvailableDaySegments,
+  minutesToPercent,
+  resolveDefaultDaySegment,
+  type DaySegmentKey,
+} from "@/lib/training/planning-grid/day-segments";
 import type {
   PlanningGridViewModel,
   PlanningResourceCategoryKey,
@@ -35,6 +42,7 @@ type Props = {
   locale?: string;
   timezone?: string;
   basePath?: string;
+  daypartParam?: string | null;
 };
 
 type PendingReassignment = {
@@ -92,6 +100,7 @@ export default function ResourcePlanningGridClient({
   locale = "de-CH",
   timezone = "Europe/Zurich",
   basePath = "/dashboard/training",
+  daypartParam = null,
 }: Props) {
   const router = useRouter();
   const { toast } = useToast();
@@ -105,7 +114,6 @@ export default function ResourcePlanningGridClient({
   const [resourceChangeBlock, setResourceChangeBlock] = useState<ScheduledActivityBlock | null>(null);
 
   const {
-    timeline,
     resourceGroups,
     lanes,
     blocks,
@@ -119,9 +127,31 @@ export default function ResourcePlanningGridClient({
     category,
     showFacilityFilter,
     density,
+    date,
+    suggestedDaySegment,
   } = viewModel;
 
-  const timelineTicks = useMemo(() => buildTimelineTicks(timeline), [timeline]);
+  const allDayBlocks = useMemo(() => [...blocks, ...unplannedBlocks], [blocks, unplannedBlocks]);
+  const availableSegments = useMemo(
+    () => listAvailableDaySegments(allDayBlocks, timezone),
+    [allDayBlocks, timezone],
+  );
+  const activeDaySegment = useMemo(
+    () =>
+      resolveDefaultDaySegment({
+        date,
+        blocks: allDayBlocks,
+        timeZone: timezone,
+        daypartParam,
+      }),
+    [allDayBlocks, date, daypartParam, timezone],
+  );
+  const segmentTimeline = useMemo(
+    () => buildDaySegmentTimeline(activeDaySegment),
+    [activeDaySegment],
+  );
+  const majorTicks = useMemo(() => buildMajorTimelineTicks(segmentTimeline), [segmentTimeline]);
+  const minorMarkers = useMemo(() => buildMinorTimelineMarkers(segmentTimeline), [segmentTimeline]);
   const allPlannedBlocks = useMemo(
     () => blocks.filter((block) => block.resourceId),
     [blocks],
@@ -173,11 +203,35 @@ export default function ResourcePlanningGridClient({
   const hrefParams = {
     day: dayParam,
     category,
+    daypart: activeDaySegment,
     facility: filters.facilityId ?? undefined,
     team: filters.teamSeasonId ?? undefined,
     conflicts: filters.conflictsOnly ? "1" : undefined,
     unallocated: filters.unallocatedOnly ? "1" : undefined,
   };
+
+  const segmentBlocks = useMemo(
+    () =>
+      blocks.filter(
+        (block) =>
+          Boolean(block.resourceId) &&
+          activityOverlapsSegment(block.startAt, block.endAt, activeDaySegment, timezone),
+      ),
+    [activeDaySegment, blocks, timezone],
+  );
+
+  const segmentUnplanned = useMemo(
+    () =>
+      unplannedBlocks.filter((block) =>
+        activityOverlapsSegment(block.startAt, block.endAt, activeDaySegment, timezone),
+      ),
+    [activeDaySegment, timezone, unplannedBlocks],
+  );
+
+  const mobileBlocks = useMemo(
+    () => [...segmentBlocks, ...segmentUnplanned],
+    [segmentBlocks, segmentUnplanned],
+  );
 
   if (lanes.length === 0 && unplannedBlocks.length === 0) {
     return (
@@ -196,6 +250,8 @@ export default function ResourcePlanningGridClient({
           showFacilityFilter={showFacilityFilter}
           conflictCount={conflictCount}
           onToggleConflicts={() => setShowConflictPanel((v) => !v)}
+          availableSegments={availableSegments}
+          activeDaySegment={activeDaySegment}
         />
         <EmptyState
           icon={<CalendarDays className="h-8 w-8" />}
@@ -222,53 +278,39 @@ export default function ResourcePlanningGridClient({
         showFacilityFilter={showFacilityFilter}
         conflictCount={conflictCount}
         onToggleConflicts={() => setShowConflictPanel((v) => !v)}
+        availableSegments={availableSegments}
+        activeDaySegment={activeDaySegment}
       />
-
-      {conflictCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setShowConflictPanel(true)}
-          className="inline-flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800"
-          data-testid="planning-conflict-count"
-        >
-          <AlertTriangle className="h-4 w-4" />
-          {conflictCount} Konflikt{conflictCount === 1 ? "" : "e"}
-        </button>
-      )}
 
       {/* Desktop / tablet grid */}
       <div className="hidden md:block overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-        <div className="min-w-[720px]">
-          <div className="sticky top-0 z-20 grid border-b border-[var(--border)] bg-[var(--surface-2)]"
-            style={{ gridTemplateColumns: "11rem 1fr" }}>
-            <div className="border-r border-[var(--border)] px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]">
+        <div className="min-w-[640px]">
+          <div
+            className="sticky top-0 z-20 grid border-b border-[var(--border)] bg-[var(--surface-2)]"
+            style={{ gridTemplateColumns: "12rem 1fr" }}
+          >
+            <div className="sticky left-0 z-30 border-r border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs font-semibold uppercase text-[var(--muted)]">
               Ressource
             </div>
-            <div className="relative h-10">
-              {timelineTicks.map((tick) => {
-                const left = ((tick - timeline.gridStartMinutes) / (timeline.gridEndMinutes - timeline.gridStartMinutes)) * 100;
-                return (
-                  <span
-                    key={tick}
-                    className="absolute top-2 -translate-x-1/2 text-[0.65rem] font-medium text-[var(--muted)]"
-                    style={{ left: `${left}%` }}
-                  >
-                    {formatTimelineLabel(tick)}
-                  </span>
-                );
-              })}
-            </div>
+            <SegmentTimelineAxis majorTicks={majorTicks} minorMarkers={minorMarkers} timeline={segmentTimeline} />
           </div>
 
           {resourceGroups.map((group) => (
             <div key={group.facilityId}>
               {resourceGroups.length > 1 && (
-                <div className="sticky z-10 border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold text-[var(--text-2)]">
-                  {group.facilityName}
+                <div
+                  className="grid border-b border-[var(--border)] bg-[var(--surface-2)]"
+                  style={{ gridTemplateColumns: "12rem 1fr" }}
+                >
+                  <div className="sticky left-0 z-10 border-r border-[var(--border)] bg-[var(--surface-2)] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-[var(--text-2)]">
+                    {group.facilityName}
+                  </div>
+                  <div className="bg-[var(--surface-2)]" />
                 </div>
               )}
               {group.lanes.map((lane) => {
-                const laneBlocks = blocks.filter((block) => block.resourceId === lane.resourceId);
+                const laneBlocks = segmentBlocks.filter((block) => block.resourceId === lane.resourceId);
+                const showFacilityInLane = resourceGroups.length === 1 && group.lanes.length > 1;
                 const dropState =
                   draggedBlock && hoverLaneId === lane.resourceId
                     ? evaluateDropTarget(draggedBlock, lane, allPlannedBlocks, category)
@@ -278,7 +320,7 @@ export default function ResourcePlanningGridClient({
                   <div
                     key={lane.resourceId}
                     className={cn("grid border-b border-[var(--border)] last:border-b-0", laneHeightClass)}
-                    style={{ gridTemplateColumns: "11rem 1fr" }}
+                    style={{ gridTemplateColumns: "12rem 1fr" }}
                     data-testid={`resource-lane-${lane.resourceId}`}
                     onDragOver={(event) => {
                       if (!draggedBlock || !canManage) return;
@@ -291,7 +333,12 @@ export default function ResourcePlanningGridClient({
                       handleDropOnLane(lane);
                     }}
                   >
-                    <div className="flex items-center border-r border-[var(--border)] px-3 py-2">
+                    <div className="sticky left-0 z-10 flex flex-col justify-center border-r border-[var(--border)] bg-[var(--surface)] px-3 py-2">
+                      {showFacilityInLane && (
+                        <span className="truncate text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                          {lane.facilityName}
+                        </span>
+                      )}
                       <span className="truncate text-sm font-medium text-[var(--foreground)]">{lane.resourceName}</span>
                     </div>
                     <div
@@ -306,7 +353,7 @@ export default function ResourcePlanningGridClient({
                         <ActivityBlock
                           key={block.sessionId}
                           block={block}
-                          timeline={timeline}
+                          segment={activeDaySegment}
                           locale={locale}
                           timezone={timezone}
                           highlighted={highlightConflictId ? block.conflicts.some((c) => c.id === highlightConflictId) : false}
@@ -328,9 +375,9 @@ export default function ResourcePlanningGridClient({
             </div>
           ))}
 
-          {unplannedBlocks.length > 0 && !filters.conflictsOnly && (
+          {segmentUnplanned.length > 0 && !filters.conflictsOnly && (
             <UnplannedSection
-              blocks={unplannedBlocks}
+              blocks={segmentUnplanned}
               locale={locale}
               timezone={timezone}
               canManage={canManage}
@@ -344,7 +391,14 @@ export default function ResourcePlanningGridClient({
 
       {/* Mobile list */}
       <div className="space-y-3 md:hidden">
-        {[...blocks, ...unplannedBlocks].map((block) => (
+        <DaySegmentSwitcher
+          availableSegments={availableSegments}
+          activeDaySegment={activeDaySegment}
+          basePath={basePath}
+          hrefParams={hrefParams}
+          compact
+        />
+        {mobileBlocks.map((block) => (
           <MobileActivityCard
             key={block.sessionId}
             block={block}
@@ -511,6 +565,8 @@ function PlanningToolbar({
   showFacilityFilter,
   conflictCount,
   onToggleConflicts,
+  availableSegments,
+  activeDaySegment,
 }: {
   dayLabel: string;
   dayParam: string;
@@ -525,6 +581,8 @@ function PlanningToolbar({
   showFacilityFilter: boolean;
   conflictCount: number;
   onToggleConflicts: () => void;
+  availableSegments: { key: DaySegmentKey; label: string }[];
+  activeDaySegment: DaySegmentKey;
 }) {
   const todayParam = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Europe/Zurich",
@@ -563,11 +621,24 @@ function PlanningToolbar({
         </div>
         <span className="text-sm font-semibold">{dayLabel}</span>
         {conflictCount > 0 && (
-          <button type="button" onClick={onToggleConflicts} className="text-xs font-semibold text-amber-700">
-            ⚠ {conflictCount} Konflikte
+          <button
+            type="button"
+            onClick={onToggleConflicts}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800"
+            data-testid="planning-conflict-count"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" aria-hidden />
+            {conflictCount} Konflikt{conflictCount === 1 ? "" : "e"}
           </button>
         )}
       </div>
+
+      <DaySegmentSwitcher
+        availableSegments={availableSegments}
+        activeDaySegment={activeDaySegment}
+        basePath={basePath}
+        hrefParams={hrefParams}
+      />
 
       <div className="flex flex-wrap gap-2">
         {categories.length > 1 &&
@@ -657,9 +728,83 @@ function PlanningToolbar({
   );
 }
 
+function SegmentTimelineAxis({
+  timeline,
+  majorTicks,
+  minorMarkers,
+}: {
+  timeline: PlanningGridViewModel["timeline"];
+  majorTicks: number[];
+  minorMarkers: number[];
+}) {
+  return (
+    <div className="relative h-10" data-testid="segment-timeline-axis">
+      {minorMarkers.map((marker) => (
+        <div
+          key={`minor-${marker}`}
+          className="absolute top-0 bottom-0 w-px bg-[var(--border)]/50"
+          style={{ left: `${minutesToPercent(marker, timeline)}%` }}
+          aria-hidden
+        />
+      ))}
+      {majorTicks.map((tick) => (
+        <span
+          key={tick}
+          className="absolute top-2 -translate-x-1/2 text-[0.7rem] font-medium text-[var(--muted)]"
+          style={{ left: `${minutesToPercent(tick, timeline)}%` }}
+          data-testid={`timeline-major-${formatTimelineLabel(tick)}`}
+        >
+          {formatTimelineLabel(tick)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DaySegmentSwitcher({
+  availableSegments,
+  activeDaySegment,
+  basePath,
+  hrefParams,
+  compact = false,
+}: {
+  availableSegments: { key: DaySegmentKey; label: string }[];
+  activeDaySegment: DaySegmentKey;
+  basePath: string;
+  hrefParams: Record<string, string | undefined>;
+  compact?: boolean;
+}) {
+  return (
+    <div className={cn("space-y-1", compact ? "" : "border-t border-[var(--border)] pt-2")} data-testid="day-segment-switcher">
+      <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">Tagesabschnitt</p>
+      <div className={cn("flex flex-wrap gap-1", compact ? "" : "")} role="group" aria-label="Tagesabschnitt">
+        {availableSegments.map((segment) => {
+          const isActive = segment.key === activeDaySegment;
+          return (
+            <Link
+              key={segment.key}
+              href={buildPlanningHref(basePath, { ...hrefParams, daypart: segment.key })}
+              data-testid={`day-segment-${segment.key}`}
+              aria-pressed={isActive}
+              className={cn(
+                "rounded-md border px-2 py-1 text-[0.7rem] font-semibold transition-colors",
+                isActive
+                  ? "border-[var(--sce-primary)] bg-[var(--sce-primary-light)] text-[var(--sce-primary)]"
+                  : "border-[var(--border)] text-[var(--text-2)] hover:border-[var(--sce-primary)]/40",
+              )}
+            >
+              {segment.label}
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ActivityBlock({
   block,
-  timeline,
+  segment,
   locale,
   timezone,
   highlighted,
@@ -671,7 +816,7 @@ function ActivityBlock({
   canManage,
 }: {
   block: ScheduledActivityBlock;
-  timeline: PlanningGridViewModel["timeline"];
+  segment: DaySegmentKey;
   locale: string;
   timezone: string;
   highlighted: boolean;
@@ -682,7 +827,8 @@ function ActivityBlock({
   onChangeResource: () => void;
   canManage: boolean;
 }) {
-  const pos = blockPositionStyle(block, timeline);
+  const fragment = blockSegmentFragment(block, segment, timezone);
+  if (!fragment) return null;
 
   return (
     <button
@@ -697,17 +843,35 @@ function ActivityBlock({
           ? "border-amber-400 bg-amber-50 text-amber-950"
           : "border-[var(--border)] bg-[var(--sce-primary-light)] text-[var(--foreground)]",
         highlighted && "ring-2 ring-amber-500",
+        fragment.continuesBefore && "rounded-l-none border-l-2 border-l-dashed border-l-amber-500",
+        fragment.continuesAfter && "rounded-r-none border-r-2 border-r-dashed border-r-amber-500",
       )}
-      style={{ left: `${pos.leftPercent}%`, width: `${pos.widthPercent}%` }}
+      style={{ left: `${fragment.leftPercent}%`, width: `${fragment.widthPercent}%` }}
       data-testid={`activity-block-${block.sessionId}`}
       data-conflict={block.hasConflict ? "true" : "false"}
+      data-continues-before={fragment.continuesBefore ? "true" : "false"}
+      data-continues-after={fragment.continuesAfter ? "true" : "false"}
+      aria-label={`${block.session.teamName}, ${formatTimeRange(block.startAt, block.endAt, locale, timezone)}${block.hasConflict ? ", Konflikt" : ""}`}
     >
+      {fragment.continuesBefore && (
+        <span className="absolute left-0.5 top-1 text-[0.55rem] font-bold text-amber-700" aria-hidden>
+          ‹
+        </span>
+      )}
       <span className="block truncate text-xs font-semibold">{block.session.teamName}</span>
       <span className="block truncate text-[0.65rem] opacity-80">
         {formatTimeRange(block.startAt, block.endAt, locale, timezone)}
       </span>
       {block.secondaryResourceLabel && (
         <span className="block truncate text-[0.6rem] opacity-70">{block.secondaryResourceLabel}</span>
+      )}
+      {block.hasConflict && (
+        <span className="block truncate text-[0.6rem] font-medium text-amber-800">Konflikt</span>
+      )}
+      {fragment.continuesAfter && (
+        <span className="absolute right-0.5 top-1 text-[0.55rem] font-bold text-amber-700" aria-hidden>
+          ›
+        </span>
       )}
       {canManage && (
         <span
