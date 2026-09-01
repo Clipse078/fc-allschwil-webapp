@@ -43,7 +43,12 @@ type StandingsFailureCategory =
   | "SFV_TIMEOUT"
   | "SFV_UNAVAILABLE"
   | "SFV_PROVIDER_ERROR"
+  | "SFV_EMPTY_OR_UNUSABLE"
   | "UNKNOWN";
+
+type SnapshotFallbackReason =
+  | { kind: "provider_failure"; error: unknown }
+  | { kind: "empty_or_unusable" };
 
 function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && value > 0;
@@ -127,12 +132,34 @@ function logStandingsProviderFailure(
   );
 }
 
+function resolveSnapshotFallbackDiagnostics(
+  reason: SnapshotFallbackReason,
+): {
+  errorCode: string;
+  failureCategory: StandingsFailureCategory;
+} {
+  if (reason.kind === "empty_or_unusable") {
+    return {
+      errorCode: "SFV_STANDINGS_RESOLUTION_EMPTY",
+      failureCategory: "SFV_EMPTY_OR_UNUSABLE",
+    };
+  }
+
+  const error = reason.error;
+  const isSfvError = error instanceof SfvError;
+
+  return {
+    errorCode: isSfvError ? error.code : "INTERNAL_ERROR",
+    failureCategory: classifyStandingsFailure(error),
+  };
+}
+
 function logStandingsSnapshotFallback(
   input: FetchTeamStandingsInput,
   snapshot: { fetchedAt: Date },
-  error: unknown,
+  reason: SnapshotFallbackReason,
 ): void {
-  const isSfvError = error instanceof SfvError;
+  const diagnostics = resolveSnapshotFallbackDiagnostics(reason);
 
   console.warn(
     JSON.stringify({
@@ -143,8 +170,8 @@ function logStandingsSnapshotFallback(
       externalSeasonId: input.externalSeasonId,
       providerLeagueId: input.providerLeagueId ?? null,
       snapshotFetchedAt: snapshot.fetchedAt.toISOString(),
-      errorCode: isSfvError ? error.code : "INTERNAL_ERROR",
-      failureCategory: classifyStandingsFailure(error),
+      errorCode: diagnostics.errorCode,
+      failureCategory: diagnostics.failureCategory,
     }),
   );
 }
@@ -183,10 +210,17 @@ async function fetchRankingEntriesWithInflightDedup(
 
 async function tryLoadSnapshotFallback(
   input: FetchTeamStandingsInput,
-  error: unknown,
+  reason: SnapshotFallbackReason,
 ): Promise<SportingStandingsTable | null> {
   const identity = buildSnapshotIdentity(input);
-  if (!identity || !isProviderFailureEligibleForSnapshotFallback(error)) {
+  if (!identity) {
+    return null;
+  }
+
+  if (
+    reason.kind === "provider_failure" &&
+    !isProviderFailureEligibleForSnapshotFallback(reason.error)
+  ) {
     return null;
   }
 
@@ -195,7 +229,7 @@ async function tryLoadSnapshotFallback(
     return null;
   }
 
-  logStandingsSnapshotFallback(input, snapshot, error);
+  logStandingsSnapshotFallback(input, snapshot, reason);
   return snapshot.standingsTable;
 }
 
@@ -283,7 +317,9 @@ export async function fetchTeamStandingsForMapping(
           ),
         }),
       );
-      return null;
+      return await tryLoadSnapshotFallback(input, {
+        kind: "empty_or_unusable",
+      });
     }
 
     const fetchedAt = new Date();
@@ -292,6 +328,9 @@ export async function fetchTeamStandingsForMapping(
     return resolved.standings;
   } catch (error) {
     logStandingsProviderFailure(input, error);
-    return await tryLoadSnapshotFallback(input, error);
+    return await tryLoadSnapshotFallback(input, {
+      kind: "provider_failure",
+      error,
+    });
   }
 }

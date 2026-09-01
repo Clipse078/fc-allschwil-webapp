@@ -269,6 +269,7 @@ describe("fetchTeamStandingsForMapping", () => {
       rankingEntryCount: 2,
       externalTeamIdPresent: false,
     });
+    expect(mocks.loadStandingsSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("returns resolved standings without emitting diagnostics", async () => {
@@ -556,12 +557,56 @@ describe("fetchTeamStandingsForMapping", () => {
 
       expect(result).toBeNull();
       expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      expect(mocks.loadStandingsSnapshot).toHaveBeenCalledTimes(1);
     });
 
-    it("does not overwrite snapshot when provider returns an empty usable table", async () => {
+    it("returns snapshot when provider resolution is empty and a durable snapshot exists", async () => {
+      const fetchedAt = new Date("2026-08-20T10:00:00.000Z");
+      const snapshotTable = createSnapshotTable();
+      mocks.loadStandingsSnapshot.mockResolvedValue({
+        standingsTable: snapshotTable,
+        fetchedAt,
+        sfvLeagueId: 10,
+        sfvDivisionId: 20,
+        sfvGroupId: 30,
+      });
+
+      const result = await fetchTeamStandingsForMapping({
+        tenantId: "tenant-a",
+        externalTeamId: 999,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+        teamSeasonId: "team-season-1",
+      });
+
+      expect(result).toEqual(snapshotTable);
+      expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[0]?.[0]))).toMatchObject({
+        event: "SFV_STANDINGS_RESOLUTION_EMPTY",
+      });
+      expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[1]?.[0]))).toMatchObject({
+        event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+        tenantId: "tenant-a",
+        teamSeasonId: "team-season-1",
+        snapshotFetchedAt: fetchedAt.toISOString(),
+        errorCode: "SFV_STANDINGS_RESOLUTION_EMPTY",
+        failureCategory: "SFV_EMPTY_OR_UNUSABLE",
+      });
+    });
+
+    it("returns snapshot when provider returns an unusable table and a durable snapshot exists", async () => {
+      const snapshotTable = createSnapshotTable();
       mocks.fetchClubRanking.mockResolvedValue([
         createEntry({ teamId: 100, position: 1 }),
       ]);
+      mocks.loadStandingsSnapshot.mockResolvedValue({
+        standingsTable: snapshotTable,
+        fetchedAt: new Date("2026-08-20T10:00:00.000Z"),
+        sfvLeagueId: 10,
+        sfvDivisionId: 20,
+        sfvGroupId: 30,
+      });
 
       const result = await fetchTeamStandingsForMapping({
         tenantId: "tenant-a",
@@ -570,8 +615,15 @@ describe("fetchTeamStandingsForMapping", () => {
         providerLeagueId: 10,
       });
 
-      expect(result).toBeNull();
+      expect(result).toEqual(snapshotTable);
       expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      const fallbackDiagnostic = JSON.parse(
+        String(vi.mocked(console.warn).mock.calls.at(-1)?.[0]),
+      ) as Record<string, unknown>;
+      expect(fallbackDiagnostic).toMatchObject({
+        event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+        failureCategory: "SFV_EMPTY_OR_UNUSABLE",
+      });
     });
 
     it("isolates snapshots by tenant", async () => {
