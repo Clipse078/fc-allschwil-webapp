@@ -376,4 +376,40 @@ describe("VisualResourceAvailabilityPicker — reversible selection (TRAINING-CE
 
     expect(screen.getByLabelText("Kunstrasen 2 entfernen")).toBeInTheDocument();
   });
+
+  it("renders compact football-pitch glyphs for pitch resources in aggregated free rows", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={FREE_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    const freeRow = screen.getByTestId("picker-card-res-pitch-a");
+    expect(freeRow.querySelector("svg")).toBeTruthy();
+    expect(freeRow).toHaveTextContent("Frei");
+  });
+
+  it("renders compact football-pitch glyph for occupied pitch resources", () => {
+    render(
+      <VisualResourceAvailabilityPicker
+        facilityGroups={FACILITY_GROUPS}
+        selectedResourceIds={new Set()}
+        onSelect={vi.fn()}
+        onDeselect={vi.fn()}
+        availabilityByResourceId={MIXED_AVAILABILITY}
+        layout="aggregated"
+        testId="picker"
+      />,
+    );
+
+    const occupiedRow = screen.getByTestId("picker-card-res-pitch-b");
+    expect(occupiedRow.querySelector("svg")).toBeTruthy();
+    expect(occupiedRow).toHaveTextContent("Belegt");
+  });
 });

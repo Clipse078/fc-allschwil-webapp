@@ -249,6 +249,30 @@ export async function getTrainingSessionAllocation(
  * series-level summary entirely" (both fields default to false, which is a
  * no-op under OR).
  */
+/**
+ * TRAINING-CENTER-PREMIUM-03: tenant-wide session override lookup keyed by
+ * TrainingSession id — used by the planning grid to resolve effective
+ * per-occurrence allocations without N+1 queries.
+ */
+export async function listSessionAllocationsGroupedBySession(
+  tenantId: string,
+): Promise<Map<string, TrainingSessionAllocationDto[]>> {
+  const rows = await prisma.trainingSessionAllocation.findMany({
+    where: { tenantId },
+    include: sessionAllocationInclude,
+    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+  });
+
+  const grouped = new Map<string, TrainingSessionAllocationDto[]>();
+  for (const row of rows) {
+    const dto = allocationToDto(row as unknown as SessionAllocationRow);
+    const bucket = grouped.get(dto.trainingSessionId) ?? [];
+    bucket.push(dto);
+    grouped.set(dto.trainingSessionId, bucket);
+  }
+  return grouped;
+}
+
 export async function listSessionAllocationSummaryByTenant(
   tenantId: string,
 ): Promise<Map<string, TrainingAllocationSummary>> {

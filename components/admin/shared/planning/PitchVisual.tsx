@@ -35,6 +35,8 @@ export type PitchVisualProps = {
   siblingState?: PitchVisualState;
   /** Compact/small rendering (used in "Deine Auswahl" summary). Default false. */
   compact?: boolean;
+  /** Inline list glyph — smallest pitch/hall indicator for compact rows. */
+  micro?: boolean;
   /**
    * PLANNING-RESOURCE-UX-01-C2 — facility-level type (e.g. "INDOOR_HALL").
    * When "INDOOR_HALL", renders a neutral hall visual regardless of resource
@@ -187,9 +189,9 @@ function HalfPitchSvg({
 
 // ── Public Component ──────────────────────────────────────────────────────────
 
-export function PitchVisual({ resourceType, resourceName, state, siblingState, compact = false, facilityType }: PitchVisualProps) {
-  const w = compact ? 72 : 120;
-  const h = compact ? 44 : 74;
+export function PitchVisual({ resourceType, resourceName, state, siblingState, compact = false, micro = false, facilityType }: PitchVisualProps) {
+  const w = micro ? 18 : compact ? 72 : 120;
+  const h = micro ? 11 : compact ? 44 : 74;
 
   // MVP hall fallback: indoor-hall facilities must not display football-pitch markings,
   // even when their resource type is FULL_PITCH or HALF_PITCH.

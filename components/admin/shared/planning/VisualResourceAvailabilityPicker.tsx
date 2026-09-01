@@ -26,8 +26,6 @@ import { cn } from "@/lib/cn";
 import { PitchVisual, type PitchVisualState } from "./PitchVisual";
 import type { FacilityResourceType } from "@prisma/client";
 
-// ── Re-export types callers need ──────────────────────────────────────────────
-
 export type { FacilityGroup, ResourceOption } from "@/components/admin/training/FacilityResourceSelector";
 export type { ResourceAvailabilityAnnotation } from "@/components/admin/training/FacilityResourceSelector";
 
@@ -106,6 +104,51 @@ function availabilityState(
   if (isSelected) return "selected";
   if (!annotation) return "neutral";
   return annotation.status === "FREE" ? "free" : "occupied";
+}
+
+function isFootballPitchResource(resourceType: FacilityResourceType, facilityType?: string): boolean {
+  if (facilityType === "INDOOR_HALL") return false;
+  return resourceType === "FULL_PITCH" || resourceType === "HALF_PITCH";
+}
+
+function ResourceAvailabilityGlyph({
+  resourceType,
+  resourceName,
+  facilityType,
+  state,
+}: {
+  resourceType: FacilityResourceType;
+  resourceName: string;
+  facilityType?: string;
+  state: PitchVisualState;
+}) {
+  if (isFootballPitchResource(resourceType, facilityType)) {
+    return (
+      <PitchVisual
+        resourceType={resourceType}
+        resourceName={resourceName}
+        state={state}
+        facilityType={facilityType}
+        micro
+      />
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "mt-0.5 h-2 w-2 shrink-0 rounded-full inline-block",
+        state === "selected"
+          ? "bg-[var(--sce-primary)]"
+          : state === "free"
+            ? "bg-emerald-500"
+            : state === "occupied"
+              ? "bg-rose-500"
+              : "bg-[var(--muted)]",
+      )}
+      aria-hidden
+    />
+  );
 }
 
 /**
@@ -262,11 +305,11 @@ function ResourceCard({
             : "cursor-default opacity-50",
         )}
       >
-        <span
-          className={cn(
-            "mt-0.5 h-2 w-2 shrink-0 rounded-full inline-block",
-            isSharedSelection ? "bg-amber-500" : "bg-rose-500",
-          )}
+        <ResourceAvailabilityGlyph
+          resourceType={resourceType}
+          resourceName={resourceName}
+          facilityType={facilityType}
+          state={isSharedSelection ? "selected" : "occupied"}
         />
         <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold leading-tight text-[var(--foreground)] truncate">{resourceName}</p>
@@ -395,7 +438,16 @@ function ResourceCard({
         )}
         {isFree && !isSelected && (
           <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+            {isFootballPitchResource(resourceType, facilityType) ? (
+              <ResourceAvailabilityGlyph
+                resourceType={resourceType}
+                resourceName={resourceName}
+                facilityType={facilityType}
+                state="free"
+              />
+            ) : (
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 inline-block" />
+            )}
             Frei
           </span>
         )}
@@ -530,6 +582,14 @@ function CompactFreeResourceRow({
     else onSelect();
   };
 
+  const glyphState: PitchVisualState = isSelected
+    ? "selected"
+    : isFree
+      ? "free"
+      : isNeutral
+        ? "neutral"
+        : "occupied";
+
   const showFacilityContext = entry.name !== entry.facilityName;
 
   return (
@@ -550,11 +610,11 @@ function CompactFreeResourceRow({
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1",
       )}
     >
-      <span
-        className={cn(
-          "h-2 w-2 shrink-0 rounded-full",
-          isSelected ? "bg-[var(--sce-primary)]" : isFree ? "bg-emerald-500" : "bg-[var(--muted)]",
-        )}
+      <ResourceAvailabilityGlyph
+        resourceType={entry.type}
+        resourceName={entry.name}
+        facilityType={entry.facilityType}
+        state={glyphState}
       />
       <div className="min-w-0 flex-1">
         <p className="truncate text-xs font-semibold text-[var(--foreground)]">{entry.name}</p>

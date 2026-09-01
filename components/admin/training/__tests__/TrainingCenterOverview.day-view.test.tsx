@@ -90,7 +90,8 @@ describe("TrainingCenterOverview day view — TRAINING-URGENT-01H", () => {
 
     const dayRows = screen.getAllByTestId("training-session-row");
     expect(dayRows).toHaveLength(3);
-    expect(screen.getByTestId("trainingcenter-kpi-trainings")).toHaveTextContent("3");
+    expect(screen.getByTestId("trainingcenter-summary-strip")).toHaveTextContent("3");
+    expect(screen.getByTestId("trainingcenter-summary-strip")).toHaveTextContent("Trainings");
     expect(screen.queryByText("Junioren B1")).toBeTruthy();
     expect(dayRows.length).toBe(3);
   });
