@@ -520,6 +520,9 @@ export default function TeamSettingsCard({
           parseSavedPublication(publicationData?.publication) ?? {
             showNextMatch: publicationDraft.showNextMatch,
             showNextTournament: publicationDraft.showNextTournament,
+            squadWebsiteVisible: publicationDraft.squadWebsiteVisible,
+            trainerTeamWebsiteVisible: publicationDraft.trainerTeamWebsiteVisible,
+            trainingWebsiteVisible: publicationDraft.trainingWebsiteVisible,
           };
         setPublicationBaseline(savedPublication);
         setPublicationDraft(savedPublication);
