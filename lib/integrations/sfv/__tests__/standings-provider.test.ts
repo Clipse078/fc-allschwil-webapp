@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   fetchClubRanking: vi.fn(),
   isSfvEnabledForTenant: vi.fn(),
   requireEnabledSfvConfigForTenant: vi.fn(),
+  loadStandingsSnapshot: vi.fn(),
+  persistStandingsSnapshot: vi.fn(),
 }));
 
 vi.mock("../client", async (importOriginal) => {
@@ -25,6 +27,11 @@ vi.mock("../client", async (importOriginal) => {
 vi.mock("../tenant-config-service", () => ({
   isSfvEnabledForTenant: mocks.isSfvEnabledForTenant,
   requireEnabledSfvConfigForTenant: mocks.requireEnabledSfvConfigForTenant,
+}));
+
+vi.mock("../standings-snapshot-repository", () => ({
+  loadStandingsSnapshot: mocks.loadStandingsSnapshot,
+  persistStandingsSnapshot: mocks.persistStandingsSnapshot,
 }));
 
 function createEntry(
@@ -67,6 +74,53 @@ const defaultEntries = [
   createEntry({ teamId: 200, position: 2 }),
 ];
 
+function createSnapshotTable() {
+  return {
+    competition: {
+      name: "League",
+      divisionName: null,
+      groupName: null,
+    },
+    rows: [
+      {
+        position: 1,
+        externalTeamId: 100,
+        teamName: "Team 100",
+        shortName: null,
+        played: 6,
+        won: 5,
+        drawn: 1,
+        lost: 0,
+        goalsFor: 12,
+        goalsAgainst: 3,
+        points: 16,
+        penaltyPoints: 0,
+      },
+      {
+        position: 2,
+        externalTeamId: 200,
+        teamName: "Team 200",
+        shortName: null,
+        played: 0,
+        won: 0,
+        drawn: 0,
+        lost: 0,
+        goalsFor: 0,
+        goalsAgainst: 0,
+        points: 0,
+        penaltyPoints: 0,
+      },
+    ],
+  };
+}
+
+const mappingInput = {
+  tenantId: "tenant-a",
+  externalTeamId: 100,
+  externalSeasonId: 2027,
+  providerLeagueId: 10,
+};
+
 describe("fetchTeamStandingsForMapping", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,6 +137,8 @@ describe("fetchTeamStandingsForMapping", () => {
       enabled: true,
     });
     mocks.fetchClubRanking.mockResolvedValue(defaultEntries);
+    mocks.loadStandingsSnapshot.mockResolvedValue(null);
+    mocks.persistStandingsSnapshot.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -213,6 +269,7 @@ describe("fetchTeamStandingsForMapping", () => {
       rankingEntryCount: 2,
       externalTeamIdPresent: false,
     });
+    expect(mocks.loadStandingsSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("returns resolved standings without emitting diagnostics", async () => {
@@ -393,6 +450,237 @@ describe("fetchTeamStandingsForMapping", () => {
       await fetchTeamStandingsForMapping(input);
 
       expect(mocks.fetchClubRanking).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("durable snapshot", () => {
+    it("persists a snapshot on successful provider fetch", async () => {
+      const result = await fetchTeamStandingsForMapping(mappingInput);
+
+      expect(result).not.toBeNull();
+      expect(mocks.persistStandingsSnapshot).toHaveBeenCalledTimes(1);
+      expect(mocks.persistStandingsSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: "tenant-a",
+          externalSeasonId: 2027,
+          externalTeamId: 100,
+          providerLeagueId: 10,
+          sfvLeagueId: 10,
+          sfvDivisionId: 20,
+          sfvGroupId: 30,
+          standingsTable: createSnapshotTable(),
+        }),
+      );
+    });
+
+    it("returns snapshot on auth failure when a durable snapshot exists", async () => {
+      const fetchedAt = new Date("2026-08-20T10:00:00.000Z");
+      const snapshotTable = createSnapshotTable();
+      mocks.fetchClubRanking.mockRejectedValue(
+        new SfvAuthError("SFV_UNAUTHORIZED", "SFV ranking request rejected: 401 Unauthorized."),
+      );
+      mocks.loadStandingsSnapshot.mockResolvedValue({
+        standingsTable: snapshotTable,
+        fetchedAt,
+        sfvLeagueId: 10,
+        sfvDivisionId: 20,
+        sfvGroupId: 30,
+      });
+
+      const result = await fetchTeamStandingsForMapping({
+        ...mappingInput,
+        teamSeasonId: "team-season-1",
+      });
+
+      expect(result).toEqual(snapshotTable);
+      expect(console.warn).toHaveBeenCalledTimes(1);
+      expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[0]?.[0]))).toMatchObject({
+        event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+        tenantId: "tenant-a",
+        teamSeasonId: "team-season-1",
+        snapshotFetchedAt: fetchedAt.toISOString(),
+        errorCode: "SFV_UNAUTHORIZED",
+        failureCategory: "SFV_AUTH",
+      });
+    });
+
+    it.each([
+      ["SFV_TIMEOUT", "SFV_TIMEOUT"],
+      ["SFV_UNAVAILABLE", "SFV_UNAVAILABLE"],
+    ] as const)(
+      "returns snapshot on %s when a durable snapshot exists",
+      async (errorCode, expectedCategory) => {
+        const snapshotTable = createSnapshotTable();
+        mocks.fetchClubRanking.mockRejectedValue(
+          new SfvNetworkError(errorCode, "Safe provider failure."),
+        );
+        mocks.loadStandingsSnapshot.mockResolvedValue({
+          standingsTable: snapshotTable,
+          fetchedAt: new Date("2026-08-20T10:00:00.000Z"),
+          sfvLeagueId: 10,
+          sfvDivisionId: 20,
+          sfvGroupId: 30,
+        });
+
+        const result = await fetchTeamStandingsForMapping(mappingInput);
+
+        expect(result).toEqual(snapshotTable);
+        const diagnostic = JSON.parse(
+          String(vi.mocked(console.warn).mock.calls[0]?.[0]),
+        ) as Record<string, unknown>;
+        expect(diagnostic).toMatchObject({
+          event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+          failureCategory: expectedCategory,
+        });
+      },
+    );
+
+    it("returns null on provider failure when no snapshot exists", async () => {
+      mocks.fetchClubRanking.mockRejectedValue(
+        new SfvAuthError("SFV_UNAUTHORIZED", "SFV ranking request rejected: 401 Unauthorized."),
+      );
+
+      const result = await fetchTeamStandingsForMapping(mappingInput);
+
+      expect(result).toBeNull();
+      expect(mocks.loadStandingsSnapshot).toHaveBeenCalledTimes(1);
+      expect(console.warn).not.toHaveBeenCalled();
+    });
+
+    it("does not overwrite snapshot when provider resolution is empty", async () => {
+      const result = await fetchTeamStandingsForMapping({
+        tenantId: "tenant-a",
+        externalTeamId: 999,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+      });
+
+      expect(result).toBeNull();
+      expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      expect(mocks.loadStandingsSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns snapshot when provider resolution is empty and a durable snapshot exists", async () => {
+      const fetchedAt = new Date("2026-08-20T10:00:00.000Z");
+      const snapshotTable = createSnapshotTable();
+      mocks.loadStandingsSnapshot.mockResolvedValue({
+        standingsTable: snapshotTable,
+        fetchedAt,
+        sfvLeagueId: 10,
+        sfvDivisionId: 20,
+        sfvGroupId: 30,
+      });
+
+      const result = await fetchTeamStandingsForMapping({
+        tenantId: "tenant-a",
+        externalTeamId: 999,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+        teamSeasonId: "team-season-1",
+      });
+
+      expect(result).toEqual(snapshotTable);
+      expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      expect(console.warn).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[0]?.[0]))).toMatchObject({
+        event: "SFV_STANDINGS_RESOLUTION_EMPTY",
+      });
+      expect(JSON.parse(String(vi.mocked(console.warn).mock.calls[1]?.[0]))).toMatchObject({
+        event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+        tenantId: "tenant-a",
+        teamSeasonId: "team-season-1",
+        snapshotFetchedAt: fetchedAt.toISOString(),
+        errorCode: "SFV_STANDINGS_RESOLUTION_EMPTY",
+        failureCategory: "SFV_EMPTY_OR_UNUSABLE",
+      });
+    });
+
+    it("returns snapshot when provider returns an unusable table and a durable snapshot exists", async () => {
+      const snapshotTable = createSnapshotTable();
+      mocks.fetchClubRanking.mockResolvedValue([
+        createEntry({ teamId: 100, position: 1 }),
+      ]);
+      mocks.loadStandingsSnapshot.mockResolvedValue({
+        standingsTable: snapshotTable,
+        fetchedAt: new Date("2026-08-20T10:00:00.000Z"),
+        sfvLeagueId: 10,
+        sfvDivisionId: 20,
+        sfvGroupId: 30,
+      });
+
+      const result = await fetchTeamStandingsForMapping({
+        tenantId: "tenant-a",
+        externalTeamId: 999,
+        externalSeasonId: 2027,
+        providerLeagueId: 10,
+      });
+
+      expect(result).toEqual(snapshotTable);
+      expect(mocks.persistStandingsSnapshot).not.toHaveBeenCalled();
+      const fallbackDiagnostic = JSON.parse(
+        String(vi.mocked(console.warn).mock.calls.at(-1)?.[0]),
+      ) as Record<string, unknown>;
+      expect(fallbackDiagnostic).toMatchObject({
+        event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+        failureCategory: "SFV_EMPTY_OR_UNUSABLE",
+      });
+    });
+
+    it("isolates snapshots by tenant", async () => {
+      mocks.fetchClubRanking.mockRejectedValue(
+        new SfvAuthError("SFV_UNAUTHORIZED", "SFV ranking request rejected: 401 Unauthorized."),
+      );
+      mocks.loadStandingsSnapshot.mockImplementation(async (identity) => {
+        if (identity.tenantId === "tenant-a") {
+          return {
+            standingsTable: createSnapshotTable(),
+            fetchedAt: new Date("2026-08-20T10:00:00.000Z"),
+            sfvLeagueId: 10,
+            sfvDivisionId: 20,
+            sfvGroupId: 30,
+          };
+        }
+        return null;
+      });
+
+      const tenantA = await fetchTeamStandingsForMapping(mappingInput);
+      const tenantB = await fetchTeamStandingsForMapping({
+        ...mappingInput,
+        tenantId: "tenant-b",
+      });
+
+      expect(tenantA).not.toBeNull();
+      expect(tenantB).toBeNull();
+    });
+
+    it("isolates snapshots by season/league identity", async () => {
+      mocks.fetchClubRanking.mockRejectedValue(
+        new SfvAuthError("SFV_UNAUTHORIZED", "SFV ranking request rejected: 401 Unauthorized."),
+      );
+      mocks.loadStandingsSnapshot.mockImplementation(async (identity) => {
+        if (
+          identity.externalSeasonId === 2027 &&
+          identity.providerLeagueId === 10
+        ) {
+          return {
+            standingsTable: createSnapshotTable(),
+            fetchedAt: new Date("2026-08-20T10:00:00.000Z"),
+            sfvLeagueId: 10,
+            sfvDivisionId: 20,
+            sfvGroupId: 30,
+          };
+        }
+        return null;
+      });
+
+      const matching = await fetchTeamStandingsForMapping(mappingInput);
+      const otherLeague = await fetchTeamStandingsForMapping({
+        ...mappingInput,
+        providerLeagueId: 99,
+      });
+
+      expect(matching).not.toBeNull();
+      expect(otherLeague).toBeNull();
     });
   });
 

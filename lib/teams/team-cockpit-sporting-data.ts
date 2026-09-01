@@ -6,7 +6,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { fetchTeamStandingsForMapping } from "@/lib/integrations/sfv/standings-provider";
+import { resolveStandingsForMapping } from "@/lib/integrations/sfv/standings-resolution";
 import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 import {
   listTeamSeasonMatches,
@@ -265,8 +265,9 @@ export async function getTeamCockpitSportingData(
   if (input.sfvMapping) {
     let standingsTable = null;
     try {
-      standingsTable = await fetchTeamStandingsForMapping({
+      standingsTable = await resolveStandingsForMapping({
         tenantId: input.tenantId,
+        teamSeasonId: input.teamSeasonId,
         externalTeamId: input.sfvMapping.externalTeamId,
         externalSeasonId: input.sfvMapping.externalSeasonId,
         providerLeagueId: input.sfvMapping.providerLeagueId,

@@ -672,6 +672,8 @@ model Tenant {
   // ADMIN-DELETE-02A-C1: intentionally-deleted SFV match suppression — see
   // SfvMatchDeletionTombstone doc comment.
   sfvMatchDeletionTombstones       SfvMatchDeletionTombstone[]
+  /// STANDINGS-AVAILABILITY-06: durable last-known-good SFV standings snapshots.
+  sfvStandingsSnapshots            SfvStandingsSnapshot[]
   // CLUB-DIRECTORY-01: canonical external club/team directory. Supersedes
   // the earlier "Opponent"/"OpponentExternalMapping" foundation (MC-04B),
   // which was never wired to any write path or UI and had no club/team split.
@@ -3910,6 +3912,37 @@ model MatchExternalMapping {
 // provider entity" mechanism — scoped to exactly this one, already-diagnosed
 // re-creation risk.
 // ---------------------------------------------------------------------------
+// STANDINGS-AVAILABILITY-06 — Durable canonical standings snapshot
+//
+// Persists the normalized SportingStandingsTable returned by
+// fetchTeamStandingsForMapping() so a temporary SFV auth/network/provider
+// failure can fall back to the most recent valid table instead of standings:null.
+// Keyed by tenant + external season + external team + provider league — the same
+// identity used for authoritative table resolution, not by website route.
+// ---------------------------------------------------------------------------
+model SfvStandingsSnapshot {
+  id               String   @id @default(cuid())
+  tenantId         String
+  externalSeasonId Int
+  externalTeamId   Int
+  providerLeagueId Int
+  /// Normalized canonical standings table (competition + rows) as JSON.
+  standingsTable   Json
+  /// SFV league/division/group tuple for the resolved table (competition isolation).
+  sfvLeagueId      Int
+  sfvDivisionId    Int
+  sfvGroupId       Int
+  /// When the provider fetch that produced this snapshot succeeded.
+  fetchedAt        DateTime
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+
+  @@unique([tenantId, externalSeasonId, externalTeamId, providerLeagueId])
+  @@index([tenantId])
+}
+
 model SfvMatchDeletionTombstone {
   id               String   @id @default(cuid())
   /// Owning tenant. All queries must be scoped by tenantId.
