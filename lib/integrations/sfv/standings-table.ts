@@ -88,6 +88,65 @@ function buildCompetition(
   };
 }
 
+export type ResolvedStandingsTable = {
+  standings: SportingStandingsTable;
+  sfvLeagueId: number;
+  sfvDivisionId: number;
+  sfvGroupId: number;
+};
+
+/**
+ * Resolves the authoritative ranking table and the SFV table identity tuple.
+ */
+export function resolveStandingsTableWithIdentity(
+  input: StandingsTableResolutionInput,
+): ResolvedStandingsTable | null {
+  const standings = resolveStandingsTable(input);
+  if (!standings) {
+    return null;
+  }
+
+  const anchors = input.entries.filter(
+    (entry) => entry.teamId === input.externalTeamId,
+  );
+  if (anchors.length === 0) {
+    return null;
+  }
+
+  let selectedAnchor = anchors[0]!;
+
+  if (anchors.length > 1 && input.providerLeagueId != null) {
+    const leagueMatches = anchors.filter(
+      (entry) => entry.leagueId === input.providerLeagueId,
+    );
+
+    if (leagueMatches.length === 1) {
+      selectedAnchor = leagueMatches[0]!;
+    } else if (leagueMatches.length > 1) {
+      selectedAnchor = [...leagueMatches].sort((left, right) =>
+        compareTableTuples(tableTuple(left), tableTuple(right)),
+      )[0]!;
+    } else {
+      selectedAnchor = [...anchors].sort((left, right) =>
+        compareTableTuples(tableTuple(left), tableTuple(right)),
+      )[0]!;
+    }
+  } else if (anchors.length > 1) {
+    selectedAnchor = [...anchors].sort((left, right) =>
+      compareTableTuples(tableTuple(left), tableTuple(right)),
+    )[0]!;
+  }
+
+  const anchorTuple = tableTuple(selectedAnchor);
+
+  return {
+    standings,
+    sfvLeagueId: anchorTuple.leagueId,
+    sfvDivisionId: anchorTuple.divisionId,
+    sfvGroupId: anchorTuple.groupId,
+  };
+}
+
 /**
  * Resolves the authoritative ranking table for a mapped external team.
  *

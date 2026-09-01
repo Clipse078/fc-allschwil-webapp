@@ -16,8 +16,8 @@ vi.mock("@/lib/db/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/integrations/sfv/standings-provider", () => ({
-  fetchTeamStandingsForMapping: vi.fn(),
+vi.mock("@/lib/integrations/sfv/standings-resolution", () => ({
+  resolveStandingsForMapping: vi.fn(),
 }));
 
 vi.mock("@/lib/club-directory/canonical-logo-resolution", async () => {
@@ -41,7 +41,7 @@ vi.mock("../team-match-query-service", async () => {
 });
 
 import { prisma } from "@/lib/db/prisma";
-import { fetchTeamStandingsForMapping } from "@/lib/integrations/sfv/standings-provider";
+import { resolveStandingsForMapping } from "@/lib/integrations/sfv/standings-resolution";
 import { listTeamSeasonMatches } from "../team-match-query-service";
 
 const TENANT_ID = "tenant-1";
@@ -55,7 +55,7 @@ const mockPrisma = prisma as unknown as {
     findMany: ReturnType<typeof vi.fn>;
   };
 };
-const mockFetchStandings = fetchTeamStandingsForMapping as ReturnType<typeof vi.fn>;
+const mockFetchStandings = resolveStandingsForMapping as ReturnType<typeof vi.fn>;
 const mockListMatches = listTeamSeasonMatches as ReturnType<typeof vi.fn>;
 
 function createUpcomingMatch(overrides: Record<string, unknown> = {}) {

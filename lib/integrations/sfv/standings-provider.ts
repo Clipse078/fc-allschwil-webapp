@@ -1,7 +1,8 @@
 /**
  * lib/integrations/sfv/standings-provider.ts
  *
- * SFV standings provider with tenant-scoped club resolution and read-through cache.
+ * SFV standings provider with tenant-scoped club resolution, read-through cache,
+ * and durable last-known-good snapshot fallback.
  */
 
 import type { ClubRankingEntry } from "./client";
@@ -13,7 +14,14 @@ import {
   getCachedStandingsEntries,
   setCachedStandingsEntries,
 } from "./standings-cache";
-import { resolveStandingsTable } from "./standings-table";
+import {
+  loadStandingsSnapshot,
+  persistStandingsSnapshot,
+  type StandingsSnapshotIdentity,
+} from "./standings-snapshot-repository";
+import {
+  resolveStandingsTableWithIdentity,
+} from "./standings-table";
 import {
   isSfvEnabledForTenant,
   requireEnabledSfvConfigForTenant,
@@ -24,6 +32,7 @@ export type FetchTeamStandingsInput = {
   externalTeamId: number;
   externalSeasonId: number;
   providerLeagueId?: number | null;
+  teamSeasonId?: string | null;
 };
 
 /** In-flight deduplication keyed by tenant + season (canonical cache scope). */
@@ -35,6 +44,28 @@ type StandingsFailureCategory =
   | "SFV_UNAVAILABLE"
   | "SFV_PROVIDER_ERROR"
   | "UNKNOWN";
+
+function isPositiveInteger(value: number): boolean {
+  return Number.isInteger(value) && value > 0;
+}
+
+function buildSnapshotIdentity(
+  input: FetchTeamStandingsInput,
+): StandingsSnapshotIdentity | null {
+  if (
+    input.providerLeagueId == null ||
+    !isPositiveInteger(input.providerLeagueId)
+  ) {
+    return null;
+  }
+
+  return {
+    tenantId: input.tenantId,
+    externalSeasonId: input.externalSeasonId,
+    externalTeamId: input.externalTeamId,
+    providerLeagueId: input.providerLeagueId,
+  };
+}
 
 function classifyStandingsFailure(error: unknown): StandingsFailureCategory {
   if (!(error instanceof SfvError)) {
@@ -55,6 +86,23 @@ function classifyStandingsFailure(error: unknown): StandingsFailureCategory {
   }
 }
 
+function isProviderFailureEligibleForSnapshotFallback(
+  error: unknown,
+): boolean {
+  if (error instanceof SfvError) {
+    switch (error.code) {
+      case "CONFIGURATION_MISSING":
+      case "CONFIGURATION_INVALID":
+      case "CONTRACT_UNRESOLVED":
+        return false;
+      default:
+        return true;
+    }
+  }
+
+  return true;
+}
+
 function logStandingsProviderFailure(
   input: FetchTeamStandingsInput,
   error: unknown,
@@ -65,6 +113,7 @@ function logStandingsProviderFailure(
     JSON.stringify({
       event: "SFV_STANDINGS_PROVIDER_FAILURE",
       tenantId: input.tenantId,
+      teamSeasonId: input.teamSeasonId ?? null,
       externalTeamId: input.externalTeamId,
       externalSeasonId: input.externalSeasonId,
       providerLeagueId: input.providerLeagueId ?? null,
@@ -73,6 +122,28 @@ function logStandingsProviderFailure(
       errorMessage: isSfvError
         ? error.message
         : "An unexpected error occurred in the SFV standings provider.",
+      failureCategory: classifyStandingsFailure(error),
+    }),
+  );
+}
+
+function logStandingsSnapshotFallback(
+  input: FetchTeamStandingsInput,
+  snapshot: { fetchedAt: Date },
+  error: unknown,
+): void {
+  const isSfvError = error instanceof SfvError;
+
+  console.warn(
+    JSON.stringify({
+      event: "SFV_STANDINGS_SNAPSHOT_FALLBACK",
+      tenantId: input.tenantId,
+      teamSeasonId: input.teamSeasonId ?? null,
+      externalTeamId: input.externalTeamId,
+      externalSeasonId: input.externalSeasonId,
+      providerLeagueId: input.providerLeagueId ?? null,
+      snapshotFetchedAt: snapshot.fetchedAt.toISOString(),
+      errorCode: isSfvError ? error.code : "INTERNAL_ERROR",
       failureCategory: classifyStandingsFailure(error),
     }),
   );
@@ -110,11 +181,55 @@ async function fetchRankingEntriesWithInflightDedup(
   return promise;
 }
 
+async function tryLoadSnapshotFallback(
+  input: FetchTeamStandingsInput,
+  error: unknown,
+): Promise<SportingStandingsTable | null> {
+  const identity = buildSnapshotIdentity(input);
+  if (!identity || !isProviderFailureEligibleForSnapshotFallback(error)) {
+    return null;
+  }
+
+  const snapshot = await loadStandingsSnapshot(identity);
+  if (!snapshot) {
+    return null;
+  }
+
+  logStandingsSnapshotFallback(input, snapshot, error);
+  return snapshot.standingsTable;
+}
+
+async function persistSuccessfulStandingsSnapshot(
+  input: FetchTeamStandingsInput,
+  resolved: {
+    standings: SportingStandingsTable;
+    sfvLeagueId: number;
+    sfvDivisionId: number;
+    sfvGroupId: number;
+  },
+  fetchedAt: Date,
+): Promise<void> {
+  const identity = buildSnapshotIdentity(input);
+  if (!identity) {
+    return;
+  }
+
+  await persistStandingsSnapshot({
+    ...identity,
+    standingsTable: resolved.standings,
+    sfvLeagueId: resolved.sfvLeagueId,
+    sfvDivisionId: resolved.sfvDivisionId,
+    sfvGroupId: resolved.sfvGroupId,
+    fetchedAt,
+  });
+}
+
 /**
  * Fetches the authoritative standings table for a mapped SFV team.
  *
  * ClubId is always resolved from tenant configuration — never caller-supplied.
- * Returns null on any configuration, provider, or resolution failure.
+ * On transient provider failure, returns the durable last-known-good snapshot
+ * when one exists. Returns null when no snapshot exists and fetch/resolution fails.
  */
 export async function fetchTeamStandingsForMapping(
   input: FetchTeamStandingsInput,
@@ -147,17 +262,18 @@ export async function fetchTeamStandingsForMapping(
       }),
     );
 
-    const standings = resolveStandingsTable({
+    const resolved = resolveStandingsTableWithIdentity({
       entries,
       externalTeamId: input.externalTeamId,
       providerLeagueId: input.providerLeagueId,
     });
 
-    if (!standings) {
+    if (!resolved) {
       console.warn(
         JSON.stringify({
           event: "SFV_STANDINGS_RESOLUTION_EMPTY",
           tenantId: input.tenantId,
+          teamSeasonId: input.teamSeasonId ?? null,
           externalTeamId: input.externalTeamId,
           externalSeasonId: input.externalSeasonId,
           providerLeagueId: input.providerLeagueId ?? null,
@@ -167,11 +283,15 @@ export async function fetchTeamStandingsForMapping(
           ),
         }),
       );
+      return null;
     }
 
-    return standings;
+    const fetchedAt = new Date();
+    await persistSuccessfulStandingsSnapshot(input, resolved, fetchedAt);
+
+    return resolved.standings;
   } catch (error) {
     logStandingsProviderFailure(input, error);
-    return null;
+    return await tryLoadSnapshotFallback(input, error);
   }
 }
