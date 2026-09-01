@@ -26,7 +26,10 @@ import {
 import { buildTrainingCenterViewModel, normalizeTrainingActionFilter } from "@/lib/training/view-model";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingCenterOverview from "@/components/admin/training/TrainingCenterOverview";
+import ResourcePlanningGridClient from "@/components/admin/training/planning-grid/ResourcePlanningGridClient";
 import TrainingSeriesListView from "@/components/admin/training/TrainingSeriesListView";
+import { fetchPlanningGridData, normalizePlanningGridFilters } from "@/lib/training/planning-grid/data-service";
+import type { PlanningResourceCategoryKey } from "@/lib/training/planning-grid/types";
 import { cn } from "@/lib/cn";
 
 type TrainingPageSearchParams = {
@@ -37,15 +40,21 @@ type TrainingPageSearchParams = {
   week?: string;
   day?: string;
   filter?: string;
+  category?: string;
+  facility?: string;
+  team?: string;
+  conflicts?: string;
+  unallocated?: string;
 };
 
 type Props = {
   searchParams?: Promise<TrainingPageSearchParams>;
 };
 
-const TOP_TABS: { key: "kalender" | "serien"; label: string }[] = [
+const TOP_TABS: { key: "kalender" | "planungsraster" | "serien"; label: string }[] = [
   { key: "kalender", label: "Kalender" },
-  { key: "serien", label: "Serien verwalten" },
+  { key: "planungsraster", label: "Planungsraster" },
+  { key: "serien", label: "Serien" },
 ];
 
 export default async function TrainingCenterPage({ searchParams }: Props) {
@@ -73,9 +82,54 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
   // (manage alone must never authorize permanent deletion).
   const canDelete = hasPermission(session, PERMISSIONS.TRAININGS_DELETE);
   const params: TrainingPageSearchParams = searchParams ? await searchParams : {};
-  const tab = params.tab === "serien" ? "serien" : "kalender";
+  const tab =
+    params.tab === "serien" ? "serien" : params.tab === "planungsraster" ? "planungsraster" : "kalender";
   const timezone = tenantContext.timezone ?? TRAINING_DEFAULT_TIMEZONE;
   const locale = tenantContext.locale ?? "de-CH";
+
+  if (tab === "planungsraster") {
+    const planningData = await fetchPlanningGridData({
+      tenantId: tenantContext.id,
+      timezone,
+      dateParam: params.day,
+      category: (params.category?.toUpperCase() as PlanningResourceCategoryKey | undefined) ?? null,
+      filters: normalizePlanningGridFilters({
+        facilityId: params.facility ?? null,
+        teamSeasonId: params.team ?? null,
+        conflictsOnly: params.conflicts === "1",
+        unallocatedOnly: params.unallocated === "1",
+      }),
+    });
+
+    return (
+      <div className="max-w-[1600px] space-y-6">
+        <AdminSectionHeader
+          eyebrow="Planung"
+          title="TrainingCenter"
+          description="Kalender, Planungsraster und Serien für alle Trainingsserien."
+          actions={
+            canManage ? (
+              <Link href="/dashboard/training/new" className="fca-button-primary inline-flex items-center gap-1.5 text-sm">
+                <Plus className="h-3.5 w-3.5" />
+                Neue Trainingsserie
+              </Link>
+            ) : undefined
+          }
+        />
+        <TopTabs active={tab} />
+        <ResourcePlanningGridClient
+          viewModel={planningData.viewModel}
+          dayLabel={formatTrainingDayLabel(planningData.viewModel.date, locale, timezone)}
+          dayParam={planningData.dayWindow.param}
+          previousDayParam={planningData.dayWindow.previousParam}
+          nextDayParam={planningData.dayWindow.nextParam}
+          canManage={canManage}
+          locale={locale}
+          timezone={timezone}
+        />
+      </div>
+    );
+  }
 
   if (tab === "serien") {
     const showArchived = params.archived === "1";
@@ -118,7 +172,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
         <AdminSectionHeader
           eyebrow="Planung"
           title="TrainingCenter"
-          description="Kalender und Serien-Verwaltung für alle Trainingsserien."
+          description="Kalender, Planungsraster und Serien für alle Trainingsserien."
           actions={
             canCreate ? (
               <Link href="/dashboard/training/new" className="fca-button-primary inline-flex items-center gap-1.5 text-sm">
@@ -193,7 +247,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
       <AdminSectionHeader
         eyebrow="Planung"
         title="TrainingCenter"
-        description="Kalender und Serien-Verwaltung für alle Trainingsserien."
+        description="Kalender, Planungsraster und Serien für alle Trainingsserien."
         actions={
           canManage ? (
             <Link href="/dashboard/training/new" className="fca-button-primary inline-flex items-center gap-1.5 text-sm">
@@ -239,7 +293,7 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
   );
 }
 
-function TopTabs({ active }: { active: "kalender" | "serien" }) {
+function TopTabs({ active }: { active: "kalender" | "planungsraster" | "serien" }) {
   return (
     <div role="tablist" aria-label="TrainingCenter-Bereiche" className="flex gap-1 border-b border-[var(--border)]">
       {TOP_TABS.map((item) => {

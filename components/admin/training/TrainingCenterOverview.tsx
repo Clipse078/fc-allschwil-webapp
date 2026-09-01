@@ -160,10 +160,35 @@ export default function TrainingCenterOverview({
       </div>
 
       {/* Operational summary ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-3">
-        <SummaryCard label="Trainings" value={displayKpis.gesamt} tone="default" />
-        <SummaryCard label="Offen" value={displayKpis.offen} tone="amber" />
-        <SummaryCard label="Erledigt" value={displayKpis.erledigt} tone="emerald" />
+      <div
+        className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-[var(--border)] bg-[var(--surface-2)] px-4 py-2 text-sm text-[var(--text-2)]"
+        data-testid="trainingcenter-summary-strip"
+      >
+        <span>
+          <span className="font-semibold text-[var(--foreground)]">{displayKpis.gesamt}</span> Trainings
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          <span className={cn("font-semibold", displayKpis.offen > 0 ? "text-amber-600" : "text-[var(--foreground)]")}>
+            {displayKpis.offen}
+          </span>{" "}
+          offen
+        </span>
+        <span aria-hidden>·</span>
+        <span>
+          <span className="font-semibold text-emerald-600">{displayKpis.erledigt}</span> erledigt
+        </span>
+        {view === "MONTH" && (
+          <>
+            <span aria-hidden>·</span>
+            <Link
+              href={`${basePath}?tab=planungsraster&day=${dayWindow.param}`}
+              className="font-semibold text-[var(--sce-primary)] hover:underline"
+            >
+              Im Planungsraster öffnen
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Alle / Offen / Erledigt ─────────────────────────────────────────── */}
@@ -252,22 +277,6 @@ export default function TrainingCenterOverview({
           </div>
         </SectionCard>
       )}
-    </div>
-  );
-}
-
-function SummaryCard({ label, value, tone }: { label: string; value: number; tone: "default" | "amber" | "emerald" }) {
-  const toneClass = tone === "amber" ? "text-amber-600" : tone === "emerald" ? "text-emerald-600" : "text-[var(--blue)]";
-
-  return (
-    <div className="sce-kpi-card p-4" data-testid={`trainingcenter-kpi-${label.toLowerCase()}`}>
-      <p className="sce-data-label">{label}</p>
-      <p
-        className={cn("mt-1.5 text-[1.75rem] font-bold leading-none tracking-tight", toneClass)}
-        style={{ fontFamily: "var(--font-display)" }}
-      >
-        {value}
-      </p>
     </div>
   );
 }
