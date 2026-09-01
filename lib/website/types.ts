@@ -322,11 +322,11 @@ export type PublicTrainerMember = {
 // ---------------------------------------------------------------------------
 
 export type PublicTeamTrainingSession = {
-  /** Day of week in German (e.g. "Dienstag"), derived from startTime. */
+  /** Day of week in German (e.g. "Dienstag"). */
   weekday: string;
-  /** ISO 8601 UTC start timestamp. */
+  /** ISO 8601 UTC timestamp representing the recurring start time. */
   startTime: string;
-  /** ISO 8601 UTC end timestamp, null when not set. */
+  /** ISO 8601 UTC timestamp representing the recurring end time. */
   endTime: string | null;
   location: string | null;
   /** Human-readable pitch name from facility registry, null when unresolvable. */
@@ -492,8 +492,9 @@ export type PublicTeamDetail = {
    */
   trainers: PublicTrainerMember[];
   /**
-   * Upcoming TRAINING events for the team (next 4 weeks, website-visible).
-   * Ordered by startTime ascending.
+   * Regular training schedule for the requested season, sourced from
+   * canonical TrainingSeries recurrence. Empty when
+   * TeamSeason.trainingWebsiteVisible = false.
    */
   training: PublicTeamTrainingSession[];
   /** Seasonal eligibility controls for the single public team-page next-event position. */

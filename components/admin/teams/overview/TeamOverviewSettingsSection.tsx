@@ -60,6 +60,7 @@ type Team = {
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   } | null;
 };
 
@@ -121,6 +122,7 @@ export default function TeamOverviewSettingsSection({
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   }) {
     setTeam((current) =>
       current.currentSeasonPublication
@@ -132,6 +134,7 @@ export default function TeamOverviewSettingsSection({
               showNextTournament: publication.showNextTournament,
               squadWebsiteVisible: publication.squadWebsiteVisible,
               trainerTeamWebsiteVisible: publication.trainerTeamWebsiteVisible,
+              trainingWebsiteVisible: publication.trainingWebsiteVisible,
             },
           }
         : current,

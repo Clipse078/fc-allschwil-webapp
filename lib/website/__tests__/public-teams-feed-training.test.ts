@@ -6,19 +6,17 @@ const mocks = vi.hoisted(() => ({
   teamFindFirst: vi.fn(),
   playerSquadMemberFindMany: vi.fn(),
   trainerTeamMemberFindMany: vi.fn(),
-  eventFindMany: vi.fn(),
-  facilityResourceFindMany: vi.fn(),
   tenantFindUnique: vi.fn(),
   teamFindMany: vi.fn(),
   externalTeamFindMany: vi.fn(),
   teamSeasonFindFirst: vi.fn(),
-  matchEventFindMany: vi.fn(),
   teamExternalMappingFindFirst: vi.fn(),
   fetchTeamStandingsForMapping: vi.fn(),
   buildStandingsClubEnrichmentByProviderTeamId: vi.fn(),
   findNextTournamentEventForTeamSeason: vi.fn(),
   listTournamentsByIds: vi.fn(),
   listTeamSeasonMatches: vi.fn(),
+  getTeamTrainingSchedule: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -32,12 +30,6 @@ vi.mock("@/lib/db/prisma", () => ({
     },
     trainerTeamMember: {
       findMany: mocks.trainerTeamMemberFindMany,
-    },
-    event: {
-      findMany: mocks.eventFindMany,
-    },
-    facilityResource: {
-      findMany: mocks.facilityResourceFindMany,
     },
     tenant: {
       findUnique: mocks.tenantFindUnique,
@@ -77,7 +69,7 @@ vi.mock("@/lib/teams/team-match-query-service", () => ({
 }));
 
 vi.mock("@/lib/teams/team-training-schedule", () => ({
-  getTeamTrainingSchedule: vi.fn().mockResolvedValue([]),
+  getTeamTrainingSchedule: mocks.getTeamTrainingSchedule,
 }));
 
 const TENANT_ID = "tenant-fca";
@@ -85,11 +77,7 @@ const TEAM_ID = "team-e1";
 const TEAM_SEASON_ID = "team-season-1";
 const NOW = new Date("2026-08-25T12:00:00.000Z");
 
-function mockTeamDetail(visibility: {
-  squadWebsiteVisible: boolean;
-  trainerTeamWebsiteVisible: boolean;
-  trainingWebsiteVisible?: boolean;
-}) {
+function mockTeamDetail(trainingWebsiteVisible: boolean) {
   mocks.teamFindFirst.mockResolvedValue({
     id: TEAM_ID,
     name: "FC Example E1",
@@ -102,9 +90,9 @@ function mockTeamDetail(visibility: {
         id: TEAM_SEASON_ID,
         displayName: "FC Example E1 2026/27",
         shortName: "E1",
-        squadWebsiteVisible: visibility.squadWebsiteVisible,
-        trainerTeamWebsiteVisible: visibility.trainerTeamWebsiteVisible,
-        trainingWebsiteVisible: visibility.trainingWebsiteVisible ?? true,
+        squadWebsiteVisible: true,
+        trainerTeamWebsiteVisible: true,
+        trainingWebsiteVisible,
         showNextMatch: true,
         showNextTournament: true,
         season: { key: "2026-2027", name: "Saison 2026/27" },
@@ -113,33 +101,15 @@ function mockTeamDetail(visibility: {
   });
 }
 
-describe("getPublicTeamDetail — squad and trainer visibility", () => {
+describe("getPublicTeamDetail — training visibility", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
 
-    mockTeamDetail({
-      squadWebsiteVisible: false,
-      trainerTeamWebsiteVisible: false,
-    });
-    mocks.playerSquadMemberFindMany.mockResolvedValue([
-      {
-        shirtNumber: 10,
-        positionLabel: "Stürmer",
-        isCaptain: true,
-        isViceCaptain: false,
-        person: { firstName: "Max", lastName: "Muster" },
-      },
-    ]);
-    mocks.trainerTeamMemberFindMany.mockResolvedValue([
-      {
-        roleLabel: "Trainer",
-        person: { firstName: "Anna", lastName: "Coach" },
-      },
-    ]);
-    mocks.eventFindMany.mockResolvedValue([]);
-    mocks.facilityResourceFindMany.mockResolvedValue([]);
+    mockTeamDetail(true);
+    mocks.playerSquadMemberFindMany.mockResolvedValue([]);
+    mocks.trainerTeamMemberFindMany.mockResolvedValue([]);
     mocks.tenantFindUnique.mockResolvedValue({
       name: "FC Example",
       logoUrl: null,
@@ -147,7 +117,6 @@ describe("getPublicTeamDetail — squad and trainer visibility", () => {
     mocks.teamFindMany.mockResolvedValue([]);
     mocks.externalTeamFindMany.mockResolvedValue([]);
     mocks.teamSeasonFindFirst.mockResolvedValue(null);
-    mocks.matchEventFindMany.mockResolvedValue([]);
     mocks.teamExternalMappingFindFirst.mockResolvedValue(null);
     mocks.fetchTeamStandingsForMapping.mockResolvedValue(null);
     mocks.buildStandingsClubEnrichmentByProviderTeamId.mockResolvedValue(new Map());
@@ -157,58 +126,48 @@ describe("getPublicTeamDetail — squad and trainer visibility", () => {
       upcoming: [],
       completed: [],
     });
-  });
-
-  it("suppresses squad when squadWebsiteVisible is false", async () => {
-    const detail = await getPublicTeamDetail({
-      tenantId: TENANT_ID,
-      slug: "e1",
-    });
-
-    expect(detail?.squad).toEqual([]);
-    expect(mocks.playerSquadMemberFindMany).not.toHaveBeenCalled();
-  });
-
-  it("suppresses trainers when trainerTeamWebsiteVisible is false", async () => {
-    const detail = await getPublicTeamDetail({
-      tenantId: TENANT_ID,
-      slug: "e1",
-    });
-
-    expect(detail?.trainers).toEqual([]);
-    expect(mocks.trainerTeamMemberFindMany).not.toHaveBeenCalled();
-  });
-
-  it("loads squad and trainers when both visibility flags are true", async () => {
-    mockTeamDetail({
-      squadWebsiteVisible: true,
-      trainerTeamWebsiteVisible: true,
-    });
-
-    const detail = await getPublicTeamDetail({
-      tenantId: TENANT_ID,
-      slug: "e1",
-    });
-
-    expect(mocks.playerSquadMemberFindMany).toHaveBeenCalledOnce();
-    expect(mocks.trainerTeamMemberFindMany).toHaveBeenCalledOnce();
-    expect(detail?.squad).toEqual([
+    mocks.getTeamTrainingSchedule.mockResolvedValue([
       {
-        firstName: "Max",
-        lastName: "Muster",
-        shirtNumber: 10,
-        positionLabel: "Stürmer",
-        captain: true,
-        viceCaptain: false,
-        photo: null,
+        weekday: "TUESDAY",
+        weekdayLabel: "Dienstag",
+        startsAt: "17:15",
+        endsAt: "18:45",
+        locationLabel: "Kunstrasen 2",
+        seriesId: "series-1",
+        seriesTitle: "E1 Training",
       },
     ]);
-    expect(detail?.trainers).toEqual([
+  });
+
+  it("suppresses training when trainingWebsiteVisible is false", async () => {
+    mockTeamDetail(false);
+
+    const detail = await getPublicTeamDetail({
+      tenantId: TENANT_ID,
+      slug: "e1",
+    });
+
+    expect(detail?.training).toEqual([]);
+    expect(mocks.getTeamTrainingSchedule).not.toHaveBeenCalled();
+  });
+
+  it("returns canonical TrainingSeries schedule when trainingWebsiteVisible is true", async () => {
+    const detail = await getPublicTeamDetail({
+      tenantId: TENANT_ID,
+      slug: "e1",
+    });
+
+    expect(mocks.getTeamTrainingSchedule).toHaveBeenCalledWith(
+      TENANT_ID,
+      TEAM_SEASON_ID,
+    );
+    expect(detail?.training).toEqual([
       {
-        firstName: "Anna",
-        lastName: "Coach",
-        roleLabel: "Trainer",
-        photo: null,
+        weekday: "Dienstag",
+        startTime: "2026-01-06T16:15:00.000Z",
+        endTime: "2026-01-06T17:45:00.000Z",
+        location: "Kunstrasen 2",
+        pitchName: "Kunstrasen 2",
       },
     ]);
   });

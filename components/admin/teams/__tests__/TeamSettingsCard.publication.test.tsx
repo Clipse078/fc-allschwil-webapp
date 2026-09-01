@@ -44,6 +44,7 @@ const publication = {
   showNextTournament: false,
   squadWebsiteVisible: true,
   trainerTeamWebsiteVisible: true,
+  trainingWebsiteVisible: true,
 };
 
 function publicationPatchCalls() {
@@ -112,6 +113,10 @@ beforeEach(() => {
               typeof body.trainerTeamWebsiteVisible === "boolean"
                 ? body.trainerTeamWebsiteVisible
                 : publication.trainerTeamWebsiteVisible,
+            trainingWebsiteVisible:
+              typeof body.trainingWebsiteVisible === "boolean"
+                ? body.trainingWebsiteVisible
+                : publication.trainingWebsiteVisible,
           },
         }),
       };
@@ -278,6 +283,7 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
       showNextTournament: true,
       squadWebsiteVisible: true,
       trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
     });
     expect(saveButtons()[0]).toBeDisabled();
 
@@ -289,6 +295,7 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           showNextTournament: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
+          trainingWebsiteVisible: true,
         },
       }),
     );
@@ -320,6 +327,7 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           showNextTournament: publication.showNextTournament,
           squadWebsiteVisible: publication.squadWebsiteVisible,
           trainerTeamWebsiteVisible: publication.trainerTeamWebsiteVisible,
+          trainingWebsiteVisible: publication.trainingWebsiteVisible,
         },
       }),
     );
@@ -659,6 +667,20 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
       initial: false,
       next: true,
     },
+    {
+      label: "trainingWebsiteVisible true → false",
+      toggleName: "Trainingszeiten auf Teamseite anzeigen",
+      field: "trainingWebsiteVisible",
+      initial: true,
+      next: false,
+    },
+    {
+      label: "trainingWebsiteVisible false → true",
+      toggleName: "Trainingszeiten auf Teamseite anzeigen",
+      field: "trainingWebsiteVisible",
+      initial: false,
+      next: true,
+    },
   ])("persists $label via Team speichern", async ({ toggleName, field, initial, next }) => {
     renderCard({
       publication: {
@@ -671,6 +693,10 @@ describe("TeamSettingsCard seasonal next-event controls", () => {
           field === "trainerTeamWebsiteVisible"
             ? initial
             : publication.trainerTeamWebsiteVisible,
+        trainingWebsiteVisible:
+          field === "trainingWebsiteVisible"
+            ? initial
+            : publication.trainingWebsiteVisible,
       },
     });
 

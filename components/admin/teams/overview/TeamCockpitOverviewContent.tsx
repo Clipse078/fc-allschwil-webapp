@@ -64,6 +64,7 @@ type Team = {
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   } | null;
 };
 

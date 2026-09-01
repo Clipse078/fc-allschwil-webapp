@@ -16,8 +16,8 @@
  * - displayName uses the canonical Team naming contract (Team.name wins over
  *   stale TeamSeason.displayName); falls back to team.name when no season row exists.
  * - Season is resolved by active season flag when seasonKey is not supplied.
- * - Squad/trainer visibility is gated by TeamSeason.squadWebsiteVisible /
- *   TeamSeason.trainerTeamWebsiteVisible.
+ * - Squad/trainer/training visibility is gated by TeamSeason.squadWebsiteVisible /
+ *   TeamSeason.trainerTeamWebsiteVisible / TeamSeason.trainingWebsiteVisible.
  * - pitchCode (internal allocation code) is resolved to pitchName via
  *   FacilityResource but the raw code is never exposed publicly.
  */
@@ -51,7 +51,9 @@ import {
   type PublicTeamStandingsIdentityContext,
 } from "@/lib/website/public-team-standings-mapper";
 import { loadTeamSeasonHasStandingsForList } from "@/lib/teams/team-season-standings-capability";
+import { getTeamTrainingSchedule } from "@/lib/teams/team-training-schedule";
 import { resolvePublicTeamNextEvent } from "@/lib/website/public-team-next-event";
+import { mapPublicTeamTrainingSchedule } from "@/lib/website/public-team-training-mapper";
 import { toPublicWebsiteTournamentFromDto } from "@/lib/website/public-tournaments-mapper";
 import type {
   PublicTeamListItem,
@@ -318,6 +320,7 @@ export type GetPublicTeamDetailInput = {
  * - Hidden members (isWebsiteVisible = false): excluded by DB WHERE — never loaded.
  * - Season-hidden squad (squadWebsiteVisible = false): query skipped entirely.
  * - Season-hidden trainers (trainerTeamWebsiteVisible = false): query skipped entirely.
+ * - Season-hidden training (trainingWebsiteVisible = false): query skipped entirely.
  */
 export async function getPublicTeamDetail(
   input: GetPublicTeamDetailInput,
@@ -359,6 +362,7 @@ export async function getPublicTeamDetail(
           shortName: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
+          trainingWebsiteVisible: true,
           showNextMatch: true,
           showNextTournament: true,
           season: { select: { key: true, name: true } },
@@ -448,67 +452,17 @@ export async function getPublicTeamDetail(
         )
     : [];
 
-  // ── Phase 3: Upcoming training sessions ─────────────────────────────────
-  // Scoped by teamId + tenantId (double tenant guard).
-  // pitchCode is fetched only for internal name resolution; never returned.
+  // ── Phase 3: Regular training schedule ───────────────────────────────────
+  // Uses the same canonical TrainingSeries source as the Team Cockpit.
+  // Query is skipped entirely when trainingWebsiteVisible = false.
+  const training: PublicTeamTrainingSession[] =
+    teamSeason?.trainingWebsiteVisible
+      ? mapPublicTeamTrainingSchedule(
+          await getTeamTrainingSchedule(input.tenantId, teamSeason.id),
+        )
+      : [];
+
   const now = new Date();
-  const windowEnd = new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000);
-
-  const rawTrainingEvents = await prisma.event.findMany({
-    where: {
-      teamId: team.id,
-      tenantId: input.tenantId,
-      type: "TRAINING",
-      status: { notIn: ["CANCELLED", "ARCHIVED"] },
-      websiteVisible: true,
-      startAt: { gte: now, lte: windowEnd },
-    },
-    orderBy: { startAt: "asc" },
-    take: 20,
-    select: {
-      startAt: true,
-      endAt: true,
-      location: true,
-      pitchCode: true,
-    },
-  });
-
-  // Resolve pitchCode → human-readable pitchName via FacilityResource.
-  // The raw pitchCode is never returned in the public response.
-  const uniquePitchCodes = [
-    ...new Set(
-      rawTrainingEvents
-        .map((e) => e.pitchCode)
-        .filter((c): c is string => c !== null),
-    ),
-  ];
-
-  const pitchNameMap = new Map<string, string>();
-  if (uniquePitchCodes.length > 0) {
-    const resources = await prisma.facilityResource.findMany({
-      where: {
-        tenantId: input.tenantId,
-        code: { in: uniquePitchCodes },
-        status: "ACTIVE",
-      },
-      select: { code: true, name: true },
-    });
-    for (const r of resources) {
-      pitchNameMap.set(r.code, r.name);
-    }
-  }
-
-  // Map training sessions — derive weekday from startAt using de-CH locale.
-  const training: PublicTeamTrainingSession[] = rawTrainingEvents.map((e) => ({
-    weekday: e.startAt.toLocaleDateString("de-CH", {
-      weekday: "long",
-      timeZone: "Europe/Zurich",
-    }),
-    startTime: e.startAt.toISOString(),
-    endTime: e.endAt?.toISOString() ?? null,
-    location: e.location ?? null,
-    pitchName: e.pitchCode ? (pitchNameMap.get(e.pitchCode) ?? null) : null,
-  }));
 
   // ── Phase 4+5+6: Upcoming matches, recent results, standings ───────────
   let nextMatches: PublicTeamMatch[] = [];

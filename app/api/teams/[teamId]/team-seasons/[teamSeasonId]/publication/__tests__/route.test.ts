@@ -60,12 +60,14 @@ beforeEach(() => {
       showNextTournament: false,
       squadWebsiteVisible: true,
       trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
     },
     publication: {
       showNextMatch: false,
       showNextTournament: false,
       squadWebsiteVisible: true,
       trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
     },
   });
 });
@@ -138,6 +140,17 @@ describe("PATCH TeamSeason publication", () => {
       teamSeasonId: "season-a",
       squadWebsiteVisible: false,
       trainerTeamWebsiteVisible: false,
+    });
+  });
+
+  it("supports changing trainingWebsiteVisible", async () => {
+    await PATCH(request({ trainingWebsiteVisible: false }), context);
+
+    expect(mocks.updateTeamSeasonPublication).toHaveBeenCalledWith({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      trainingWebsiteVisible: false,
     });
   });
 

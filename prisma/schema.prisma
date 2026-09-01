@@ -1737,6 +1737,7 @@ model TeamSeason {
   infoboardVisible          Boolean           @default(true)
   squadWebsiteVisible       Boolean           @default(true)
   trainerTeamWebsiteVisible Boolean           @default(true)
+  trainingWebsiteVisible    Boolean           @default(true)
   showNextMatch             Boolean           @default(true)
   showNextTournament        Boolean           @default(false)
   createdAt                 DateTime          @default(now())
@@ -1773,6 +1774,7 @@ model TeamSeason {
   @@index([participationType])
   @@index([squadWebsiteVisible])
   @@index([trainerTeamWebsiteVisible])
+  @@index([trainingWebsiteVisible])
 }
 
 // ---------------------------------------------------------------------------
