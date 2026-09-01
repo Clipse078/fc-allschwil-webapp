@@ -12,7 +12,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { currentTeamSeasonWhere } from "@/lib/teams/current-season";
+import { trainingSeriesTeamSeasonEligibilityWhere } from "@/lib/training/team-season-eligibility";
 import type { TrainingSeriesStatus, TrainingSessionStatus, Weekday } from "./types";
 
 // ── Row shape returned by the DB ──────────────────────────────────────────────
@@ -134,10 +134,15 @@ export async function findTeamSeasonForTenant(
  * TRAININGCENTER-03A: Row shape for the "Team / TeamSeason" picker used by
  * the TrainingSeries create/edit form.
  *
- * Only active TeamSeasons belonging to active teams are eligible — creating
- * a TrainingSeries for an inactive team is rejected at the service layer
- * (see TrainingSeriesArchivedTeamError), so the picker only ever offers
- * choices that will actually succeed.
+ * Only eligible current-season TeamSeason rows belonging to active teams are
+ * returned — creating a TrainingSeries for an inactive team is rejected at
+ * the service layer (see TrainingSeriesArchivedTeamError), so the picker
+ * only ever offers choices that will actually succeed.
+ *
+ * TRAINING-SERIES-PREMIUM-01: eligibility is aligned with the Teams module
+ * and createTrainingSeries() — competition-less / training-only teams are
+ * included; TeamSeason.status === "ACTIVE" is NOT required (only ARCHIVED
+ * TeamSeason rows are excluded). See lib/training/team-season-eligibility.ts.
  *
  * trainers is the "Trainers where supported" display: the ACTIVE
  * TrainerTeamMember roster already assigned to this TeamSeason. There is no
@@ -149,6 +154,10 @@ export type TeamSeasonPickerRow = {
   teamId: string;
   teamName: string;
   seasonName: string;
+  /** Canonical Team.category for grouped selectors (e.g. Trainingsgruppe, Seniorinnen). */
+  category: string;
+  genderGroup: string | null;
+  sortOrder: number;
   trainers: { id: string; name: string; roleLabel: string | null }[];
 };
 
@@ -195,15 +204,18 @@ export async function findTeamSeasonsForTenant(
   tenantId: string,
 ): Promise<TeamSeasonPickerRow[]> {
   const rows = await prisma.teamSeason.findMany({
-    where: {
-      status: "ACTIVE",
-      team: { tenantId, isActive: true },
-      ...currentTeamSeasonWhere(),
-    },
+    where: trainingSeriesTeamSeasonEligibilityWhere(tenantId),
     select: {
       id: true,
       teamId: true,
-      team: { select: { name: true } },
+      team: {
+        select: {
+          name: true,
+          category: true,
+          genderGroup: true,
+          sortOrder: true,
+        },
+      },
       season: { select: { name: true } },
       trainerTeamMembers: {
         where: { status: "ACTIVE" },
@@ -215,7 +227,7 @@ export async function findTeamSeasonsForTenant(
         },
       },
     },
-    orderBy: [{ team: { name: "asc" } }, { season: { startDate: "desc" } }],
+    orderBy: [{ team: { category: "asc" } }, { team: { sortOrder: "asc" } }, { team: { name: "asc" } }],
   });
 
   return rows.map((row) => ({
@@ -223,6 +235,9 @@ export async function findTeamSeasonsForTenant(
     teamId: row.teamId,
     teamName: row.team.name,
     seasonName: row.season.name,
+    category: row.team.category,
+    genderGroup: row.team.genderGroup,
+    sortOrder: row.team.sortOrder,
     trainers: row.trainerTeamMembers.map((t) => ({
       id: t.id,
       name: t.person.displayName || `${t.person.firstName} ${t.person.lastName}`,
@@ -254,7 +269,14 @@ export async function findTeamSeasonPickerRow(
     select: {
       id: true,
       teamId: true,
-      team: { select: { name: true } },
+      team: {
+        select: {
+          name: true,
+          category: true,
+          genderGroup: true,
+          sortOrder: true,
+        },
+      },
       season: { select: { name: true } },
       trainerTeamMembers: {
         where: { status: "ACTIVE" },
@@ -275,6 +297,9 @@ export async function findTeamSeasonPickerRow(
     teamId: row.teamId,
     teamName: row.team.name,
     seasonName: row.season.name,
+    category: row.team.category,
+    genderGroup: row.team.genderGroup,
+    sortOrder: row.team.sortOrder,
     trainers: row.trainerTeamMembers.map((t) => ({
       id: t.id,
       name: t.person.displayName || `${t.person.firstName} ${t.person.lastName}`,

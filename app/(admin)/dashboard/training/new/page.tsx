@@ -1,5 +1,4 @@
 import { notFound } from "next/navigation";
-import { auth } from "@/auth";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
@@ -82,7 +81,14 @@ export default async function NewTrainingSeriesPage() {
       />
 
       <TrainingSeriesCreateForm
-        teamSeasons={filteredTeamSeasons.map((ts) => ({ id: ts.id, teamId: ts.teamId, teamName: ts.teamName, seasonName: ts.seasonName }))}
+        teamSeasons={filteredTeamSeasons.map((ts) => ({
+          id: ts.id,
+          teamId: ts.teamId,
+          teamName: ts.teamName,
+          seasonName: ts.seasonName,
+          category: ts.category,
+          genderGroup: ts.genderGroup,
+        }))}
         pitchHallFacilityGroups={pitchHallFacilityGroups}
         dressingRoomFacilityGroups={dressingRoomFacilityGroups}
         canValidateDirectly={canValidateDirectly}
