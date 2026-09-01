@@ -10,10 +10,13 @@
  *   1. TrainingSessionAllocation rows for this occurrence + group
  *   2. TrainingSeries TrainingAllocation rows for this group
  *
- * Within each tier exactly one resource per group is returned — the row with
- * the lowest displayOrder (then createdAt) — so arbitrary DB ordering or
- * stale multi-row series history cannot surface the wrong pitch/dressing room
- * on a different weekday occurrence.
+ * Within each tier exactly one resource per group is returned:
+ *   - Session overrides: highest displayOrder (then newest createdAt). Occurrence
+ *     overrides are appended with auto-incrementing displayOrder, so a newer
+ *     override in the same group must supersede stale siblings (e.g. an old O4
+ *     row left behind when E3 was assigned later for that occurrence).
+ *   - Series defaults: lowest displayOrder (then oldest createdAt) — the
+ *     canonical primary allocation for the recurring series.
  */
 
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "./allocation-groups";
@@ -35,7 +38,10 @@ export type ResolvedTrainingAllocationGroup = {
   dressingRoom: TrainingAllocationResourceRow[];
 };
 
-function compareAllocationRows(a: TrainingAllocationResourceRow, b: TrainingAllocationResourceRow): number {
+function compareSeriesAllocationRows(
+  a: TrainingAllocationResourceRow,
+  b: TrainingAllocationResourceRow,
+): number {
   const orderDiff = a.displayOrder - b.displayOrder;
   if (orderDiff !== 0) return orderDiff;
   const aCreated = a.createdAt?.getTime() ?? 0;
@@ -43,11 +49,30 @@ function compareAllocationRows(a: TrainingAllocationResourceRow, b: TrainingAllo
   return aCreated - bCreated;
 }
 
-function pickCanonicalRow(
+function compareSessionOverrideRows(
+  a: TrainingAllocationResourceRow,
+  b: TrainingAllocationResourceRow,
+): number {
+  const orderDiff = b.displayOrder - a.displayOrder;
+  if (orderDiff !== 0) return orderDiff;
+  const aCreated = a.createdAt?.getTime() ?? 0;
+  const bCreated = b.createdAt?.getTime() ?? 0;
+  return bCreated - aCreated;
+}
+
+function pickCanonicalSeriesRow(
   rows: readonly TrainingAllocationResourceRow[],
 ): TrainingAllocationResourceRow[] {
   if (rows.length === 0) return [];
-  const sorted = [...rows].sort(compareAllocationRows);
+  const sorted = [...rows].sort(compareSeriesAllocationRows);
+  return [sorted[0]!];
+}
+
+function pickCanonicalSessionOverrideRow(
+  rows: readonly TrainingAllocationResourceRow[],
+): TrainingAllocationResourceRow[] {
+  if (rows.length === 0) return [];
+  const sorted = [...rows].sort(compareSessionOverrideRows);
   return [sorted[0]!];
 }
 
@@ -65,13 +90,13 @@ export function resolveTrainingOccurrenceAllocationGroup(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
   if (overridesForGroup.length > 0) {
-    return pickCanonicalRow(overridesForGroup);
+    return pickCanonicalSessionOverrideRow(overridesForGroup);
   }
 
   const seriesForGroup = seriesRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
-  return pickCanonicalRow(seriesForGroup);
+  return pickCanonicalSeriesRow(seriesForGroup);
 }
 
 /**

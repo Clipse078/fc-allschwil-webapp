@@ -109,4 +109,22 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
 
     expect(resolved.dressingRoom[0]?.facilityResource.name).toBe("Garderobe E3");
   });
+
+  it("prefers the newest occurrence dressing-room override when stale siblings remain", () => {
+    const seriesRows = [resource("O4", "Garderobe O4", "DRESSING_ROOM", 0)];
+    const sessionRows = [
+      resource("KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      resource("O4", "Garderobe O4", "DRESSING_ROOM", 1, new Date("2026-01-01T00:00:00.000Z")),
+      resource("E3", "Garderobe E3", "DRESSING_ROOM", 2, new Date("2026-01-02T00:00:00.000Z")),
+    ];
+
+    const resolved = resolveTrainingOccurrenceAllocations({
+      seriesRows,
+      sessionOverrideRows: sessionRows,
+    });
+
+    expect(resolved.pitch[0]?.facilityResource.code).toBe("KR3A");
+    expect(resolved.dressingRoom).toHaveLength(1);
+    expect(resolved.dressingRoom[0]?.facilityResource.code).toBe("E3");
+  });
 });

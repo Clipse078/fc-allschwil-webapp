@@ -206,6 +206,43 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     expect(wednesday.dressingRoomAllocations).toHaveLength(1);
   });
 
+  it("D9-D1 Wednesday ignores stale occurrence dressing-room rows when a newer override exists", async () => {
+    mocks.listTrainingSessions.mockResolvedValue([
+      trainingSessionDto({
+        id: "session-d9-wed",
+        trainingSeriesId: "series-d9",
+        trainingSeriesTitle: "Junioren D-9 D1 Training",
+        teamName: "Junioren D-9 D1",
+        weekday: "WEDNESDAY",
+        date: "2026-08-26",
+        startAt: "2026-08-26T16:45:00.000Z",
+        endAt: "2026-08-26T18:15:00.000Z",
+        originalDate: "2026-08-26",
+        originalStartAt: "2026-08-26T16:45:00.000Z",
+        originalEndAt: "2026-08-26T18:15:00.000Z",
+      }),
+    ]);
+    mocks.trainingAllocationFindMany.mockResolvedValue([
+      allocationRow("series-d9", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      allocationRow("series-d9", "O4", "Garderobe O4", "DRESSING_ROOM", 0),
+    ]);
+    mocks.trainingSessionAllocationFindMany.mockResolvedValue([
+      sessionAllocationRow("session-d9-wed", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      sessionAllocationRow("session-d9-wed", "O4", "Garderobe O4", "DRESSING_ROOM", 1),
+      sessionAllocationRow("session-d9-wed", "E3", "Garderobe E3", "DRESSING_ROOM", 2),
+    ]);
+
+    const week = await getWeekplannerWeek(TENANT_A, WEEK_WINDOW);
+    const wednesday = week.days.find((day) => day.dayKey === "2026-08-26")?.items[0];
+
+    expect(wednesday?.type).toBe("TRAINING");
+    if (wednesday?.type !== "TRAINING") throw new Error("expected TRAINING");
+    expect(wednesday.pitchAllocations[0]?.name).toBe("Kunstrasen 3 A");
+    expect(wednesday.dressingRoomAllocations).toEqual([
+      expect.objectContaining({ code: "E3", name: "Garderobe E3" }),
+    ]);
+  });
+
   it("uses lowest displayOrder series allocation when no occurrence override exists", async () => {
     mocks.listTrainingSessions.mockResolvedValue([trainingSessionDto()]);
     mocks.trainingAllocationFindMany.mockResolvedValue([
