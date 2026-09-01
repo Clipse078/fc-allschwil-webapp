@@ -702,6 +702,7 @@ export type UpdateTeamSeasonPublicationInput = {
   showNextTournament?: boolean;
   squadWebsiteVisible?: boolean;
   trainerTeamWebsiteVisible?: boolean;
+  trainingWebsiteVisible?: boolean;
 };
 
 export type TeamSeasonPublicationSettings = {
@@ -709,6 +710,7 @@ export type TeamSeasonPublicationSettings = {
   showNextTournament: boolean;
   squadWebsiteVisible: boolean;
   trainerTeamWebsiteVisible: boolean;
+  trainingWebsiteVisible: boolean;
 };
 
 export type UpdateTeamSeasonPublicationResult =
@@ -745,6 +747,7 @@ export async function updateTeamSeasonPublication(
       showNextTournament: true,
       squadWebsiteVisible: true,
       trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
       team: { select: { tenantId: true } },
     },
   });
@@ -770,6 +773,7 @@ export async function updateTeamSeasonPublication(
     showNextTournament?: boolean;
     squadWebsiteVisible?: boolean;
     trainerTeamWebsiteVisible?: boolean;
+    trainingWebsiteVisible?: boolean;
   } = {};
 
   if (input.showNextMatch !== undefined) {
@@ -783,6 +787,9 @@ export async function updateTeamSeasonPublication(
   }
   if (input.trainerTeamWebsiteVisible !== undefined) {
     data.trainerTeamWebsiteVisible = input.trainerTeamWebsiteVisible;
+  }
+  if (input.trainingWebsiteVisible !== undefined) {
+    data.trainingWebsiteVisible = input.trainingWebsiteVisible;
   }
 
   if (Object.keys(data).length === 0) {
@@ -802,6 +809,7 @@ export async function updateTeamSeasonPublication(
         showNextTournament: true,
         squadWebsiteVisible: true,
         trainerTeamWebsiteVisible: true,
+        trainingWebsiteVisible: true,
       },
     });
 
@@ -812,6 +820,7 @@ export async function updateTeamSeasonPublication(
         showNextTournament: teamSeason.showNextTournament,
         squadWebsiteVisible: teamSeason.squadWebsiteVisible,
         trainerTeamWebsiteVisible: teamSeason.trainerTeamWebsiteVisible,
+        trainingWebsiteVisible: teamSeason.trainingWebsiteVisible,
       },
       publication,
     };

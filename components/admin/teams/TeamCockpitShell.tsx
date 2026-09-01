@@ -87,6 +87,7 @@ type Team = {
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   } | null;
   teamSeasons: TeamSeasonItem[];
 };
@@ -148,6 +149,7 @@ export default function TeamCockpitShell({
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   }) {
     setTeam((current) =>
       current.currentSeasonPublication
@@ -159,6 +161,7 @@ export default function TeamCockpitShell({
               showNextTournament: publication.showNextTournament,
               squadWebsiteVisible: publication.squadWebsiteVisible,
               trainerTeamWebsiteVisible: publication.trainerTeamWebsiteVisible,
+              trainingWebsiteVisible: publication.trainingWebsiteVisible,
             },
           }
         : current,

@@ -23,6 +23,7 @@ function teamSeason(
     showNextTournament: boolean;
     squadWebsiteVisible: boolean;
     trainerTeamWebsiteVisible: boolean;
+    trainingWebsiteVisible: boolean;
   }> = {},
 ) {
   return {
@@ -31,6 +32,7 @@ function teamSeason(
     showNextTournament: overrides.showNextTournament ?? false,
     squadWebsiteVisible: overrides.squadWebsiteVisible ?? true,
     trainerTeamWebsiteVisible: overrides.trainerTeamWebsiteVisible ?? true,
+    trainingWebsiteVisible: overrides.trainingWebsiteVisible ?? true,
     team: { tenantId: overrides.tenantId ?? "tenant-a" },
   };
 }
@@ -43,6 +45,7 @@ beforeEach(() => {
     showNextTournament: false,
     squadWebsiteVisible: true,
     trainerTeamWebsiteVisible: true,
+    trainingWebsiteVisible: true,
   } as never);
 });
 
@@ -64,6 +67,7 @@ describe("updateTeamSeasonPublication", () => {
         showNextTournament: true,
         squadWebsiteVisible: true,
         trainerTeamWebsiteVisible: true,
+        trainingWebsiteVisible: true,
       },
     });
   });
@@ -87,6 +91,7 @@ describe("updateTeamSeasonPublication", () => {
       showNextTournament: true,
       squadWebsiteVisible: true,
       trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
     } as never);
 
     const result = await updateTeamSeasonPublication({
@@ -109,6 +114,7 @@ describe("updateTeamSeasonPublication", () => {
         showNextTournament: true,
         squadWebsiteVisible: true,
         trainerTeamWebsiteVisible: true,
+        trainingWebsiteVisible: true,
       },
     });
     if (result.ok) {
@@ -117,6 +123,7 @@ describe("updateTeamSeasonPublication", () => {
         showNextTournament: true,
         squadWebsiteVisible: true,
         trainerTeamWebsiteVisible: true,
+        trainingWebsiteVisible: true,
       });
     }
   });
@@ -280,6 +287,52 @@ describe("updateTeamSeasonPublication", () => {
 
     expect(update.mock.calls[0]?.[0].data).toEqual({
       trainerTeamWebsiteVisible: true,
+    });
+  });
+
+  it("persists trainingWebsiteVisible true → false independently", async () => {
+    update.mockResolvedValueOnce({
+      showNextMatch: true,
+      showNextTournament: false,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: false,
+    } as never);
+
+    const result = await updateTeamSeasonPublication({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      trainingWebsiteVisible: false,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(update.mock.calls[0]?.[0].data).toEqual({
+      trainingWebsiteVisible: false,
+    });
+  });
+
+  it("persists trainingWebsiteVisible false → true independently", async () => {
+    findUnique.mockResolvedValueOnce(
+      teamSeason({ trainingWebsiteVisible: false }) as never,
+    );
+    update.mockResolvedValueOnce({
+      showNextMatch: true,
+      showNextTournament: false,
+      squadWebsiteVisible: true,
+      trainerTeamWebsiteVisible: true,
+      trainingWebsiteVisible: true,
+    } as never);
+
+    await updateTeamSeasonPublication({
+      tenantId: "tenant-a",
+      teamId: "team-a",
+      teamSeasonId: "season-a",
+      trainingWebsiteVisible: true,
+    });
+
+    expect(update.mock.calls[0]?.[0].data).toEqual({
+      trainingWebsiteVisible: true,
     });
   });
 });

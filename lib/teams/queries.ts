@@ -268,6 +268,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           infoboardVisible: true,
           squadWebsiteVisible: true,
           trainerTeamWebsiteVisible: true,
+          trainingWebsiteVisible: true,
           showNextMatch: true,
           showNextTournament: true,
           season: {
@@ -460,6 +461,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
           showNextTournament: activeSeasonEntry.showNextTournament,
           squadWebsiteVisible: activeSeasonEntry.squadWebsiteVisible,
           trainerTeamWebsiteVisible: activeSeasonEntry.trainerTeamWebsiteVisible,
+          trainingWebsiteVisible: activeSeasonEntry.trainingWebsiteVisible,
         }
       : null,
     // TEAM-SEASON-ORGUNIT-01: primary OrgUnit for the current season.

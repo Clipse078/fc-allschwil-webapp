@@ -18,6 +18,7 @@ const publicationUpdateSchema = z
     showNextTournament: z.boolean().optional(),
     squadWebsiteVisible: z.boolean().optional(),
     trainerTeamWebsiteVisible: z.boolean().optional(),
+    trainingWebsiteVisible: z.boolean().optional(),
   })
   .strict()
   .refine(
@@ -25,7 +26,8 @@ const publicationUpdateSchema = z
       value.showNextMatch !== undefined ||
       value.showNextTournament !== undefined ||
       value.squadWebsiteVisible !== undefined ||
-      value.trainerTeamWebsiteVisible !== undefined,
+      value.trainerTeamWebsiteVisible !== undefined ||
+      value.trainingWebsiteVisible !== undefined,
     { message: "Mindestens eine Veröffentlichungseinstellung ist erforderlich." },
   );
 
