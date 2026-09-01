@@ -85,6 +85,22 @@ describe("TrainingSeriesListView — weekday cockpit", () => {
     expect(screen.getByText("E4")).toBeTruthy();
   });
 
+  it("does not render a duplicate Neue Trainingsserie CTA inside the cockpit content", () => {
+    render(
+      <TrainingSeriesListView
+        cockpitRows={[makeRow()]}
+        showArchived={false}
+        archivedCount={0}
+        canManage={true}
+        canDelete={false}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.queryByText("Neue Trainingsserie")).toBeNull();
+  });
+
   it("does not show redundant Ressourcen/Bearbeiten top-level actions", () => {
     render(
       <TrainingSeriesListView
@@ -136,5 +152,6 @@ describe("TrainingSeriesListView — ADMIN-DELETE-02A-C1 root-cause fix", () => 
 
     expect(screen.getByText("Keine aktiven Trainingsserien")).toBeTruthy();
     expect(screen.getAllByText("Archiv anzeigen").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Neue Trainingsserie")).toBeNull();
   });
 });

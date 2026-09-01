@@ -78,6 +78,15 @@ export type VisualResourceAvailabilityPickerProps = {
    * (for Wochenplaner editor context). Default false.
    */
   compact?: boolean;
+  /**
+   * TRAINING-CENTER-PREMIUM-02 — "aggregated" shows all free resources first,
+   * then all occupied, without facility hierarchy grouping. Default "facility".
+   */
+  layout?: "facility" | "aggregated";
+  /** Label for the aggregated available section. */
+  availableLabel?: string;
+  /** Label for the aggregated occupied section. */
+  occupiedLabel?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -458,6 +467,262 @@ function AvailabilitySummary({
   );
 }
 
+// ── Aggregated layout helpers ─────────────────────────────────────────────────
+
+type FlatResourceEntry = {
+  id: string;
+  name: string;
+  type: FacilityResourceType;
+  facilityId: string;
+  facilityName: string;
+  facilityType?: string;
+  order: number;
+};
+
+function flattenFacilityResources(facilityGroups: FacilityGroup[]): FlatResourceEntry[] {
+  const entries: FlatResourceEntry[] = [];
+  let order = 0;
+  for (const fg of facilityGroups) {
+    for (const r of fg.resources) {
+      entries.push({
+        id: r.id,
+        name: r.name,
+        type: r.type,
+        facilityId: fg.facilityId,
+        facilityName: fg.facilityName,
+        facilityType: fg.facilityType ?? r.facilityType,
+        order: order++,
+      });
+    }
+  }
+  return entries;
+}
+
+function sortFlatResources(entries: FlatResourceEntry[]): FlatResourceEntry[] {
+  return [...entries].sort((a, b) => a.order - b.order || a.name.localeCompare(b.name, "de"));
+}
+
+// ── CompactFreeResourceRow ────────────────────────────────────────────────────
+
+function CompactFreeResourceRow({
+  entry,
+  annotation,
+  isSelected,
+  disabled,
+  onSelect,
+  onDeselect,
+  testId,
+}: {
+  entry: FlatResourceEntry;
+  annotation: ResourceAvailabilityAnnotation | undefined;
+  isSelected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+  testId?: string;
+}) {
+  const isFree = annotation?.status === "FREE";
+  const isNeutral = !annotation;
+
+  const handleClick = () => {
+    if (disabled) return;
+    if (isSelected) onDeselect();
+    else onSelect();
+  };
+
+  const showFacilityContext = entry.name !== entry.facilityName;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      data-testid={testId ? `${testId}-card-${entry.id}` : undefined}
+      aria-pressed={isSelected}
+      aria-label={`${entry.name} ${isSelected ? "ausgewählt" : isFree ? "Frei" : ""}`}
+      className={cn(
+        "group flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all",
+        isSelected
+          ? "border-[var(--sce-primary)] bg-blue-50 ring-1 ring-[var(--sce-primary)]"
+          : isFree
+            ? "border-emerald-200 bg-[var(--surface)] hover:border-emerald-300 hover:bg-emerald-50/40"
+            : "border-[var(--border)] bg-[var(--surface)]",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1",
+      )}
+    >
+      <span
+        className={cn(
+          "h-2 w-2 shrink-0 rounded-full",
+          isSelected ? "bg-[var(--sce-primary)]" : isFree ? "bg-emerald-500" : "bg-[var(--muted)]",
+        )}
+      />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-semibold text-[var(--foreground)]">{entry.name}</p>
+        {showFacilityContext ? (
+          <p className="truncate text-[10px] text-[var(--muted)]">{entry.facilityName}</p>
+        ) : null}
+      </div>
+      <div className="shrink-0 text-right">
+        {isNeutral ? (
+          <span className="text-[10px] text-[var(--muted)]">Zeit wählen</span>
+        ) : isSelected ? (
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[var(--sce-primary)]">
+            <Check className="h-2.5 w-2.5" />
+            Gewählt
+          </span>
+        ) : isFree ? (
+          <span className="text-[10px] font-medium text-emerald-600">Frei</span>
+        ) : null}
+      </div>
+    </button>
+  );
+}
+
+// ── SelectedResourceSummary ───────────────────────────────────────────────────
+
+function SelectedResourceSummary({
+  facilityGroups,
+  selectedResourceIds,
+  availabilityByResourceId,
+  testId,
+}: {
+  facilityGroups: FacilityGroup[];
+  selectedResourceIds: Set<string>;
+  availabilityByResourceId: Map<string, ResourceAvailabilityAnnotation>;
+  testId?: string;
+}) {
+  const selected = flattenFacilityResources(facilityGroups).filter((r) => selectedResourceIds.has(r.id));
+  if (selected.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-lg border border-[var(--sce-primary)]/30 bg-blue-50/50 px-3 py-2"
+      data-testid={testId ? `${testId}-selected-summary` : undefined}
+    >
+      {selected.map((entry) => {
+        const annotation = availabilityByResourceId.get(entry.id);
+        const isFree = annotation?.status === "FREE";
+        const isOccupied = annotation?.status === "OCCUPIED";
+        return (
+          <div key={entry.id} className="flex items-center gap-2 text-sm">
+            <Check className="h-3.5 w-3.5 shrink-0 text-[var(--sce-primary)]" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-[var(--foreground)]">{entry.name}</p>
+              <p className="text-xs text-[var(--text-2)]">
+                {isFree ? "verfügbar" : isOccupied ? "Mehrfachbelegung" : "ausgewählt"}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── AggregatedLayout ──────────────────────────────────────────────────────────
+
+function AggregatedLayout({
+  facilityGroups,
+  selectedResourceIds,
+  availabilityByResourceId,
+  disabled,
+  onSelect,
+  onDeselect,
+  testId,
+  availableLabel,
+  occupiedLabel,
+}: {
+  facilityGroups: FacilityGroup[];
+  selectedResourceIds: Set<string>;
+  availabilityByResourceId: Map<string, ResourceAvailabilityAnnotation>;
+  disabled: boolean;
+  onSelect: (id: string) => void;
+  onDeselect: (id: string) => void;
+  testId?: string;
+  availableLabel: string;
+  occupiedLabel: string;
+}) {
+  const allEntries = useMemo(() => sortFlatResources(flattenFacilityResources(facilityGroups)), [facilityGroups]);
+  const hasAvailabilityData = availabilityByResourceId.size > 0;
+
+  const available = allEntries.filter((r) => {
+    const status = availabilityByResourceId.get(r.id)?.status;
+    return !hasAvailabilityData || status === "FREE" || !availabilityByResourceId.has(r.id);
+  });
+  const occupied = allEntries.filter((r) => availabilityByResourceId.get(r.id)?.status === "OCCUPIED");
+
+  return (
+    <div className="space-y-3">
+      <SelectedResourceSummary
+        facilityGroups={facilityGroups}
+        selectedResourceIds={selectedResourceIds}
+        availabilityByResourceId={availabilityByResourceId}
+        testId={testId}
+      />
+
+      {hasAvailabilityData ? (
+        <div data-testid={testId ? `${testId}-summary` : undefined}>
+          <AvailabilitySummary facilityGroups={facilityGroups} availability={availabilityByResourceId} />
+        </div>
+      ) : (
+        <p className="text-xs text-[var(--text-2)]">Verfügbarkeit erscheint nach Auswahl von Tag &amp; Zeit.</p>
+      )}
+
+      {available.length > 0 ? (
+        <div data-testid={testId ? `${testId}-available` : undefined}>
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+            {availableLabel}
+          </p>
+          <div className={cn("grid gap-1.5", "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3")}>
+            {available.map((entry) => (
+              <CompactFreeResourceRow
+                key={entry.id}
+                entry={entry}
+                annotation={availabilityByResourceId.get(entry.id)}
+                isSelected={selectedResourceIds.has(entry.id)}
+                disabled={disabled}
+                onSelect={() => onSelect(entry.id)}
+                onDeselect={() => onDeselect(entry.id)}
+                testId={testId}
+              />
+            ))}
+          </div>
+        </div>
+      ) : hasAvailabilityData ? (
+        <p className="text-xs text-[var(--muted)]">Keine freien Spielfelder / Hallen für diesen Zeitraum.</p>
+      ) : null}
+
+      {occupied.length > 0 ? (
+        <div data-testid={testId ? `${testId}-occupied` : undefined}>
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {occupiedLabel}
+          </p>
+          <div className="space-y-1">
+            {occupied.map((entry) => (
+              <ResourceCard
+                key={entry.id}
+                facilityName={entry.facilityName}
+                facilityType={entry.facilityType}
+                resourceName={entry.name}
+                resourceId={entry.id}
+                resourceType={entry.type}
+                annotation={availabilityByResourceId.get(entry.id)}
+                isSelected={selectedResourceIds.has(entry.id)}
+                isRecommended={false}
+                disabled={disabled}
+                onSelect={() => onSelect(entry.id)}
+                onDeselect={() => onDeselect(entry.id)}
+                testId={testId}
+                compact
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 // ── FacilitySection ───────────────────────────────────────────────────────────
 
 /**
@@ -580,6 +845,9 @@ export function VisualResourceAvailabilityPicker({
   allResourcesLabel = "Alle Spielfelder",
   emptyMessage = "Keine Spielfelder / Hallen konfiguriert.",
   compact = false,
+  layout = "facility",
+  availableLabel = "Verfügbar",
+  occupiedLabel = "Belegt",
 }: VisualResourceAvailabilityPickerProps) {
   const allResources = useMemo(
     () => facilityGroups.flatMap((fg) => fg.resources),
@@ -598,6 +866,24 @@ export function VisualResourceAvailabilityPicker({
 
   if (allResources.length === 0) {
     return <p className="text-sm text-[var(--muted)] italic">{emptyMessage}</p>;
+  }
+
+  if (layout === "aggregated") {
+    return (
+      <div data-testid={testId}>
+        <AggregatedLayout
+          facilityGroups={facilityGroups}
+          selectedResourceIds={selectedResourceIds}
+          availabilityByResourceId={availabilityByResourceId}
+          disabled={disabled}
+          onSelect={onSelect}
+          onDeselect={onDeselect}
+          testId={testId}
+          availableLabel={availableLabel}
+          occupiedLabel={occupiedLabel}
+        />
+      </div>
+    );
   }
 
   return (

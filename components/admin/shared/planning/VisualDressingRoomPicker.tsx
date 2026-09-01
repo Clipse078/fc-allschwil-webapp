@@ -43,6 +43,15 @@ export type VisualDressingRoomPickerProps = {
   emptyMessage?: string;
   /** Compact layout for narrow contexts (Wochenplaner editor). */
   compact?: boolean;
+  /**
+   * TRAINING-CENTER-PREMIUM-02 — "aggregated" shows free rooms first, then
+   * occupied, with section labels. Default "default".
+   */
+  layout?: "default" | "aggregated";
+  /** Label for aggregated available section. */
+  availableLabel?: string;
+  /** Label for aggregated occupied section. */
+  occupiedLabel?: string;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -341,6 +350,113 @@ function AvailabilitySummary({
   );
 }
 
+// ── SelectedDressingRoomSummary ───────────────────────────────────────────────
+
+function SelectedDressingRoomSummary({
+  facilityGroups,
+  selectedResourceIds,
+  availabilityByResourceId,
+  testId,
+}: {
+  facilityGroups: FacilityGroup[];
+  selectedResourceIds: Set<string>;
+  availabilityByResourceId: Map<string, ResourceAvailabilityAnnotation>;
+  testId?: string;
+}) {
+  const selected = facilityGroups
+    .flatMap((fg) => fg.resources.map((r) => ({ ...r, facilityName: fg.facilityName })))
+    .filter((r) => selectedResourceIds.has(r.id));
+
+  if (selected.length === 0) return null;
+
+  return (
+    <div
+      className="rounded-lg border border-[var(--sce-primary)]/30 bg-blue-50/50 px-3 py-2"
+      data-testid={testId ? `${testId}-selected-summary` : undefined}
+    >
+      {selected.map((resource) => {
+        const annotation = availabilityByResourceId.get(resource.id);
+        const isFree = annotation?.status === "FREE";
+        const isOccupied = annotation?.status === "OCCUPIED";
+        return (
+          <div key={resource.id} className="flex items-center gap-2 text-sm">
+            <Check className="h-3.5 w-3.5 shrink-0 text-[var(--sce-primary)]" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-[var(--foreground)]">{resource.name}</p>
+              <p className="text-xs text-[var(--text-2)]">
+                {isFree ? "verfügbar" : isOccupied ? "Mehrfachbelegung" : "ausgewählt"}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── CompactFreeDressingRoomRow ────────────────────────────────────────────────
+
+function CompactFreeDressingRoomRow({
+  resourceName,
+  resourceId,
+  annotation,
+  isSelected,
+  disabled,
+  onSelect,
+  onDeselect,
+  testId,
+}: {
+  resourceName: string;
+  resourceId: string;
+  annotation: ResourceAvailabilityAnnotation | undefined;
+  isSelected: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+  testId?: string;
+}) {
+  const isFree = annotation?.status === "FREE";
+  const isNeutral = !annotation;
+
+  const handleClick = () => {
+    if (disabled) return;
+    if (isSelected) onDeselect();
+    else onSelect();
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={disabled}
+      data-testid={testId ? `${testId}-card-${resourceId}` : undefined}
+      aria-pressed={isSelected}
+      className={cn(
+        "flex w-full items-center gap-2 rounded-lg border px-2.5 py-2 text-left transition-all",
+        isSelected
+          ? "border-[var(--sce-primary)] bg-blue-50 ring-1 ring-[var(--sce-primary)]"
+          : isFree
+            ? "border-emerald-200 bg-[var(--surface)] hover:border-emerald-300"
+            : "border-[var(--border)] bg-[var(--surface)]",
+        disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer",
+      )}
+    >
+      <DoorOpen className={cn("h-3.5 w-3.5 shrink-0", isSelected ? "text-[var(--sce-primary)]" : "text-emerald-600")} />
+      <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--foreground)]">{resourceName}</span>
+      {isNeutral ? (
+        <span className="text-[10px] text-[var(--muted)]">Zeit wählen</span>
+      ) : isSelected ? (
+        <span className="inline-flex items-center gap-0.5 text-[10px] font-medium text-[var(--sce-primary)]">
+          <Check className="h-2.5 w-2.5" />
+          Gewählt
+        </span>
+      ) : isFree ? (
+        <span className="text-[10px] font-medium text-emerald-600">Frei</span>
+      ) : null}
+    </button>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function VisualDressingRoomPicker({
@@ -355,6 +471,9 @@ export function VisualDressingRoomPicker({
   testId,
   emptyMessage = "Keine Garderoben konfiguriert.",
   compact = false,
+  layout = "default",
+  availableLabel = "Verfügbar",
+  occupiedLabel = "Belegt",
 }: VisualDressingRoomPickerProps) {
   const allResources = facilityGroups.flatMap((fg) => fg.resources);
   const hasAvailabilityData = availabilityByResourceId.size > 0;
@@ -378,6 +497,77 @@ export function VisualDressingRoomPicker({
   const occupied = allResources.filter(
     (r) => availabilityByResourceId.get(r.id)?.status === "OCCUPIED",
   );
+
+  if (layout === "aggregated") {
+    return (
+      <div className="space-y-3" data-testid={testId}>
+        {label ? (
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label}</p>
+        ) : null}
+
+        <SelectedDressingRoomSummary
+          facilityGroups={facilityGroups}
+          selectedResourceIds={selectedResourceIds}
+          availabilityByResourceId={availabilityByResourceId}
+          testId={testId}
+        />
+
+        {hasAvailabilityData ? (
+          <AvailabilitySummary facilityGroups={facilityGroups} availability={availabilityByResourceId} />
+        ) : (
+          <p className="text-xs text-[var(--text-2)]">Verfügbarkeit erscheint nach Auswahl von Tag &amp; Zeit.</p>
+        )}
+
+        {freeAndNeutral.length > 0 ? (
+          <div data-testid={testId ? `${testId}-available` : undefined}>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+              {availableLabel}
+            </p>
+            <div className={cn("grid gap-1.5", "grid-cols-1 sm:grid-cols-2")}>
+              {freeAndNeutral.map((resource) => (
+                <CompactFreeDressingRoomRow
+                  key={resource.id}
+                  resourceName={resource.name}
+                  resourceId={resource.id}
+                  annotation={availabilityByResourceId.get(resource.id)}
+                  isSelected={selectedResourceIds.has(resource.id)}
+                  disabled={disabled}
+                  onSelect={() => handleSelect(resource.id)}
+                  onDeselect={() => onDeselect(resource.id)}
+                  testId={testId}
+                />
+              ))}
+            </div>
+          </div>
+        ) : hasAvailabilityData ? (
+          <p className="text-xs text-[var(--muted)]">Keine freien Garderoben für diesen Zeitraum.</p>
+        ) : null}
+
+        {occupied.length > 0 ? (
+          <div data-testid={testId ? `${testId}-occupied` : undefined}>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+              {occupiedLabel}
+            </p>
+            <div className="space-y-1">
+              {occupied.map((r) => (
+                <OccupiedRoomChip
+                  key={r.id}
+                  resourceName={r.name}
+                  resourceId={r.id}
+                  annotation={availabilityByResourceId.get(r.id)}
+                  isSelected={selectedResourceIds.has(r.id)}
+                  disabled={disabled}
+                  onSelect={() => handleSelect(r.id)}
+                  onDeselect={() => onDeselect(r.id)}
+                  testId={testId}
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-2.5" data-testid={testId}>
