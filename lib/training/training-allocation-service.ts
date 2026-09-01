@@ -324,6 +324,26 @@ export async function listAllocationSummaryByTenant(
 }
 
 /**
+ * TRAINING-SERIES-PREMIUM-01: tenant-wide allocation lookup keyed by
+ * TrainingSeries id — used by the weekday cockpit to show pitch and
+ * dressing room without N+1 queries per series.
+ */
+export async function listAllocationsGroupedBySeries(
+  tenantId: string,
+): Promise<Map<string, TrainingAllocationDto[]>> {
+  const allocations = await listTrainingAllocations(tenantId);
+  const grouped = new Map<string, TrainingAllocationDto[]>();
+
+  for (const allocation of allocations) {
+    const bucket = grouped.get(allocation.trainingSeriesId) ?? [];
+    bucket.push(allocation);
+    grouped.set(allocation.trainingSeriesId, bucket);
+  }
+
+  return grouped;
+}
+
+/**
  * Generic list with optional filters.
  */
 export async function listTrainingAllocations(

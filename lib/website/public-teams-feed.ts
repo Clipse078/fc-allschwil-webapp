@@ -454,12 +454,25 @@ export async function getPublicTeamDetail(
   // ── Phase 3: Regular training schedule ───────────────────────────────────
   // Uses the same canonical TrainingSeries source as the Team Cockpit.
   // Query is skipped entirely when trainingWebsiteVisible = false.
-  const training: PublicTeamTrainingSession[] =
-    teamSeason?.trainingWebsiteVisible
-      ? mapPublicTeamTrainingSchedule(
-          await getTeamTrainingSchedule(input.tenantId, teamSeason.id),
-        )
-      : [];
+  const resolvedTeamDisplayName =
+    resolveLongTeamName({
+      teamName: team.name,
+      teamSeasonDisplayName: teamSeason?.displayName ?? null,
+    }) ?? team.name;
+
+  const training: PublicTeamTrainingSession[] = teamSeason?.trainingWebsiteVisible
+    ? mapPublicTeamTrainingSchedule(
+        await getTeamTrainingSchedule(input.tenantId, teamSeason.id, {
+          clubName: (
+            await prisma.tenant.findUnique({
+              where: { id: input.tenantId },
+              select: { name: true },
+            })
+          )?.name ?? null,
+          teamDisplayName: resolvedTeamDisplayName,
+        }),
+      )
+    : [];
 
   const now = new Date();
 

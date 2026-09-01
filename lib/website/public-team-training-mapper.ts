@@ -34,8 +34,13 @@ export function mapPublicTeamTrainingSchedule(
       weekday: entry.weekdayLabel,
       startTime: startAt.toISOString(),
       endTime: endAt.toISOString(),
-      location: entry.locationLabel,
-      pitchName: entry.locationLabel,
+      clubName: entry.clubName,
+      teamDisplayName: entry.teamDisplayName,
+      seriesDisplayName: entry.seriesDisplayName,
+      location: entry.pitch?.displayName ?? entry.locationLabel,
+      pitchName: entry.pitch?.displayName ?? entry.locationLabel,
+      pitch: entry.pitch,
+      dressingRoom: entry.dressingRoom,
     };
   });
 }

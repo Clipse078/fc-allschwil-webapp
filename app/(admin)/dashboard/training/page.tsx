@@ -6,6 +6,9 @@ import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { listTrainingSeries } from "@/lib/training/training-service";
+import { buildTrainingSeriesCockpitViewModel } from "@/lib/training/series-cockpit-data";
+import { getFacilitiesForTenant } from "@/lib/facilities/queries";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import { listTrainingSessions } from "@/lib/training/session-generation-service";
 import { listAllocationSummaryByTenant } from "@/lib/training/training-allocation-service";
 import { listSessionAllocationSummaryByTenant } from "@/lib/training/session-allocation-service";
@@ -77,6 +80,38 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
   if (tab === "serien") {
     const showArchived = params.archived === "1";
     const allSeries = await listTrainingSeries(tenantContext.id, { includeArchived: true });
+    const displayedSeries = showArchived ? allSeries : allSeries.filter((series) => series.status !== "ARCHIVED");
+    const archivedCount = allSeries.filter((series) => series.status === "ARCHIVED").length;
+
+    const [cockpitRows, facilities] = await Promise.all([
+      buildTrainingSeriesCockpitViewModel(tenantContext.id, displayedSeries),
+      getFacilitiesForTenant(tenantContext.id),
+    ]);
+
+    function facilityGroupsForTypes(types: readonly string[]): FacilityGroup[] {
+      return facilities
+        .filter((facility) => facility.status !== "ARCHIVED")
+        .map((facility) => ({
+          facilityId: facility.id,
+          facilityName: facility.name,
+          facilityType: facility.type as string,
+          resources: facility.resources
+            .filter((resource) => resource.status !== "ARCHIVED" && types.includes(resource.type))
+            .map((resource) => ({
+              id: resource.id,
+              name: resource.name,
+              code: resource.code,
+              type: resource.type,
+              facilityId: facility.id,
+              facilityName: facility.name,
+              facilityType: facility.type as string,
+            })),
+        }))
+        .filter((group) => group.resources.length > 0);
+    }
+
+    const pitchFacilityGroups = facilityGroupsForTypes(["FULL_PITCH", "HALF_PITCH"]);
+    const dressingRoomFacilityGroups = facilityGroupsForTypes(["DRESSING_ROOM"]);
 
     return (
       <div className="space-y-6">
@@ -95,11 +130,14 @@ export default async function TrainingCenterPage({ searchParams }: Props) {
         />
         <TopTabs active={tab} />
         <TrainingSeriesListView
-          allSeries={allSeries}
+          cockpitRows={cockpitRows}
           showArchived={showArchived}
+          archivedCount={archivedCount}
           canManage={canManage}
           isCoordinator={canManage}
           canDelete={canDelete}
+          pitchFacilityGroups={pitchFacilityGroups}
+          dressingRoomFacilityGroups={dressingRoomFacilityGroups}
         />
       </div>
     );

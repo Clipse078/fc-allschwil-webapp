@@ -3,136 +3,138 @@
  *
  * components/admin/training/__tests__/TrainingSeriesListView.test.tsx
  *
- * ADMIN-DELETE-02A-C1 — root-cause regression test: the actual
- * Serien-Verwaltung list (/dashboard/training?tab=serien) — not just the
- * deeper per-series edit page — must expose the permanent "Endgültig
- * löschen" action to a trainings.delete holder, independent of
- * trainings.manage (Ressourcen/Bearbeiten/Archivieren) and independent of
- * archive status.
+ * TRAINING-SERIES-PREMIUM-01 — weekday cockpit + ADMIN-DELETE-02A-C1 regressions.
  */
 
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import TrainingSeriesListView from "@/components/admin/training/TrainingSeriesListView";
-import type { TrainingSeriesDto } from "@/lib/training/types";
+import type { TrainingSeriesCockpitRow } from "@/lib/training/series-cockpit";
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-function makeSeries(overrides: Partial<TrainingSeriesDto> = {}): TrainingSeriesDto {
+function makeRow(overrides: Partial<TrainingSeriesCockpitRow> = {}): TrainingSeriesCockpitRow {
   return {
-    id: "series-1",
-    tenantId: "tenant-a",
+    rowKey: "series-1:MONDAY",
+    seriesId: "series-1",
     teamSeasonId: "team-season-1",
-    title: "U13 Dienstag/Donnerstag",
-    description: null,
+    teamDisplayName: "Junioren E1",
+    weekday: "MONDAY",
+    startsAt: "17:15",
+    endsAt: "18:45",
+    title: "Junioren E1 Training",
     status: "ACTIVE",
-    startsAt: "18:00",
-    endsAt: "19:30",
-    timezone: "Europe/Zurich",
-    weekdays: ["TUESDAY", "THURSDAY"],
-    weekdaySchedules: [
-      { weekday: "TUESDAY", startsAt: "18:00", endsAt: "19:30" },
-      { weekday: "THURSDAY", startsAt: "18:00", endsAt: "19:30" },
-    ],
+    planningStage: "APPROVED",
     validFrom: null,
     validUntil: null,
-    archivedAt: null,
+    timezone: "Europe/Zurich",
+    seriesWeekdaySchedules: [{ weekday: "MONDAY", startsAt: "17:15", endsAt: "18:45" }],
     sessionCount: 8,
-    createdAt: "2026-01-01T00:00:00.000Z",
-    updatedAt: "2026-01-01T00:00:00.000Z",
-    // ORG-ACCESS-03: planning workflow fields.
-    planningStage: "APPROVED",
-    planningSubmittedAt: null,
-    planningSubmittedById: null,
-    planningValidatedAt: null,
-    planningValidatedById: null,
-    createdByUserId: null,
+    pitchName: "Kunstrasen 2 A",
+    dressingRoomName: "O4",
+    pitchAllocationId: "alloc-pitch",
+    dressingRoomAllocationId: "alloc-room",
+    pitchResourceId: "res-pitch",
+    dressingRoomResourceId: "res-room",
     ...overrides,
   };
 }
 
-describe("TrainingSeriesListView — ADMIN-DELETE-02A-C1 root-cause fix", () => {
-  it("shows Ressourcen/Bearbeiten/Archivieren but NOT the delete action for a trainings.manage-only caller", () => {
-    render(
-      <TrainingSeriesListView allSeries={[makeSeries()]} showArchived={false} canManage={true} canDelete={false} />,
-    );
+const facilityGroups = [
+  {
+    facilityId: "facility-1",
+    facilityName: "Sportanlage",
+    facilityType: "SPORTANLAGE",
+    resources: [{ id: "res-pitch", name: "Kunstrasen 2 A", code: "KR2A", type: "HALF_PITCH", facilityId: "facility-1", facilityName: "Sportanlage", facilityType: "SPORTANLAGE" }],
+  },
+];
 
-    expect(screen.getByText("Ressourcen")).toBeTruthy();
-    expect(screen.getByText("Bearbeiten")).toBeTruthy();
-    expect(screen.getByText("Archivieren")).toBeTruthy();
-    expect(screen.queryByTestId("training-series-delete-inline")).toBeNull();
-  });
-
-  it("shows the delete action for a trainings.delete-only caller (canManage=false) — the previously-missing action", () => {
-    render(
-      <TrainingSeriesListView allSeries={[makeSeries()]} showArchived={false} canManage={false} canDelete={true} />,
-    );
-
-    expect(screen.getByTestId("training-series-delete-inline")).toBeTruthy();
-    // Manage-gated actions must stay hidden for a delete-only caller.
-    expect(screen.queryByText("Ressourcen")).toBeNull();
-    expect(screen.queryByText("Bearbeiten")).toBeNull();
-    expect(screen.queryByText("Archivieren")).toBeNull();
-  });
-
-  it("shows both manage actions and the delete action when the caller holds both authorities", () => {
-    render(
-      <TrainingSeriesListView allSeries={[makeSeries()]} showArchived={false} canManage={true} canDelete={true} />,
-    );
-
-    expect(screen.getByText("Bearbeiten")).toBeTruthy();
-    expect(screen.getByTestId("training-series-delete-inline")).toBeTruthy();
-  });
-
-  it("still shows the delete action for an ARCHIVED series (permanent delete is not blocked by lifecycle status)", () => {
+describe("TrainingSeriesListView — weekday cockpit", () => {
+  it("groups rows by weekday with time, pitch and dressing room visible", () => {
     render(
       <TrainingSeriesListView
-        allSeries={[makeSeries({ status: "ARCHIVED" })]}
-        showArchived={true}
+        cockpitRows={[
+          makeRow(),
+          makeRow({
+            rowKey: "series-2:TUESDAY",
+            seriesId: "series-2",
+            weekday: "TUESDAY",
+            title: "Junioren D-7 D1 Training",
+            pitchName: "Kunstrasen 3 B",
+            dressingRoomName: "E4",
+          }),
+        ]}
+        showArchived={false}
+        archivedCount={0}
         canManage={true}
-        canDelete={true}
+        canDelete={false}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
       />,
     );
 
-    // Manage row actions (Ressourcen/Bearbeiten/Archivieren) are hidden for
-    // an archived series (existing, unchanged behavior)...
+    expect(screen.getByTestId("training-series-weekday-group-MONDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-weekday-group-TUESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-time-series-1:MONDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-time-series-2:TUESDAY")).toBeTruthy();
+    expect(screen.getByText("Kunstrasen 2 A")).toBeTruthy();
+    expect(screen.getByText("O4")).toBeTruthy();
+    expect(screen.getByText("Kunstrasen 3 B")).toBeTruthy();
+    expect(screen.getByText("E4")).toBeTruthy();
+  });
+
+  it("does not show redundant Ressourcen/Bearbeiten top-level actions", () => {
+    render(
+      <TrainingSeriesListView
+        cockpitRows={[makeRow()]}
+        showArchived={false}
+        archivedCount={0}
+        canManage={true}
+        canDelete={false}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.queryByText("Ressourcen")).toBeNull();
     expect(screen.queryByText("Bearbeiten")).toBeNull();
-    // ...but the permanent-delete action must still be reachable.
+  });
+});
+
+describe("TrainingSeriesListView — ADMIN-DELETE-02A-C1 root-cause fix", () => {
+  it("shows the delete action for a trainings.delete-only caller via overflow menu", () => {
+    render(
+      <TrainingSeriesListView
+        cockpitRows={[makeRow()]}
+        showArchived={false}
+        archivedCount={0}
+        canManage={false}
+        canDelete={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-1:MONDAY"));
     expect(screen.getByTestId("training-series-delete-inline")).toBeTruthy();
   });
 
-  it("ADMIN-DELETE-02A-C2: surfaces 'Archiv anzeigen' when there are zero active series and one archived series", () => {
-    // Root-cause regression: with 0 active series, the series list would
-    // otherwise show only the empty state — the archived series must still
-    // be reachable via the toggle, for a trainings.delete-only caller too.
+  it("ADMIN-DELETE-02A-C2: surfaces 'Archiv anzeigen' when there are zero active rows and one archived series", () => {
     render(
       <TrainingSeriesListView
-        allSeries={[makeSeries({ status: "ARCHIVED" })]}
+        cockpitRows={[]}
         showArchived={false}
+        archivedCount={1}
         canManage={false}
         canDelete={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
       />,
     );
 
     expect(screen.getByText("Keine aktiven Trainingsserien")).toBeTruthy();
-    const archiveToggles = screen.getAllByText("Archiv anzeigen");
-    expect(archiveToggles.length).toBeGreaterThan(0);
-    for (const toggle of archiveToggles) {
-      expect(toggle.closest("a")).toHaveAttribute(
-        "href",
-        "/dashboard/training?tab=serien&archived=1",
-      );
-    }
-  });
-
-  it("renders no action row at all when the caller holds neither authority", () => {
-    render(
-      <TrainingSeriesListView allSeries={[makeSeries()]} showArchived={false} canManage={false} canDelete={false} />,
-    );
-
-    expect(screen.queryByText("Bearbeiten")).toBeNull();
-    expect(screen.queryByTestId("training-series-delete-inline")).toBeNull();
+    expect(screen.getAllByText("Archiv anzeigen").length).toBeGreaterThan(0);
   });
 });

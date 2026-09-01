@@ -40,6 +40,7 @@ vi.mock("@/lib/db/prisma", () => ({
 
 import { prisma } from "@/lib/db/prisma";
 import { findTeamSeasonsForTenant, findTeamSeasonPickerRow } from "../queries";
+import { trainingSeriesTeamSeasonEligibilityWhere } from "../team-season-eligibility";
 
 const mockPrisma = prisma as unknown as {
   teamSeason: {
@@ -61,7 +62,12 @@ function teamSeasonRow(overrides: {
   return {
     id: overrides.id,
     teamId: overrides.teamId,
-    team: { name: overrides.teamName },
+    team: {
+      name: overrides.teamName,
+      category: "TRAININGSGRUPPE",
+      genderGroup: "FRAUEN",
+      sortOrder: 10,
+    },
     season: { name: overrides.seasonName },
     trainerTeamMembers: overrides.trainerTeamMembers ?? [],
   };
@@ -72,27 +78,37 @@ beforeEach(() => {
 });
 
 describe("findTeamSeasonsForTenant — TEAMCENTER-UX-01C root-cause fix", () => {
-  it("scopes the query to the canonical current season (Season.isActive), not just TeamSeason.status", async () => {
+  it("scopes the query to the canonical current season and eligibility rule (not TeamSeason.status ACTIVE)", async () => {
     mockPrisma.teamSeason.findMany.mockResolvedValue([]);
 
     await findTeamSeasonsForTenant(TENANT_A);
 
     const callArgs = mockPrisma.teamSeason.findMany.mock.calls[0][0];
-    expect(callArgs.where).toMatchObject({
-      status: "ACTIVE",
-      team: { tenantId: TENANT_A, isActive: true },
-      season: { isActive: true },
-    });
+    expect(callArgs.where).toEqual(trainingSeriesTeamSeasonEligibilityWhere(TENANT_A));
   });
 
-  it("still requires TeamSeason.status ACTIVE and an active Team (existing eligibility rules preserved)", async () => {
+  it("still requires an active Team (archived teams excluded)", async () => {
     mockPrisma.teamSeason.findMany.mockResolvedValue([]);
 
     await findTeamSeasonsForTenant(TENANT_A);
 
     const callArgs = mockPrisma.teamSeason.findMany.mock.calls[0][0];
-    expect(callArgs.where.status).toBe("ACTIVE");
     expect(callArgs.where.team.isActive).toBe(true);
+  });
+
+  it("includes competition-less INACTIVE TeamSeason rows (Seniorinnen-style training-only teams)", async () => {
+    mockPrisma.teamSeason.findMany.mockResolvedValue([
+      teamSeasonRow({
+        id: "ts-seniorinnen",
+        teamId: "team-seniorinnen",
+        teamName: "Seniorinnen",
+        seasonName: "2026/2027",
+      }),
+    ]);
+
+    const rows = await findTeamSeasonsForTenant(TENANT_A);
+    expect(rows[0]?.teamName).toBe("Seniorinnen");
+    expect(mockPrisma.teamSeason.findMany.mock.calls[0][0].where.NOT).toEqual({ status: "ARCHIVED" });
   });
 
   it("maps rows returned by Prisma to picker options unchanged (mapping is unaffected by the scoping fix)", async () => {
@@ -108,6 +124,9 @@ describe("findTeamSeasonsForTenant — TEAMCENTER-UX-01C root-cause fix", () => 
         teamId: "team-1",
         teamName: "FC Allschwil E1",
         seasonName: "2026/2027",
+        category: "TRAININGSGRUPPE",
+        genderGroup: "FRAUEN",
+        sortOrder: 10,
         trainers: [],
       },
     ]);
@@ -234,7 +253,7 @@ describe("findTeamSeasonPickerRow — edit-mode lookup bypasses season-currency 
     mockPrisma.teamSeason.findFirst.mockResolvedValue({
       id: "ts-stale",
       teamId: "team-1",
-      team: { name: "FC Allschwil E1" },
+      team: { name: "FC Allschwil E1", category: "JUNIOREN", genderGroup: null, sortOrder: 0 },
       season: { name: "2024/2025" },
       trainerTeamMembers: [
         {
@@ -252,6 +271,9 @@ describe("findTeamSeasonPickerRow — edit-mode lookup bypasses season-currency 
       teamId: "team-1",
       teamName: "FC Allschwil E1",
       seasonName: "2024/2025",
+      category: "JUNIOREN",
+      genderGroup: null,
+      sortOrder: 0,
       trainers: [{ id: "trainer-1", name: "Max Muster", roleLabel: "Cheftrainer" }],
     });
   });

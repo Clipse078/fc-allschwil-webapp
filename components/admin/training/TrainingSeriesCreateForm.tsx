@@ -76,6 +76,7 @@ import {
 } from "@/components/admin/training/FacilityResourceSelector";
 import { VisualResourceAvailabilityPicker } from "@/components/admin/shared/planning/VisualResourceAvailabilityPicker";
 import { VisualDressingRoomPicker } from "@/components/admin/shared/planning/VisualDressingRoomPicker";
+import TeamSeasonSearchablePicker from "@/components/admin/shared/TeamSeasonSearchablePicker";
 import { weekdayFromDate, zonedTimeToUtc } from "@/lib/training/recurrence";
 import type { Weekday } from "@/lib/training/types";
 
@@ -86,6 +87,8 @@ export type TeamSeasonOption = {
   teamId: string;
   teamName: string;
   seasonName: string;
+  category?: string;
+  genderGroup?: string | null;
 };
 
 type GenerationResult = {
@@ -523,20 +526,13 @@ export default function TrainingSeriesCreateForm({
                   Kein Team mit Schreibzugriff verfügbar. Bitte wenden Sie sich an die Koordination.
                 </p>
               ) : (
-                <select
+                <TeamSeasonSearchablePicker
+                  options={teamSeasons}
                   value={teamSeasonId}
-                  onChange={(e) => setTeamSeasonId(e.target.value)}
-                  className="fca-select"
+                  onChange={setTeamSeasonId}
                   required
-                  data-testid="training-create-team-season-select"
-                >
-                  <option value="">— Auswählen —</option>
-                  {teamSeasons.map((ts) => (
-                    <option key={ts.id} value={ts.id}>
-                      {ts.teamName} · {ts.seasonName}
-                    </option>
-                  ))}
-                </select>
+                  testId="training-create-team-season-select"
+                />
               )}
             </label>
 

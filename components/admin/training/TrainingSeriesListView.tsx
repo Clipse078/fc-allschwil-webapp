@@ -1,112 +1,53 @@
 import Link from "next/link";
-import {
-  Archive,
-  CalendarDays,
-  Dumbbell,
-  Layers,
-  Pencil,
-  Plus,
-} from "lucide-react";
-import type { TrainingSeriesDto, TrainingSeriesStatus, Weekday } from "@/lib/training/types";
-import TrainingSeriesArchiveButton from "./TrainingSeriesArchiveButton";
-import TrainingSeriesDeleteControl from "./TrainingSeriesDeleteControl";
-import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
-import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWorkflowActionsClient";
-
-const WEEKDAY_LABELS: Record<Weekday, string> = {
-  MONDAY: "Mo",
-  TUESDAY: "Di",
-  WEDNESDAY: "Mi",
-  THURSDAY: "Do",
-  FRIDAY: "Fr",
-  SATURDAY: "Sa",
-  SUNDAY: "So",
-};
-
-function statusBadgeClasses(status: TrainingSeriesStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "border-emerald-200 bg-emerald-50 text-emerald-700";
-    case "INACTIVE":
-      return "border-amber-200 bg-amber-50 text-amber-700";
-    case "ARCHIVED":
-      return "border-slate-200 bg-slate-100 text-slate-500";
-  }
-}
-
-function statusLabel(status: TrainingSeriesStatus): string {
-  switch (status) {
-    case "ACTIVE":
-      return "Aktiv";
-    case "INACTIVE":
-      return "Inaktiv";
-    case "ARCHIVED":
-      return "Archiviert";
-  }
-}
-
-/** Formats an ISO datetime as "DD.MM.YYYY" for display. */
-function formatDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  return d.toLocaleDateString("de-CH", { day: "2-digit", month: "2-digit", year: "numeric" });
-}
+import { Archive, Dumbbell, Plus } from "lucide-react";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
+import TrainingSeriesCockpitRow from "./TrainingSeriesCockpitRow";
+import type { TrainingSeriesCockpitRow as CockpitRow } from "@/lib/training/series-cockpit";
+import { groupCockpitRowsByWeekday } from "@/lib/training/series-cockpit";
 
 type Props = {
-  allSeries: TrainingSeriesDto[];
+  cockpitRows: CockpitRow[];
   showArchived: boolean;
+  archivedCount: number;
   canManage: boolean;
-  /**
-   * ORG-ACCESS-03: true when the user holds tenant-wide trainings.manage
-   * (coordinator path). Used to decide which workflow action buttons to show:
-   * - isCoordinator: false (scoped user) → show "Einreichen" for DRAFT records
-   * - isCoordinator: true (coordinator)  → show "Validieren" / "Wiedereröffnen"
-   * Matches canManage when that is sourced from hasPermission(TRAININGS_MANAGE).
-   */
   isCoordinator?: boolean;
-  /**
-   * ADMIN-DELETE-02A-C1: effective PERMISSIONS.TRAININGS_DELETE authority.
-   * Deliberately independent of canManage/trainings.manage — permanent
-   * deletion is a separate authority from create/edit/archive, and must
-   * render here (the actual Serien-Verwaltung admins use day to day), not
-   * only on the deeper per-series edit page.
-   */
   canDelete?: boolean;
+  pitchFacilityGroups: FacilityGroup[];
+  dressingRoomFacilityGroups: FacilityGroup[];
   basePath?: string;
 };
 
 /**
- * TrainingCenter's Serien-Verwaltung (series administration) view: the
- * canonical CRUD surface for recurring TrainingSeries — creating, editing,
- * archiving, and managing resource allocations. Extracted unchanged from
- * the pre-TRAININGCENTER-01 /dashboard/training page so the operational
- * Monat/Woche/Tag calendar (TrainingCenterOverview) could become that
- * route's default tab without touching this proven flow.
+ * TRAINING-SERIES-PREMIUM-01 — weekday-oriented Training Series Cockpit.
+ *
+ * Replaces the previous card list with a compact, scannable weekday grouping
+ * optimized for operational editing (time, pitch, dressing room visible and
+ * editable inline). Rare/destructive actions live in a compact overflow menu.
  */
 export default function TrainingSeriesListView({
-  allSeries,
+  cockpitRows,
   showArchived,
+  archivedCount,
   canManage,
   isCoordinator = canManage,
   canDelete = false,
+  pitchFacilityGroups,
+  dressingRoomFacilityGroups,
   basePath = "/dashboard/training",
 }: Props) {
-  const activeSeries = allSeries.filter((s) => s.status !== "ARCHIVED");
-  const archivedSeries = allSeries.filter((s) => s.status === "ARCHIVED");
-  const displayedSeries = showArchived ? allSeries : activeSeries;
-
+  const weekdayGroups = groupCockpitRowsByWeekday(cockpitRows);
   const archiveToggleHref = showArchived
     ? `${basePath}?tab=serien`
     : `${basePath}?tab=serien&archived=1`;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5" data-testid="training-series-weekday-cockpit">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-[var(--muted)]">
-          Übersicht aller Trainingsserien. Beim Speichern werden die konkreten Trainingstermine automatisch generiert.
+          Wochentags-Cockpit: Zeit, Team, Spielfeld und Garderobe auf einen Blick. Änderungen direkt in der Liste.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {archivedSeries.length > 0 ? (
+          {archivedCount > 0 ? (
             <Link href={archiveToggleHref} className="fca-button-secondary inline-flex items-center gap-1.5 text-sm">
               <Archive className="h-3.5 w-3.5" />
               {showArchived ? "Archiv ausblenden" : "Archiv anzeigen"}
@@ -121,9 +62,9 @@ export default function TrainingSeriesListView({
         </div>
       </div>
 
-      {displayedSeries.length === 0 ? (
+      {weekdayGroups.length === 0 ? (
         <div className="sce-detail-section">
-          <div className="sce-detail-section-body flex flex-col items-center justify-center gap-3 py-16 text-center">
+          <div className="sce-detail-section-body flex flex-col items-center justify-center gap-3 py-12 text-center">
             <Dumbbell className="h-10 w-10 text-[var(--muted)]" />
             <p className="font-semibold text-[var(--foreground)]">
               {showArchived ? "Keine Trainingsserien vorhanden" : "Keine aktiven Trainingsserien"}
@@ -142,149 +83,45 @@ export default function TrainingSeriesListView({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {displayedSeries.map((series) => {
-            const validFrom = formatDate(series.validFrom);
-            const validUntil = formatDate(series.validUntil);
-            return (
-              <div key={series.id} className="sce-detail-section">
-                <div className="sce-detail-section-header">
-                  <div className="flex min-w-0 flex-wrap items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-white">
-                      <Dumbbell className="h-4 w-4 text-[var(--blue)]" />
-                    </div>
+        <div className="space-y-4">
+          <div className="hidden md:grid md:grid-cols-[5.5rem_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] gap-3 px-3 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span>Zeit</span>
+            <span>Training / Team</span>
+            <span>Spielfeld</span>
+            <span>Garderobe</span>
+            <span className="text-right">Status</span>
+          </div>
 
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                      <span className="text-sm font-semibold text-[var(--foreground)]">{series.title}</span>
-                      <span
-                        className={`inline-flex h-5 items-center rounded-full border px-2 text-[0.65rem] font-semibold ${statusBadgeClasses(series.status as TrainingSeriesStatus)}`}
-                      >
-                        {statusLabel(series.status as TrainingSeriesStatus)}
-                      </span>
-                      {/* ORG-ACCESS-03: show planning workflow stage badge */}
-                      {(series.planningStage === "DRAFT" || series.planningStage === "SUBMITTED" ||
-                        (series.planningStage === "APPROVED" && !isCoordinator)) && (
-                        <PlanningWorkflowBadge stage={series.planningStage} size="sm" />
-                      )}
-                    </div>
-                  </div>
-
-                  {(canManage || canDelete || series.planningStage === "DRAFT") && (
-                    <div className="flex shrink-0 flex-wrap items-center gap-2">
-                      {canManage && series.status !== "ARCHIVED" && (
-                        <>
-                          <Link
-                            href={`/dashboard/training/series/${series.id}/allocations`}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
-                          >
-                            <Layers className="h-3.5 w-3.5 text-[var(--blue)]" />
-                            Ressourcen
-                          </Link>
-                          <Link
-                            href={`/dashboard/training/series/${series.id}/edit`}
-                            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--foreground)] transition hover:bg-[var(--surface-2)]"
-                          >
-                            <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
-                            Bearbeiten
-                          </Link>
-                          <TrainingSeriesArchiveButton seriesId={series.id} seriesTitle={series.title} />
-                        </>
-                      )}
-                      {/* ORG-ACCESS-03: planning workflow action buttons */}
-                      {series.status !== "ARCHIVED" && (
-                        <PlanningWorkflowActionsClient
-                          recordId={series.id}
-                          domain="training"
-                          planningStage={series.planningStage}
-                          isCoordinator={isCoordinator}
-                        />
-                      )}
-                      {/*
-                        ADMIN-DELETE-02A-C1: permanent delete requires effective
-                        trainings.delete authority, independent of canManage and
-                        of archive status — dependencies/history are impact, not
-                        blockers, so this must reach even an archived series.
-                      */}
-                      <TrainingSeriesDeleteControl
-                        seriesId={series.id}
-                        seriesTitle={series.title}
-                        canDelete={canDelete}
-                        variant="inline"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="sce-detail-section-body">
-                  <div className="grid grid-cols-2 gap-5 sm:grid-cols-4">
-                    <div className="sce-data-field col-span-2">
-                      <p className="sce-data-label">Wochentage &amp; Zeiten</p>
-                      <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {series.weekdaySchedules.length > 0 ? (
-                          series.weekdaySchedules.map((s) => (
-                            <span
-                              key={s.weekday}
-                              className="inline-flex items-center rounded-full border border-[var(--blue)]/30 bg-[var(--blue-light)] px-2 py-0.5 text-[0.68rem] font-semibold text-[var(--blue)]"
-                            >
-                              {WEEKDAY_LABELS[s.weekday]} {s.startsAt}–{s.endsAt}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-sm text-[var(--muted)]">—</span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="sce-data-field">
-                      <p className="sce-data-label">Zeitraum</p>
-                      <p className="sce-data-value mt-1.5">
-                        {validFrom && validUntil ? `${validFrom} – ${validUntil}` : "Unbegrenzt"}
-                      </p>
-                    </div>
-
-                    <div className="sce-data-field">
-                      <p className="sce-data-label">Zeitzone</p>
-                      <p className="sce-data-value mt-1.5">{series.timezone}</p>
-                    </div>
-
-                    <div className="sce-data-field">
-                      <p className="sce-data-label">Generierte Termine</p>
-                      <p className="sce-data-value mt-1.5 flex items-center gap-1.5">
-                        <CalendarDays className="h-3.5 w-3.5 text-[var(--muted)]" />
-                        {series.sessionCount}
-                      </p>
-                    </div>
-
-                    {series.description ? (
-                      <div className="sce-data-field col-span-2 sm:col-span-4">
-                        <p className="sce-data-label">Beschreibung</p>
-                        <p className="sce-data-value mt-1.5 line-clamp-2">{series.description}</p>
-                      </div>
-                    ) : null}
-                  </div>
-
-                  {!canManage && (
-                    <div className="mt-3 pt-3 border-t border-[var(--border)]">
-                      <Link
-                        href={`/dashboard/training/series/${series.id}/allocations`}
-                        className="inline-flex items-center gap-1.5 text-xs text-[var(--blue)] hover:underline"
-                      >
-                        <Layers className="h-3 w-3" />
-                        Ressourcenzuteilung ansehen
-                      </Link>
-                    </div>
-                  )}
-                </div>
+          {weekdayGroups.map((group) => (
+            <section
+              key={group.weekday}
+              className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-sm"
+              data-testid={`training-series-weekday-group-${group.weekday}`}
+            >
+              <header className="border-b border-[var(--border)] bg-[var(--surface-2)] px-3 py-2">
+                <h2 className="text-sm font-semibold tracking-wide text-[var(--foreground)]">{group.label}</h2>
+              </header>
+              <div>
+                {group.rows.map((row) => (
+                  <TrainingSeriesCockpitRow
+                    key={row.rowKey}
+                    row={row}
+                    canManage={canManage}
+                    canDelete={canDelete}
+                    isCoordinator={isCoordinator}
+                    pitchFacilityGroups={pitchFacilityGroups}
+                    dressingRoomFacilityGroups={dressingRoomFacilityGroups}
+                  />
+                ))}
               </div>
-            );
-          })}
+            </section>
+          ))}
         </div>
       )}
 
-      {!showArchived && archivedSeries.length > 0 && (
+      {!showArchived && archivedCount > 0 && (
         <p className="text-xs text-[var(--muted)] text-center">
-          {archivedSeries.length} archivierte{" "}
-          {archivedSeries.length === 1 ? "Trainingsserie" : "Trainingsserien"} —{" "}
+          {archivedCount} archivierte {archivedCount === 1 ? "Trainingsserie" : "Trainingsserien"} —{" "}
           <Link href={`${basePath}?tab=serien&archived=1`} className="text-[var(--blue)] hover:underline">
             Archiv anzeigen
           </Link>
