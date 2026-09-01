@@ -384,6 +384,7 @@ async function findWeekplannerTrainingItems(
         trainingSeriesId: true,
         displayOrder: true,
         createdAt: true,
+        updatedAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
@@ -396,6 +397,7 @@ async function findWeekplannerTrainingItems(
         trainingSessionId: true,
         displayOrder: true,
         createdAt: true,
+        updatedAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },

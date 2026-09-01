@@ -11,12 +11,17 @@
  *   2. TrainingSeries TrainingAllocation rows for this group
  *
  * Within each tier exactly one resource per group is returned:
- *   - Session overrides: highest displayOrder (then newest createdAt). Occurrence
- *     overrides are appended with auto-incrementing displayOrder, so a newer
- *     override in the same group must supersede stale siblings (e.g. an old O4
- *     row left behind when E3 was assigned later for that occurrence).
+ *   - Session overrides: when multiple siblings exist for the same group,
+ *     the row with the highest displayOrder (then newest createdAt) is the
+ *     occurrence's authored override — matching reassignment-service.ts,
+ *     which deletes prior group rows before creating the next override.
  *   - Series defaults: lowest displayOrder (then oldest createdAt) — the
  *     canonical primary allocation for the recurring series.
+ *   - Cross-layer tie-break: when both tiers have a candidate, the row with
+ *     the newer updatedAt (then createdAt) wins. A stale occurrence override
+ *     left behind after the series canonical row was updated must not block
+ *     the current series default (e.g. old O4 session row vs. newer E3
+ *     series row).
  */
 
 import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from "./allocation-groups";
@@ -24,6 +29,7 @@ import { classifyFacilityResourceType, type TrainingAllocationGroupKey } from ".
 export type TrainingAllocationResourceRow = {
   displayOrder: number;
   createdAt?: Date;
+  updatedAt?: Date;
   facilityResource: {
     id: string;
     code: string;
@@ -37,6 +43,10 @@ export type ResolvedTrainingAllocationGroup = {
   pitch: TrainingAllocationResourceRow[];
   dressingRoom: TrainingAllocationResourceRow[];
 };
+
+function rowAuthorityTimestamp(row: TrainingAllocationResourceRow): number {
+  return row.updatedAt?.getTime() ?? row.createdAt?.getTime() ?? 0;
+}
 
 function compareSeriesAllocationRows(
   a: TrainingAllocationResourceRow,
@@ -76,10 +86,26 @@ function pickCanonicalSessionOverrideRow(
   return [sorted[0]!];
 }
 
+function resolveCrossLayerAllocation(
+  seriesCanonical: readonly TrainingAllocationResourceRow[],
+  sessionCanonical: readonly TrainingAllocationResourceRow[],
+): TrainingAllocationResourceRow[] {
+  if (sessionCanonical.length === 0) return [...seriesCanonical];
+  if (seriesCanonical.length === 0) return [...sessionCanonical];
+
+  const sessionRow = sessionCanonical[0]!;
+  const seriesRow = seriesCanonical[0]!;
+  const sessionAuthority = rowAuthorityTimestamp(sessionRow);
+  const seriesAuthority = rowAuthorityTimestamp(seriesRow);
+
+  return sessionAuthority > seriesAuthority ? [sessionRow] : [seriesRow];
+}
+
 /**
  * Resolves the canonical Standardplan allocation for one training occurrence
- * and allocation group. Session-level overrides win independently per group;
- * otherwise the series default resolves to a single deterministic row.
+ * and allocation group. Session-level overrides win independently per group
+ * when they are the more recently authored assignment; otherwise the series
+ * canonical row applies.
  */
 export function resolveTrainingOccurrenceAllocationGroup(
   group: Extract<TrainingAllocationGroupKey, "PITCH_HALL" | "DRESSING_ROOM">,
@@ -89,14 +115,17 @@ export function resolveTrainingOccurrenceAllocationGroup(
   const overridesForGroup = sessionOverrideRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
-  if (overridesForGroup.length > 0) {
-    return pickCanonicalSessionOverrideRow(overridesForGroup);
-  }
-
   const seriesForGroup = seriesRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
-  return pickCanonicalSeriesRow(seriesForGroup);
+
+  const seriesCanonical = pickCanonicalSeriesRow(seriesForGroup);
+  if (overridesForGroup.length === 0) {
+    return seriesCanonical;
+  }
+
+  const sessionCanonical = pickCanonicalSessionOverrideRow(overridesForGroup);
+  return resolveCrossLayerAllocation(seriesCanonical, sessionCanonical);
 }
 
 /**

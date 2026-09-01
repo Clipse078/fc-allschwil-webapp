@@ -16,10 +16,12 @@ function resource(
   type: "HALF_PITCH" | "DRESSING_ROOM",
   displayOrder: number,
   createdAt?: Date,
+  updatedAt?: Date,
 ): TrainingAllocationResourceRow {
   return {
     displayOrder,
     createdAt,
+    updatedAt,
     facilityResource: {
       id: `res-${code}`,
       code,
@@ -33,7 +35,16 @@ function resource(
 describe("resolveTrainingOccurrenceAllocationGroup", () => {
   it("prefers occurrence-level dressing room override over series default", () => {
     const seriesRows = [resource("O4", "Garderobe O4", "DRESSING_ROOM", 0)];
-    const sessionRows = [resource("E3", "Garderobe E3", "DRESSING_ROOM", 0)];
+    const sessionRows = [
+      resource(
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+    ];
 
     const resolved = resolveTrainingOccurrenceAllocationGroup(
       "DRESSING_ROOM",
@@ -47,8 +58,26 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
 
   it("keeps Monday and Wednesday dressing rooms independent via occurrence overrides", () => {
     const seriesRows = [resource("O4", "Garderobe O4", "DRESSING_ROOM", 0)];
-    const mondayOverride = [resource("E4", "Garderobe E4", "DRESSING_ROOM", 0)];
-    const wednesdayOverride = [resource("O3", "Garderobe O3", "DRESSING_ROOM", 0)];
+    const mondayOverride = [
+      resource(
+        "E4",
+        "Garderobe E4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+    ];
+    const wednesdayOverride = [
+      resource(
+        "O3",
+        "Garderobe O3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+    ];
 
     expect(
       resolveTrainingOccurrenceAllocationGroup("DRESSING_ROOM", seriesRows, mondayOverride)[0]
@@ -66,8 +95,22 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
       resource("O4", "Garderobe O4", "DRESSING_ROOM", 0),
     ];
     const sessionRows = [
-      resource("KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
-      resource("E3", "Garderobe E3", "DRESSING_ROOM", 0),
+      resource(
+        "KR3A",
+        "Kunstrasen 3 A",
+        "HALF_PITCH",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      resource(
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
     ];
 
     const resolved = resolveTrainingOccurrenceAllocations({
@@ -100,7 +143,7 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
 
   it("D9-D1 Wednesday canonical E3 cannot become stale O4 when session override exists", () => {
     const seriesRows = [resource("O4", "Garderobe O4", "DRESSING_ROOM", 0)];
-    const sessionRows = [resource("E3", "Garderobe E3", "DRESSING_ROOM", 0)];
+    const sessionRows = [resource("E3", "Garderobe E3", "DRESSING_ROOM", 0, new Date("2026-02-01T00:00:00.000Z"))];
 
     const resolved = resolveTrainingOccurrenceAllocations({
       seriesRows,
@@ -126,5 +169,76 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
     expect(resolved.pitch[0]?.facilityResource.code).toBe("KR3A");
     expect(resolved.dressingRoom).toHaveLength(1);
     expect(resolved.dressingRoom[0]?.facilityResource.code).toBe("E3");
+  });
+
+  it("defers a stale occurrence dressing-room override to a newer series canonical row", () => {
+    const seriesRows = [
+      resource(
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-01-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      resource(
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        5,
+        new Date("2026-01-01T00:00:00.000Z"),
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+    ];
+    const sessionRows = [
+      resource("KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      resource(
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-01-01T00:00:00.000Z"),
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+    ];
+
+    const resolved = resolveTrainingOccurrenceAllocations({
+      seriesRows,
+      sessionOverrideRows: sessionRows,
+    });
+
+    expect(resolved.pitch[0]?.facilityResource.code).toBe("KR3A");
+    expect(resolved.dressingRoom[0]?.facilityResource.code).toBe("E3");
+  });
+
+  it("keeps an occurrence dressing-room override when it is newer than the series canonical row", () => {
+    const seriesRows = [
+      resource(
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-01-01T00:00:00.000Z"),
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+    ];
+    const sessionRows = [
+      resource(
+        "E4",
+        "Garderobe E4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+    ];
+
+    const resolved = resolveTrainingOccurrenceAllocationGroup(
+      "DRESSING_ROOM",
+      seriesRows,
+      sessionRows,
+    );
+
+    expect(resolved[0]?.facilityResource.code).toBe("E4");
   });
 });

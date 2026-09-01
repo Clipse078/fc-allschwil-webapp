@@ -281,6 +281,7 @@ async function collectTrainingOccupants(
         trainingSeriesId: true,
         displayOrder: true,
         createdAt: true,
+        updatedAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
@@ -293,6 +294,7 @@ async function collectTrainingOccupants(
         trainingSessionId: true,
         displayOrder: true,
         createdAt: true,
+        updatedAt: true,
         facilityResource: {
           select: { id: true, code: true, name: true, type: true, facility: { select: { name: true } } },
         },
@@ -307,6 +309,7 @@ async function collectTrainingOccupants(
     list.push({
       displayOrder: row.displayOrder,
       createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
       facilityResource: row.facilityResource,
     });
     seriesAllocMap.set(row.trainingSeriesId, list);
@@ -318,6 +321,7 @@ async function collectTrainingOccupants(
     list.push({
       displayOrder: row.displayOrder,
       createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
       facilityResource: row.facilityResource,
     });
     sessionAllocMap.set(row.trainingSessionId, list);

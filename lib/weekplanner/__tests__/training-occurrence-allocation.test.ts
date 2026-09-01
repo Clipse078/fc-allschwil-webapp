@@ -87,11 +87,13 @@ function allocationRow(
   name: string,
   type: string,
   displayOrder: number,
+  updatedAt: Date = new Date("2026-01-01T00:00:00.000Z"),
 ) {
   return {
     trainingSeriesId: seriesId,
     displayOrder,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt,
     facilityResource: {
       id: `res-${code}`,
       code,
@@ -108,11 +110,13 @@ function sessionAllocationRow(
   name: string,
   type: string,
   displayOrder: number,
+  updatedAt: Date = new Date("2026-01-01T00:00:00.000Z"),
 ) {
   return {
     trainingSessionId: sessionId,
     displayOrder,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt,
     facilityResource: {
       id: `res-${code}`,
       code,
@@ -151,10 +155,38 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
       allocationRow("series-d7", "O4", "Garderobe O4", "DRESSING_ROOM", 5),
     ]);
     mocks.trainingSessionAllocationFindMany.mockResolvedValue([
-      sessionAllocationRow("session-mon", "KR3B", "Kunstrasen 3 B", "HALF_PITCH", 0),
-      sessionAllocationRow("session-mon", "E4", "Garderobe E4", "DRESSING_ROOM", 0),
-      sessionAllocationRow("session-wed", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
-      sessionAllocationRow("session-wed", "O3", "Garderobe O3", "DRESSING_ROOM", 0),
+      sessionAllocationRow(
+        "session-mon",
+        "KR3B",
+        "Kunstrasen 3 B",
+        "HALF_PITCH",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-mon",
+        "E4",
+        "Garderobe E4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-wed",
+        "KR3A",
+        "Kunstrasen 3 A",
+        "HALF_PITCH",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-wed",
+        "O3",
+        "Garderobe O3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
     ]);
 
     const week = await getWeekplannerWeek(TENANT_A, WEEK_WINDOW);
@@ -192,8 +224,22 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
       allocationRow("series-d9", "O4", "Garderobe O4", "DRESSING_ROOM", 0),
     ]);
     mocks.trainingSessionAllocationFindMany.mockResolvedValue([
-      sessionAllocationRow("session-d9-wed", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
-      sessionAllocationRow("session-d9-wed", "E3", "Garderobe E3", "DRESSING_ROOM", 0),
+      sessionAllocationRow(
+        "session-d9-wed",
+        "KR3A",
+        "Kunstrasen 3 A",
+        "HALF_PITCH",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-d9-wed",
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
     ]);
 
     const week = await getWeekplannerWeek(TENANT_A, WEEK_WINDOW);
@@ -228,8 +274,22 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     ]);
     mocks.trainingSessionAllocationFindMany.mockResolvedValue([
       sessionAllocationRow("session-d9-wed", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
-      sessionAllocationRow("session-d9-wed", "O4", "Garderobe O4", "DRESSING_ROOM", 1),
-      sessionAllocationRow("session-d9-wed", "E3", "Garderobe E3", "DRESSING_ROOM", 2),
+      sessionAllocationRow(
+        "session-d9-wed",
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        1,
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-d9-wed",
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        2,
+        new Date("2026-01-02T00:00:00.000Z"),
+      ),
     ]);
 
     const week = await getWeekplannerWeek(TENANT_A, WEEK_WINDOW);
@@ -241,6 +301,86 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     expect(wednesday.dressingRoomAllocations).toEqual([
       expect.objectContaining({ code: "E3", name: "Garderobe E3" }),
     ]);
+  });
+
+  it("D9-D1 Wednesday production shape: stale lone O4 session row defers to newer series E3", async () => {
+    mocks.listTrainingSessions.mockResolvedValue([
+      trainingSessionDto({
+        id: "session-d9-wed",
+        trainingSeriesId: "series-d9",
+        trainingSeriesTitle: "Junioren D-9 D1 Training",
+        teamName: "Junioren D-9 D1",
+        weekday: "WEDNESDAY",
+        date: "2026-09-02",
+        startAt: "2026-09-02T16:45:00.000Z",
+        endAt: "2026-09-02T18:15:00.000Z",
+        originalDate: "2026-09-02",
+        originalStartAt: "2026-09-02T16:45:00.000Z",
+        originalEndAt: "2026-09-02T18:15:00.000Z",
+      }),
+    ]);
+    mocks.trainingAllocationFindMany.mockResolvedValue([
+      allocationRow("series-d9", "KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      allocationRow(
+        "series-d9",
+        "E3",
+        "Garderobe E3",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      allocationRow(
+        "series-d9",
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        5,
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+    ]);
+    mocks.trainingSessionAllocationFindMany.mockResolvedValue([
+      sessionAllocationRow(
+        "session-d9-wed",
+        "KR3A",
+        "Kunstrasen 3 A",
+        "HALF_PITCH",
+        0,
+        new Date("2026-02-01T00:00:00.000Z"),
+      ),
+      sessionAllocationRow(
+        "session-d9-wed",
+        "O4",
+        "Garderobe O4",
+        "DRESSING_ROOM",
+        0,
+        new Date("2026-01-01T00:00:00.000Z"),
+      ),
+    ]);
+
+    const week = await getWeekplannerWeek(TENANT_A, {
+      ...WEEK_WINDOW,
+      days: [
+        "2026-09-01",
+        "2026-09-02",
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-05",
+        "2026-09-06",
+        "2026-09-07",
+      ],
+      param: "2026-09-01",
+    });
+    const wednesday = week.days.find((day) => day.dayKey === "2026-09-02")?.items[0];
+
+    expect(wednesday?.type).toBe("TRAINING");
+    if (wednesday?.type !== "TRAINING") throw new Error("expected TRAINING");
+    expect(wednesday.pitchAllocations[0]?.name).toBe("Kunstrasen 3 A");
+    expect(wednesday.dressingRoomAllocations).toEqual([
+      expect.objectContaining({ code: "E3", name: "Garderobe E3" }),
+    ]);
+    expect(wednesday.dressingRoomAllocations).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ code: "O4" })]),
+    );
   });
 
   it("uses lowest displayOrder series allocation when no occurrence override exists", async () => {
