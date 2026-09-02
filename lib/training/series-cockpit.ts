@@ -41,6 +41,11 @@ export type TrainingSeriesAllocationDisplay = {
   dressingRoomResourceId: string | null;
 };
 
+/** Canonical admin route for editing a training series. */
+export function buildTrainingSeriesEditHref(seriesId: string): string {
+  return `/dashboard/training/series/${seriesId}/edit`;
+}
+
 export type TrainingSeriesCockpitRow = {
   rowKey: string;
   seriesId: string;

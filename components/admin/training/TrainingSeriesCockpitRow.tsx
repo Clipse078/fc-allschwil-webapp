@@ -10,7 +10,10 @@ import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWor
 import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
 import { PopoverContent } from "@/components/ui/Popover";
 import { cn } from "@/lib/cn";
-import type { TrainingSeriesCockpitRow as CockpitRow } from "@/lib/training/series-cockpit";
+import {
+  buildTrainingSeriesEditHref,
+  type TrainingSeriesCockpitRow as CockpitRow,
+} from "@/lib/training/series-cockpit";
 import type { SeriesCockpitOccurrenceException } from "@/lib/training/series-cockpit-exceptions";
 
 type ResourceGroup = "PITCH_HALL" | "DRESSING_ROOM";
@@ -366,12 +369,11 @@ export default function TrainingSeriesCockpitRow({
   const editable = canManage && row.status !== "ARCHIVED";
   const validFrom = formatDate(row.validFrom);
   const validUntil = formatDate(row.validUntil);
-  const seriesEditHref = `/dashboard/training/series/${row.seriesId}/edit`;
 
   const navigateToSeriesEdit = useCallback(() => {
-    router.push(seriesEditHref);
+    router.push(buildTrainingSeriesEditHref(row.seriesId));
     setMenuOpen(false);
-  }, [router, seriesEditHref]);
+  }, [router, row.seriesId]);
 
   return (
     <article

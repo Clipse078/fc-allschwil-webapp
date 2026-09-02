@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildTrainingSeriesCockpitRows,
+  buildTrainingSeriesEditHref,
   groupCockpitRowsByWeekday,
   resolveSeriesAllocationDisplay,
   sortTrainingSeriesCockpitRows,
@@ -88,6 +89,10 @@ describe("series cockpit grouping", () => {
     const grouped = groupCockpitRowsByWeekday(rows);
     expect(grouped.map((group) => group.weekday)).toEqual(["MONDAY", "TUESDAY"]);
     expect(grouped[0]?.rows.map((row) => row.seriesId)).toEqual(["series-early", "series-late"]);
+    expect(grouped[0]?.rows[0]?.seriesId).toBe("series-early");
+    expect(buildTrainingSeriesEditHref(grouped[0]!.rows[0]!.seriesId)).toBe(
+      "/dashboard/training/series/series-early/edit",
+    );
   });
 
   it("exposes pitch and dressing room from canonical series allocations", () => {
@@ -122,6 +127,18 @@ describe("series cockpit grouping", () => {
     });
 
     expect(rows[0]?.status).toBe("ARCHIVED");
+  });
+});
+
+describe("buildTrainingSeriesEditHref", () => {
+  it("interpolates the real series id into the admin edit route", () => {
+    expect(buildTrainingSeriesEditHref("series-123")).toBe("/dashboard/training/series/series-123/edit");
+  });
+
+  it("does not emit a literal route placeholder", () => {
+    const href = buildTrainingSeriesEditHref("series-123");
+    expect(href).not.toContain("{seriesId}");
+    expect(href).not.toContain("%7BseriesId%7D");
   });
 });
 

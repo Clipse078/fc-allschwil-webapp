@@ -3,7 +3,7 @@
  *
  * components/admin/training/__tests__/TrainingSeriesCockpitRow.test.tsx
  *
- * TRAININGCENTER-EDIT-01C — Serie bearbeiten navigation + exception indicator.
+ * TRAININGCENTER-EDIT-01D — Serie bearbeiten navigation + exception indicator.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -20,8 +20,8 @@ vi.mock("next/navigation", () => ({
 
 function makeRow(overrides: Partial<CockpitRow> = {}): CockpitRow {
   return {
-    rowKey: "series-1:WEDNESDAY",
-    seriesId: "series-1",
+    rowKey: "series-123:WEDNESDAY",
+    seriesId: "series-123",
     teamSeasonId: "team-season-1",
     teamDisplayName: "Junioren D-9 D1",
     weekday: "WEDNESDAY",
@@ -83,11 +83,14 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-1:WEDNESDAY"));
-    fireEvent.mouseDown(screen.getByTestId("training-series-cockpit-edit-series-1:WEDNESDAY"));
+    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-123:WEDNESDAY"));
+    fireEvent.mouseDown(screen.getByTestId("training-series-cockpit-edit-series-123:WEDNESDAY"));
 
     expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-1/edit");
+    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-123/edit");
+    const pushedHref = pushMock.mock.calls[0]?.[0];
+    expect(pushedHref).not.toContain("{seriesId}");
+    expect(pushedHref).not.toContain("%7BseriesId%7D");
   });
 
   it("navigates to the existing series edit route from the overflow menu on keyboard activation", () => {
@@ -102,13 +105,16 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-1:WEDNESDAY"));
-    fireEvent.keyDown(screen.getByTestId("training-series-cockpit-edit-series-1:WEDNESDAY"), {
+    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-123:WEDNESDAY"));
+    fireEvent.keyDown(screen.getByTestId("training-series-cockpit-edit-series-123:WEDNESDAY"), {
       key: "Enter",
     });
 
     expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-1/edit");
+    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-123/edit");
+    const pushedHref = pushMock.mock.calls[0]?.[0];
+    expect(pushedHref).not.toContain("{seriesId}");
+    expect(pushedHref).not.toContain("%7BseriesId%7D");
   });
 });
 
@@ -125,7 +131,7 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
       />,
     );
 
-    expect(screen.queryByTestId("training-series-cockpit-exceptions-series-1:WEDNESDAY")).toBeNull();
+    expect(screen.queryByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toBeNull();
   });
 
   it("shows an occurrence-based exception badge and detail list", () => {
@@ -160,8 +166,8 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
       />,
     );
 
-    expect(screen.getByTestId("training-series-cockpit-exceptions-series-1:WEDNESDAY")).toHaveTextContent("1 Ausnahme");
-    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-1:WEDNESDAY"));
+    expect(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toHaveTextContent("1 Ausnahme");
+    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY"));
     expect(screen.getByText(/Serien-Standard: E3/)).toBeTruthy();
     expect(screen.getByText(/Garderobe: O4/)).toBeTruthy();
   });
@@ -198,7 +204,7 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-1:WEDNESDAY"));
+    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY"));
     fireEvent.click(screen.getByTestId("training-series-cockpit-exception-item-session-1"));
 
     expect(pushMock).toHaveBeenCalledWith("/dashboard/training/sessions/session-1/edit");
