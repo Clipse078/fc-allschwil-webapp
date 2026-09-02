@@ -47,15 +47,6 @@
  */
 
 import type { ReactElement } from "react";
-import {
-  Sun,
-  CloudSun,
-  Cloud,
-  CloudRain,
-  CloudSnow,
-  Zap,
-  CloudDrizzle,
-} from "lucide-react";
 import type {
   InfoboardScreen2Feed,
   PitchOccupancy,
@@ -86,7 +77,7 @@ export type InfoboardScreen2Props = {
   /**
    * Current weather for the facility location. Rendered compactly in the
    * header next to the time/date block (INFOBOARD-INTEGRATION-01C-C1).
-   * When absent or unavailable, renders a compact "WETTER N/A" fallback.
+   * When absent or unavailable, the canonical kiosk header omits weather quietly.
    * Only visible when headerConfig.showWeather is true (defaults to true to
    * preserve existing behavior).
    */
@@ -193,25 +184,6 @@ function eventTypeLabel(type: PublishingEventType): string {
     case "TOURNAMENT": return "TURNIER";
     default:           return "EVENT";
   }
-}
-
-// ── Weather icon helper ───────────────────────────────────────────────────────
-
-type LucideIconProps = { size?: number; strokeWidth?: number; "aria-hidden"?: boolean };
-type LucideIcon = (props: LucideIconProps) => ReactElement;
-
-function getWeatherIcon(conditionCode: number): LucideIcon {
-  if (conditionCode === 0 || conditionCode === 1) return Sun as LucideIcon;
-  if (conditionCode === 2) return CloudSun as LucideIcon;
-  if (conditionCode === 3) return Cloud as LucideIcon;
-  if (conditionCode >= 45 && conditionCode <= 48) return Cloud as LucideIcon;
-  if (conditionCode >= 51 && conditionCode <= 57) return CloudDrizzle as LucideIcon;
-  if (conditionCode >= 61 && conditionCode <= 67) return CloudRain as LucideIcon;
-  if (conditionCode >= 71 && conditionCode <= 77) return CloudSnow as LucideIcon;
-  if (conditionCode >= 80 && conditionCode <= 82) return CloudRain as LucideIcon;
-  if (conditionCode >= 85 && conditionCode <= 86) return CloudSnow as LucideIcon;
-  if (conditionCode >= 95) return Zap as LucideIcon;
-  return Cloud as LucideIcon;
 }
 
 // ── Pitch event block (JETZT / DANACH) ────────────────────────────────────────
@@ -419,71 +391,6 @@ function UnallocatedSection({ activities, timeZone }: UnallocatedSectionProps): 
   );
 }
 
-// ── Header weather (compact — INFOBOARD-INTEGRATION-01C-C1) ──────────────────
-
-type HeaderWeatherProps = {
-  weather: WeatherResult | null | undefined;
-};
-
-/**
- * Compact weather indicator for the Screen 2 header, placed next to the
- * time/date block. Replaces the former standalone weather content-area
- * panel. Intentionally minimal — icon, temperature, short condition text,
- * and the MeteoSwiss attribution required by the OGD terms. No wind, no
- * secondary panel; never a weather dashboard.
- */
-function HeaderWeather({ weather }: HeaderWeatherProps): ReactElement {
-  const isAvailable = weather?.isAvailable === true;
-
-  if (!isAvailable || !weather) {
-    return (
-      <div
-        className={styles.headerWeather}
-        data-testid="header-weather"
-        aria-label="Wetter"
-      >
-        <span
-          className={styles.headerWeatherUnavailable}
-          data-testid="header-weather-unavailable"
-        >
-          WETTER N/A
-        </span>
-      </div>
-    );
-  }
-
-  const IconComponent = getWeatherIcon(weather.conditionCode);
-
-  return (
-    <div
-      className={styles.headerWeather}
-      data-testid="header-weather"
-      aria-label="Wetter"
-    >
-      <IconComponent size={26} strokeWidth={1.5} aria-hidden={true} />
-      <span className={styles.headerWeatherTemp} data-testid="header-weather-temperature">
-        {weather.temperatureC}
-        <span className={styles.headerWeatherTempUnit}>&thinsp;°C</span>
-      </span>
-      <div className={styles.headerWeatherMeta}>
-        <span
-          className={styles.headerWeatherCondition}
-          data-testid="header-weather-condition"
-        >
-          {weather.conditionLabel}
-        </span>
-        {/* Attribution required by MeteoSwiss OGD terms: "Source: MeteoSwiss" */}
-        <span
-          className={styles.headerWeatherAttribution}
-          data-testid="header-weather-attribution"
-        >
-          Quelle: MeteoSwiss
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // ── Root component ────────────────────────────────────────────────────────────
 
 export function InfoboardScreen2({
@@ -533,7 +440,8 @@ export function InfoboardScreen2({
         subtitle={subtitleText ?? null}
         subtitleEnabled={subtitleEnabled}
         liveClock={liveClock}
-        rightContent={showWeather ? <HeaderWeather weather={weather} /> : undefined}
+        liveWeather={liveClock}
+        weather={showWeather ? weather : null}
       />
 
       {/* ── Main content: facility overview (full width) ───────────────────

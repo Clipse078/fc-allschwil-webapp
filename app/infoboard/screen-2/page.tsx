@@ -56,7 +56,7 @@ import {
   buildAnlageplanLivePayload,
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
-import { fetchCurrentWeather } from "@/lib/weather/weather-service";
+import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
@@ -113,7 +113,7 @@ export default async function InfoboardScreen2Page() {
 
   // ── Request time ───────────────────────────────────────────────────────────
   const now = new Date();
-  const weather = await fetchCurrentWeather();
+  const weather = await getCanonicalKioskWeather();
 
   const database = createPrismaScreen2Db();
 

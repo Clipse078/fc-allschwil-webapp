@@ -134,6 +134,7 @@ export function InfoboardAnlageplan({
         showTime={showTime}
         showDate={showDate}
         liveClock={liveClock}
+        liveWeather={liveClock}
       />
 
       {/* ── BODY: map canvas ───────────────────────────────────────────── */}

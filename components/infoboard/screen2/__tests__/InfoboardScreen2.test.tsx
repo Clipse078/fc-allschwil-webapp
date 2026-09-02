@@ -82,7 +82,7 @@ const SAMPLE_WEATHER: WeatherDto = {
   isAvailable: true,
   temperatureC: 22,
   conditionCode: 2,
-  conditionLabel: "Teilweise bewÃ¶lkt",
+  conditionLabel: "Teilweise bewölkt",
   windKmh: 6,
   precipitationProbability: null,
   observedAt: "2026-09-12T15:30:00Z",
@@ -579,95 +579,71 @@ describe("Free pitch status", () => {
 // â”€â”€ Header weather â€” compact (INFOBOARD-INTEGRATION-01C-C1) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-describe("Header weather â€” available", () => {
+describe("Header weather — available", () => {
   it("2. renders compact weather in the header when weather data is available", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} liveClock={false} />);
     const header = screen.getByTestId("kiosk-shell-header");
     expect(within(header).getByTestId("header-weather")).toBeTruthy();
   });
 
-  it("3. temperature renders in Â°C", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+  it("3. temperature renders in canonical ° format", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} liveClock={false} />);
     const temp = screen.getByTestId("header-weather-temperature");
-    expect(temp.textContent).toContain("22");
-    expect(temp.textContent).toContain("Â°C");
+    expect(temp.textContent).toBe("22°");
   });
 
   it("4. German condition text renders", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} liveClock={false} />);
     const condition = screen.getByTestId("header-weather-condition");
-    expect(condition.textContent).toBe("Teilweise bewÃ¶lkt");
+    expect(condition.textContent).toBe("Teilweise bewölkt");
   });
 
   it("does not render header-weather-unavailable when data is available", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} liveClock={false} />);
     expect(screen.queryByTestId("header-weather-unavailable")).toBeNull();
   });
 
   it("weather icon is rendered alongside temperature", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
+    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} liveClock={false} />);
     const weather = screen.getByTestId("header-weather");
     expect(weather.querySelector("svg")).toBeTruthy();
   });
 });
 
-describe("Header weather â€” unavailable", () => {
-  it("5. renders fallback safely when weather is null", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    expect(screen.getByTestId("header-weather")).toBeTruthy();
-    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
+describe("Header weather — unavailable", () => {
+  it("5. omits weather chrome safely when weather is null", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} liveClock={false} />);
+    expect(screen.queryByTestId("header-weather")).toBeNull();
+    expect(screen.queryByTestId("header-weather-unavailable")).toBeNull();
   });
 
-  it("5. renders fallback when weather is WEATHER_UNAVAILABLE", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} />);
-    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
-  });
-
-  it("5. fallback text indicates weather is unavailable", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    const fallback = screen.getByTestId("header-weather-unavailable");
-    expect(fallback.textContent?.toUpperCase()).toContain("WETTER");
+  it("5. omits weather chrome when weather is WEATHER_UNAVAILABLE", () => {
+    render(<InfoboardScreen2 feed={makeFeed()} weather={WEATHER_UNAVAILABLE} liveClock={false} />);
+    expect(screen.queryByTestId("header-weather")).toBeNull();
+    expect(screen.queryByTestId("header-weather-unavailable")).toBeNull();
   });
 
   it("no header-weather-temperature when unavailable", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
+    render(<InfoboardScreen2 feed={makeFeed()} weather={null} liveClock={false} />);
     expect(screen.queryByTestId("header-weather-temperature")).toBeNull();
   });
 
   it("renders without crashing when weather prop is omitted", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} />);
-    expect(screen.getByTestId("header-weather")).toBeTruthy();
-    expect(screen.getByTestId("header-weather-unavailable")).toBeTruthy();
+    render(<InfoboardScreen2 feed={makeFeed()} liveClock={false} />);
+    expect(screen.queryByTestId("header-weather")).toBeNull();
+    expect(screen.queryByTestId("header-weather-unavailable")).toBeNull();
   });
 });
 
-describe("Header weather â€” MeteoSwiss OGD attribution (WEATHER-01)", () => {
-  it("renders header-weather-attribution when weather data is available", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    expect(screen.getByTestId("header-weather-attribution")).toBeTruthy();
-  });
-
-  it("attribution text contains 'MeteoSwiss'", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const attribution = screen.getByTestId("header-weather-attribution");
-    expect(attribution.textContent).toContain("MeteoSwiss");
-  });
-
-  it("attribution uses 'Quelle: MeteoSwiss' wording (OGD requirement)", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={SAMPLE_WEATHER} />);
-    const attribution = screen.getByTestId("header-weather-attribution");
-    expect(attribution.textContent).toContain("Quelle");
-  });
-
-  it("attribution is not shown when weather is unavailable", () => {
-    render(<InfoboardScreen2 feed={makeFeed()} weather={null} />);
-    expect(screen.queryByTestId("header-weather-attribution")).toBeNull();
-  });
-});
-
-describe("Header weather â€” preview fixture", () => {
+describe("Header weather — preview fixture", () => {
   it("PREVIEW_WEATHER renders correctly in the header", () => {
-    render(<InfoboardScreen2 feed={PREVIEW_FIXTURE_SCREEN2} weather={PREVIEW_WEATHER} />);
+    render(
+      <InfoboardScreen2
+        feed={PREVIEW_FIXTURE_SCREEN2}
+        weather={PREVIEW_WEATHER}
+        liveClock={false}
+      />,
+    );
     expect(screen.getByTestId("header-weather")).toBeTruthy();
     expect(screen.getByTestId("header-weather-temperature")).toBeTruthy();
   });

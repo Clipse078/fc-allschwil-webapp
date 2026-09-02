@@ -20,7 +20,7 @@ import type { Screen1SourceEvent } from "@/lib/publishing/infoboard/screen1-even
 import type { Screen1TournamentPresentationDatabase } from "@/lib/publishing/infoboard/screen1-tournament-presentation";
 import type { ResolvedOrganizerClub } from "@/lib/tournaments/club-identity";
 import type { WeatherResult } from "@/lib/weather/weather-types";
-import { fetchCurrentWeather } from "@/lib/weather/weather-service";
+import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
 import {
   createScreen1TournamentPresentationDatabase,
   resolveScreen1OrganizerClubsByName,
@@ -69,7 +69,7 @@ export async function buildScreen1KioskPresentation(params: {
     resolveOrganizerClubsByName,
   });
 
-  const weather = params.weather ?? (await fetchCurrentWeather());
+  const weather = params.weather ?? (await getCanonicalKioskWeather());
 
   return {
     payload,

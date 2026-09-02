@@ -40,7 +40,7 @@ import {
   buildAnlageplanLivePayload,
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
-import { fetchCurrentWeather } from "@/lib/weather/weather-service";
+import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
 import { prisma } from "@/lib/db/prisma";
 
 // ── FCA branding constants ─────────────────────────────────────────────────────
@@ -108,7 +108,7 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
 
   const now = new Date();
   const db = createPrismaDb();
-  const weather = await fetchCurrentWeather();
+  const weather = await getCanonicalKioskWeather();
 
   // ── ANLAGENUEBERSICHT branch ───────────────────────────────────────────────
   if (board.templateType === "ANLAGENUEBERSICHT") {
