@@ -13,6 +13,7 @@ import {
   SCREEN2_TRANSPORT_COMPACT_ROWS_PER_DIRECTION,
   SCREEN2_TRANSPORT_PANEL_HEIGHT_PX,
 } from "@/lib/infoboard/screen2-body-shell-sizing";
+import { resolveTransportLineColor } from "@/lib/transport/transport-line-colors";
 import type { TransportDeparture, TransportResult } from "@/lib/transport/transport-types";
 
 const BASE_DEPARTURE: TransportDeparture = {
@@ -95,7 +96,7 @@ describe("Screen2TransportSlide", () => {
     expect(screen.getByTestId("screen2-transport-direction-bachgraben-basel")).toBeTruthy();
     expect(screen.getByText("← RICHTUNG ALLSCHWIL ZENTRUM")).toBeTruthy();
     expect(screen.getByText("RICHTUNG BACHGRABEN / BASEL →")).toBeTruthy();
-    expect(screen.getByText("48")).toBeTruthy();
+    expect(screen.getByTestId("screen2-transport-line-badge").textContent?.trim()).toBe("48");
     expect(screen.getByText("Basel, Bachgraben")).toBeTruthy();
     expect(screen.getByTestId("screen2-transport-delay").textContent?.trim()).toBe("+3");
   });
@@ -401,6 +402,201 @@ describe("Screen2TransportSlide", () => {
     );
 
     expect(screen.getByTestId("screen2-transport-unavailable")).toBeTruthy();
+  });
+});
+
+describe("Screen2TransportSlide UX5 premium color hierarchy", () => {
+  function renderCompactRow(
+    overrides: Partial<TransportDeparture> & Pick<TransportDeparture, "plannedDeparture">,
+    nowIso = "2026-09-02T16:40:00.000Z",
+  ) {
+    const departure: TransportDeparture = {
+      ...BASE_DEPARTURE,
+      realtimeDeparture: overrides.plannedDeparture,
+      delayMinutes: null,
+      ...overrides,
+    };
+
+    render(
+      <Screen2TransportSlide
+        transport={makeTransport({
+          directionGroups: [
+            {
+              id: "allschwil-zentrum",
+              displayName: "Richtung Allschwil Zentrum",
+              orientation: "left",
+              departures: [],
+            },
+            {
+              id: "bachgraben-basel",
+              displayName: "Richtung Bachgraben / Basel",
+              orientation: "right",
+              departures: [departure],
+            },
+          ],
+        })}
+        timezone="Europe/Zurich"
+        nowIso={nowIso}
+        compact
+      />,
+    );
+  }
+
+  it("renders the line number inside a colored badge", () => {
+    renderCompactRow({ line: "48", plannedDeparture: "2026-09-02T18:48:00+0200" });
+
+    const badge = screen.getByTestId("screen2-transport-line-badge");
+    expect(badge.textContent?.trim()).toBe("48");
+    expect(badge.className).toContain("lineBadge");
+    expect(badge.style.backgroundColor).toBeTruthy();
+  });
+
+  it("keeps line badge colors stable across rerenders and order changes", () => {
+    const firstColor = resolveTransportLineColor("48").background;
+
+    const { rerender } = render(
+      <Screen2TransportSlide
+        transport={makeTransport()}
+        timezone="Europe/Zurich"
+        nowIso="2026-09-02T16:40:00.000Z"
+        compact
+      />,
+    );
+
+    const initialBadge = screen.getByTestId("screen2-transport-line-badge");
+    expect(initialBadge.style.backgroundColor).toBeTruthy();
+
+    rerender(
+      <Screen2TransportSlide
+        transport={makeTransport({
+          directionGroups: [
+            {
+              id: "allschwil-zentrum",
+              displayName: "Richtung Allschwil Zentrum",
+              orientation: "left",
+              departures: [
+                makeDeparture({
+                  line: "11",
+                  destination: "Other",
+                  plannedDeparture: "2026-09-02T18:45:00+0200",
+                }),
+              ],
+            },
+            {
+              id: "bachgraben-basel",
+              displayName: "Richtung Bachgraben / Basel",
+              orientation: "right",
+              departures: [BASE_DEPARTURE],
+            },
+          ],
+        })}
+        timezone="Europe/Zurich"
+        nowIso="2026-09-02T16:40:00.000Z"
+        compact
+      />,
+    );
+
+    const refreshedBadge = within(
+      screen.getByTestId("screen2-transport-direction-bachgraben-basel"),
+    ).getByTestId("screen2-transport-line-badge");
+    expect(resolveTransportLineColor("48").background).toBe(firstColor);
+    expect(refreshedBadge.textContent?.trim()).toBe("48");
+  });
+
+  it("applies semantic wait-time tones without coloring destination or absolute time", () => {
+    const cases = [
+      { plannedDeparture: "2026-09-02T18:40:00+0200", tone: "soon", label: "Jetzt" },
+      { plannedDeparture: "2026-09-02T18:41:00+0200", tone: "soon", label: "1 min" },
+      { plannedDeparture: "2026-09-02T18:45:00+0200", tone: "soon", label: "5 min" },
+      { plannedDeparture: "2026-09-02T18:46:00+0200", tone: "medium", label: "6 min" },
+      { plannedDeparture: "2026-09-02T18:55:00+0200", tone: "medium", label: "15 min" },
+      { plannedDeparture: "2026-09-02T18:56:00+0200", tone: "long", label: "16 min" },
+      { plannedDeparture: "2026-09-02T19:10:00+0200", tone: "long", label: "30 min" },
+    ] as const;
+
+    for (const testCase of cases) {
+      const { unmount } = render(
+        <Screen2TransportSlide
+          transport={makeTransport({
+            directionGroups: [
+              {
+                id: "allschwil-zentrum",
+                displayName: "Richtung Allschwil Zentrum",
+                orientation: "left",
+                departures: [],
+              },
+              {
+                id: "bachgraben-basel",
+                displayName: "Richtung Bachgraben / Basel",
+                orientation: "right",
+                departures: [
+                  {
+                    ...BASE_DEPARTURE,
+                    realtimeDeparture: testCase.plannedDeparture,
+                    delayMinutes: null,
+                    plannedDeparture: testCase.plannedDeparture,
+                  },
+                ],
+              },
+            ],
+          })}
+          timezone="Europe/Zurich"
+          nowIso="2026-09-02T16:40:00.000Z"
+          compact
+        />,
+      );
+
+      const waitTime = screen.getByTestId("screen2-transport-wait-time");
+      expect(waitTime.textContent?.trim()).toBe(testCase.label);
+      expect(waitTime.getAttribute("data-wait-tone")).toBe(testCase.tone);
+      expect(waitTime.className).toContain(
+        testCase.tone === "soon"
+          ? "minutesSoon"
+          : testCase.tone === "medium"
+            ? "minutesMedium"
+            : "minutesLong",
+      );
+
+      const destination = screen.getByText("Basel, Bachgraben");
+      expect(destination.className).not.toMatch(/minutes/);
+
+      const absoluteTime = screen.getByTestId("screen2-transport-absolute-time");
+      expect(absoluteTime.className).not.toMatch(/minutes/);
+
+      unmount();
+    }
+  });
+
+  it("keeps HH:mm +N on the secondary line with a distinct delay accent", () => {
+    renderCompactRow({
+      plannedDeparture: "2026-09-02T18:41:00+0200",
+      realtimeDeparture: "2026-09-02T18:42:00+0200",
+      delayMinutes: 1,
+    });
+
+    const waitTime = screen.getByTestId("screen2-transport-wait-time");
+    const absoluteTime = screen.getByTestId("screen2-transport-absolute-time");
+    const delay = screen.getByTestId("screen2-transport-delay");
+
+    expect(waitTime.className).toContain("minutesSoon");
+    expect(absoluteTime.textContent?.replace(/\s+/g, " ").trim()).toBe("18:42 +1");
+    expect(delay.className).toContain("delayInline");
+    expect(delay.className).not.toContain("minutesSoon");
+  });
+
+  it("does not introduce red urgency classes for long waits", () => {
+    renderCompactRow({ plannedDeparture: "2026-09-02T19:10:00+0200" });
+
+    const css = readRepoFile("components/infoboard/screen2/Screen2TransportSlide.module.css");
+    expect(css).not.toMatch(/minutes.*red|danger/i);
+    expect(screen.getByTestId("screen2-transport-wait-time").className).toContain("minutesLong");
+  });
+
+  it("keeps badge styling inside the frozen 36px row contract", () => {
+    const css = readRepoFile("components/infoboard/screen2/Screen2TransportSlide.module.css");
+    expect(css).toContain(".lineBadge");
+    expect(css).toMatch(/\.compact \.row[\s\S]*max-height: var\(--screen2-transport-row-height/);
+    expect(css).toMatch(/\.compact \.lineBadge[\s\S]*height: 18px/);
   });
 });
 

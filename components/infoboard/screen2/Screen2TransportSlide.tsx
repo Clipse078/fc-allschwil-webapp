@@ -5,11 +5,17 @@
  */
 
 import type { ReactElement } from "react";
+import { resolveTransportLineColor } from "@/lib/transport/transport-line-colors";
 import type {
   TransportDeparture,
   TransportDirectionGroup,
   TransportResult,
 } from "@/lib/transport/transport-types";
+import {
+  computeMinutesUntil,
+  formatRelativeWaitLabel,
+  resolveWaitTimeTone,
+} from "@/lib/transport/transport-wait-time";
 import styles from "./Screen2TransportSlide.module.css";
 
 export type Screen2TransportSlideProps = {
@@ -24,11 +30,17 @@ function formatMinutesUntil(
   departure: TransportDeparture,
   nowMs: number,
   timezone: string,
-): { minutesLabel: string; absoluteTime: string; delayLabel: string | null } {
+): {
+  minutesLabel: string;
+  waitTimeTone: ReturnType<typeof resolveWaitTimeTone>;
+  absoluteTime: string;
+  delayLabel: string | null;
+} {
   const effectiveIso = departure.realtimeDeparture ?? departure.plannedDeparture;
   const effectiveMs = Date.parse(effectiveIso);
-  const diffMinutes = Math.max(0, Math.round((effectiveMs - nowMs) / 60_000));
-  const minutesLabel = diffMinutes <= 0 ? "Jetzt" : `${diffMinutes} min`;
+  const diffMinutes = computeMinutesUntil(effectiveMs, nowMs);
+  const minutesLabel = formatRelativeWaitLabel(diffMinutes);
+  const waitTimeTone = resolveWaitTimeTone(diffMinutes);
 
   const absoluteTime = new Intl.DateTimeFormat("de-CH", {
     hour: "2-digit",
@@ -41,7 +53,7 @@ function formatMinutesUntil(
       ? `+${departure.delayMinutes}`
       : null;
 
-  return { minutesLabel, absoluteTime, delayLabel };
+  return { minutesLabel, waitTimeTone, absoluteTime, delayLabel };
 }
 
 function resolveDepartures(transport: TransportResult | null | undefined): {
@@ -119,16 +131,43 @@ function TransportDepartureRow({
   timezone: string;
 }): ReactElement {
   const timing = formatMinutesUntil(departure, nowMs, timezone);
+  const lineColor = resolveTransportLineColor(departure.line);
+  const minutesClassName = [
+    styles.minutes,
+    timing.waitTimeTone === "soon"
+      ? styles.minutesSoon
+      : timing.waitTimeTone === "medium"
+        ? styles.minutesMedium
+        : styles.minutesLong,
+    timing.minutesLabel === "Jetzt" ? styles.minutesImminent : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <div className={styles.row} data-testid="screen2-transport-row">
       <div className={styles.lineBlock}>
         <span className={styles.category}>{departure.categoryLabel}</span>
-        <span className={styles.line}>{departure.line}</span>
+        <span
+          className={styles.lineBadge}
+          data-testid="screen2-transport-line-badge"
+          style={{
+            backgroundColor: lineColor.background,
+            color: lineColor.foreground,
+          }}
+        >
+          {departure.line}
+        </span>
       </div>
       <div className={styles.destination}>{departure.destination}</div>
       <div className={styles.departureBlock}>
-        <span className={styles.minutes}>{timing.minutesLabel}</span>
+        <span
+          className={minutesClassName}
+          data-testid="screen2-transport-wait-time"
+          data-wait-tone={timing.waitTimeTone}
+        >
+          {timing.minutesLabel}
+        </span>
         <span className={styles.absoluteTime} data-testid="screen2-transport-absolute-time">
           {timing.absoluteTime}
           {timing.delayLabel ? (

@@ -125,10 +125,19 @@
   color: rgba(148, 163, 184, 0.95);
 }
 
-.line {
-  font-size: clamp(24px, 1.7vw, 32px);
+.lineBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: clamp(28px, 2vw, 36px);
+  height: clamp(22px, 1.5vw, 28px);
+  padding: 0 clamp(6px, 0.45vw, 8px);
+  border-radius: 5px;
+  font-size: clamp(18px, 1.35vw, 24px);
   font-weight: 800;
   line-height: 1;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
 }
 
 .destination {
@@ -153,6 +162,23 @@
   font-size: clamp(20px, 1.45vw, 28px);
   font-weight: 800;
   line-height: 1;
+}
+
+.minutesSoon {
+  color: #4ade80;
+}
+
+.minutesMedium {
+  color: var(--sce-warning, #fbbf24);
+}
+
+.minutesLong {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.minutesImminent {
+  font-weight: 900;
+  color: #4ade80;
 }
 
 .absoluteTime {
@@ -262,8 +288,12 @@
   font-size: 9px;
 }
 
-.compact .line {
-  font-size: 14px;
+.compact .lineBadge {
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 11px;
 }
 
 .compact .destination {
@@ -273,6 +303,19 @@
 
 .compact .minutes {
   font-size: 13px;
+}
+
+.compact .minutesSoon,
+.compact .minutesImminent {
+  color: #4ade80;
+}
+
+.compact .minutesMedium {
+  color: #fbbf24;
+}
+
+.compact .minutesLong {
+  color: rgba(255, 255, 255, 0.58);
 }
 
 .compact .absoluteTime {
