@@ -81,6 +81,34 @@ const TRANSPORT: TransportResult = {
       hasRealtime: true,
     },
   ],
+  directionGroups: [
+    {
+      id: "allschwil-dorf",
+      displayName: "Richtung Allschwil Dorf",
+      orientation: "left",
+      departures: [],
+    },
+    {
+      id: "bachgraben-basel",
+      displayName: "Richtung Bachgraben / Basel",
+      orientation: "right",
+      departures: [
+        {
+          line: "48",
+          category: "bus",
+          categoryLabel: "BUS",
+          destination: "Basel, Bachgraben",
+          plannedDeparture: "2026-09-02T18:48:00+0200",
+          realtimeDeparture: "2026-09-02T18:51:00+0200",
+          delayMinutes: 3,
+          platform: null,
+          direction: "Basel, Bachgraben",
+          provider: "opendata.ch",
+          hasRealtime: true,
+        },
+      ],
+    },
+  ],
   fetchedAt: "2026-09-02T16:40:00.000Z",
   isStale: false,
   hasRealtimeData: true,
@@ -314,5 +342,29 @@ describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
     expect(lowerSponsor).toContain("railSubline");
     expect(lowerSponsor).toContain("railLabel");
     expect(lowerSponsor).toContain("Handshake");
+  });
+
+  it("lower sponsor zone spans full available center width", () => {
+    const lowerSponsorCss = readRepoFile(
+      "components/infoboard/screen2/Screen2LowerSponsorZone.module.css",
+    );
+
+    expect(lowerSponsorCss).toMatch(/\.zone[\s\S]*width:\s*100%/);
+    expect(lowerSponsorCss).toMatch(/\.placeholder[\s\S]*width:\s*100%/);
+    expect(lowerSponsorCss).not.toContain("520px");
+  });
+
+  it("keeps sponsor content centered inside the full-width band", () => {
+    render(
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={{ clubName: "FC Allschwil" }}
+      />,
+    );
+
+    const lowerSponsor = screen.getByTestId("screen2-lower-sponsor-zone");
+    const placeholder = lowerSponsor.firstElementChild;
+    expect(placeholder?.className).toContain("rail");
+    expect(lowerSponsor.textContent).toContain("IHRE WERBUNG");
   });
 });
