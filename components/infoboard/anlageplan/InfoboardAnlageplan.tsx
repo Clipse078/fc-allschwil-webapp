@@ -38,6 +38,7 @@ import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShell";
 import { Screen2CenterRotator } from "@/components/infoboard/screen2/Screen2CenterRotator";
+import { Screen2LowerSponsorZone } from "@/components/infoboard/screen2/Screen2LowerSponsorZone";
 import { resolveTenantTransportConfig } from "@/lib/transport/transport-config";
 import type { TransportResult } from "@/lib/transport/transport-types";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
@@ -116,19 +117,24 @@ export function InfoboardAnlageplan({
   const transportConfig = tenantKey ? resolveTenantTransportConfig(tenantKey) : null;
 
   const anlageplanCenter = (
-    <div
-      data-testid="anlageplan-map-canvas"
-      className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
-    >
-      <AnlageplanMapScene
-        config={anlageplanConfig}
-        backgroundUrl={backgroundUrl}
-        bgTransform={bgTransform}
-        pitchMap={pitchMap}
-        suppressedCodes={suppressedCodes}
-        timezone={tz}
-        richEventCards={richEventCards}
-      />
+    <div data-testid="anlageplan-slide" className={styles.anlageplanSlide}>
+      <div className={styles.mapRow}>
+        <div
+          data-testid="anlageplan-map-canvas"
+          className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
+        >
+          <AnlageplanMapScene
+            config={anlageplanConfig}
+            backgroundUrl={backgroundUrl}
+            bgTransform={bgTransform}
+            pitchMap={pitchMap}
+            suppressedCodes={suppressedCodes}
+            timezone={tz}
+            richEventCards={richEventCards}
+          />
+        </div>
+      </div>
+      <Screen2LowerSponsorZone />
     </div>
   );
 

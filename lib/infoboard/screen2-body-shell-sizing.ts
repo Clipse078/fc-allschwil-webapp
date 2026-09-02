@@ -107,6 +107,10 @@ export const SCREEN2_ANLAGEPLAN_MAP_DIMENSIONS = computeAnlageplanMapDimensions(
   SCREEN2_CENTER_HEIGHT_PX,
 );
 
+/** Remaining center height below the Anlageplan map at the logical canvas. */
+export const SCREEN2_LOWER_SPONSOR_ZONE_HEIGHT_PX =
+  SCREEN2_CENTER_HEIGHT_PX - SCREEN2_ANLAGEPLAN_MAP_DIMENSIONS.heightPx;
+
 export const SCREEN2_BODY_SHELL_CSS_VARS = {
   "--screen2-body-padding-x": `${SCREEN2_BODY_PADDING_X_PX}px`,
   "--screen2-body-padding-y": `${SCREEN2_BODY_PADDING_Y_PX}px`,

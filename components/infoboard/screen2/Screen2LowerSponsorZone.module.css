@@ -1,0 +1,25 @@
+/**
+ * components/infoboard/screen2/Screen2LowerSponsorZone.module.css
+ *
+ * INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone on Anlageplan slide.
+ */
+
+.zone {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0 0;
+  box-sizing: border-box;
+}
+
+.placeholder {
+  width: min(100%, 520px);
+  height: auto;
+  min-height: 0;
+  max-height: 100%;
+  padding: 16px 24px;
+  gap: 8px;
+}
