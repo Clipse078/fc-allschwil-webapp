@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   getInfoboardBySlug: vi.fn(),
   buildScreen2LivePayload: vi.fn(),
   buildAnlageplanLivePayload: vi.fn(),
-  fetchCurrentWeather: vi.fn(),
+  getCanonicalKioskWeather: vi.fn(),
   notFound: vi.fn(),
 }));
 
@@ -65,8 +65,8 @@ vi.mock("@/lib/publishing/infoboard/anlageplan-live-service", async () => {
   };
 });
 
-vi.mock("@/lib/weather/weather-service", () => ({
-  fetchCurrentWeather: mocks.fetchCurrentWeather,
+vi.mock("@/lib/infoboard/kiosk-weather", () => ({
+  getCanonicalKioskWeather: mocks.getCanonicalKioskWeather,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -156,7 +156,7 @@ describe("InfoboardScreen2Page — /infoboard/screen-2", () => {
     mocks.getInfoboardBySlug.mockResolvedValue(null);
     mocks.buildScreen2LivePayload.mockResolvedValue(SCREEN2_PAYLOAD);
     mocks.buildAnlageplanLivePayload.mockResolvedValue(ANLAGEPLAN_PAYLOAD);
-    mocks.fetchCurrentWeather.mockResolvedValue({ type: "WEATHER_UNAVAILABLE" });
+    mocks.getCanonicalKioskWeather.mockResolvedValue({ isAvailable: false });
     mocks.notFound.mockImplementation(() => {
       throw new Error("NEXT_NOT_FOUND");
     });

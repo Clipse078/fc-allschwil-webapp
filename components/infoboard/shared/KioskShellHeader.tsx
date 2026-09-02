@@ -22,8 +22,8 @@
  */
 
 import type { ReactElement, ReactNode } from "react";
-import { Cloud, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun } from "lucide-react";
-import { resolveWeatherVisual } from "@/components/infoboard/shared/weatherVisual";
+import { LiveKioskShellWeather } from "@/components/infoboard/shared/LiveKioskShellWeather";
+import { KioskShellWeatherDisplay } from "@/components/infoboard/shared/KioskShellWeatherDisplay";
 
 import { LiveClockScreen1 } from "@/components/infoboard/screen1/LiveClockScreen1";
 import {
@@ -55,6 +55,12 @@ export type KioskShellHeaderProps = {
   weather?: WeatherResult | null;
 
   /**
+   * Keep weather refreshed on long-running kiosk sessions.
+   * Preview hosts should pass false to keep simulated weather fixed.
+   */
+  liveWeather?: boolean;
+
+  /**
    * Backward-compatible weather/right presentation slot.
    *
    * IMPORTANT:
@@ -76,91 +82,24 @@ const HEADER_WEATHER_MIN_WIDTH_PX = KIOSK_SHELL_WEATHER_ZONE_MIN_WIDTH_PX;
 const HEADER_WEATHER_MAX_WIDTH_PX = KIOSK_SHELL_WEATHER_ZONE_MAX_WIDTH_PX;
 const HEADER_ALEXA_SAFE_ZONE_WIDTH_PX = KIOSK_SHELL_ALEXA_SAFE_ZONE_WIDTH_PX;
 
-function SharedWeather({
-  weather,
-}: {
-  weather: WeatherResult;
-}): ReactElement | null {
+function renderCanonicalWeather(
+  weather: WeatherResult,
+  liveWeather: boolean,
+): ReactElement | null {
   if (weather.isAvailable !== true) {
     return null;
   }
 
-  const code = weather.conditionCode;
-
-  const weatherVisual = resolveWeatherVisual(code);
-
-  const Icon =
-    weatherVisual.iconFamily === "sun"
-      ? Sun
-      : weatherVisual.iconFamily === "cloud-sun"
-        ? CloudSun
-        : weatherVisual.iconFamily === "cloud-rain"
-          ? CloudRain
-          : weatherVisual.iconFamily === "snow"
-            ? CloudSnow
-            : weatherVisual.iconFamily === "fog"
-              ? CloudFog
-              : weatherVisual.iconFamily === "storm"
-                ? CloudLightning
-                : Cloud;
-
-  const iconColor = weatherVisual.color;
-  const temperature = Math.round(weather.temperatureC);
-
-  return (
-    <div
-      data-testid="header-weather"
-      aria-label="Wetter"
-      style={{
-        display: "grid",
-        gridTemplateColumns: "auto auto minmax(0, 1fr)",
-        alignItems: "center",
-        columnGap: "14px",
-        minWidth: "max-content",
-        width: "auto",
-        whiteSpace: "nowrap",
-      }}
-    >
-      <Icon
-        aria-hidden="true"
-        size={Number.parseInt(KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-icon"], 10)}
-        strokeWidth={1.6}
-        style={{
-          color: iconColor,
-          flexShrink: 0,
-        }}
+  if (liveWeather) {
+    return (
+      <LiveKioskShellWeather
+        initialWeather={weather}
+        live={true}
       />
+    );
+  }
 
-      <span
-        data-testid="header-weather-temperature"
-        style={{
-          fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-temp-font"],
-          fontWeight: 800,
-          color: "#ffffff",
-          lineHeight: 1,
-          letterSpacing: "0.01em",
-        }}
-      >
-        {temperature}°
-      </span>
-
-      <span
-        data-testid="header-weather-condition"
-        style={{
-          fontSize: KIOSK_SHELL_CSS_VARS["--kiosk-shell-weather-condition-font"],
-          fontWeight: 500,
-          color: "rgba(255,255,255,0.74)",
-          lineHeight: 1,
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
-          minWidth: 0,
-        }}
-      >
-        {weather.conditionLabel}
-      </span>
-    </div>
-  );
+  return <KioskShellWeatherDisplay weather={weather} />;
 }
 
 export function KioskShellHeader({
@@ -176,6 +115,7 @@ export function KioskShellHeader({
   staticDateFallback,
   liveClock = true,
   weather,
+  liveWeather = true,
   rightContent,
 }: KioskShellHeaderProps): ReactElement {
   const showSubtitle =
@@ -185,7 +125,7 @@ export function KioskShellHeader({
 
   const weatherContent =
     weather != null
-      ? <SharedWeather weather={weather} />
+      ? renderCanonicalWeather(weather, liveWeather)
       : rightContent ?? null;
 
   return (

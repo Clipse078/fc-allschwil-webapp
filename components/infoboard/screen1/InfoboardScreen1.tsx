@@ -1691,6 +1691,7 @@ export function InfoboardScreen1({
         subtitle={subtitleText != null ? subtitleText.toUpperCase() : null}
         subtitleEnabled={subtitleEnabled}
         liveClock={liveClock}
+        liveWeather={liveClock}
       />
 
       {/* ── Main: event list (demand-paginated, rotated when multi-page) ── */}
