@@ -21,6 +21,10 @@ vi.mock("@/lib/publishing/infoboard/screen1-live-service", async () => {
   };
 });
 
+vi.mock("next/cache", () => ({
+  unstable_cache: (fn: () => Promise<unknown>) => fn,
+}));
+
 vi.mock("@/lib/weather/weather-service", () => ({
   fetchCurrentWeather: mocks.fetchCurrentWeather,
 }));

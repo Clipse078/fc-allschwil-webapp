@@ -30,11 +30,16 @@ export function useKioskWeather(
   initialWeather: WeatherResult | null | undefined,
   live = true,
 ): WeatherResult | null | undefined {
-  const [weather, setWeather] = useState(initialWeather);
+  const [polledWeather, setPolledWeather] = useState(initialWeather);
+
+  const [prevInitialWeather, setPrevInitialWeather] = useState(initialWeather);
+  if (initialWeather !== prevInitialWeather) {
+    setPrevInitialWeather(initialWeather);
+    setPolledWeather(initialWeather);
+  }
 
   useEffect(() => {
     if (!live) {
-      setWeather(initialWeather);
       return undefined;
     }
 
@@ -53,7 +58,7 @@ export function useKioskWeather(
         const payload: unknown = await response.json();
 
         if (!cancelled && isWeatherResult(payload)) {
-          setWeather(payload);
+          setPolledWeather(payload);
         }
       } catch {
         // Preserve the last known weather on transient network errors.
@@ -75,11 +80,5 @@ export function useKioskWeather(
     };
   }, [live]);
 
-  useEffect(() => {
-    if (!live) {
-      setWeather(initialWeather);
-    }
-  }, [initialWeather, live]);
-
-  return live ? weather : initialWeather;
+  return live ? polledWeather : initialWeather;
 }
