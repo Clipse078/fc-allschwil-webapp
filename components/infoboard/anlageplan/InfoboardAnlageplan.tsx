@@ -6,12 +6,11 @@
  * Layout (16:9, dark premium shell):
  *   ┌────────────────────────────────────────────────────────┐
  *   │ SHARED KIOSK HEADER (logo / name / time / date)        │
- *   ├──────────────────────────────────────┬─────────────────┤
- *   │                                      │ NÄCHSTE         │
- *   │  MAP CANVAS (~78% width)             │ AKTIVITÄTEN     │
- *   │  AnlageplanMapScene                  │ (~22% width)    │
- *   │  (bg + zones + markers)              │                 │
- *   ├──────────────────────────────────────┴─────────────────┤
+ *   ├──────────┬──────────────────────────────┬──────────────┤
+ *   │ SPONSOR  │ MAP CANVAS (center zone)     │ SPONSOR      │
+ *   │ RAIL     │ AnlageplanMapScene           │ RAIL         │
+ *   │ (left)   │ (bg + zones + markers)       │ (right)      │
+ *   ├──────────┴──────────────────────────────┴──────────────┤
  *   │ SHARED KIOSK FOOTER                                    │
  *   └────────────────────────────────────────────────────────┘
  *
@@ -37,7 +36,9 @@ import { KioskShellHeader } from "@/components/infoboard/shared/KioskShellHeader
 import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
+import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShell";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
+import styles from "./InfoboardAnlageplan.module.css";
 
 // ── Component props ───────────────────────────────────────────────────────────
 
@@ -137,49 +138,30 @@ export function InfoboardAnlageplan({
         liveWeather={liveClock}
       />
 
-      {/* ── BODY: map canvas ───────────────────────────────────────────── */}
-      <div
-        data-testid="anlageplan-main-region"
-        style={{
-          flex: 1,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 0,
-          width: "100%",
-          padding: "8px 16px",
-          boxSizing: "border-box",
-        }}
-      >
-        <div
-          data-testid="anlageplan-map-canvas"
-          style={{
-            width: "100%",
-            height: "100%",
-            maxWidth: "100%",
-            maxHeight: "100%",
-            aspectRatio: "16/9",
-            position: "relative",
-            borderRadius: "clamp(6px, 0.8vh, 14px)",
-            overflow: "hidden",
-            background: backgroundUrl ? "transparent" : "#0d1520",
-            border: "1px solid rgba(255,255,255,0.06)",
-          }}
-        >
-          {/* Canonical shared map scene — identical geometry to designer + preview.
-              suppressedCodes: zones for hierarchy-suppressed resources are
-              completely omitted (not shown as FREI). This prop is absent/empty
-              in the designer path so admins can see all configured zones. */}
-          <AnlageplanMapScene
-            config={anlageplanConfig}
-            backgroundUrl={backgroundUrl}
-            bgTransform={bgTransform}
-            pitchMap={pitchMap}
-            suppressedCodes={suppressedCodes}
-            timezone={tz}
-            richEventCards={richEventCards}
-          />
-        </div>
+      {/* ── BODY: sponsor rails + centered Anlageplan canvas ───────────── */}
+      <div data-testid="anlageplan-main-region" className={styles.mainRegion}>
+        <Screen2BodyShell
+          center={
+            <div
+              data-testid="anlageplan-map-canvas"
+              className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
+            >
+              {/* Canonical shared map scene — identical geometry to designer + preview.
+                  suppressedCodes: zones for hierarchy-suppressed resources are
+                  completely omitted (not shown as FREI). This prop is absent/empty
+                  in the designer path so admins can see all configured zones. */}
+              <AnlageplanMapScene
+                config={anlageplanConfig}
+                backgroundUrl={backgroundUrl}
+                bgTransform={bgTransform}
+                pitchMap={pitchMap}
+                suppressedCodes={suppressedCodes}
+                timezone={tz}
+                richEventCards={richEventCards}
+              />
+            </div>
+          }
+        />
       </div>
 
       {/* ── SHARED FOOTER ─────────────────────────────────────────────── */}

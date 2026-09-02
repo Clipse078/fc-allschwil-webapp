@@ -17,6 +17,14 @@
 
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+const REPO_ROOT = process.cwd();
+
+function readRepoFile(path: string): string {
+  return readFileSync(join(REPO_ROOT, path), "utf8");
+}
 
 // ── Browser API stubs (jsdom environment) ─────────────────────────────────────
 
@@ -555,7 +563,10 @@ describe("D. Persistence — save payload includes shell fields", () => {
 // ── E. Framing — live canvas is 16:9 ─────────────────────────────────────────
 
 describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
-  it("anlageplan-map-canvas has aspectRatio 16/9 style", () => {
+  it("anlageplan-map-canvas preserves 16/9 via module CSS", () => {
+    const mapCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
+    expect(mapCss).toContain("aspect-ratio: 16 / 9");
+
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
@@ -563,12 +574,16 @@ describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
       />,
     );
     const canvas = screen.getByTestId("anlageplan-map-canvas");
-    // The canvas must declare aspectRatio: 16/9 so it matches the designer
-    // coordinate system and prevents top-tree crop at wider live canvas ARs.
-    expect(canvas.style.aspectRatio).toBe("16/9");
+    expect(canvas.className).toContain("mapCanvas");
   });
 
-  it("anlageplan-map-canvas fills the available main region inside the canvas", () => {
+  it("anlageplan-map-canvas maximizes within the center zone without distortion", () => {
+    const mapCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
+    expect(mapCss).toContain("width: min(100cqw, calc(100cqh * 16 / 9))");
+    expect(mapCss).toContain("height: min(100cqh, calc(100cqw * 9 / 16))");
+    expect(mapCss).toContain("max-width: 100%");
+    expect(mapCss).toContain("max-height: 100%");
+
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
@@ -576,10 +591,7 @@ describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
       />,
     );
     const canvas = screen.getByTestId("anlageplan-map-canvas");
-    expect(canvas.style.width).toBe("100%");
-    expect(canvas.style.height).toBe("100%");
-    expect(canvas.style.maxWidth).toBe("100%");
-    expect(canvas.style.maxHeight).toBe("100%");
+    expect(canvas.className).toContain("mapCanvas");
   });
 
   it("anlageplan-map-scene is rendered inside the canvas", () => {
