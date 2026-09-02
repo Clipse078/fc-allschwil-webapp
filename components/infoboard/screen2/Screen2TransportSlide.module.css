@@ -40,16 +40,6 @@
   line-height: 1.1;
 }
 
-.subtitle {
-  font-size: clamp(16px, 1.1vw, 20px);
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.staleHint {
-  font-size: clamp(13px, 0.9vw, 16px);
-  color: rgba(251, 191, 36, 0.82);
-}
-
 .directionColumns {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -118,6 +108,7 @@
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
 }
 
 .lineBlock {
@@ -153,7 +144,9 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 2px;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
 }
 
 .minutes {
@@ -164,11 +157,13 @@
 
 .absoluteTime {
   font-size: clamp(14px, 0.95vw, 17px);
+  line-height: 1;
   color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
 }
 
-.delay {
-  font-size: clamp(13px, 0.9vw, 16px);
+.delayInline {
+  font-size: inherit;
   color: rgba(251, 146, 60, 0.92);
   font-weight: 700;
 }
@@ -187,84 +182,109 @@
 }
 
 .compact {
-  padding: clamp(8px, 1vh, 12px) clamp(12px, 1.4vw, 18px);
-  border-radius: clamp(4px, 0.5vh, 8px);
+  height: var(--screen2-transport-panel-height);
+  max-height: var(--screen2-transport-panel-height);
+  padding: 6px 14px 8px;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .compact .header {
-  margin-bottom: clamp(6px, 0.8vh, 10px);
-  gap: clamp(2px, 0.25vh, 4px);
+  margin-bottom: 4px;
+  gap: 1px;
+  flex-shrink: 0;
 }
 
 .compact .eyebrow {
-  font-size: clamp(11px, 0.75vw, 14px);
+  font-size: 11px;
   letter-spacing: 0.14em;
+  line-height: 1.1;
 }
 
 .compact .station {
-  font-size: clamp(16px, 1.1vw, 20px);
-}
-
-.compact .subtitle {
-  font-size: clamp(11px, 0.75vw, 13px);
-}
-
-.compact .staleHint {
-  font-size: clamp(10px, 0.7vw, 12px);
+  font-size: 16px;
+  line-height: 1.1;
 }
 
 .compact .directionColumns {
-  gap: clamp(8px, 1vw, 12px);
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.compact .directionColumn {
+  gap: 3px;
+  min-height: 0;
 }
 
 .compact .directionHeading {
-  font-size: clamp(10px, 0.7vw, 12px);
+  font-size: 10px;
   letter-spacing: 0.06em;
+  line-height: 1.1;
+  flex-shrink: 0;
 }
 
 .compact .directionRows {
-  gap: clamp(3px, 0.35vh, 5px);
+  display: grid;
+  grid-template-rows: repeat(
+    3,
+    var(--screen2-transport-row-height, 36px)
+  );
+  gap: var(--screen2-transport-row-gap, 3px);
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .compact .directionEmpty {
-  min-height: clamp(48px, 5vh, 72px);
-  padding: clamp(6px, 0.7vh, 10px);
-  font-size: clamp(11px, 0.75vw, 13px);
+  min-height: calc(
+    3 * var(--screen2-transport-row-height, 36px) +
+      2 * var(--screen2-transport-row-gap, 3px)
+  );
+  max-height: calc(
+    3 * var(--screen2-transport-row-height, 36px) +
+      2 * var(--screen2-transport-row-gap, 3px)
+  );
+  padding: 6px;
+  font-size: 11px;
 }
 
 .compact .row {
   grid-template-columns: minmax(56px, 20%) minmax(0, 1fr) minmax(64px, 22%);
-  gap: clamp(4px, 0.5vw, 8px);
-  padding: clamp(4px, 0.45vh, 6px) clamp(6px, 0.6vw, 8px);
-  border-radius: 6px;
+  gap: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  height: var(--screen2-transport-row-height, 36px);
+  min-height: var(--screen2-transport-row-height, 36px);
+  max-height: var(--screen2-transport-row-height, 36px);
 }
 
 .compact .category {
-  font-size: clamp(9px, 0.6vw, 11px);
+  font-size: 9px;
 }
 
 .compact .line {
-  font-size: clamp(14px, 1vw, 18px);
+  font-size: 14px;
 }
 
 .compact .destination {
-  font-size: clamp(11px, 0.8vw, 14px);
+  font-size: 11px;
+  line-height: 1;
 }
 
 .compact .minutes {
-  font-size: clamp(12px, 0.85vw, 16px);
+  font-size: 13px;
 }
 
 .compact .absoluteTime {
-  font-size: clamp(9px, 0.6vw, 11px);
+  font-size: 10px;
 }
 
-.compact .delay {
-  font-size: clamp(9px, 0.6vw, 11px);
+.compact .delayInline {
+  font-size: 10px;
 }
 
 .compact .emptyState,
 .compact .unavailableState {
-  font-size: clamp(13px, 0.95vw, 16px);
+  font-size: 13px;
   padding: 12px;
 }

@@ -114,6 +114,15 @@ export const SCREEN2_TRANSPORT_PANEL_HEIGHT_PX =
 /** @deprecated Use SCREEN2_TRANSPORT_PANEL_HEIGHT_PX */
 export const SCREEN2_LOWER_SPONSOR_ZONE_HEIGHT_PX = SCREEN2_TRANSPORT_PANEL_HEIGHT_PX;
 
+/** Fixed departure row height in the compact ÖV panel (1920×1080 contract). */
+export const SCREEN2_TRANSPORT_COMPACT_ROW_HEIGHT_PX = 36;
+
+/** Gap between compact departure rows. */
+export const SCREEN2_TRANSPORT_COMPACT_ROW_GAP_PX = 3;
+
+/** Departures rendered per physical direction column. */
+export const SCREEN2_TRANSPORT_COMPACT_ROWS_PER_DIRECTION = 3;
+
 export const SCREEN2_BODY_SHELL_CSS_VARS = {
   "--screen2-body-padding-x": `${SCREEN2_BODY_PADDING_X_PX}px`,
   "--screen2-body-padding-y": `${SCREEN2_BODY_PADDING_Y_PX}px`,
@@ -121,6 +130,9 @@ export const SCREEN2_BODY_SHELL_CSS_VARS = {
   "--screen2-body-height": `${SCREEN2_BODY_HEIGHT_PX}px`,
   "--screen2-sponsor-rail-width": `${SCREEN2_SPONSOR_RAIL_WIDTH_PX}px`,
   "--screen2-center-width": `${SCREEN2_CENTER_WIDTH_PX}px`,
+  "--screen2-transport-panel-height": `${SCREEN2_TRANSPORT_PANEL_HEIGHT_PX}px`,
+  "--screen2-transport-row-height": `${SCREEN2_TRANSPORT_COMPACT_ROW_HEIGHT_PX}px`,
+  "--screen2-transport-row-gap": `${SCREEN2_TRANSPORT_COMPACT_ROW_GAP_PX}px`,
 } as const satisfies Record<string, string>;
 
 export type Screen2BodyShellMeasurementContract = {

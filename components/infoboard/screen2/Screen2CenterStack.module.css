@@ -19,8 +19,10 @@
 }
 
 .transportRegion {
-  flex: 1 1 auto;
+  flex: 0 0 var(--screen2-transport-panel-height);
   width: 100%;
+  height: var(--screen2-transport-panel-height);
+  max-height: var(--screen2-transport-panel-height);
   min-height: 0;
   overflow: hidden;
 }

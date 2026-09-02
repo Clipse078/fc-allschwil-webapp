@@ -6,9 +6,10 @@
  */
 "use client";
 
-import type { ReactElement, ReactNode } from "react";
+import type { CSSProperties, ReactElement, ReactNode } from "react";
 import { useKioskTransport } from "@/components/infoboard/kiosk-transport";
 import { Screen2TransportSlide } from "@/components/infoboard/screen2/Screen2TransportSlide";
+import { SCREEN2_BODY_SHELL_CSS_VARS } from "@/lib/infoboard/screen2-body-shell-sizing";
 import type { TransportResult } from "@/lib/transport/transport-types";
 import styles from "./Screen2CenterStack.module.css";
 
@@ -37,7 +38,11 @@ export function Screen2CenterStack({
   );
 
   return (
-    <div className={styles.stack} data-testid="screen2-center-stack">
+    <div
+      className={styles.stack}
+      data-testid="screen2-center-stack"
+      style={SCREEN2_BODY_SHELL_CSS_VARS as CSSProperties}
+    >
       <div className={styles.mapRegion}>{children}</div>
       <div className={styles.transportRegion} data-testid="screen2-transport-panel">
         <Screen2TransportSlide

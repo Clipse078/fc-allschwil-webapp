@@ -24,7 +24,7 @@ function formatMinutesUntil(
   departure: TransportDeparture,
   nowMs: number,
   timezone: string,
-): { minutesLabel: string; absoluteTime: string } {
+): { minutesLabel: string; absoluteTime: string; delayLabel: string | null } {
   const effectiveIso = departure.realtimeDeparture ?? departure.plannedDeparture;
   const effectiveMs = Date.parse(effectiveIso);
   const diffMinutes = Math.max(0, Math.round((effectiveMs - nowMs) / 60_000));
@@ -36,7 +36,12 @@ function formatMinutesUntil(
     timeZone: timezone,
   }).format(new Date(effectiveIso));
 
-  return { minutesLabel, absoluteTime };
+  const delayLabel =
+    departure.delayMinutes && departure.delayMinutes > 0
+      ? `+${departure.delayMinutes}`
+      : null;
+
+  return { minutesLabel, absoluteTime, delayLabel };
 }
 
 function resolveDepartures(transport: TransportResult | null | undefined): {
@@ -124,10 +129,15 @@ function TransportDepartureRow({
       <div className={styles.destination}>{departure.destination}</div>
       <div className={styles.departureBlock}>
         <span className={styles.minutes}>{timing.minutesLabel}</span>
-        <span className={styles.absoluteTime}>{timing.absoluteTime}</span>
-        {departure.delayMinutes && departure.delayMinutes > 0 ? (
-          <span className={styles.delay}>+{departure.delayMinutes}</span>
-        ) : null}
+        <span className={styles.absoluteTime} data-testid="screen2-transport-absolute-time">
+          {timing.absoluteTime}
+          {timing.delayLabel ? (
+            <span className={styles.delayInline} data-testid="screen2-transport-delay">
+              {" "}
+              {timing.delayLabel}
+            </span>
+          ) : null}
+        </span>
       </div>
     </div>
   );
@@ -184,18 +194,11 @@ export function Screen2TransportSlide({
       className={`${styles.slide}${compact ? ` ${styles.compact}` : ""}`}
       data-testid="screen2-transport-slide"
       data-compact={compact ? "true" : "false"}
+      data-stale={resolved.isStale ? "true" : "false"}
     >
       <div className={styles.header}>
         <div className={styles.eyebrow}>ÖV-ABFAHRTEN</div>
         <div className={styles.station}>{resolved.stationDisplayName || "—"}</div>
-        <div className={styles.subtitle}>
-          {resolved.hasRealtimeData ? "Live-Abfahrten" : "Abfahrten"}
-        </div>
-        {resolved.isStale ? (
-          <div className={styles.staleHint} data-testid="screen2-transport-stale">
-            Aktualisierung verzögert
-          </div>
-        ) : null}
       </div>
 
       {resolved.unavailable ? (
