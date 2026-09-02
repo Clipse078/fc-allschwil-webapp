@@ -4,6 +4,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TransportStopConfig } from "@/lib/transport/transport-config";
+import { FC_ALLSCHWIL_DIRECTION_GROUPS } from "@/lib/transport/transport-config";
 import {
   clearTransportServiceCache,
   fetchTransportForConfig,
@@ -15,6 +16,8 @@ const CONFIG: TransportStopConfig = {
   stopId: "8578172",
   stationDisplayName: "Allschwil, Im Brüel",
   departureCount: 6,
+  departuresPerDirectionGroup: 4,
+  directionGroups: FC_ALLSCHWIL_DIRECTION_GROUPS,
   refreshIntervalSeconds: 45,
   rotatorIntervalMs: 20_000,
 };
@@ -52,6 +55,8 @@ describe("transport service", () => {
     if (!result.isAvailable) return;
     expect(result.stationDisplayName).toBe("Allschwil, Im Brüel");
     expect(result.departures).toHaveLength(1);
+    expect(result.directionGroups).toHaveLength(2);
+    expect(result.directionGroups[1]?.departures).toHaveLength(1);
   });
 
   it("retains cached departures on provider failure", async () => {

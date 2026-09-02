@@ -5,6 +5,7 @@
  */
 
 import { resolveTenantTransportConfig, type TransportStopConfig } from "./transport-config";
+import { classifyDeparturesIntoDirectionGroups } from "./transport-direction-groups";
 import { fetchOpendataChStationboard } from "./providers/opendata-ch-transport-provider";
 import type { TransportDeparture, TransportResult, TransportUnavailableResult } from "./transport-types";
 
@@ -54,6 +55,37 @@ function unavailableResult(
   };
 }
 
+function enrichWithDirectionGroups(
+  config: TransportStopConfig,
+  departures: TransportDeparture[],
+) {
+  return classifyDeparturesIntoDirectionGroups(
+    departures,
+    config.directionGroups,
+    config.departuresPerDirectionGroup,
+  );
+}
+
+function availableResult(
+  config: TransportStopConfig,
+  departures: TransportDeparture[],
+  stationId: string,
+  fetchedAt: string,
+  isStale: boolean,
+  hasRealtimeData: boolean,
+): TransportResult {
+  return {
+    isAvailable: true,
+    stationDisplayName: config.stationDisplayName,
+    stationId,
+    departures,
+    directionGroups: enrichWithDirectionGroups(config, departures),
+    fetchedAt,
+    isStale,
+    hasRealtimeData,
+  };
+}
+
 export async function fetchTransportForConfig(
   config: TransportStopConfig,
   fetchFn: typeof fetch = fetch,
@@ -74,15 +106,14 @@ export async function fetchTransportForConfig(
   if (!providerResult.ok) {
     const cachedDepartures = readCachedDepartures(config);
     if (cachedDepartures && cachedDepartures.length > 0) {
-      const staleResult: TransportResult = {
-        isAvailable: true,
-        stationDisplayName: config.stationDisplayName,
-        stationId: config.stopId,
-        departures: cachedDepartures,
+      const staleResult = availableResult(
+        config,
+        cachedDepartures,
+        config.stopId,
         fetchedAt,
-        isStale: true,
-        hasRealtimeData: cachedDepartures.some((departure) => departure.hasRealtime),
-      };
+        true,
+        cachedDepartures.some((departure) => departure.hasRealtime),
+      );
       storeCache(config, staleResult);
       return staleResult;
     }
@@ -97,15 +128,14 @@ export async function fetchTransportForConfig(
     return unavailable;
   }
 
-  const result: TransportResult = {
-    isAvailable: true,
-    stationDisplayName: config.stationDisplayName,
-    stationId: providerResult.stationId,
-    departures: providerResult.departures,
+  const result = availableResult(
+    config,
+    providerResult.departures,
+    providerResult.stationId,
     fetchedAt,
-    isStale: false,
-    hasRealtimeData: providerResult.hasRealtimeData,
-  };
+    false,
+    providerResult.hasRealtimeData,
+  );
 
   storeCache(config, result);
   return result;

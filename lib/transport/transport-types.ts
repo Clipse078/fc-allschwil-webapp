@@ -38,11 +38,22 @@ export type TransportDeparture = {
   hasRealtime: boolean;
 };
 
+export type TransportDirectionOrientation = "left" | "right";
+
+export type TransportDirectionGroup = {
+  id: string;
+  displayName: string;
+  orientation: TransportDirectionOrientation;
+  departures: TransportDeparture[];
+};
+
 export type TransportAvailableResult = {
   isAvailable: true;
   stationDisplayName: string;
   stationId: string;
   departures: TransportDeparture[];
+  /** Pre-classified direction groups when configured for the tenant. */
+  directionGroups: TransportDirectionGroup[];
   fetchedAt: string;
   /** True when the payload is served from a previous successful fetch. */
   isStale: boolean;

@@ -7,7 +7,17 @@
  * can persist equivalent fields on Tenant or Infoboard records.
  */
 
-import type { TransportCategory, TransportProviderId } from "./transport-types";
+import type { TransportCategory, TransportDirectionOrientation, TransportProviderId } from "./transport-types";
+
+export type TransportDirectionGroupConfig = {
+  id: string;
+  displayName: string;
+  orientation: TransportDirectionOrientation;
+  /** Preferred matchers against provider direction/headsign fields. */
+  providerDirectionMatchers?: string[];
+  /** Controlled fallback matchers against normalized destination text. */
+  destinationMatchers?: string[];
+};
 
 export type TransportStopConfig = {
   enabled: boolean;
@@ -26,11 +36,31 @@ export type TransportStopConfig = {
   lineFilters?: string[];
   destinationFilters?: string[];
   departureCount: number;
+  /** Max departures shown per configured direction group. */
+  departuresPerDirectionGroup?: number;
+  directionGroups?: TransportDirectionGroupConfig[];
   /** Server/client refresh interval in seconds. */
   refreshIntervalSeconds: number;
   /** Center rotator dwell time per slide in milliseconds. */
   rotatorIntervalMs: number;
 };
+
+export const FC_ALLSCHWIL_DIRECTION_GROUPS: TransportDirectionGroupConfig[] = [
+  {
+    id: "allschwil-dorf",
+    displayName: "Richtung Allschwil Dorf",
+    orientation: "left",
+    providerDirectionMatchers: ["Allschwil, Friedhof", "Allschwil, Dorf"],
+    destinationMatchers: ["allschwil, friedhof", "allschwil, dorf"],
+  },
+  {
+    id: "bachgraben-basel",
+    displayName: "Richtung Bachgraben / Basel",
+    orientation: "right",
+    providerDirectionMatchers: ["Basel, Bachgraben", "Basel,"],
+    destinationMatchers: ["bachgraben", "basel,"],
+  },
+];
 
 const FC_ALLSCHWIL_TRANSPORT: TransportStopConfig = {
   enabled: true,
@@ -44,6 +74,8 @@ const FC_ALLSCHWIL_TRANSPORT: TransportStopConfig = {
   },
   allowedCategories: ["bus", "tram", "train"],
   departureCount: 8,
+  departuresPerDirectionGroup: 4,
+  directionGroups: FC_ALLSCHWIL_DIRECTION_GROUPS,
   refreshIntervalSeconds: 45,
   rotatorIntervalMs: 20_000,
 };

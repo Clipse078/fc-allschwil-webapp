@@ -26,6 +26,7 @@ describe("getCanonicalKioskTransport", () => {
       stationDisplayName: "Allschwil, Im Brüel",
       stationId: "8578172",
       departures: [],
+      directionGroups: [],
       fetchedAt: "2026-09-02T16:40:00.000Z",
       isStale: false,
       hasRealtimeData: false,

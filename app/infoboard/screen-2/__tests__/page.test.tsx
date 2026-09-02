@@ -167,6 +167,7 @@ describe("InfoboardScreen2Page — /infoboard/screen-2", () => {
       stationDisplayName: "Allschwil, Im Brüel",
       stationId: "8578172",
       departures: [],
+      directionGroups: [],
       fetchedAt: NOW_ISO,
       isStale: false,
       hasRealtimeData: false,

@@ -50,6 +50,57 @@
   color: rgba(251, 191, 36, 0.82);
 }
 
+.directionColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 22px);
+  flex: 1;
+  min-height: 0;
+}
+
+.directionColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: clamp(8px, 1vh, 12px);
+}
+
+.directionHeading {
+  margin: 0;
+  font-size: clamp(15px, 1.05vw, 19px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  color: rgba(125, 211, 252, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.directionRows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.8vh, 10px);
+  flex: 1;
+  min-height: 0;
+}
+
+.directionEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: clamp(96px, 12vh, 140px);
+  padding: clamp(12px, 1.4vh, 18px);
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  font-size: clamp(16px, 1.1vw, 20px);
+  color: rgba(255, 255, 255, 0.58);
+}
+
 .rows {
   display: flex;
   flex-direction: column;
@@ -60,10 +111,10 @@
 
 .row {
   display: grid;
-  grid-template-columns: minmax(110px, 14%) minmax(0, 1fr) minmax(120px, 18%);
+  grid-template-columns: minmax(88px, 22%) minmax(0, 1fr) minmax(96px, 24%);
   align-items: center;
-  gap: clamp(12px, 1.4vw, 20px);
-  padding: clamp(10px, 1.1vh, 14px) clamp(12px, 1.2vw, 16px);
+  gap: clamp(8px, 1vw, 14px);
+  padding: clamp(8px, 0.9vh, 12px) clamp(10px, 1vw, 14px);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -84,13 +135,13 @@
 }
 
 .line {
-  font-size: clamp(28px, 2vw, 36px);
+  font-size: clamp(24px, 1.7vw, 32px);
   font-weight: 800;
   line-height: 1;
 }
 
 .destination {
-  font-size: clamp(22px, 1.55vw, 30px);
+  font-size: clamp(18px, 1.25vw, 24px);
   font-weight: 600;
   line-height: 1.15;
   white-space: nowrap;
@@ -106,7 +157,7 @@
 }
 
 .minutes {
-  font-size: clamp(24px, 1.8vw, 34px);
+  font-size: clamp(20px, 1.45vw, 28px);
   font-weight: 800;
   line-height: 1;
 }
