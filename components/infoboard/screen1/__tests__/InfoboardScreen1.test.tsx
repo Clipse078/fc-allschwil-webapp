@@ -14,6 +14,9 @@
  */
 
 import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   InfoboardScreen1,
@@ -36,7 +39,6 @@ import {
   CARD_DEMAND_MATCH_SUB_TEAM,
   CARD_DEMAND_MATCH_END_TIME,
   CARD_DEMAND_TOURNAMENT_BASE,
-  CARD_DEMAND_TOURNAMENT_DISPLAY_ROW,
   CARD_DEMAND_TOURNAMENT_PARTICIPANT,
   CARD_DEMAND_PAGE_MAX,
 } from "@/components/infoboard/screen1/InfoboardScreen1";
@@ -62,6 +64,7 @@ import type {
 import type {
   InfoboardAnnouncementPresentation,
   InfoboardEventPresentationExtension,
+  InfoboardTeamAllocationPresentation,
 } from "@/components/infoboard/screen1/screen1-presentation-types";
 
 // â”€â”€ Fixture helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1223,7 +1226,7 @@ describe("4-team tournament allocation", () => {
     expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
 
-  it("logo strip stays left-aligned and caps at four logos", () => {
+  it("logo strip stays left-aligned and renders all four logos", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
@@ -1296,6 +1299,153 @@ describe("Tournament logo strip alignment â€” INFOBOARD-LOGO-08A", () => {
       expect(logoArea.textContent?.trim()).toBe("");
     },
   );
+});
+
+describe("Dynamic tournament participants — INFOBOARD-SATURDAY-02A", () => {
+  function makeAllocations(
+    count: number,
+  ): readonly InfoboardTeamAllocationPresentation[] {
+    return Array.from({ length: count }, (_, index) => ({
+      id: `dynamic-${index + 1}`,
+      teamDisplayName: `Participant ${index + 1}`,
+      dressingRoomLabel: `Kabine O${index + 1}`,
+      clubLogoUrl:
+        index % 4 === 3 ? null : `https://cdn.example.com/logo-${index + 1}.png`,
+    }));
+  }
+
+  function renderTournament(allocations: readonly InfoboardTeamAllocationPresentation[]) {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "evt-dynamic-tournament",
+          type: "TOURNAMENT",
+          displayTitle: "Dynamic Tournament",
+          allocation: {
+            pitchLabel: "Kunstrasen 1",
+            homeDressingRoomLabel: null,
+            awayDressingRoomLabel: null,
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        eventPresentation={makeEventPresentation(
+          "evt-dynamic-tournament",
+          allocations,
+        )}
+      />,
+    );
+
+    return {
+      allocationBlock: screen.getByTestId("participant-allocation-block"),
+      logoArea: screen.getByTestId("tournament-participants"),
+    };
+  }
+
+  function participantIdentityNodes(logoArea: HTMLElement): Element[] {
+    return Array.from(
+      logoArea.querySelectorAll(
+        '[data-testid^="tournament-participant-logo-"]',
+      ),
+    );
+  }
+
+  it.each([1, 2, 3, 4, 5, 6, 8])(
+    "renders all %i canonical participants without truncation",
+    (count) => {
+      const allocations = makeAllocations(count);
+      const { allocationBlock, logoArea } = renderTournament(allocations);
+
+      expect(participantIdentityNodes(logoArea)).toHaveLength(count);
+      expect(allocationBlock.children).toHaveLength(count);
+      for (const allocation of allocations) {
+        expect(allocationBlock.textContent).toContain(allocation.teamDisplayName);
+      }
+    },
+  );
+
+  it("preserves canonical participant order across logos and Kabine rows", () => {
+    const allocations = makeAllocations(6);
+    const { allocationBlock, logoArea } = renderTournament(allocations);
+
+    expect(
+      participantIdentityNodes(logoArea).map((node) =>
+        node.getAttribute("data-testid")?.replace(/-placeholder$/, ""),
+      ),
+    ).toEqual(
+      allocations.map(
+        (allocation) => `tournament-participant-logo-${allocation.id}`,
+      ),
+    );
+    expect(
+      Array.from(allocationBlock.children, (row) =>
+        row.textContent?.replace(/\s+/g, " ").trim(),
+      ),
+    ).toEqual(
+      allocations.map(
+        (allocation, index) => `O${index + 1}${allocation.teamDisplayName}`,
+      ),
+    );
+  });
+
+  it("keeps missing-logo fallback identities alongside canonical crests", () => {
+    const { logoArea } = renderTournament(makeAllocations(6));
+
+    expect(logoArea.querySelectorAll("img")).toHaveLength(5);
+    expect(
+      logoArea.querySelectorAll('[data-testid$="-placeholder"]'),
+    ).toHaveLength(1);
+    expect(participantIdentityNodes(logoArea)).toHaveLength(6);
+  });
+
+  it("keeps every other Kabine when one participant has none", () => {
+    const allocations = makeAllocations(4).map((allocation, index) =>
+      index === 1
+        ? { ...allocation, dressingRoomLabel: null }
+        : allocation,
+    );
+    const { allocationBlock } = renderTournament(allocations);
+
+    expect(allocationBlock.children).toHaveLength(4);
+    expect(allocationBlock.textContent).toContain("O1");
+    expect(allocationBlock.textContent).toContain("—");
+    expect(allocationBlock.textContent).toContain("O3");
+    expect(allocationBlock.textContent).toContain("O4");
+    expect(allocationBlock.textContent).toContain("Participant 2");
+  });
+
+  it("preserves the tournament pitch presentation", () => {
+    renderTournament(makeAllocations(2));
+    expect(screen.getByTestId("pitch-value").textContent).toBe("Kunstrasen 1");
+  });
+
+  it("uses a wrapping, width-bounded logo container", () => {
+    const css = readFileSync(
+      join(
+        dirname(fileURLToPath(import.meta.url)),
+        "../InfoboardScreen1.module.css",
+      ),
+      "utf8",
+    );
+    const rule = css.match(
+      /\.tournamentParticipantLogos\s*\{[\s\S]*?\}/,
+    )?.[0];
+
+    expect(rule).toMatch(/flex-wrap:\s*wrap;/);
+    expect(rule).toMatch(/max-width:\s*100%;/);
+  });
+
+  it("leaves Match and Training renderers unchanged", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} />);
+    expect(screen.getAllByTestId("match-home-team-row").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("training-row-matrix").length).toBeGreaterThan(0);
+  });
 });
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -3289,13 +3439,13 @@ describe("Content-demand â€” computeTournamentDemand", () => {
     expect(computeTournamentParticipantDisplayRows(6)).toBe(3);
   });
 
-  it("small tournament uses display-row demand without allocation matrix", () => {
+  it("small tournament demand accounts for every allocation row", () => {
     const demand = computeTournamentDemand([
       { id: "p1", teamDisplayName: "Team A", dressingRoomLabel: null },
       { id: "p2", teamDisplayName: "Team B", dressingRoomLabel: null },
     ]);
     expect(demand).toBeCloseTo(
-      CARD_DEMAND_TOURNAMENT_BASE + CARD_DEMAND_TOURNAMENT_DISPLAY_ROW,
+      CARD_DEMAND_TOURNAMENT_BASE + 2 * CARD_DEMAND_TOURNAMENT_PARTICIPANT,
     );
   });
 
