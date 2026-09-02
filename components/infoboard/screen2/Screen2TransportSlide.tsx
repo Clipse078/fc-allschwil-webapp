@@ -16,6 +16,8 @@ export type Screen2TransportSlideProps = {
   transport: TransportResult | null | undefined;
   timezone: string;
   nowIso?: string;
+  /** Compact embedded panel below the Sportanlage map. */
+  compact?: boolean;
 };
 
 function formatMinutesUntil(
@@ -171,13 +173,18 @@ export function Screen2TransportSlide({
   transport,
   timezone,
   nowIso,
+  compact = false,
 }: Screen2TransportSlideProps): ReactElement {
   const nowMs = Date.parse(nowIso ?? new Date().toISOString());
   const resolved = resolveDepartures(transport);
   const hasDirectionGroups = resolved.directionGroups.length > 0;
 
   return (
-    <div className={styles.slide} data-testid="screen2-transport-slide">
+    <div
+      className={`${styles.slide}${compact ? ` ${styles.compact}` : ""}`}
+      data-testid="screen2-transport-slide"
+      data-compact={compact ? "true" : "false"}
+    >
       <div className={styles.header}>
         <div className={styles.eyebrow}>ÖV-ABFAHRTEN</div>
         <div className={styles.station}>{resolved.stationDisplayName || "—"}</div>

@@ -37,8 +37,7 @@ import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShell";
-import { Screen2CenterRotator } from "@/components/infoboard/screen2/Screen2CenterRotator";
-import { Screen2LowerSponsorZone } from "@/components/infoboard/screen2/Screen2LowerSponsorZone";
+import { Screen2CenterStack } from "@/components/infoboard/screen2/Screen2CenterStack";
 import { resolveTenantTransportConfig } from "@/lib/transport/transport-config";
 import type { TransportResult } from "@/lib/transport/transport-types";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
@@ -73,7 +72,7 @@ export type InfoboardAnlageplanProps = {
   shellConfig?: InfoboardAnlageplanShellConfig | null;
   /** Preview-only: keep the supplied simulated moment fixed. */
   liveClock?: boolean;
-  /** Tenant key for transport refresh + rotator configuration. */
+  /** Tenant key for transport refresh configuration. */
   tenantKey?: string | null;
   /** Initial normalized transport payload from the server boundary. */
   transport?: TransportResult | null;
@@ -134,7 +133,6 @@ export function InfoboardAnlageplan({
           />
         </div>
       </div>
-      <Screen2LowerSponsorZone />
     </div>
   );
 
@@ -176,17 +174,15 @@ export function InfoboardAnlageplan({
         <Screen2BodyShell
           center={
             transportConfig && tenantKey ? (
-              <Screen2CenterRotator
+              <Screen2CenterStack
                 tenantKey={tenantKey}
                 timezone={tz}
                 initialTransport={transport}
                 refreshIntervalSeconds={transportConfig.refreshIntervalSeconds}
-                anlageplanDurationMs={transportConfig.rotatorIntervalMs}
-                transportDurationMs={transportConfig.rotatorIntervalMs}
                 live={liveClock}
               >
                 {anlageplanCenter}
-              </Screen2CenterRotator>
+              </Screen2CenterStack>
             ) : (
               anlageplanCenter
             )

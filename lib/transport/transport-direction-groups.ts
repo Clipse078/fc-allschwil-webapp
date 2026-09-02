@@ -36,12 +36,28 @@ function matchesAny(value: string, matchers: string[] | undefined): boolean {
 /**
  * Resolves the configured direction group for a single departure.
  *
- * Prefers provider direction/headsign (`direction`) over destination fallback matchers.
+ * Prefers provider next-stop topology, then direction/headsign, then destination fallback.
  */
 export function resolveDepartureDirectionGroupId(
   departure: TransportDeparture,
   groups: TransportDirectionGroupConfig[],
 ): string | null {
+  if (departure.nextStopName) {
+    for (const group of groups) {
+      if (matchesAny(departure.nextStopName, group.nextStopMatchers)) {
+        return group.id;
+      }
+    }
+  }
+
+  if (departure.nextStopId) {
+    for (const group of groups) {
+      if (matchesAny(departure.nextStopId, group.nextStopIdMatchers)) {
+        return group.id;
+      }
+    }
+  }
+
   const providerDirection = departure.direction ?? departure.destination;
 
   for (const group of groups) {

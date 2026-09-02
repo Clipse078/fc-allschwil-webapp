@@ -57,8 +57,3 @@ export function getKioskTransportRefreshSeconds(tenantKey: string): number {
   const config = resolveTenantTransportConfig(tenantKey);
   return config?.refreshIntervalSeconds ?? DEFAULT_KIOSK_TRANSPORT_REVALIDATE_SECONDS;
 }
-
-export function getKioskTransportRotatorIntervalMs(tenantKey: string): number {
-  const config = resolveTenantTransportConfig(tenantKey);
-  return config?.rotatorIntervalMs ?? 20_000;
-}

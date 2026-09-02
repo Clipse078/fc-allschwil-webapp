@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone focused tests.
+ * INFOBOARD-TRANSPORT-02-UX3 — static center layout focused tests.
  */
 
 import { readFileSync } from "node:fs";
@@ -11,14 +11,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InfoboardAnlageplan } from "@/components/infoboard/anlageplan/InfoboardAnlageplan";
 import { InfoboardScreen1 } from "@/components/infoboard/screen1/InfoboardScreen1";
 import { PREVIEW_FIXTURE } from "@/components/infoboard/screen1/screen1-preview-fixture";
-import { Screen2CenterRotator } from "@/components/infoboard/screen2/Screen2CenterRotator";
+import { Screen2CenterStack } from "@/components/infoboard/screen2/Screen2CenterStack";
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import {
   SCREEN2_ANLAGEPLAN_MAP_DIMENSIONS,
   SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT,
   SCREEN2_CENTER_HEIGHT_PX,
   SCREEN2_CENTER_WIDTH_PX,
-  SCREEN2_LOWER_SPONSOR_ZONE_HEIGHT_PX,
+  SCREEN2_TRANSPORT_PANEL_HEIGHT_PX,
   computeAnlageplanMapDimensions,
 } from "@/lib/infoboard/screen2-body-shell-sizing";
 import type { TransportResult } from "@/lib/transport/transport-types";
@@ -77,14 +77,16 @@ const TRANSPORT: TransportResult = {
       delayMinutes: 3,
       platform: null,
       direction: "Basel, Bachgraben",
+      nextStopId: "8578171",
+      nextStopName: "Allschwil, Kreuzstrasse",
       provider: "opendata.ch",
       hasRealtime: true,
     },
   ],
   directionGroups: [
     {
-      id: "allschwil-dorf",
-      displayName: "Richtung Allschwil Dorf",
+      id: "allschwil-zentrum",
+      displayName: "Richtung Allschwil Zentrum",
       orientation: "left",
       departures: [],
     },
@@ -103,6 +105,8 @@ const TRANSPORT: TransportResult = {
           delayMinutes: 3,
           platform: null,
           direction: "Basel, Bachgraben",
+          nextStopId: "8578171",
+          nextStopName: "Allschwil, Kreuzstrasse",
           provider: "opendata.ch",
           hasRealtime: true,
         },
@@ -118,7 +122,7 @@ vi.mock("@/components/infoboard/kiosk-transport", () => ({
   useKioskTransport: (initial: TransportResult | null) => initial,
 }));
 
-describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
+describe("INFOBOARD-TRANSPORT-02-UX3 — static center layout", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -127,105 +131,111 @@ describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
     vi.useRealTimers();
   });
 
-  it("1. Anlageplan slide renders lower sponsor placeholder", () => {
+  it("renders Sportanlage and ÖV panel permanently when transport is configured", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
         branding={{ clubName: "FC Allschwil" }}
+        tenantKey="fc-allschwil"
+        transport={TRANSPORT}
       />,
     );
 
     expect(screen.getByTestId("anlageplan-slide")).toBeTruthy();
-    expect(screen.getByTestId("screen2-lower-sponsor-zone")).toBeTruthy();
+    expect(screen.getByTestId("anlageplan-map-canvas")).toBeTruthy();
+    expect(screen.getByTestId("screen2-center-stack")).toBeTruthy();
+    expect(screen.getByTestId("screen2-transport-panel")).toBeTruthy();
+    expect(screen.getByTestId("screen2-transport-slide")).toBeTruthy();
   });
 
-  it("2. lower sponsor text contains IHRE WERBUNG, HIER, SPONSOR", () => {
+  it("does not render lower center sponsor placeholder", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
         branding={{ clubName: "FC Allschwil" }}
+        tenantKey="fc-allschwil"
+        transport={TRANSPORT}
       />,
     );
 
-    const lowerSponsor = screen.getByTestId("screen2-lower-sponsor-zone");
-    expect(lowerSponsor.textContent).toContain("IHRE WERBUNG");
-    expect(lowerSponsor.textContent).toContain("HIER");
-    expect(lowerSponsor.textContent).toContain("SPONSOR");
+    expect(screen.queryByTestId("screen2-lower-sponsor-zone")).toBeNull();
   });
 
-  it("3. left sponsor remains present", () => {
+  it("keeps left and right sponsor rails present", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
         branding={{ clubName: "FC Allschwil" }}
+        tenantKey="fc-allschwil"
+        transport={TRANSPORT}
       />,
     );
 
     expect(screen.getByTestId("screen2-sponsor-rail-left")).toBeTruthy();
+    expect(screen.getByTestId("screen2-sponsor-rail-right")).toBeTruthy();
   });
 
-  it("4. right sponsor remains present", () => {
+  it("keeps header and footer present", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
         branding={{ clubName: "FC Allschwil" }}
+        tenantKey="fc-allschwil"
+        transport={TRANSPORT}
       />,
     );
 
-    expect(screen.getByTestId("screen2-sponsor-rail-right")).toBeTruthy();
+    expect(screen.getByTestId("kiosk-shell-header")).toBeTruthy();
+    expect(screen.getByTestId("kiosk-shell-footer")).toBeTruthy();
   });
 
-  it("5. transport slide does not render lower sponsor placeholder", () => {
+  it("does not rotate center content after 60 seconds", () => {
     render(
-      <Screen2CenterRotator
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={{ clubName: "FC Allschwil" }}
         tenantKey="fc-allschwil"
-        timezone="Europe/Zurich"
-        initialTransport={TRANSPORT}
-        refreshIntervalSeconds={45}
-        activeSlide="transport"
-        autoRotate={false}
-        live={false}
-      >
-        <div data-testid="anlageplan-child">Anlageplan</div>
-      </Screen2CenterRotator>,
+        transport={TRANSPORT}
+        liveClock={false}
+      />,
     );
 
+    expect(screen.getByTestId("anlageplan-map-canvas")).toBeTruthy();
     expect(screen.getByTestId("screen2-transport-slide")).toBeTruthy();
-    expect(screen.queryByTestId("screen2-lower-sponsor-zone")).toBeNull();
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(screen.getByTestId("anlageplan-map-canvas")).toBeTruthy();
+    expect(screen.getByTestId("screen2-transport-slide")).toBeTruthy();
+    expect(screen.queryByTestId("screen2-center-rotator")).toBeNull();
   });
 
-  it("6. transport continues to use full center slide", () => {
-    const transportCss = readRepoFile(
-      "components/infoboard/screen2/Screen2TransportSlide.module.css",
-    );
-    const rotatorCss = readRepoFile(
-      "components/infoboard/screen2/Screen2CenterRotator.module.css",
-    );
-
-    expect(transportCss).toMatch(/width:\s*100%/);
-    expect(transportCss).toMatch(/height:\s*100%/);
-    expect(rotatorCss).toContain("inset: 0");
-
+  it("places ÖV panel below the map inside center content", () => {
     render(
-      <Screen2CenterRotator
+      <InfoboardAnlageplan
+        payload={makeAnlageplanPayload()}
+        branding={{ clubName: "FC Allschwil" }}
         tenantKey="fc-allschwil"
-        timezone="Europe/Zurich"
-        initialTransport={TRANSPORT}
-        refreshIntervalSeconds={45}
-        activeSlide="transport"
-        autoRotate={false}
-        live={false}
-      >
-        <div data-testid="anlageplan-child">Anlageplan</div>
-      </Screen2CenterRotator>,
+        transport={TRANSPORT}
+      />,
     );
 
-    const transportSlide = screen.getByTestId("screen2-center-slide-transport");
-    expect(transportSlide.contains(screen.getByTestId("screen2-transport-slide"))).toBe(true);
-    expect(transportSlide.contains(screen.getByTestId("anlageplan-child"))).toBe(false);
+    const center = screen.getByTestId("screen2-center-content");
+    const stack = screen.getByTestId("screen2-center-stack");
+    const slide = screen.getByTestId("anlageplan-slide");
+    const canvas = screen.getByTestId("anlageplan-map-canvas");
+    const transportPanel = screen.getByTestId("screen2-transport-panel");
+
+    expect(center.contains(stack)).toBe(true);
+    expect(stack.contains(slide)).toBe(true);
+    expect(stack.contains(transportPanel)).toBe(true);
+    expect(slide.contains(canvas)).toBe(true);
+    expect(canvas.compareDocumentPosition(transportPanel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("7. Anlageplan dimensions/fit contract unchanged", () => {
+  it("Anlageplan dimensions/fit contract unchanged", () => {
     const mapDimensions = computeAnlageplanMapDimensions(
       SCREEN2_CENTER_WIDTH_PX,
       SCREEN2_CENTER_HEIGHT_PX,
@@ -239,7 +249,7 @@ describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
     );
     expect(SCREEN2_ANLAGEPLAN_MAP_DIMENSIONS.widthPx).toBe(mapDimensions.widthPx);
     expect(SCREEN2_ANLAGEPLAN_MAP_DIMENSIONS.heightPx).toBe(mapDimensions.heightPx);
-    expect(SCREEN2_LOWER_SPONSOR_ZONE_HEIGHT_PX).toBe(
+    expect(SCREEN2_TRANSPORT_PANEL_HEIGHT_PX).toBe(
       SCREEN2_CENTER_HEIGHT_PX - mapDimensions.heightPx,
     );
 
@@ -251,7 +261,7 @@ describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
     expect(anlageplanCss).toContain("height: min(100cqh, calc(100cqw * 9 / 16))");
   });
 
-  it("8. Screen2BodyShell geometry unchanged", () => {
+  it("Screen2BodyShell geometry unchanged", () => {
     const shellCss = readRepoFile("components/infoboard/screen2/Screen2BodyShell.module.css");
     const shellTs = readRepoFile("components/infoboard/screen2/Screen2BodyShell.tsx");
     const sizing = readRepoFile("lib/infoboard/screen2-body-shell-sizing.ts");
@@ -264,107 +274,40 @@ describe("INFOBOARD-TRANSPORT-02-UX1 — lower center sponsor zone", () => {
     expect(sizing).toContain("SCREEN2_CENTER_SHARE = 0.62");
   });
 
-  it("9. Screen 1 unaffected", () => {
+  it("Screen 1 unaffected", () => {
     const screen1 = readRepoFile("components/infoboard/screen1/InfoboardScreen1.tsx");
-    expect(screen1).not.toContain("Screen2LowerSponsorZone");
+    expect(screen1).not.toContain("Screen2CenterStack");
+    expect(screen1).not.toContain("Screen2TransportSlide");
 
     render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} liveClock={false} />);
 
-    expect(screen.queryByTestId("screen2-lower-sponsor-zone")).toBeNull();
+    expect(screen.queryByTestId("screen2-transport-slide")).toBeNull();
     expect(screen.getByTestId("infoboard-screen1-root")).toBeTruthy();
   });
 
-  it("10. rotator still transitions Anlageplan → Transport → Anlageplan", () => {
+  it("Screen2CenterStack keeps map and transport mounted together", () => {
     render(
-      <Screen2CenterRotator
+      <Screen2CenterStack
         tenantKey="fc-allschwil"
         timezone="Europe/Zurich"
         initialTransport={TRANSPORT}
         refreshIntervalSeconds={45}
-        anlageplanDurationMs={100}
-        transportDurationMs={100}
         live={false}
       >
-        <div data-testid="anlageplan-slide-child">
-          <div data-testid="screen2-lower-sponsor-zone">Lower sponsor</div>
-        </div>
-      </Screen2CenterRotator>,
+        <div data-testid="anlageplan-child">Anlageplan</div>
+      </Screen2CenterStack>,
     );
 
-    expect(screen.getByTestId("screen2-center-rotator").getAttribute("data-active-slide")).toBe(
-      "anlageplan",
-    );
-    expect(screen.getByTestId("screen2-lower-sponsor-zone")).toBeTruthy();
-
-    act(() => {
-      vi.advanceTimersByTime(100);
-    });
-    expect(screen.getByTestId("screen2-center-rotator").getAttribute("data-active-slide")).toBe(
-      "transport",
-    );
-    expect(screen.getByTestId("screen2-transport-slide")).toBeTruthy();
-
-    act(() => {
-      vi.advanceTimersByTime(100);
-    });
-    expect(screen.getByTestId("screen2-center-rotator").getAttribute("data-active-slide")).toBe(
-      "anlageplan",
-    );
+    const stack = screen.getByTestId("screen2-center-stack");
+    expect(stack.contains(screen.getByTestId("anlageplan-child"))).toBe(true);
+    expect(stack.contains(screen.getByTestId("screen2-transport-slide"))).toBe(true);
+    expect(screen.getByTestId("screen2-transport-slide").getAttribute("data-compact")).toBe("true");
   });
 
-  it("lower sponsor belongs to Anlageplan slide inside center content", () => {
-    render(
-      <InfoboardAnlageplan
-        payload={makeAnlageplanPayload()}
-        branding={{ clubName: "FC Allschwil" }}
-        tenantKey="fc-allschwil"
-        transport={TRANSPORT}
-      />,
-    );
-
-    const center = screen.getByTestId("screen2-center-content");
-    const slide = screen.getByTestId("anlageplan-slide");
-    const lowerSponsor = screen.getByTestId("screen2-lower-sponsor-zone");
-    const canvas = screen.getByTestId("anlageplan-map-canvas");
-
-    expect(center.contains(slide)).toBe(true);
-    expect(slide.contains(canvas)).toBe(true);
-    expect(slide.contains(lowerSponsor)).toBe(true);
-    expect(canvas.compareDocumentPosition(lowerSponsor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-
-  it("reuses Screen2 sponsor rail visual primitives", () => {
-    const lowerSponsor = readRepoFile(
-      "components/infoboard/screen2/Screen2LowerSponsorZone.tsx",
-    );
-    expect(lowerSponsor).toContain("Screen2BodyShell.module.css");
-    expect(lowerSponsor).toContain("railHeadline");
-    expect(lowerSponsor).toContain("railSubline");
-    expect(lowerSponsor).toContain("railLabel");
-    expect(lowerSponsor).toContain("Handshake");
-  });
-
-  it("lower sponsor zone spans full available center width", () => {
-    const lowerSponsorCss = readRepoFile(
-      "components/infoboard/screen2/Screen2LowerSponsorZone.module.css",
-    );
-
-    expect(lowerSponsorCss).toMatch(/\.zone[\s\S]*width:\s*100%/);
-    expect(lowerSponsorCss).toMatch(/\.placeholder[\s\S]*width:\s*100%/);
-    expect(lowerSponsorCss).not.toContain("520px");
-  });
-
-  it("keeps sponsor content centered inside the full-width band", () => {
-    render(
-      <InfoboardAnlageplan
-        payload={makeAnlageplanPayload()}
-        branding={{ clubName: "FC Allschwil" }}
-      />,
-    );
-
-    const lowerSponsor = screen.getByTestId("screen2-lower-sponsor-zone");
-    const placeholder = lowerSponsor.firstElementChild;
-    expect(placeholder?.className).toContain("rail");
-    expect(lowerSponsor.textContent).toContain("IHRE WERBUNG");
+  it("does not retain center rotator implementation", () => {
+    expect(() => readRepoFile("components/infoboard/screen2/Screen2CenterRotator.tsx")).toThrow();
+    const anlageplan = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.tsx");
+    expect(anlageplan).not.toContain("Screen2CenterRotator");
+    expect(anlageplan).toContain("Screen2CenterStack");
   });
 });

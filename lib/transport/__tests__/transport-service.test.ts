@@ -16,10 +16,9 @@ const CONFIG: TransportStopConfig = {
   stopId: "8578172",
   stationDisplayName: "Allschwil, Im Brüel",
   departureCount: 6,
-  departuresPerDirectionGroup: 4,
+  departuresPerDirectionGroup: 3,
   directionGroups: FC_ALLSCHWIL_DIRECTION_GROUPS,
   refreshIntervalSeconds: 45,
-  rotatorIntervalMs: 20_000,
 };
 
 const NOW = new Date("2026-09-02T16:40:00.000Z");
@@ -45,6 +44,10 @@ describe("transport service", () => {
           number: "48",
           to: "Basel, Bachgraben",
           stop: { departure: "2026-09-02T18:48:00+0200", delay: 0 },
+          passList: [
+            { station: { id: "8578172", name: "Allschwil, Im Brühl" } },
+            { station: { id: "8578171", name: "Allschwil, Kreuzstrasse" } },
+          ],
         },
       ],
     });
@@ -68,6 +71,10 @@ describe("transport service", () => {
           number: "48",
           to: "Basel, Bachgraben",
           stop: { departure: "2026-09-02T18:48:00+0200", delay: 0 },
+          passList: [
+            { station: { id: "8578172", name: "Allschwil, Im Brühl" } },
+            { station: { id: "8578171", name: "Allschwil, Kreuzstrasse" } },
+          ],
         },
       ],
     });

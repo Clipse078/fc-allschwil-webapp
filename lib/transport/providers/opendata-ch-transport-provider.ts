@@ -31,6 +31,17 @@ type OpendataStop = {
   prognosis?: {
     departure?: string | null;
   } | null;
+  station?: {
+    id?: string | null;
+    name?: string | null;
+  } | null;
+};
+
+type OpendataPassListEntry = {
+  station?: {
+    id?: string | null;
+    name?: string | null;
+  } | null;
 };
 
 type OpendataStationboardEntry = {
@@ -39,6 +50,7 @@ type OpendataStationboardEntry = {
   to?: string | null;
   operator?: string | null;
   stop?: OpendataStop | null;
+  passList?: OpendataPassListEntry[] | null;
 };
 
 type OpendataStationboardResponse = {
@@ -115,7 +127,34 @@ function parseDelayMinutes(
   return diffMinutes > 0 ? diffMinutes : 0;
 }
 
-function normalizeDeparture(entry: OpendataStationboardEntry): TransportDeparture | null {
+function resolveNextStop(
+  entry: OpendataStationboardEntry,
+  stopId: string,
+): { nextStopId: string | null; nextStopName: string | null } {
+  const passList = Array.isArray(entry.passList) ? entry.passList : [];
+  if (passList.length === 0) {
+    return { nextStopId: null, nextStopName: null };
+  }
+
+  let currentIndex = passList.findIndex(
+    (pass) => pass.station?.id?.trim() === stopId,
+  );
+
+  if (currentIndex === -1) {
+    currentIndex = 0;
+  }
+
+  const nextEntry = passList[currentIndex + 1];
+  return {
+    nextStopId: nextEntry?.station?.id?.trim() || null,
+    nextStopName: nextEntry?.station?.name?.trim() || null,
+  };
+}
+
+function normalizeDeparture(
+  entry: OpendataStationboardEntry,
+  stopId: string,
+): TransportDeparture | null {
   const plannedDeparture = entry.stop?.departure?.trim();
   if (!plannedDeparture) {
     return null;
@@ -129,6 +168,7 @@ function normalizeDeparture(entry: OpendataStationboardEntry): TransportDepartur
   const realtimeDeparture = prognosisDeparture ?? plannedDeparture;
   const category = mapCategory(entry.category);
   const line = (entry.number ?? "").trim() || "—";
+  const { nextStopId, nextStopName } = resolveNextStop(entry, stopId);
 
   return {
     line,
@@ -140,6 +180,8 @@ function normalizeDeparture(entry: OpendataStationboardEntry): TransportDepartur
     delayMinutes: parseDelayMinutes(plannedDeparture, realtimeDeparture, rawDelay),
     platform: entry.stop?.platform?.trim() || null,
     direction: (entry.to ?? null)?.trim() || null,
+    nextStopId,
+    nextStopName,
     provider: PROVIDER,
     hasRealtime,
   };
@@ -198,7 +240,7 @@ export function normalizeOpendataStationboard(
   const stationId = response.station?.id?.trim() || config.stopId;
 
   const departures = entries
-    .map((entry) => normalizeDeparture(entry))
+    .map((entry) => normalizeDeparture(entry, stationId))
     .filter((departure): departure is TransportDeparture => departure !== null)
     .filter((departure) => matchesFilters(departure, config))
     .filter((departure) => effectiveDepartureMs(departure) >= now.getTime() - 60_000)

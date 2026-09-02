@@ -185,3 +185,86 @@
   color: rgba(255, 255, 255, 0.72);
   padding: 24px;
 }
+
+.compact {
+  padding: clamp(8px, 1vh, 12px) clamp(12px, 1.4vw, 18px);
+  border-radius: clamp(4px, 0.5vh, 8px);
+}
+
+.compact .header {
+  margin-bottom: clamp(6px, 0.8vh, 10px);
+  gap: clamp(2px, 0.25vh, 4px);
+}
+
+.compact .eyebrow {
+  font-size: clamp(11px, 0.75vw, 14px);
+  letter-spacing: 0.14em;
+}
+
+.compact .station {
+  font-size: clamp(16px, 1.1vw, 20px);
+}
+
+.compact .subtitle {
+  font-size: clamp(11px, 0.75vw, 13px);
+}
+
+.compact .staleHint {
+  font-size: clamp(10px, 0.7vw, 12px);
+}
+
+.compact .directionColumns {
+  gap: clamp(8px, 1vw, 12px);
+}
+
+.compact .directionHeading {
+  font-size: clamp(10px, 0.7vw, 12px);
+  letter-spacing: 0.06em;
+}
+
+.compact .directionRows {
+  gap: clamp(3px, 0.35vh, 5px);
+}
+
+.compact .directionEmpty {
+  min-height: clamp(48px, 5vh, 72px);
+  padding: clamp(6px, 0.7vh, 10px);
+  font-size: clamp(11px, 0.75vw, 13px);
+}
+
+.compact .row {
+  grid-template-columns: minmax(56px, 20%) minmax(0, 1fr) minmax(64px, 22%);
+  gap: clamp(4px, 0.5vw, 8px);
+  padding: clamp(4px, 0.45vh, 6px) clamp(6px, 0.6vw, 8px);
+  border-radius: 6px;
+}
+
+.compact .category {
+  font-size: clamp(9px, 0.6vw, 11px);
+}
+
+.compact .line {
+  font-size: clamp(14px, 1vw, 18px);
+}
+
+.compact .destination {
+  font-size: clamp(11px, 0.8vw, 14px);
+}
+
+.compact .minutes {
+  font-size: clamp(12px, 0.85vw, 16px);
+}
+
+.compact .absoluteTime {
+  font-size: clamp(9px, 0.6vw, 11px);
+}
+
+.compact .delay {
+  font-size: clamp(9px, 0.6vw, 11px);
+}
+
+.compact .emptyState,
+.compact .unavailableState {
+  font-size: clamp(13px, 0.95vw, 16px);
+  padding: 12px;
+}

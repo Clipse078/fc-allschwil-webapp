@@ -19,6 +19,8 @@ const BASE_DEPARTURE: TransportDeparture = {
   delayMinutes: 3,
   platform: null,
   direction: "Basel, Bachgraben",
+  nextStopId: "8578171",
+  nextStopName: "Allschwil, Kreuzstrasse",
   provider: "opendata.ch",
   hasRealtime: true,
 };
@@ -33,8 +35,8 @@ function makeTransport(
     departures: [BASE_DEPARTURE],
     directionGroups: [
       {
-        id: "allschwil-dorf",
-        displayName: "Richtung Allschwil Dorf",
+        id: "allschwil-zentrum",
+        displayName: "Richtung Allschwil Zentrum",
         orientation: "left",
         departures: [],
       },
@@ -65,9 +67,9 @@ describe("Screen2TransportSlide", () => {
     expect(screen.getByText("Allschwil, Im Brüel")).toBeTruthy();
     expect(screen.getByText("Live-Abfahrten")).toBeTruthy();
     expect(screen.getByTestId("screen2-transport-direction-columns")).toBeTruthy();
-    expect(screen.getByTestId("screen2-transport-direction-allschwil-dorf")).toBeTruthy();
+    expect(screen.getByTestId("screen2-transport-direction-allschwil-zentrum")).toBeTruthy();
     expect(screen.getByTestId("screen2-transport-direction-bachgraben-basel")).toBeTruthy();
-    expect(screen.getByText("← RICHTUNG ALLSCHWIL DORF")).toBeTruthy();
+    expect(screen.getByText("← RICHTUNG ALLSCHWIL ZENTRUM")).toBeTruthy();
     expect(screen.getByText("RICHTUNG BACHGRABEN / BASEL →")).toBeTruthy();
     expect(screen.getByText("48")).toBeTruthy();
     expect(screen.getByText("Basel, Bachgraben")).toBeTruthy();
@@ -83,7 +85,7 @@ describe("Screen2TransportSlide", () => {
       />,
     );
 
-    const leftColumn = screen.getByTestId("screen2-transport-direction-allschwil-dorf");
+    const leftColumn = screen.getByTestId("screen2-transport-direction-allschwil-zentrum");
     const rightColumn = screen.getByTestId("screen2-transport-direction-bachgraben-basel");
     expect(leftColumn.getAttribute("data-orientation")).toBe("left");
     expect(rightColumn.getAttribute("data-orientation")).toBe("right");
@@ -98,7 +100,7 @@ describe("Screen2TransportSlide", () => {
       />,
     );
 
-    const leftColumn = screen.getByTestId("screen2-transport-direction-allschwil-dorf");
+    const leftColumn = screen.getByTestId("screen2-transport-direction-allschwil-zentrum");
     expect(leftColumn.querySelector('[data-testid="screen2-transport-direction-empty"]')).toBeTruthy();
     expect(leftColumn.textContent).toContain("Keine nächsten Verbindungen");
     expect(screen.getByTestId("screen2-transport-direction-bachgraben-basel").textContent).toContain(
@@ -111,6 +113,19 @@ describe("Screen2TransportSlide", () => {
     expect(source).not.toMatch(/destination\.includes/i);
     expect(source).not.toMatch(/direction\.includes/i);
     expect(source).toContain("directionGroups");
+  });
+
+  it("supports compact embedded panel variant", () => {
+    render(
+      <Screen2TransportSlide
+        transport={makeTransport()}
+        timezone="Europe/Zurich"
+        nowIso="2026-09-02T16:40:00.000Z"
+        compact
+      />,
+    );
+
+    expect(screen.getByTestId("screen2-transport-slide").getAttribute("data-compact")).toBe("true");
   });
 
   it("renders global empty state when no direction groups are configured", () => {

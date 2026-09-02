@@ -33,6 +33,9 @@ export type TransportDeparture = {
   delayMinutes: number | null;
   platform: string | null;
   direction: string | null;
+  /** Next stop after the configured departure stop when supplied by the provider. */
+  nextStopId: string | null;
+  nextStopName: string | null;
   provider: TransportProviderId;
   /** True when the provider supplied realtime/prognosis data for this row. */
   hasRealtime: boolean;

@@ -15,7 +15,6 @@ const BASE_CONFIG: TransportStopConfig = {
   stationDisplayName: "Allschwil, Im Brüel",
   departureCount: 8,
   refreshIntervalSeconds: 45,
-  rotatorIntervalMs: 20_000,
 };
 
 const NOW = new Date("2026-09-02T16:40:00.000Z");
@@ -57,6 +56,36 @@ describe("opendata.ch transport provider normalization", () => {
       realtimeDeparture: "2026-09-02T18:51:00+0200",
       delayMinutes: 3,
       hasRealtime: true,
+    });
+  });
+
+  it("extracts next-stop topology from passList", () => {
+    const result = normalizeOpendataStationboard(
+      makePayload([
+        {
+          category: "B",
+          number: "48",
+          to: "Basel, Bachgraben",
+          stop: {
+            departure: "2026-09-02T18:48:00+0200",
+            delay: 0,
+          },
+          passList: [
+            { station: { id: "8578172", name: "Allschwil, Im Brühl" } },
+            { station: { id: "8578171", name: "Allschwil, Kreuzstrasse" } },
+          ],
+        },
+      ]),
+      BASE_CONFIG,
+      NOW,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.departures[0]).toMatchObject({
+      nextStopId: "8578171",
+      nextStopName: "Allschwil, Kreuzstrasse",
     });
   });
 

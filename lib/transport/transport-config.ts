@@ -13,9 +13,13 @@ export type TransportDirectionGroupConfig = {
   id: string;
   displayName: string;
   orientation: TransportDirectionOrientation;
-  /** Preferred matchers against provider direction/headsign fields. */
+  /** Primary matchers against the provider next-stop name after the departure stop. */
+  nextStopMatchers?: string[];
+  /** Matchers against the provider next-stop identifier. */
+  nextStopIdMatchers?: string[];
+  /** Fallback matchers against provider direction/headsign fields. */
   providerDirectionMatchers?: string[];
-  /** Controlled fallback matchers against normalized destination text. */
+  /** Last-resort fallback matchers against normalized destination text. */
   destinationMatchers?: string[];
 };
 
@@ -41,24 +45,28 @@ export type TransportStopConfig = {
   directionGroups?: TransportDirectionGroupConfig[];
   /** Server/client refresh interval in seconds. */
   refreshIntervalSeconds: number;
-  /** Center rotator dwell time per slide in milliseconds. */
-  rotatorIntervalMs: number;
 };
 
+/**
+ * Physical directions from Allschwil, Im Brüel (8578172) validated via
+ * transport.opendata.ch passList next-stop topology (2026-09-02):
+ *   - Hagmattstrasse: south/west through Allschwil (Friedhof, Oberwil, Therwil, Basel SBB)
+ *   - Kreuzstrasse: north/east towards Bachgraben and Basel city
+ */
 export const FC_ALLSCHWIL_DIRECTION_GROUPS: TransportDirectionGroupConfig[] = [
   {
-    id: "allschwil-dorf",
-    displayName: "Richtung Allschwil Dorf",
+    id: "allschwil-zentrum",
+    displayName: "Richtung Allschwil Zentrum",
     orientation: "left",
-    providerDirectionMatchers: ["Allschwil, Friedhof", "Allschwil, Dorf"],
-    destinationMatchers: ["allschwil, friedhof", "allschwil, dorf"],
+    nextStopMatchers: ["Allschwil, Hagmattstrasse"],
+    nextStopIdMatchers: ["8578173"],
   },
   {
     id: "bachgraben-basel",
     displayName: "Richtung Bachgraben / Basel",
     orientation: "right",
-    providerDirectionMatchers: ["Basel, Bachgraben", "Basel,"],
-    destinationMatchers: ["bachgraben", "basel,"],
+    nextStopMatchers: ["Allschwil, Kreuzstrasse"],
+    nextStopIdMatchers: ["8578171"],
   },
 ];
 
@@ -74,10 +82,9 @@ const FC_ALLSCHWIL_TRANSPORT: TransportStopConfig = {
   },
   allowedCategories: ["bus", "tram", "train"],
   departureCount: 8,
-  departuresPerDirectionGroup: 4,
+  departuresPerDirectionGroup: 3,
   directionGroups: FC_ALLSCHWIL_DIRECTION_GROUPS,
   refreshIntervalSeconds: 45,
-  rotatorIntervalMs: 20_000,
 };
 
 const TENANT_TRANSPORT_CONFIG: Readonly<Record<string, TransportStopConfig>> = {
