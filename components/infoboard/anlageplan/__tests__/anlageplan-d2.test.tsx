@@ -579,10 +579,8 @@ describe("E. Screen 2 framing — live canvas uses 16:9 aspect ratio", () => {
 
   it("anlageplan-map-canvas maximizes within the center zone without distortion", () => {
     const mapCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
-    expect(mapCss).toContain("width: min(100cqw, calc(100cqh * 16 / 9))");
-    expect(mapCss).toContain("height: min(100cqh, calc(100cqw * 9 / 16))");
-    expect(mapCss).toContain("max-width: 100%");
-    expect(mapCss).toContain("max-height: 100%");
+    expect(mapCss).toContain("width: max(100cqw, calc(100cqh * 16 / 9))");
+    expect(mapCss).toContain("height: max(100cqh, calc(100cqw * 9 / 16))");
 
     render(
       <InfoboardAnlageplan

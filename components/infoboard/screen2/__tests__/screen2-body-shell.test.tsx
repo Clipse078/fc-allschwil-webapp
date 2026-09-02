@@ -190,8 +190,9 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.anlageplanMapHeightPx).toBe(
       mapDimensions.heightPx,
     );
-    expect(mapDimensions.widthPx).toBeLessThanOrEqual(SCREEN2_CENTER_WIDTH_PX);
-    expect(mapDimensions.heightPx).toBeLessThanOrEqual(SCREEN2_CENTER_HEIGHT_PX);
+    expect(mapDimensions.heightPx).toBe(SCREEN2_CENTER_HEIGHT_PX);
+    expect(mapDimensions.widthPx).toBeGreaterThan(SCREEN2_CENTER_WIDTH_PX);
+    expect(mapDimensions.widthPx / mapDimensions.heightPx).toBeCloseTo(16 / 9, 2);
 
     const sizing = readRepoFile("lib/infoboard/screen2-body-shell-sizing.ts");
     expect(sizing).toContain("SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT");
@@ -273,7 +274,7 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
     expect(anlageplanCss).toContain("flex-direction: column");
   });
 
-  it("Anlageplan outer sizing preserves 16/9 aspect ratio inside center", () => {
+  it("Anlageplan outer sizing uses 16/9 cover-fit inside center", () => {
     render(
       <InfoboardAnlageplan
         payload={makeAnlageplanPayload()}
@@ -284,8 +285,8 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
     const canvas = screen.getByTestId("anlageplan-map-canvas");
     const mapCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
     expect(mapCss).toContain("aspect-ratio: 16 / 9");
-    expect(mapCss).toContain("width: min(100cqw, calc(100cqh * 16 / 9))");
-    expect(mapCss).toContain("height: min(100cqh, calc(100cqw * 9 / 16))");
+    expect(mapCss).toContain("width: max(100cqw, calc(100cqh * 16 / 9))");
+    expect(mapCss).toContain("height: max(100cqh, calc(100cqw * 9 / 16))");
     expect(canvas.className).toContain("mapCanvas");
   });
 });

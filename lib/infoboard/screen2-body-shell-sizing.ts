@@ -77,16 +77,17 @@ export const SCREEN2_CENTER_HEIGHT_PX = SCREEN2_BODY_INNER_HEIGHT_PX;
 export const ANLAGEPLAN_MAP_ASPECT_RATIO = 16 / 9;
 
 /**
- * Fit the Anlageplan map inside the center zone while preserving 16:9.
- * Width-constrained when the center is relatively tall; height-constrained
- * when the center is relatively wide.
+ * Size the Anlageplan map for cover-fit inside the Screen 2 center zone while
+ * preserving 16:9. When the center is taller than 16:9 the map scales to full
+ * height and peripheral horizontal scenery is clipped by the center overflow
+ * boundary. When the center is wider than 16:9 the map scales to full width.
  */
 export function computeAnlageplanMapDimensions(
   centerWidthPx: number,
   centerHeightPx: number,
 ): { readonly widthPx: number; readonly heightPx: number } {
   const containerRatio = centerWidthPx / centerHeightPx;
-  if (containerRatio > ANLAGEPLAN_MAP_ASPECT_RATIO) {
+  if (containerRatio < ANLAGEPLAN_MAP_ASPECT_RATIO) {
     const heightPx = centerHeightPx;
     return {
       widthPx: Math.round(heightPx * ANLAGEPLAN_MAP_ASPECT_RATIO),
