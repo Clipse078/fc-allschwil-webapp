@@ -227,6 +227,55 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
       clubLogoUrl: null,
     });
   });
+
+  it("maps every canonical participant without an artificial collection cap", async () => {
+    const participants = Array.from({ length: 8 }, (_, index) => ({
+      id: `p-${index + 1}`,
+      eventId: "evt-t8",
+      displayName: `Club ${index + 1}`,
+      manualLabel: null,
+      displayOrder: index,
+      team: null,
+      externalClub: {
+        name: `Club ${index + 1}`,
+        shortName: null,
+        logoUrl: `https://cdn.example.com/club-${index + 1}.png`,
+      },
+      externalTeam: null,
+      dressingRoomAllocations:
+        index === 3
+          ? []
+          : [
+              {
+                displayOrder: 0,
+                facilityResource: {
+                  code: `O${index + 1}`,
+                  name: `Kabine O${index + 1}`,
+                },
+              },
+            ],
+    }));
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => participants,
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t8"],
+      null,
+    );
+    const allocations = extensions[0]?.participantAllocations;
+
+    expect(allocations).toHaveLength(8);
+    expect(allocations?.map((allocation) => allocation.id)).toEqual(
+      participants.map((participant) => participant.id),
+    );
+    expect(allocations?.[3]?.dressingRoomLabel).toBeNull();
+    expect(allocations?.[4]?.dressingRoomLabel).toBe("O5");
+  });
 });
 
 describe("resolveCanonicalTournamentEventId", () => {

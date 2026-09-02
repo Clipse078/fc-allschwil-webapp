@@ -189,12 +189,9 @@ export const CARD_DEMAND_MATCH_SUB_TEAM = 0.22;
 export const CARD_DEMAND_MATCH_END_TIME = 0.12;
 /** Base demand for a tournament card. */
 export const CARD_DEMAND_TOURNAMENT_BASE = 1.5;
-/**
- * Added demand per centre participant display row for small tournaments
- * (< 3 participants, logo strip only — no KABINE allocation matrix).
- */
+/** Legacy demand increment retained for compatibility with exported helpers. */
 export const CARD_DEMAND_TOURNAMENT_DISPLAY_ROW = 0.25;
-/** Added demand per KABINE allocation row (≥ 3 participants). */
+/** Added demand per canonical KABINE allocation row. */
 export const CARD_DEMAND_TOURNAMENT_PARTICIPANT = 0.3;
 /** Centre participant grid columns — matches tournamentParticipants CSS. */
 export const TOURNAMENT_PARTICIPANT_DISPLAY_COLUMNS = 2;
@@ -324,9 +321,8 @@ export function computeMatchContentSafeMinimum(
 
 /**
  * Semantic demand for a TOURNAMENT card.
- * Small tournaments (< 3 participants) use centre display-row demand only.
- * Larger tournaments use KABINE allocation-row demand to avoid double-counting
- * the same participant information shown in both zones.
+ * Every canonical participant produces one KABINE allocation row, so demand
+ * grows linearly for the complete 1–N participant collection.
  * Exported for regression testing.
  */
 export function computeTournamentDemand(
@@ -334,12 +330,6 @@ export function computeTournamentDemand(
 ): number {
   const count = participantAllocations?.length ?? 0;
   if (count === 0) return CARD_DEMAND_TOURNAMENT_BASE;
-  if (count < 3) {
-    return (
-      CARD_DEMAND_TOURNAMENT_BASE
-      + computeTournamentParticipantDisplayRows(count) * CARD_DEMAND_TOURNAMENT_DISPLAY_ROW
-    );
-  }
   return CARD_DEMAND_TOURNAMENT_BASE + count * CARD_DEMAND_TOURNAMENT_PARTICIPANT;
 }
 
@@ -354,15 +344,10 @@ export function computeEventDemand(
 ): number {
   if (type === "TOURNAMENT") {
     if (participantCount === 0) return CARD_DEMAND_TOURNAMENT_BASE;
-    if (participantCount < 3) {
-      const synthetic = Array.from({ length: participantCount }, (_, i) => ({
-        id: `p${i}`,
-        teamDisplayName: `Team ${i}`,
-        dressingRoomLabel: null,
-      }));
-      return computeTournamentDemand(synthetic);
-    }
-    return CARD_DEMAND_TOURNAMENT_BASE + participantCount * CARD_DEMAND_TOURNAMENT_PARTICIPANT;
+    return (
+      CARD_DEMAND_TOURNAMENT_BASE
+      + participantCount * CARD_DEMAND_TOURNAMENT_PARTICIPANT
+    );
   }
   return CARD_DEMAND_MATCH;
 }
@@ -813,7 +798,7 @@ type ParticipantAllocationBlockProps = {
 };
 
 /**
- * Compact allocation matrix for tournaments with ≥ 3 participating teams.
+ * Compact allocation matrix for tournaments with canonical participants.
  * Each team is paired explicitly with its dressing room on the same row.
  */
 function ParticipantAllocationBlock({
@@ -1002,7 +987,7 @@ function TournamentDestination({
         </span>
 
         {participantAllocations !== undefined &&
-        participantAllocations.length >= 3 ? (
+        participantAllocations.length > 0 ? (
           <ParticipantAllocationBlock allocations={participantAllocations} />
         ) : (
           <span
@@ -1418,7 +1403,7 @@ function EventCard({
                 className={styles.tournamentParticipantLogos}
                 data-testid="tournament-participants"
               >
-                {participantAllocations.slice(0, 4).map((participant) => (
+                {participantAllocations.map((participant) => (
                   <MatchClubLogo
                     key={participant.id}
                     logoUrl={participant.clubLogoUrl ?? null}
