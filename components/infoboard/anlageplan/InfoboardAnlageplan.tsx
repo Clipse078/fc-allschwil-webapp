@@ -37,6 +37,9 @@ import { KIOSK_SHELL_CSS_VARS } from "@/lib/infoboard/kiosk-shell-sizing";
 import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShell";
+import { Screen2CenterStack } from "@/components/infoboard/screen2/Screen2CenterStack";
+import { resolveTenantTransportConfig } from "@/lib/transport/transport-config";
+import type { TransportResult } from "@/lib/transport/transport-types";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
 import styles from "./InfoboardAnlageplan.module.css";
 
@@ -69,6 +72,10 @@ export type InfoboardAnlageplanProps = {
   shellConfig?: InfoboardAnlageplanShellConfig | null;
   /** Preview-only: keep the supplied simulated moment fixed. */
   liveClock?: boolean;
+  /** Tenant key for transport refresh configuration. */
+  tenantKey?: string | null;
+  /** Initial normalized transport payload from the server boundary. */
+  transport?: TransportResult | null;
 };
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -80,6 +87,8 @@ export function InfoboardAnlageplan({
   branding,
   shellConfig,
   liveClock = true,
+  tenantKey = null,
+  transport = null,
 }: InfoboardAnlageplanProps): ReactElement {
   const { screen2, anlageplanConfig, backgroundUrl, currentTimeIso } = payload;
   const tz = screen2.feed.tenant.timezone;
@@ -104,6 +113,28 @@ export function InfoboardAnlageplan({
 
   // Build pitch occupancy lookup from VISIBLE pitches only.
   const pitchMap = new Map(visiblePitches.map((p) => [p.code, p]));
+  const transportConfig = tenantKey ? resolveTenantTransportConfig(tenantKey) : null;
+
+  const anlageplanCenter = (
+    <div data-testid="anlageplan-slide" className={styles.anlageplanSlide}>
+      <div className={styles.mapRow}>
+        <div
+          data-testid="anlageplan-map-canvas"
+          className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
+        >
+          <AnlageplanMapScene
+            config={anlageplanConfig}
+            backgroundUrl={backgroundUrl}
+            bgTransform={bgTransform}
+            pitchMap={pitchMap}
+            suppressedCodes={suppressedCodes}
+            timezone={tz}
+            richEventCards={richEventCards}
+          />
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -142,24 +173,19 @@ export function InfoboardAnlageplan({
       <div data-testid="anlageplan-main-region" className={styles.mainRegion}>
         <Screen2BodyShell
           center={
-            <div
-              data-testid="anlageplan-map-canvas"
-              className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
-            >
-              {/* Canonical shared map scene — identical geometry to designer + preview.
-                  suppressedCodes: zones for hierarchy-suppressed resources are
-                  completely omitted (not shown as FREI). This prop is absent/empty
-                  in the designer path so admins can see all configured zones. */}
-              <AnlageplanMapScene
-                config={anlageplanConfig}
-                backgroundUrl={backgroundUrl}
-                bgTransform={bgTransform}
-                pitchMap={pitchMap}
-                suppressedCodes={suppressedCodes}
+            transportConfig && tenantKey ? (
+              <Screen2CenterStack
+                tenantKey={tenantKey}
                 timezone={tz}
-                richEventCards={richEventCards}
-              />
-            </div>
+                initialTransport={transport}
+                refreshIntervalSeconds={transportConfig.refreshIntervalSeconds}
+                live={liveClock}
+              >
+                {anlageplanCenter}
+              </Screen2CenterStack>
+            ) : (
+              anlageplanCenter
+            )
           }
         />
       </div>

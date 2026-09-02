@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   buildScreen2LivePayload: vi.fn(),
   buildAnlageplanLivePayload: vi.fn(),
   getCanonicalKioskWeather: vi.fn(),
+  getCanonicalKioskTransport: vi.fn(),
   notFound: vi.fn(),
 }));
 
@@ -67,6 +68,10 @@ vi.mock("@/lib/publishing/infoboard/anlageplan-live-service", async () => {
 
 vi.mock("@/lib/infoboard/kiosk-weather", () => ({
   getCanonicalKioskWeather: mocks.getCanonicalKioskWeather,
+}));
+
+vi.mock("@/lib/infoboard/kiosk-transport", () => ({
+  getCanonicalKioskTransport: mocks.getCanonicalKioskTransport,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -157,6 +162,16 @@ describe("InfoboardScreen2Page — /infoboard/screen-2", () => {
     mocks.buildScreen2LivePayload.mockResolvedValue(SCREEN2_PAYLOAD);
     mocks.buildAnlageplanLivePayload.mockResolvedValue(ANLAGEPLAN_PAYLOAD);
     mocks.getCanonicalKioskWeather.mockResolvedValue({ isAvailable: false });
+    mocks.getCanonicalKioskTransport.mockResolvedValue({
+      isAvailable: true,
+      stationDisplayName: "Allschwil, Im Brüel",
+      stationId: "8578172",
+      departures: [],
+      directionGroups: [],
+      fetchedAt: NOW_ISO,
+      isStale: false,
+      hasRealtimeData: false,
+    });
     mocks.notFound.mockImplementation(() => {
       throw new Error("NEXT_NOT_FOUND");
     });

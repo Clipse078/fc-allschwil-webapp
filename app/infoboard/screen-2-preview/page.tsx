@@ -8,6 +8,7 @@ import {
 import { prisma } from "@/lib/db/prisma";
 import { getInfoboardBySlug } from "@/lib/infoboard/queries";
 import { resolveKioskTenant } from "@/lib/infoboard/kiosk-tenant";
+import { getCanonicalKioskTransport } from "@/lib/infoboard/kiosk-transport";
 import { resolveScreen2PreviewFacilities } from "@/lib/infoboard/screen2-preview-facility-resolver";
 import {
   buildAnlageplanLivePayload,
@@ -392,11 +393,15 @@ export default async function InfoboardScreen2PreviewPage() {
     currentTimeIso: PREVIEW_CURRENT_TIME_ISO_S2,
   };
 
+  const transport = await getCanonicalKioskTransport(tenant.key);
+
   return (
     <InfoboardAnlageplan
         payload={payload}
         weather={PREVIEW_WEATHER}
         richEventCards
+        tenantKey={tenant.key}
+        transport={transport}
       branding={{
         clubLogoSrc:
           tenant.logoUrl ??

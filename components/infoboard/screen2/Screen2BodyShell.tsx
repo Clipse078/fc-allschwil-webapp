@@ -5,8 +5,8 @@
  * LEFT SPONSOR | CENTER CONTENT | RIGHT SPONSOR
  *
  * Header and footer remain outside this shell. The center slot is owned
- * separately so a future rotator can replace its children without touching
- * sponsor rails or the shared kiosk shell.
+ * separately so static map + ÖV content can evolve without touching sponsor
+ * rails or the shared kiosk shell.
  */
 
 import type { ReactElement, ReactNode, CSSProperties } from "react";

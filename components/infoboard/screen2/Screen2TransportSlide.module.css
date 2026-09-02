@@ -1,0 +1,333 @@
+/**
+ * components/infoboard/screen2/Screen2TransportSlide.module.css
+ *
+ * INFOBOARD-TRANSPORT-02 — premium TV-distance transport departures slide.
+ */
+
+.slide {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: clamp(18px, 2.4vh, 28px) clamp(22px, 2.8vw, 36px);
+  box-sizing: border-box;
+  color: #ffffff;
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(10, 18, 28, 0.96) 0%, rgba(6, 11, 18, 0.98) 100%);
+  border-radius: clamp(6px, 0.8vh, 14px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(4px, 0.5vh, 8px);
+  margin-bottom: clamp(14px, 1.8vh, 22px);
+}
+
+.eyebrow {
+  font-size: clamp(18px, 1.45vw, 24px);
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: rgba(125, 211, 252, 0.92);
+}
+
+.station {
+  font-size: clamp(28px, 2.2vw, 38px);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.directionColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(14px, 1.6vw, 22px);
+  flex: 1;
+  min-height: 0;
+}
+
+.directionColumn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  gap: clamp(8px, 1vh, 12px);
+}
+
+.directionHeading {
+  margin: 0;
+  font-size: clamp(15px, 1.05vw, 19px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  color: rgba(125, 211, 252, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.directionRows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 0.8vh, 10px);
+  flex: 1;
+  min-height: 0;
+}
+
+.directionEmpty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: clamp(96px, 12vh, 140px);
+  padding: clamp(12px, 1.4vh, 18px);
+  border-radius: 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  text-align: center;
+  font-size: clamp(16px, 1.1vw, 20px);
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1vh, 12px);
+  flex: 1;
+  min-height: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(88px, 22%) minmax(0, 1fr) minmax(96px, 24%);
+  align-items: center;
+  gap: clamp(8px, 1vw, 14px);
+  padding: clamp(8px, 0.9vh, 12px) clamp(10px, 1vw, 14px);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-sizing: border-box;
+}
+
+.lineBlock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.category {
+  font-size: clamp(14px, 0.95vw, 17px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(148, 163, 184, 0.95);
+}
+
+.lineBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: clamp(28px, 2vw, 36px);
+  height: clamp(22px, 1.5vw, 28px);
+  padding: 0 clamp(6px, 0.45vw, 8px);
+  border-radius: 5px;
+  font-size: clamp(18px, 1.35vw, 24px);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+}
+
+.destination {
+  font-size: clamp(18px, 1.25vw, 24px);
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.departureBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+}
+
+.minutes {
+  font-size: clamp(20px, 1.45vw, 28px);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.minutesSoon {
+  color: #4ade80;
+}
+
+.minutesMedium {
+  color: var(--sce-warning, #fbbf24);
+}
+
+.minutesLong {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.minutesImminent {
+  font-weight: 900;
+  color: #4ade80;
+}
+
+.absoluteTime {
+  font-size: clamp(14px, 0.95vw, 17px);
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.62);
+  white-space: nowrap;
+}
+
+.delayInline {
+  font-size: inherit;
+  color: rgba(251, 146, 60, 0.92);
+  font-weight: 700;
+}
+
+.emptyState,
+.unavailableState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 0;
+  text-align: center;
+  font-size: clamp(22px, 1.6vw, 30px);
+  color: rgba(255, 255, 255, 0.72);
+  padding: 24px;
+}
+
+.compact {
+  height: var(--screen2-transport-panel-height);
+  max-height: var(--screen2-transport-panel-height);
+  padding: 6px 14px 8px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.compact .header {
+  margin-bottom: 4px;
+  gap: 1px;
+  flex-shrink: 0;
+}
+
+.compact .eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  line-height: 1.1;
+}
+
+.compact .station {
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.compact .directionColumns {
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+
+.compact .directionColumn {
+  gap: 3px;
+  min-height: 0;
+}
+
+.compact .directionHeading {
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+.compact .directionRows {
+  display: grid;
+  grid-template-rows: repeat(
+    3,
+    var(--screen2-transport-row-height, 36px)
+  );
+  gap: var(--screen2-transport-row-gap, 3px);
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.compact .directionEmpty {
+  min-height: calc(
+    3 * var(--screen2-transport-row-height, 36px) +
+      2 * var(--screen2-transport-row-gap, 3px)
+  );
+  max-height: calc(
+    3 * var(--screen2-transport-row-height, 36px) +
+      2 * var(--screen2-transport-row-gap, 3px)
+  );
+  padding: 6px;
+  font-size: 11px;
+}
+
+.compact .row {
+  grid-template-columns: minmax(56px, 20%) minmax(0, 1fr) minmax(64px, 22%);
+  gap: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  height: var(--screen2-transport-row-height, 36px);
+  min-height: var(--screen2-transport-row-height, 36px);
+  max-height: var(--screen2-transport-row-height, 36px);
+}
+
+.compact .category {
+  font-size: 9px;
+}
+
+.compact .lineBadge {
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.compact .destination {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.compact .minutes {
+  font-size: 13px;
+}
+
+.compact .minutesSoon,
+.compact .minutesImminent {
+  color: #4ade80;
+}
+
+.compact .minutesMedium {
+  color: #fbbf24;
+}
+
+.compact .minutesLong {
+  color: rgba(255, 255, 255, 0.58);
+}
+
+.compact .absoluteTime {
+  font-size: 10px;
+}
+
+.compact .delayInline {
+  font-size: 10px;
+}
+
+.compact .emptyState,
+.compact .unavailableState {
+  font-size: 13px;
+  padding: 12px;
+}

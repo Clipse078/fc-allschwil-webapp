@@ -57,6 +57,7 @@ import {
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { CanonicalInfoboardPolicyDatabase } from "@/lib/publishing/infoboard/canonical-source-loader";
 import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
+import { getCanonicalKioskTransport } from "@/lib/infoboard/kiosk-transport";
 
 export const metadata: Metadata = {
   title: "Infoboard — Screen 2",
@@ -162,10 +163,14 @@ export default async function InfoboardScreen2Page() {
         : null,
     };
 
+    const transport = await getCanonicalKioskTransport(tenantRow.key);
+
     return (
       <InfoboardAnlageplan weather={weather}
         payload={payload}
         shellConfig={shellConfig}
+        tenantKey={tenantRow.key}
+        transport={transport}
         branding={{
           clubLogoSrc,
           productLogoSrc: PRODUCT_LOGO_SRC,
