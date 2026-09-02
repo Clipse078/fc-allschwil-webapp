@@ -30,6 +30,8 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { PUBLIC_CACHE_DOMAINS } from "@/lib/website/public-cache-tags";
+import { scheduleTenantPublicWebsiteCacheNotificationByTenantId } from "@/lib/website/public-cache-notification";
 import type { TrainingSessionAllocationDto, CreateTrainingSessionAllocationInput } from "./types";
 import type { TrainingAllocationSummary } from "./operational-state";
 import {
@@ -184,6 +186,10 @@ export async function createTrainingSessionAllocation(
       include: sessionAllocationInclude,
     });
 
+    void scheduleTenantPublicWebsiteCacheNotificationByTenantId(tenantId, [
+      PUBLIC_CACHE_DOMAINS.WEEKPLAN,
+    ]);
+
     return allocationToDto(allocation as unknown as SessionAllocationRow);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -205,6 +211,9 @@ export async function deleteTrainingSessionAllocation(
 ): Promise<void> {
   await requireSessionAllocation(tenantId, allocationId);
   await prisma.trainingSessionAllocation.delete({ where: { id: allocationId } });
+  void scheduleTenantPublicWebsiteCacheNotificationByTenantId(tenantId, [
+    PUBLIC_CACHE_DOMAINS.WEEKPLAN,
+  ]);
 }
 
 /**
