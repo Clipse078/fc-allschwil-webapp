@@ -77,6 +77,7 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
         teamDisplayName: "FCA E1 Tournament",
         dressingRoomLabel: "DR-A",
         clubLogoUrl: "https://cdn.example.com/tenant.png",
+        clubLogoContrastMode: "normal",
         isHomeTeam: true,
       },
       {
@@ -84,6 +85,7 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
         teamDisplayName: "FC Allschwil E1",
         dressingRoomLabel: "DR-B",
         clubLogoUrl: "https://cdn.example.com/fca.png",
+        clubLogoContrastMode: "normal",
       },
     ]);
   });
@@ -292,6 +294,7 @@ describe("buildScreen1TournamentPresentationExtensions", () => {
             teamDisplayName: "FC Diegten-Eptingen",
             dressingRoomLabel: null,
             clubLogoUrl: "https://cdn.example.com/diegten.png",
+            clubLogoContrastMode: "normal",
           },
         ],
       },
@@ -418,7 +421,85 @@ describe("buildScreen1TournamentPresentationExtensions", () => {
         teamDisplayName: "Gastverein",
         dressingRoomLabel: null,
         clubLogoUrl: null,
+        clubLogoContrastMode: "normal",
       },
+    ]);
+  });
+
+  it("maps external club logoContrastMode to presentation contrast", async () => {
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => [
+          {
+            id: "p-dark",
+            eventId: "evt-dark",
+            displayName: null,
+            manualLabel: null,
+            displayOrder: 0,
+            team: null,
+            externalClub: {
+              name: "FC Black Stars Basel",
+              shortName: null,
+              logoUrl: "https://cdn.example.com/black-stars.png",
+              logoContrastMode: "INVERT_ON_DARK",
+            },
+            externalTeam: null,
+            dressingRoomAllocations: [],
+          },
+        ],
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-dark"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations?.[0]?.clubLogoContrastMode).toBe(
+      "invert-on-dark",
+    );
+  });
+
+  it("maps all tournament participants without an artificial logo cap", async () => {
+    const participants = Array.from({ length: 6 }, (_, index) => ({
+      id: `p-${index + 1}`,
+      eventId: "evt-t6",
+      displayName: `Club ${index + 1}`,
+      manualLabel: null,
+      displayOrder: index,
+      team: null,
+      externalClub: {
+        name: `Club ${index + 1}`,
+        shortName: null,
+        logoUrl: `https://cdn.example.com/club-${index + 1}.png`,
+      },
+      externalTeam: null,
+      dressingRoomAllocations: [],
+    }));
+
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => participants,
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-t6"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations).toHaveLength(6);
+    expect(extensions[0]?.participantAllocations?.map((row) => row.id)).toEqual([
+      "p-1",
+      "p-2",
+      "p-3",
+      "p-4",
+      "p-5",
+      "p-6",
     ]);
   });
 });

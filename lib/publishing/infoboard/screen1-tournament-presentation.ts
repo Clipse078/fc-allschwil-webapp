@@ -8,6 +8,7 @@
  * tenant boundaries.
  */
 
+import { resolveLogoContrastMode } from "@/lib/club-directory/logo-contrast";
 import type {
   InfoboardEventPresentationExtension,
   InfoboardTeamAllocationPresentation,
@@ -71,15 +72,18 @@ type TournamentParticipantRow = {
     readonly name: string;
     readonly shortName: string | null;
     readonly logoUrl: string | null;
+    readonly logoContrastMode?: string | null;
   } | null;
   readonly externalTeam: {
     readonly name: string;
     readonly shortName: string | null;
     readonly alternativeName: string | null;
     readonly logoUrl: string | null;
+    readonly logoContrastMode?: string | null;
     readonly externalClub: {
       readonly name: string;
       readonly logoUrl: string | null;
+      readonly logoContrastMode?: string | null;
     };
   } | null;
   readonly dressingRoomAllocations: readonly DressingRoomAllocationRow[];
@@ -180,6 +184,18 @@ function resolveParticipantLogoUrl(
   return resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
 }
 
+function resolveParticipantContrastMode(row: TournamentParticipantRow) {
+  if (row.externalClub) {
+    return resolveLogoContrastMode(row.externalClub);
+  }
+  if (row.externalTeam) {
+    const teamMode = resolveLogoContrastMode(row.externalTeam);
+    if (teamMode !== "normal") return teamMode;
+    return resolveLogoContrastMode(row.externalTeam.externalClub);
+  }
+  return "normal" as const;
+}
+
 function resolveDressingRoomLabel(
   allocations: readonly DressingRoomAllocationRow[],
 ): string | null {
@@ -202,6 +218,7 @@ function mapParticipantRows(
     teamDisplayName: resolveParticipantDisplayName(row),
     dressingRoomLabel: resolveDressingRoomLabel(row.dressingRoomAllocations),
     clubLogoUrl: resolveParticipantLogoUrl(row, tenantLogoUrl),
+    clubLogoContrastMode: resolveParticipantContrastMode(row),
     ...(row.team ? { isHomeTeam: true } : {}),
   }));
 }

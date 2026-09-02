@@ -14,6 +14,9 @@
  */
 
 import { render, screen, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   InfoboardScreen1,
@@ -62,6 +65,7 @@ import type {
 import type {
   InfoboardAnnouncementPresentation,
   InfoboardEventPresentationExtension,
+  InfoboardTeamAllocationPresentation,
 } from "@/components/infoboard/screen1/screen1-presentation-types";
 
 // â”€â”€ Fixture helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -1223,7 +1227,7 @@ describe("4-team tournament allocation", () => {
     expect(screen.getAllByText("FC Allschwil E2").length).toBeGreaterThan(0);
   });
 
-  it("logo strip stays left-aligned and caps at four logos", () => {
+  it("logo strip stays left-aligned and renders all participant identities", () => {
     render(
       <InfoboardScreen1
         feed={PREVIEW_FIXTURE_TOURNAMENT_4TEAM}
@@ -1234,6 +1238,9 @@ describe("4-team tournament allocation", () => {
     expect(logoArea.getAttribute("data-layout")).toBeNull();
     expect(logoArea.className).toContain("tournamentParticipantLogos");
     expect(logoArea.querySelectorAll("img").length).toBe(4);
+    expect(
+      logoArea.querySelectorAll('[data-testid^="tournament-participant-logo-"]').length,
+    ).toBe(4);
     expect(logoArea.textContent?.trim()).toBe("");
   });
 
@@ -1296,6 +1303,341 @@ describe("Tournament logo strip alignment â€” INFOBOARD-LOGO-08A", () => {
       expect(logoArea.textContent?.trim()).toBe("");
     },
   );
+});
+
+describe("Dynamic tournament logo groups — INFOBOARD-TOURNAMENT-LOGOS-02A", () => {
+  function makeLogoAllocations(
+    count: number,
+  ): readonly InfoboardTeamAllocationPresentation[] {
+    return Array.from({ length: count }, (_, index) => ({
+      id: `logo-count-${index + 1}`,
+      teamDisplayName: `Participant ${index + 1}`,
+      dressingRoomLabel: `Kabine ${String.fromCharCode(65 + (index % 26))}`,
+      clubLogoUrl:
+        index % 4 === 3 ? null : `https://cdn.example.com/logo-${index + 1}.png`,
+    }));
+  }
+
+  function renderTournamentLogoGroup(count: number) {
+    const allocations = makeLogoAllocations(count);
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "evt-logo-count",
+          type: "TOURNAMENT",
+          displayTitle: "Logo Count Test Turnier",
+          allocation: {
+            pitchLabel: "Kunstrasen 1",
+            homeDressingRoomLabel: null,
+            awayDressingRoomLabel: null,
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        eventPresentation={makeEventPresentation("evt-logo-count", allocations)}
+      />,
+    );
+
+    return {
+      logoArea: screen.getByTestId("tournament-participants"),
+      allocations,
+    };
+  }
+
+  function countLogoIdentityNodes(logoArea: HTMLElement): number {
+    return logoArea.querySelectorAll('[data-testid^="tournament-participant-logo-"]').length;
+  }
+
+  it.each([1, 2, 4, 5, 6, 8, 9])(
+    "renders all %i participant identities without truncation",
+    (count) => {
+      const { logoArea } = renderTournamentLogoGroup(count);
+      expect(countLogoIdentityNodes(logoArea)).toBe(count);
+      expect(logoArea.className).toContain("tournamentParticipantLogos");
+    },
+  );
+
+  it("preserves canonical participant order in the logo strip", () => {
+    const { logoArea, allocations } = renderTournamentLogoGroup(6);
+    const nodes = Array.from(
+      logoArea.querySelectorAll('[data-testid^="tournament-participant-logo-"]'),
+    );
+    expect(
+      nodes.map((node) =>
+        node.getAttribute("data-testid")?.replace(/-placeholder$/, ""),
+      ),
+    ).toEqual(
+      allocations.map((participant) => `tournament-participant-logo-${participant.id}`),
+    );
+  });
+
+  it("includes fallback placeholder identities alongside crests", () => {
+    const { logoArea } = renderTournamentLogoGroup(8);
+    expect(logoArea.querySelectorAll("img").length).toBe(6);
+    expect(logoArea.querySelectorAll('[data-testid$="-placeholder"]')).toHaveLength(2);
+    expect(countLogoIdentityNodes(logoArea)).toBe(8);
+  });
+
+  it("renders six logo identities for the 6-team preview fixture", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_6TEAM}
+        eventPresentation={PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS}
+      />,
+    );
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(countLogoIdentityNodes(logoArea)).toBe(6);
+  });
+
+  it("does not duplicate organizer or participant identities in the logo strip", () => {
+    const allocations: InfoboardTeamAllocationPresentation[] = [
+      {
+        id: "dup-1",
+        teamDisplayName: "FC Allschwil",
+        dressingRoomLabel: "Kabine A",
+        clubLogoUrl: "https://cdn.example.com/allschwil.png",
+      },
+      {
+        id: "dup-2",
+        teamDisplayName: "FC Binningen",
+        dressingRoomLabel: "Kabine B",
+        clubLogoUrl: "https://cdn.example.com/binningen.png",
+      },
+      {
+        id: "dup-3",
+        teamDisplayName: "FC Reinach",
+        dressingRoomLabel: "Kabine C",
+        clubLogoUrl: "https://cdn.example.com/reinach.png",
+      },
+    ];
+
+    render(
+      <InfoboardScreen1
+        feed={makeFeed({
+          current: [
+            makeEvent({
+              id: "evt-dup-check",
+              type: "TOURNAMENT",
+              displayTitle: "Duplicate Guard Turnier",
+            }),
+          ],
+          isEmpty: false,
+        })}
+        eventPresentation={makeEventPresentation("evt-dup-check", allocations)}
+      />,
+    );
+
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(countLogoIdentityNodes(logoArea)).toBe(3);
+    expect(logoArea.querySelectorAll("img")).toHaveLength(3);
+  });
+
+  it("uses an adaptive wrapping logo container in Screen 1 CSS", () => {
+    const cssPath = join(
+      dirname(fileURLToPath(import.meta.url)),
+      "../InfoboardScreen1.module.css",
+    );
+    const css = readFileSync(cssPath, "utf8");
+    expect(css).toMatch(/\.tournamentParticipantLogos\s*\{[\s\S]*?flex-wrap:\s*wrap;/);
+  });
+
+  it("keeps match and training cards unchanged when tournament logos wrap", () => {
+    render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} />);
+    expect(screen.queryByTestId("tournament-participants")).toBeNull();
+    expect(screen.getAllByTestId("match-home-team-row").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("training-row-matrix").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Dark crest contrast — INFOBOARD-TOURNAMENT-LOGOS-02B", () => {
+  function renderMixedContrastTournament(
+    allocations: InfoboardTeamAllocationPresentation[],
+    theme: "DARK" | "LIGHT" = "DARK",
+  ) {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          id: "evt-contrast",
+          type: "TOURNAMENT",
+          displayTitle: "Contrast Test Turnier",
+        }),
+      ],
+      isEmpty: false,
+    });
+
+    render(
+      <InfoboardScreen1
+        feed={feed}
+        theme={theme}
+        eventPresentation={makeEventPresentation("evt-contrast", allocations)}
+      />,
+    );
+
+    return screen.getByTestId("tournament-participants");
+  }
+
+  it("leaves normal colored logos unchanged on dark surface", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "colored-1",
+        teamDisplayName: "FC Allschwil",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/allschwil.png",
+        clubLogoContrastMode: "normal",
+      },
+    ]);
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(img?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("applies invert-on-dark class for explicitly marked dark crests", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "dark-crest",
+        teamDisplayName: "FC Black Stars Basel",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/black-stars.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("invert-on-dark");
+    expect(img?.className).toContain("clubLogoInvertOnDark");
+  });
+
+  it("does not invert invert-on-dark crests on light surface", () => {
+    const logoArea = renderMixedContrastTournament(
+      [
+        {
+          id: "dark-crest",
+          teamDisplayName: "FC Black Stars Basel",
+          dressingRoomLabel: "B",
+          clubLogoUrl: "https://cdn.example.com/black-stars.png",
+          clubLogoContrastMode: "invert-on-dark",
+        },
+      ],
+      "LIGHT",
+    );
+
+    const img = logoArea.querySelector("img");
+    expect(img?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(img?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("does not invert placeholder identities", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "missing-crest",
+        teamDisplayName: "Unknown Club",
+        dressingRoomLabel: "C",
+        clubLogoUrl: null,
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const placeholder = logoArea.querySelector('[data-testid="tournament-participant-logo-missing-crest-placeholder"]');
+    expect(placeholder).toBeTruthy();
+    expect(placeholder?.className).not.toContain("clubLogoInvertOnDark");
+  });
+
+  it("renders mixed colored and inverted logos together", () => {
+    const logoArea = renderMixedContrastTournament([
+      {
+        id: "colored",
+        teamDisplayName: "FC Nordstern",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/nordstern.png",
+        clubLogoContrastMode: "normal",
+      },
+      {
+        id: "dark",
+        teamDisplayName: "FC Black Stars Basel",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/black-stars.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+    ]);
+
+    const images = logoArea.querySelectorAll("img");
+    expect(images).toHaveLength(2);
+    expect(images[0]?.getAttribute("data-logo-contrast")).toBe("normal");
+    expect(images[1]?.getAttribute("data-logo-contrast")).toBe("invert-on-dark");
+  });
+
+  it("preserves six-logo PlayMore identity count with contrast enabled", () => {
+    render(
+      <InfoboardScreen1
+        feed={PREVIEW_FIXTURE_TOURNAMENT_6TEAM}
+        eventPresentation={[
+          {
+            eventId: PREVIEW_FIXTURE_TOURNAMENT_6TEAM.current[0]!.id,
+            participantAllocations: PREVIEW_TOURNAMENT_6TEAM_EXTENSIONS[0]!
+              .participantAllocations!.map((participant, index) => ({
+                ...participant,
+                clubLogoContrastMode: index === 3 ? "invert-on-dark" : "normal",
+              })),
+          },
+        ]}
+      />,
+    );
+
+    const logoArea = screen.getByTestId("tournament-participants");
+    expect(
+      logoArea.querySelectorAll('[data-testid^="tournament-participant-logo-"]').length,
+    ).toBe(6);
+  });
+
+  it("preserves participant ordering with contrast metadata", () => {
+    const allocations: InfoboardTeamAllocationPresentation[] = [
+      {
+        id: "order-1",
+        teamDisplayName: "First",
+        dressingRoomLabel: "A",
+        clubLogoUrl: "https://cdn.example.com/1.png",
+        clubLogoContrastMode: "normal",
+      },
+      {
+        id: "order-2",
+        teamDisplayName: "Second",
+        dressingRoomLabel: "B",
+        clubLogoUrl: "https://cdn.example.com/2.png",
+        clubLogoContrastMode: "invert-on-dark",
+      },
+      {
+        id: "order-3",
+        teamDisplayName: "Third",
+        dressingRoomLabel: "C",
+        clubLogoUrl: "https://cdn.example.com/3.png",
+      },
+    ];
+
+    const logoArea = renderMixedContrastTournament(allocations);
+    const ids = [...logoArea.querySelectorAll("img")].map((img) =>
+      img.getAttribute("data-testid"),
+    );
+    expect(ids).toEqual([
+      "tournament-participant-logo-order-1",
+      "tournament-participant-logo-order-2",
+      "tournament-participant-logo-order-3",
+    ]);
+  });
+
+  it("keeps match and training rendering unchanged", () => {
+    const { container } = render(<InfoboardScreen1 feed={PREVIEW_FIXTURE} />);
+    expect(screen.queryByTestId("tournament-participants")).toBeNull();
+    expect(screen.getAllByTestId("match-home-team-row").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("training-row-matrix").length).toBeGreaterThan(0);
+    expect(container.querySelector('[data-logo-contrast="invert-on-dark"]')).toBeNull();
+  });
 });
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

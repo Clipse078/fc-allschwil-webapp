@@ -561,6 +561,11 @@
   object-fit: contain;
 }
 
+/* Explicit dark-surface inversion for predominantly dark crests (Screen 1). */
+.clubLogoInvertOnDark {
+  filter: brightness(0) invert(1);
+}
+
 .matchClubLogoPlaceholder,
 .tournamentClubLogoPlaceholder {
   display: inline-block;
@@ -586,9 +591,12 @@
 .tournamentParticipantLogos {
   display: flex;
   align-items: center;
-  gap: clamp(12px, 1.4vw, 22px);
-  flex-wrap: nowrap;
+  justify-content: flex-start;
+  column-gap: clamp(12px, 1.4vw, 22px);
+  row-gap: clamp(8px, 1vh, 14px);
+  flex-wrap: wrap;
   min-width: 0;
+  width: 100%;
 }
 
 .tournamentIdentity {
