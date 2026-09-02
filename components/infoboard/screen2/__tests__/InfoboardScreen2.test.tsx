@@ -162,7 +162,7 @@ describe("Theme", () => {
     const lightTemp = screen.getByTestId("header-weather-temperature").textContent;
 
     expect(darkTemp).toBe(lightTemp);
-    expect(screen.getByTestId("header-weather-condition").textContent).toBe("Teilweise bewÃ¶lkt");
+    expect(screen.getByTestId("header-weather-condition").textContent).toBe("Teilweise bewölkt");
   });
 });
 
