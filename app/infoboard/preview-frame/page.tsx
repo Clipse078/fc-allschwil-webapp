@@ -78,6 +78,8 @@ export default async function InfoboardPreviewFramePage({
         weather={data.weather}
         shellConfig={data.shellConfig}
         branding={data.branding}
+        tenantKey={data.tenantKey}
+        transport={data.transport}
         liveClock={false}
       />
     );

@@ -41,6 +41,7 @@ import {
 } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import type { Screen2TenantContext } from "@/lib/publishing/infoboard/screen2-live-service";
 import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
+import { getCanonicalKioskTransport } from "@/lib/infoboard/kiosk-transport";
 import { prisma } from "@/lib/db/prisma";
 
 // ── FCA branding constants ─────────────────────────────────────────────────────
@@ -151,12 +152,16 @@ export default async function InfoboardSlugPage({ params }: PageProps) {
         : null,
     };
 
+    const transport = await getCanonicalKioskTransport(tenantRow.key);
+
     return (
       <PhysicalInfoboardViewport>
         <InfoboardAnlageplan
           payload={payload}
           weather={weather}
           shellConfig={shellConfig}
+          tenantKey={tenantRow.key}
+          transport={transport}
           branding={{
             clubLogoSrc,
             productLogoSrc: PRODUCT_LOGO_SRC,

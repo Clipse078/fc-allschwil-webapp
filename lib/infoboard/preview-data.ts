@@ -22,6 +22,7 @@ import {
 } from "@/lib/publishing/infoboard/screen2-live-service";
 import { buildAnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import { getCanonicalKioskWeather } from "@/lib/infoboard/kiosk-weather";
+import { getCanonicalKioskTransport } from "@/lib/infoboard/kiosk-transport";
 
 const FC_ALLSCHWIL_TENANT_KEY = "fc-allschwil";
 const FC_ALLSCHWIL_LOGO_SRC = "/images/logos/fc-allschwil.png";
@@ -85,6 +86,7 @@ export async function buildScreen2PreviewData(tenant: PreviewTenant, now: Date) 
   const board = await getInfoboardBySlug("screen-2", tenant.id);
   const screen2Tenant = tenant as Screen2TenantContext;
   const weather = await getCanonicalKioskWeather();
+  const transport = await getCanonicalKioskTransport(tenant.key);
 
   if (board?.status === "ACTIVE" && board.templateType === "ANLAGENUEBERSICHT") {
     const payload = await buildAnlageplanLivePayload({
@@ -106,6 +108,8 @@ export async function buildScreen2PreviewData(tenant: PreviewTenant, now: Date) 
       renderer: "anlageplan" as const,
       payload,
       weather,
+      transport,
+      tenantKey: tenant.key,
       shellConfig,
       branding: {
         clubLogoSrc:
