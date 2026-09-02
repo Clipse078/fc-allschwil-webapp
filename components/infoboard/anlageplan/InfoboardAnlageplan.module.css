@@ -1,12 +1,13 @@
 /**
  * components/infoboard/anlageplan/InfoboardAnlageplan.module.css
  *
- * INFOBOARD-TRANSPORT-01B-UX2 — Anlageplan map canvas cover-fit inside Screen 2 center.
+ * INFOBOARD-TRANSPORT-01B-UX3 — Anlageplan map canvas contain-fit inside Screen 2 center.
  *
  * The center slot (~1156×879 at 1920×1080) is taller than 16:9. Contain-fit
- * letterboxed ~115px above/below; cover-fit scales to full center height and
- * clips peripheral horizontal scenery via the center overflow boundary.
- * Internal 16:9 geometry is preserved — no zone distortion.
+ * scales to full center width (~1156×650) and leaves symmetrical breathing
+ * room above/below inside the center panel. Complete map visibility is
+ * prioritized over filling every vertical pixel. Internal 16:9 geometry is
+ * preserved — no zone distortion.
  */
 
 .mainRegion {
@@ -20,8 +21,8 @@
 .mapCanvas {
   position: relative;
   aspect-ratio: 16 / 9;
-  width: max(100cqw, calc(100cqh * 16 / 9));
-  height: max(100cqh, calc(100cqw * 9 / 16));
+  width: min(100cqw, calc(100cqh * 16 / 9));
+  height: min(100cqh, calc(100cqw * 9 / 16));
   flex-shrink: 0;
   border-radius: clamp(6px, 0.8vh, 14px);
   overflow: hidden;
