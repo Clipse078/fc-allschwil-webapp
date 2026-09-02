@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MoreHorizontal, Pencil } from "lucide-react";
@@ -273,28 +274,37 @@ function formatExceptionDate(date: string): string {
   });
 }
 
+function buildTrainingSessionEditHref(sessionId: string): string {
+  return `/dashboard/training/sessions/${sessionId}/edit`;
+}
+
 function SeriesOccurrenceExceptionsIndicator({
   row,
 }: {
   row: CockpitRow;
 }) {
-  const router = useRouter();
   const anchorRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(false);
   const { occurrenceExceptionCount, exceptions } = row.occurrenceExceptions;
-
-  const openSession = useCallback(
-    (sessionId: string) => {
-      setOpen(false);
-      router.push(`/dashboard/training/sessions/${sessionId}/edit`);
-    },
-    [router],
-  );
 
   if (occurrenceExceptionCount === 0) return null;
 
   const label =
     occurrenceExceptionCount === 1 ? "1 Ausnahme" : `${occurrenceExceptionCount} Ausnahmen`;
+
+  if (occurrenceExceptionCount === 1) {
+    const sessionId = exceptions[0]!.sessionId;
+    return (
+      <Link
+        href={buildTrainingSessionEditHref(sessionId)}
+        className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[0.62rem] font-semibold text-blue-700 transition hover:bg-blue-100"
+        data-testid={`training-series-cockpit-exceptions-${row.rowKey}`}
+        aria-label={label}
+      >
+        {label}
+      </Link>
+    );
+  }
 
   return (
     <>
@@ -314,7 +324,7 @@ function SeriesOccurrenceExceptionsIndicator({
           <ul className="space-y-2">
             {exceptions.map((exception) => (
               <li key={exception.sessionId}>
-                <ExceptionListItem exception={exception} onOpen={() => openSession(exception.sessionId)} />
+                <ExceptionListItem exception={exception} />
               </li>
             ))}
           </ul>
@@ -326,16 +336,13 @@ function SeriesOccurrenceExceptionsIndicator({
 
 function ExceptionListItem({
   exception,
-  onOpen,
 }: {
   exception: SeriesCockpitOccurrenceException;
-  onOpen: () => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="w-full rounded-md border border-[var(--border)] bg-white px-2.5 py-2 text-left transition hover:bg-[var(--surface-2)]"
+    <Link
+      href={buildTrainingSessionEditHref(exception.sessionId)}
+      className="block w-full rounded-md border border-[var(--border)] bg-white px-2.5 py-2 text-left transition hover:bg-[var(--surface-2)]"
       data-testid={`training-series-cockpit-exception-item-${exception.sessionId}`}
     >
       <p className="text-xs font-semibold text-[var(--foreground)]">
@@ -351,7 +358,7 @@ function ExceptionListItem({
           </p>
         ))}
       </div>
-    </button>
+    </Link>
   );
 }
 
@@ -363,17 +370,11 @@ export default function TrainingSeriesCockpitRow({
   pitchFacilityGroups,
   dressingRoomFacilityGroups,
 }: Props) {
-  const router = useRouter();
   const menuAnchorRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const editable = canManage && row.status !== "ARCHIVED";
   const validFrom = formatDate(row.validFrom);
   const validUntil = formatDate(row.validUntil);
-
-  const navigateToSeriesEdit = useCallback(() => {
-    router.push(buildTrainingSeriesEditHref(row.seriesId));
-    setMenuOpen(false);
-  }, [router, row.seriesId]);
 
   return (
     <article
@@ -414,6 +415,16 @@ export default function TrainingSeriesCockpitRow({
       </div>
 
       <div className="flex items-center justify-end gap-1.5">
+        {editable ? (
+          <Link
+            href={buildTrainingSeriesEditHref(row.seriesId)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+            aria-label="Serie bearbeiten"
+            data-testid={`training-series-cockpit-edit-${row.rowKey}`}
+          >
+            <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
+          </Link>
+        ) : null}
         <SeriesOccurrenceExceptionsIndicator row={row} />
         <span
           className={cn(
@@ -446,28 +457,9 @@ export default function TrainingSeriesCockpitRow({
             <PopoverContent open={menuOpen} onOpenChange={setMenuOpen} anchorRef={menuAnchorRef} matchAnchorWidth={false}>
               <div className="min-w-44 py-1">
                 {editable ? (
-                  <>
-                    <button
-                      type="button"
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        navigateToSeriesEdit();
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.preventDefault();
-                          navigateToSeriesEdit();
-                        }
-                      }}
-                      className="block w-full px-3 py-2 text-left text-xs hover:bg-[var(--surface-2)]"
-                      data-testid={`training-series-cockpit-edit-${row.rowKey}`}
-                    >
-                      Serie bearbeiten
-                    </button>
-                    <div className="px-3 py-2">
-                      <TrainingSeriesArchiveButton seriesId={row.seriesId} seriesTitle={row.title} />
-                    </div>
-                  </>
+                  <div className="px-3 py-2">
+                    <TrainingSeriesArchiveButton seriesId={row.seriesId} seriesTitle={row.title} />
+                  </div>
                 ) : null}
                 {row.status !== "ARCHIVED" ? (
                   <div className="px-3 py-2">

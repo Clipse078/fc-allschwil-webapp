@@ -3,7 +3,7 @@
  *
  * components/admin/training/__tests__/TrainingSeriesCockpitRow.test.tsx
  *
- * TRAININGCENTER-EDIT-01D — Serie bearbeiten navigation + exception indicator.
+ * TRAININGCENTER-EDIT-01E — direct Link navigation for series edit + single exception.
  */
 
 import { fireEvent, render, screen } from "@testing-library/react";
@@ -65,13 +65,13 @@ const facilityGroups = [
   },
 ];
 
-describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
+describe("TrainingSeriesCockpitRow — series edit link", () => {
   beforeEach(() => {
     pushMock.mockReset();
     refreshMock.mockReset();
   });
 
-  it("navigates to the existing series edit route from the overflow menu on pointer activation", () => {
+  it("renders a direct link to the series edit route on the row", () => {
     render(
       <TrainingSeriesCockpitRow
         row={makeRow()}
@@ -83,17 +83,15 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-123:WEDNESDAY"));
-    fireEvent.mouseDown(screen.getByTestId("training-series-cockpit-edit-series-123:WEDNESDAY"));
-
-    expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-123/edit");
-    const pushedHref = pushMock.mock.calls[0]?.[0];
-    expect(pushedHref).not.toContain("{seriesId}");
-    expect(pushedHref).not.toContain("%7BseriesId%7D");
+    const editLink = screen.getByTestId("training-series-cockpit-edit-series-123:WEDNESDAY");
+    expect(editLink.tagName).toBe("A");
+    expect(editLink.getAttribute("href")).toBe("/dashboard/training/series/series-123/edit");
+    const href = editLink.getAttribute("href") ?? "";
+    expect(href).not.toContain("{seriesId}");
+    expect(href).not.toContain("%7BseriesId%7D");
   });
 
-  it("navigates to the existing series edit route from the overflow menu on keyboard activation", () => {
+  it("does not render series edit in the overflow menu", () => {
     render(
       <TrainingSeriesCockpitRow
         row={makeRow()}
@@ -106,15 +104,7 @@ describe("TrainingSeriesCockpitRow — Serie bearbeiten", () => {
     );
 
     fireEvent.click(screen.getByTestId("training-series-cockpit-menu-series-123:WEDNESDAY"));
-    fireEvent.keyDown(screen.getByTestId("training-series-cockpit-edit-series-123:WEDNESDAY"), {
-      key: "Enter",
-    });
-
-    expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/series/series-123/edit");
-    const pushedHref = pushMock.mock.calls[0]?.[0];
-    expect(pushedHref).not.toContain("{seriesId}");
-    expect(pushedHref).not.toContain("%7BseriesId%7D");
+    expect(screen.queryByText("Serie bearbeiten")).toBeNull();
   });
 });
 
@@ -134,7 +124,7 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
     expect(screen.queryByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toBeNull();
   });
 
-  it("shows an occurrence-based exception badge and detail list", () => {
+  it("links directly to the session edit page when there is exactly one exception", () => {
     render(
       <TrainingSeriesCockpitRow
         row={makeRow({
@@ -166,18 +156,21 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
       />,
     );
 
-    expect(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toHaveTextContent("1 Ausnahme");
-    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY"));
-    expect(screen.getByText(/Serien-Standard: E3/)).toBeTruthy();
-    expect(screen.getByText(/Garderobe: O4/)).toBeTruthy();
+    const exceptionLink = screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY");
+    expect(exceptionLink).toHaveTextContent("1 Ausnahme");
+    expect(exceptionLink.tagName).toBe("A");
+    expect(exceptionLink.getAttribute("href")).toBe("/dashboard/training/sessions/session-1/edit");
+    const href = exceptionLink.getAttribute("href") ?? "";
+    expect(href).not.toContain("{sessionId}");
+    expect(href).not.toContain("%7BsessionId%7D");
   });
 
-  it("opens the existing session edit page from an exception item", () => {
+  it("shows a popover list with link items when there are multiple exceptions", () => {
     render(
       <TrainingSeriesCockpitRow
         row={makeRow({
           occurrenceExceptions: {
-            occurrenceExceptionCount: 1,
+            occurrenceExceptionCount: 2,
             exceptions: [
               {
                 sessionId: "session-1",
@@ -193,6 +186,20 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
                   },
                 ],
               },
+              {
+                sessionId: "session-2",
+                date: "2026-09-09",
+                startsAt: "18:45",
+                endsAt: "20:15",
+                overrides: [
+                  {
+                    group: "PITCH_HALL",
+                    groupLabel: "Spielfeld",
+                    effectiveResourceName: "Kunstrasen 2 B",
+                    seriesDefaultResourceName: "Kunstrasen 3 A",
+                  },
+                ],
+              },
             ],
           },
         })}
@@ -204,9 +211,16 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
       />,
     );
 
-    fireEvent.click(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY"));
-    fireEvent.click(screen.getByTestId("training-series-cockpit-exception-item-session-1"));
+    const exceptionButton = screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY");
+    expect(exceptionButton).toHaveTextContent("2 Ausnahmen");
+    expect(exceptionButton.tagName).toBe("BUTTON");
 
-    expect(pushMock).toHaveBeenCalledWith("/dashboard/training/sessions/session-1/edit");
+    fireEvent.click(exceptionButton);
+    expect(screen.getByText(/Serien-Standard: E3/)).toBeTruthy();
+    expect(screen.getByText(/Garderobe: O4/)).toBeTruthy();
+
+    const sessionLink = screen.getByTestId("training-series-cockpit-exception-item-session-1");
+    expect(sessionLink.tagName).toBe("A");
+    expect(sessionLink.getAttribute("href")).toBe("/dashboard/training/sessions/session-1/edit");
   });
 });
