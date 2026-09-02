@@ -1,0 +1,93 @@
+/**
+ * components/infoboard/screen2/Screen2BodyShell.module.css
+ *
+ * INFOBOARD-TRANSPORT-01B — three-column Screen 2 body shell.
+ */
+
+.shell {
+  flex: 1;
+  display: grid;
+  grid-template-columns:
+    var(--screen2-sponsor-rail-width)
+    var(--screen2-center-width)
+    var(--screen2-sponsor-rail-width);
+  gap: var(--screen2-body-column-gap);
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+  padding:
+    var(--screen2-body-padding-y)
+    var(--screen2-body-padding-x);
+  box-sizing: border-box;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 14px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(99, 135, 175, 0.18);
+  background: linear-gradient(
+    180deg,
+    rgba(15, 28, 46, 0.92) 0%,
+    rgba(8, 14, 24, 0.96) 100%
+  );
+  color: rgba(232, 238, 244, 0.72);
+  text-align: center;
+}
+
+.railIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid rgba(99, 135, 175, 0.22);
+  background: rgba(18, 33, 58, 0.72);
+  color: rgba(232, 238, 244, 0.55);
+}
+
+.railHeadline {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: rgba(232, 238, 244, 0.82);
+}
+
+.railSubline {
+  font-family: var(--font-display, "Barlow Condensed", sans-serif);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  line-height: 1;
+  text-transform: uppercase;
+  color: rgba(232, 238, 244, 0.9);
+}
+
+.railLabel {
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(110, 135, 160, 0.9);
+}
