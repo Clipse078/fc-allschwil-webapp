@@ -2,8 +2,9 @@ import Link from "next/link";
 import { Archive, Dumbbell } from "lucide-react";
 import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 import TrainingSeriesCockpitRow from "./TrainingSeriesCockpitRow";
+import { cn } from "@/lib/cn";
 import type { TrainingSeriesCockpitRow as CockpitRow } from "@/lib/training/series-cockpit";
-import { groupCockpitRowsByWeekday } from "@/lib/training/series-cockpit";
+import { groupCockpitRowsByWeekday, TRAINING_SERIES_COCKPIT_GRID_CLASS } from "@/lib/training/series-cockpit";
 
 type Props = {
   cockpitRows: CockpitRow[];
@@ -72,12 +73,22 @@ export default function TrainingSeriesListView({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="hidden md:grid md:grid-cols-[5.5rem_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] gap-3 px-3 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <div
+            className={cn(
+              TRAINING_SERIES_COCKPIT_GRID_CLASS,
+              "hidden px-3 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)] md:grid",
+            )}
+            data-testid="training-series-cockpit-header"
+          >
             <span>Zeit</span>
             <span>Training / Team</span>
             <span>Spielfeld</span>
             <span>Garderobe</span>
-            <span className="text-right">Status</span>
+            <span>Ausnahme</span>
+            <span>Status</span>
+            <span className="hidden lg:block">Gültigkeit</span>
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
           </div>
 
           {weekdayGroups.map((group) => (

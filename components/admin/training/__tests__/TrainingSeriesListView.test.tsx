@@ -118,6 +118,25 @@ describe("TrainingSeriesListView — weekday cockpit", () => {
     expect(screen.queryByText("Ressourcen")).toBeNull();
     expect(screen.queryByText("Bearbeiten")).toBeNull();
   });
+
+  it("renders a stable desktop header grid aligned with cockpit rows", () => {
+    render(
+      <TrainingSeriesListView
+        cockpitRows={[makeRow()]}
+        showArchived={false}
+        archivedCount={0}
+        canManage={true}
+        canDelete={false}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    const header = screen.getByTestId("training-series-cockpit-header");
+    expect(header.className).toContain("md:grid-cols-[5.5rem_minmax(0,1.15fr)");
+    expect(screen.getByText("Ausnahme")).toBeTruthy();
+    expect(screen.getByText("Gültigkeit")).toBeTruthy();
+  });
 });
 
 describe("TrainingSeriesListView — ADMIN-DELETE-02A-C1 root-cause fix", () => {

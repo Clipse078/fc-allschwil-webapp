@@ -4,13 +4,17 @@ import { Info } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { getFacilitiesForTenant } from "@/lib/facilities/queries";
 import { getTrainingSeries } from "@/lib/training/training-service";
+import { listAllocationsByTrainingSeries } from "@/lib/training/training-allocation-service";
 import { findTeamSeasonPickerRow } from "@/lib/training/queries";
 import { TrainingSeriesNotFoundError } from "@/lib/training/errors";
 import { countSeriesOccurrenceAllocationExceptions } from "@/lib/training/series-cockpit-exception-data";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import TrainingSeriesForm from "@/components/admin/training/TrainingSeriesForm";
 import TrainingSeriesDeleteControl from "@/components/admin/training/TrainingSeriesDeleteControl";
+import { TrainingAllocationEditor } from "@/components/admin/training/TrainingAllocationEditor";
+import type { FacilityGroup } from "@/components/admin/training/FacilityResourceSelector";
 
 type Props = { params: Promise<{ seriesId: string }> };
 
@@ -34,6 +38,8 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
   // of trainings.manage (manage alone must never authorize deletion).
   const canDelete = hasPermission(session, PERMISSIONS.TRAININGS_DELETE);
 
+  const canManage = hasPermission(session, PERMISSIONS.TRAININGS_MANAGE);
+
   const tenantId = session.user?.activeTenantId;
   if (!tenantId) notFound();
 
@@ -47,14 +53,39 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
     throw err;
   }
 
-  const [teamSeasonRow, occurrenceExceptionCount] = await Promise.all([
+  const [teamSeasonRow, occurrenceExceptionCount, allocations, facilities] = await Promise.all([
     // TEAMCENTER-UX-01C: the team/season assignment is immutable on edit, and
     // findTeamSeasonsForTenant now intentionally scopes to the current season
     // only (see lib/training/queries.ts) — so a series created in a prior
     // season must still resolve its own TeamSeason for display here.
     findTeamSeasonPickerRow(tenantId, series.teamSeasonId),
     countSeriesOccurrenceAllocationExceptions(tenantId, seriesId, series.timezone),
+    listAllocationsByTrainingSeries(tenantId, seriesId).catch((err) => {
+      if (err instanceof TrainingSeriesNotFoundError) notFound();
+      throw err;
+    }),
+    getFacilitiesForTenant(tenantId),
   ]);
+
+  const facilityGroups: FacilityGroup[] = facilities
+    .filter((f) => f.status !== "ARCHIVED")
+    .map((f) => ({
+      facilityId: f.id,
+      facilityName: f.name,
+      facilityType: f.type as string,
+      resources: f.resources
+        .filter((r) => r.status !== "ARCHIVED")
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          code: r.code,
+          type: r.type,
+          facilityId: f.id,
+          facilityName: f.name,
+          facilityType: f.type as string,
+        })),
+    }))
+    .filter((fg) => fg.resources.length > 0);
 
   return (
     <div className="space-y-6">
@@ -104,6 +135,25 @@ export default async function EditTrainingSeriesPage({ params }: Props) {
           weekdaySchedules: series.weekdaySchedules,
         }}
       />
+
+      <div className="sce-detail-section" data-testid="training-series-edit-resources-section">
+        <div className="sce-detail-section-header">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">Ressourcen</h2>
+          <p className="text-xs text-[var(--muted)]">
+            Wiederkehrende Spielfeld- und Garderoben-Zuweisung für diese Serie. Einzeltermin-Ausnahmen bleiben unverändert.
+          </p>
+        </div>
+        <div className="sce-detail-section-body">
+          <TrainingAllocationEditor
+            trainingSeriesId={series.id}
+            trainingSeriesTitle={series.title}
+            initialAllocations={allocations}
+            facilityGroups={facilityGroups}
+            canManage={canManage}
+            embedded
+          />
+        </div>
+      </div>
 
       <TrainingSeriesDeleteControl
         seriesId={series.id}

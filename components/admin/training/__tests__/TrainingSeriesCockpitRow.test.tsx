@@ -224,3 +224,90 @@ describe("TrainingSeriesCockpitRow — occurrence exceptions", () => {
     expect(sessionLink.getAttribute("href")).toBe("/dashboard/training/sessions/session-1/edit");
   });
 });
+
+describe("TrainingSeriesCockpitRow — stable desktop columns", () => {
+  it("uses the shared cockpit grid on each row", () => {
+    render(
+      <TrainingSeriesCockpitRow
+        row={makeRow()}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    const row = screen.getByTestId("training-series-cockpit-row-series-123:WEDNESDAY");
+    expect(row.className).toContain("md:grid-cols-[5.5rem_minmax(0,1.15fr)");
+  });
+
+  it("renders pitch and dressing room in dedicated column cells", () => {
+    render(
+      <TrainingSeriesCockpitRow
+        row={makeRow()}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.getByTestId("training-series-cockpit-col-pitch-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-col-dressing-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-col-edit-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-col-more-series-123:WEDNESDAY")).toBeTruthy();
+  });
+
+  it("keeps the exception badge in its own column without removing the pitch column", () => {
+    const { rerender } = render(
+      <TrainingSeriesCockpitRow
+        row={makeRow()}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.getByTestId("training-series-cockpit-col-exception-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.queryByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toBeNull();
+
+    rerender(
+      <TrainingSeriesCockpitRow
+        row={makeRow({
+          occurrenceExceptions: {
+            occurrenceExceptionCount: 1,
+            exceptions: [
+              {
+                sessionId: "session-1",
+                date: "2026-09-02",
+                startsAt: "18:45",
+                endsAt: "20:15",
+                overrides: [
+                  {
+                    group: "DRESSING_ROOM",
+                    groupLabel: "Garderobe",
+                    effectiveResourceName: "O4",
+                    seriesDefaultResourceName: "E3",
+                  },
+                ],
+              },
+            ],
+          },
+        })}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.getByTestId("training-series-cockpit-col-pitch-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-col-exception-series-123:WEDNESDAY")).toBeTruthy();
+    expect(screen.getByTestId("training-series-cockpit-exceptions-series-123:WEDNESDAY")).toBeTruthy();
+  });
+});
