@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, MoreHorizontal, Pencil } from "lucide-react";
@@ -10,7 +11,12 @@ import PlanningWorkflowActionsClient from "@/components/admin/shared/PlanningWor
 import PlanningWorkflowBadge from "@/components/admin/shared/PlanningWorkflowBadge";
 import { PopoverContent } from "@/components/ui/Popover";
 import { cn } from "@/lib/cn";
-import type { TrainingSeriesCockpitRow as CockpitRow } from "@/lib/training/series-cockpit";
+import {
+  buildTrainingSeriesEditHref,
+  TRAINING_SERIES_COCKPIT_GRID_CLASS,
+  type TrainingSeriesCockpitRow as CockpitRow,
+} from "@/lib/training/series-cockpit";
+import type { SeriesCockpitOccurrenceException } from "@/lib/training/series-cockpit-exceptions";
 
 type ResourceGroup = "PITCH_HALL" | "DRESSING_ROOM";
 
@@ -260,6 +266,103 @@ function TimeQuickEdit({ row, disabled }: { row: CockpitRow; disabled: boolean }
   );
 }
 
+function formatExceptionDate(date: string): string {
+  const parsed = new Date(`${date}T12:00:00.000Z`);
+  return parsed.toLocaleDateString("de-CH", {
+    weekday: "short",
+    day: "2-digit",
+    month: "2-digit",
+  });
+}
+
+function buildTrainingSessionEditHref(sessionId: string): string {
+  return `/dashboard/training/sessions/${sessionId}/edit`;
+}
+
+function SeriesOccurrenceExceptionsIndicator({
+  row,
+}: {
+  row: CockpitRow;
+}) {
+  const anchorRef = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const { occurrenceExceptionCount, exceptions } = row.occurrenceExceptions;
+
+  if (occurrenceExceptionCount === 0) return null;
+
+  const label =
+    occurrenceExceptionCount === 1 ? "1 Ausnahme" : `${occurrenceExceptionCount} Ausnahmen`;
+
+  if (occurrenceExceptionCount === 1) {
+    const sessionId = exceptions[0]!.sessionId;
+    return (
+      <Link
+        href={buildTrainingSessionEditHref(sessionId)}
+        className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[0.62rem] font-semibold text-blue-700 transition hover:bg-blue-100"
+        data-testid={`training-series-cockpit-exceptions-${row.rowKey}`}
+        aria-label={label}
+      >
+        {label}
+      </Link>
+    );
+  }
+
+  return (
+    <>
+      <button
+        ref={anchorRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[0.62rem] font-semibold text-blue-700 transition hover:bg-blue-100"
+        data-testid={`training-series-cockpit-exceptions-${row.rowKey}`}
+        aria-label={label}
+      >
+        {label}
+      </button>
+      <PopoverContent open={open} onOpenChange={setOpen} anchorRef={anchorRef} matchAnchorWidth={false}>
+        <div className="w-72 space-y-2 p-2">
+          <p className="text-xs font-semibold text-[var(--foreground)]">Einzeltermine mit abweichender Zuweisung</p>
+          <ul className="space-y-2">
+            {exceptions.map((exception) => (
+              <li key={exception.sessionId}>
+                <ExceptionListItem exception={exception} />
+              </li>
+            ))}
+          </ul>
+        </div>
+      </PopoverContent>
+    </>
+  );
+}
+
+function ExceptionListItem({
+  exception,
+}: {
+  exception: SeriesCockpitOccurrenceException;
+}) {
+  return (
+    <Link
+      href={buildTrainingSessionEditHref(exception.sessionId)}
+      className="block w-full rounded-md border border-[var(--border)] bg-white px-2.5 py-2 text-left transition hover:bg-[var(--surface-2)]"
+      data-testid={`training-series-cockpit-exception-item-${exception.sessionId}`}
+    >
+      <p className="text-xs font-semibold text-[var(--foreground)]">
+        {formatExceptionDate(exception.date)} · {exception.startsAt}–{exception.endsAt}
+      </p>
+      <div className="mt-1 space-y-0.5">
+        {exception.overrides.map((override) => (
+          <p key={override.group} className="text-[0.68rem] text-[var(--text-2)]">
+            {override.groupLabel}: {override.effectiveResourceName}
+            {override.seriesDefaultResourceName ? (
+              <span className="text-[var(--muted)]"> · Serien-Standard: {override.seriesDefaultResourceName}</span>
+            ) : null}
+          </p>
+        ))}
+      </div>
+    </Link>
+  );
+}
+
 export default function TrainingSeriesCockpitRow({
   row,
   canManage,
@@ -276,19 +379,22 @@ export default function TrainingSeriesCockpitRow({
 
   return (
     <article
-      className="grid grid-cols-[5.5rem_minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,0.9fr)_auto] items-center gap-3 border-b border-[var(--border)] px-3 py-2 last:border-b-0 hover:bg-[var(--surface-2)]/40"
+      className={cn(
+        TRAINING_SERIES_COCKPIT_GRID_CLASS,
+        "border-b border-[var(--border)] px-3 py-2 last:border-b-0 hover:bg-[var(--surface-2)]/40",
+      )}
       data-testid={`training-series-cockpit-row-${row.rowKey}`}
     >
-      <div className="min-w-0">
+      <div className="min-w-0" data-testid={`training-series-cockpit-col-time-${row.rowKey}`}>
         <TimeQuickEdit row={row} disabled={!editable} />
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0" data-testid={`training-series-cockpit-col-team-${row.rowKey}`}>
         <p className="truncate text-sm font-semibold text-[var(--foreground)]">{row.title}</p>
         <p className="truncate text-xs text-[var(--text-2)]">{row.teamDisplayName}</p>
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0" data-testid={`training-series-cockpit-col-pitch-${row.rowKey}`}>
         <ResourceQuickEdit
           row={row}
           group="PITCH_HALL"
@@ -300,7 +406,7 @@ export default function TrainingSeriesCockpitRow({
         />
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0" data-testid={`training-series-cockpit-col-dressing-${row.rowKey}`}>
         <ResourceQuickEdit
           row={row}
           group="DRESSING_ROOM"
@@ -312,10 +418,20 @@ export default function TrainingSeriesCockpitRow({
         />
       </div>
 
-      <div className="flex items-center justify-end gap-1.5">
+      <div
+        className="flex min-h-5 items-center"
+        data-testid={`training-series-cockpit-col-exception-${row.rowKey}`}
+      >
+        <SeriesOccurrenceExceptionsIndicator row={row} />
+      </div>
+
+      <div
+        className="flex min-h-5 flex-col items-start justify-center gap-0.5"
+        data-testid={`training-series-cockpit-col-status-${row.rowKey}`}
+      >
         <span
           className={cn(
-            "hidden xl:inline-flex h-5 items-center rounded-full border px-2 text-[0.62rem] font-semibold",
+            "inline-flex h-5 items-center rounded-full border px-2 text-[0.62rem] font-semibold",
             statusBadgeClasses(row.status),
           )}
         >
@@ -325,11 +441,32 @@ export default function TrainingSeriesCockpitRow({
           (row.planningStage === "APPROVED" && !isCoordinator)) && (
           <PlanningWorkflowBadge stage={row.planningStage} size="sm" />
         )}
-        <span className="hidden lg:inline text-[0.62rem] text-[var(--muted)]">
-          {validFrom && validUntil ? `${validFrom}–${validUntil}` : "Unbegrenzt"}
-        </span>
+      </div>
 
-        {(editable || canDelete || row.planningStage === "DRAFT") && (
+      <div
+        className="hidden min-w-0 truncate text-[0.62rem] text-[var(--muted)] lg:block"
+        data-testid={`training-series-cockpit-col-validity-${row.rowKey}`}
+      >
+        {validFrom && validUntil ? `${validFrom}–${validUntil}` : "Unbegrenzt"}
+      </div>
+
+      <div className="flex items-center justify-center" data-testid={`training-series-cockpit-col-edit-${row.rowKey}`}>
+        {editable ? (
+          <Link
+            href={buildTrainingSeriesEditHref(row.seriesId)}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-[var(--border)] bg-white text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+            aria-label="Serie bearbeiten"
+            data-testid={`training-series-cockpit-edit-${row.rowKey}`}
+          >
+            <Pencil className="h-3.5 w-3.5 text-[var(--blue)]" />
+          </Link>
+        ) : (
+          <span className="inline-block h-7 w-7" aria-hidden />
+        )}
+      </div>
+
+      <div className="flex items-center justify-center" data-testid={`training-series-cockpit-col-more-${row.rowKey}`}>
+        {(editable || canDelete || row.planningStage === "DRAFT") ? (
           <>
             <button
               ref={menuAnchorRef}
@@ -344,17 +481,9 @@ export default function TrainingSeriesCockpitRow({
             <PopoverContent open={menuOpen} onOpenChange={setMenuOpen} anchorRef={menuAnchorRef} matchAnchorWidth={false}>
               <div className="min-w-44 py-1">
                 {editable ? (
-                  <>
-                    <a
-                      href={`/dashboard/training/series/${row.seriesId}/edit`}
-                      className="block px-3 py-2 text-xs hover:bg-[var(--surface-2)]"
-                    >
-                      Serie bearbeiten
-                    </a>
-                    <div className="px-3 py-2">
-                      <TrainingSeriesArchiveButton seriesId={row.seriesId} seriesTitle={row.title} />
-                    </div>
-                  </>
+                  <div className="px-3 py-2">
+                    <TrainingSeriesArchiveButton seriesId={row.seriesId} seriesTitle={row.title} />
+                  </div>
                 ) : null}
                 {row.status !== "ARCHIVED" ? (
                   <div className="px-3 py-2">
@@ -377,6 +506,8 @@ export default function TrainingSeriesCockpitRow({
               </div>
             </PopoverContent>
           </>
+        ) : (
+          <span className="inline-block h-7 w-7" aria-hidden />
         )}
       </div>
     </article>

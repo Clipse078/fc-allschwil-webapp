@@ -8,14 +8,16 @@ import { prisma } from "@/lib/db/prisma";
 import { resolveLongTeamName } from "@/lib/teams/team-naming";
 import { listAllocationsGroupedBySeries } from "@/lib/training/training-allocation-service";
 import { buildTrainingSeriesCockpitRows } from "@/lib/training/series-cockpit";
+import { listOccurrenceAllocationExceptionsByCockpitRow } from "@/lib/training/series-cockpit-exception-data";
 import type { TrainingSeriesDto } from "@/lib/training/types";
 
 export async function buildTrainingSeriesCockpitViewModel(
   tenantId: string,
   series: TrainingSeriesDto[],
+  timezone = "Europe/Zurich",
 ) {
   const teamSeasonIds = [...new Set(series.map((item) => item.teamSeasonId))];
-  const [teamSeasonRows, allocationsBySeriesId] = await Promise.all([
+  const [teamSeasonRows, allocationsBySeriesId, occurrenceExceptionsByRowKey] = await Promise.all([
     prisma.teamSeason.findMany({
       where: { id: { in: teamSeasonIds }, team: { tenantId } },
       select: {
@@ -36,6 +38,7 @@ export async function buildTrainingSeriesCockpitViewModel(
       },
     }),
     listAllocationsGroupedBySeries(tenantId),
+    listOccurrenceAllocationExceptionsByCockpitRow(tenantId, timezone),
   ]);
 
   const teamDisplayNameByTeamSeasonId = new Map(
@@ -55,5 +58,6 @@ export async function buildTrainingSeriesCockpitViewModel(
     series,
     teamDisplayNameByTeamSeasonId,
     allocationsBySeriesId,
+    occurrenceExceptionsByRowKey,
   });
 }

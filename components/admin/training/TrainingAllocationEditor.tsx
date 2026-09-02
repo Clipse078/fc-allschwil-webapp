@@ -24,6 +24,8 @@ type Props = {
   facilityGroups: FacilityGroup[];
   /** Whether the current user can manage (add/remove) allocations. */
   canManage: boolean;
+  /** When embedded in another section (e.g. series edit page), hide the standalone header. */
+  embedded?: boolean;
 };
 
 // ── Resource type label map ───────────────────────────────────────────────────
@@ -154,6 +156,7 @@ export function TrainingAllocationEditor({
   initialAllocations,
   facilityGroups,
   canManage,
+  embedded = false,
 }: Props) {
   const [allocations, setAllocations] =
     useState<TrainingAllocationDto[]>(initialAllocations);
@@ -210,19 +213,20 @@ export function TrainingAllocationEditor({
   );
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h2 className="text-lg font-semibold text-gray-900">
-          Ressourcen-Zuweisung
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Weisen Sie Anlagen-Ressourcen der Trainingsserie{" "}
-          <span className="font-medium text-gray-700">{trainingSeriesTitle}</span> zu.
-          Ein Training kann gleichzeitig mehrere Ressourcen belegen
-          (z.&nbsp;B. zwei halbe Felder oder ein Feld&nbsp;+ Garderobe).
-        </p>
-      </div>
+    <div className="space-y-6" data-testid="training-allocation-editor">
+      {!embedded ? (
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Ressourcen-Zuweisung
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Weisen Sie Anlagen-Ressourcen der Trainingsserie{" "}
+            <span className="font-medium text-gray-700">{trainingSeriesTitle}</span> zu.
+            Ein Training kann gleichzeitig mehrere Ressourcen belegen
+            (z.&nbsp;B. zwei halbe Felder oder ein Feld&nbsp;+ Garderobe).
+          </p>
+        </div>
+      ) : null}
 
       {/* Current allocations */}
       <div>

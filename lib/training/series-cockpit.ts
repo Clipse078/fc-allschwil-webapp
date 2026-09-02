@@ -8,6 +8,8 @@
  */
 
 import { classifyFacilityResourceType } from "@/lib/training/allocation-groups";
+import type { SeriesCockpitExceptionSummary, SeriesCockpitOccurrenceException } from "@/lib/training/series-cockpit-exceptions";
+import { summarizeOccurrenceExceptions } from "@/lib/training/series-cockpit-exceptions";
 import type { TrainingAllocationDto, TrainingSeriesDto, TrainingSeriesStatus, Weekday, WeekdayScheduleDto } from "@/lib/training/types";
 
 export const COCKPIT_WEEKDAY_ORDER: Weekday[] = [
@@ -39,6 +41,19 @@ export type TrainingSeriesAllocationDisplay = {
   dressingRoomResourceId: string | null;
 };
 
+/** Canonical admin route for editing a training series. */
+export function buildTrainingSeriesEditHref(seriesId: string): string {
+  return `/dashboard/training/series/${seriesId}/edit`;
+}
+
+/**
+ * Shared desktop grid for the Training Series Cockpit header + rows.
+ * Fixed-width exception/status/action columns keep pitch and dressing room
+ * aligned across rows regardless of badge content.
+ */
+export const TRAINING_SERIES_COCKPIT_GRID_CLASS =
+  "grid grid-cols-1 md:grid md:grid-cols-[5.5rem_minmax(0,1.15fr)_minmax(6.5rem,0.85fr)_minmax(5rem,0.65fr)_5.75rem_4.5rem_minmax(6.25rem,0.65fr)_1.75rem_1.75rem] md:items-center gap-x-3 gap-y-1.5 md:gap-y-0";
+
 export type TrainingSeriesCockpitRow = {
   rowKey: string;
   seriesId: string;
@@ -62,6 +77,7 @@ export type TrainingSeriesCockpitRow = {
   dressingRoomAllocationId: string | null;
   pitchResourceId: string | null;
   dressingRoomResourceId: string | null;
+  occurrenceExceptions: SeriesCockpitExceptionSummary;
 };
 
 export function resolveSeriesAllocationDisplay(
@@ -88,6 +104,7 @@ export function buildTrainingSeriesCockpitRows(input: {
   series: readonly TrainingSeriesDto[];
   teamDisplayNameByTeamSeasonId: ReadonlyMap<string, string>;
   allocationsBySeriesId: ReadonlyMap<string, readonly TrainingAllocationDto[]>;
+  occurrenceExceptionsByRowKey?: ReadonlyMap<string, readonly SeriesCockpitOccurrenceException[]>;
 }): TrainingSeriesCockpitRow[] {
   const rows: TrainingSeriesCockpitRow[] = [];
 
@@ -115,6 +132,9 @@ export function buildTrainingSeriesCockpitRows(input: {
         seriesWeekdaySchedules: series.weekdaySchedules,
         sessionCount: series.sessionCount,
         ...allocationDisplay,
+        occurrenceExceptions: summarizeOccurrenceExceptions(
+          input.occurrenceExceptionsByRowKey?.get(`${series.id}:${schedule.weekday}`),
+        ),
       });
     }
   }
