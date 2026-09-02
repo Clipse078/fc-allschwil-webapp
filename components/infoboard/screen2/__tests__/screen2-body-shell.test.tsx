@@ -15,9 +15,12 @@ import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShel
 import type { AnlageplanLivePayload } from "@/lib/publishing/infoboard/anlageplan-live-service";
 import {
   SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT,
+  SCREEN2_BODY_HEIGHT_PX,
+  SCREEN2_BODY_INNER_HEIGHT_PX,
   SCREEN2_CENTER_HEIGHT_PX,
   SCREEN2_CENTER_WIDTH_PX,
   SCREEN2_SPONSOR_RAIL_WIDTH_PX,
+  computeAnlageplanMapDimensions,
 } from "@/lib/infoboard/screen2-body-shell-sizing";
 import {
   KIOSK_LOGICAL_HEIGHT,
@@ -167,16 +170,34 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
   it("F. logical 1920×1080 contract remains intact", () => {
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.canvasWidth).toBe(KIOSK_LOGICAL_WIDTH);
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.canvasHeight).toBe(KIOSK_LOGICAL_HEIGHT);
+    expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.bodyHeightPx).toBe(SCREEN2_BODY_HEIGHT_PX);
+    expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.bodyInnerHeightPx).toBe(
+      SCREEN2_BODY_INNER_HEIGHT_PX,
+    );
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.leftRailWidthPx).toBe(
       SCREEN2_SPONSOR_RAIL_WIDTH_PX,
     );
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.centerWidthPx).toBe(SCREEN2_CENTER_WIDTH_PX);
     expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.centerHeightPx).toBe(SCREEN2_CENTER_HEIGHT_PX);
 
+    const mapDimensions = computeAnlageplanMapDimensions(
+      SCREEN2_CENTER_WIDTH_PX,
+      SCREEN2_CENTER_HEIGHT_PX,
+    );
+    expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.anlageplanMapWidthPx).toBe(
+      mapDimensions.widthPx,
+    );
+    expect(SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT.anlageplanMapHeightPx).toBe(
+      mapDimensions.heightPx,
+    );
+    expect(mapDimensions.widthPx).toBeLessThanOrEqual(SCREEN2_CENTER_WIDTH_PX);
+    expect(mapDimensions.heightPx).toBeLessThanOrEqual(SCREEN2_CENTER_HEIGHT_PX);
+
     const sizing = readRepoFile("lib/infoboard/screen2-body-shell-sizing.ts");
     expect(sizing).toContain("SCREEN2_BODY_SHELL_MEASUREMENT_CONTRACT");
     expect(sizing).toContain("SCREEN2_SPONSOR_RAIL_SHARE = 0.19");
     expect(sizing).toContain("SCREEN2_CENTER_SHARE = 0.62");
+    expect(sizing).toContain("--screen2-body-height");
   });
 
   it("G. Screen 1 is unaffected by the Screen 2 body shell", () => {
@@ -239,6 +260,19 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
     expect(right.textContent).toBe(left.textContent);
   });
 
+  it("J. body shell fills available body height and sponsor rails stretch vertically", () => {
+    const shellCss = readRepoFile("components/infoboard/screen2/Screen2BodyShell.module.css");
+    const anlageplanCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
+
+    expect(shellCss).toContain("height: 100%");
+    expect(shellCss).toContain("grid-template-rows: minmax(0, 1fr)");
+    expect(shellCss).toContain("container-type: size");
+    expect(shellCss).toMatch(/\.rail[\s\S]*height: 100%/);
+    expect(anlageplanCss).toContain(".mainRegion");
+    expect(anlageplanCss).toContain("display: flex");
+    expect(anlageplanCss).toContain("flex-direction: column");
+  });
+
   it("Anlageplan outer sizing preserves 16/9 aspect ratio inside center", () => {
     render(
       <InfoboardAnlageplan
@@ -248,10 +282,10 @@ describe("INFOBOARD-TRANSPORT-01B — Screen 2 sponsor shell", () => {
     );
 
     const canvas = screen.getByTestId("anlageplan-map-canvas");
-    expect(canvas.style.aspectRatio).toBe("16/9");
-    expect(canvas.style.width).toBe("100%");
-    expect(canvas.style.height).toBe("100%");
-    expect(canvas.style.maxWidth).toBe("100%");
-    expect(canvas.style.maxHeight).toBe("100%");
+    const mapCss = readRepoFile("components/infoboard/anlageplan/InfoboardAnlageplan.module.css");
+    expect(mapCss).toContain("aspect-ratio: 16 / 9");
+    expect(mapCss).toContain("width: min(100cqw, calc(100cqh * 16 / 9))");
+    expect(mapCss).toContain("height: min(100cqh, calc(100cqw * 9 / 16))");
+    expect(canvas.className).toContain("mapCanvas");
   });
 });

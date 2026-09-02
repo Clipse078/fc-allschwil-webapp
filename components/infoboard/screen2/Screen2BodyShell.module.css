@@ -11,9 +11,11 @@
     var(--screen2-sponsor-rail-width)
     var(--screen2-center-width)
     var(--screen2-sponsor-rail-width);
+  grid-template-rows: minmax(0, 1fr);
   gap: var(--screen2-body-column-gap);
   align-items: stretch;
   min-height: 0;
+  height: 100%;
   width: 100%;
   padding:
     var(--screen2-body-padding-y)
@@ -27,7 +29,9 @@
   justify-content: center;
   min-width: 0;
   min-height: 0;
+  height: 100%;
   overflow: hidden;
+  container-type: size;
 }
 
 .rail {
@@ -38,6 +42,8 @@
   gap: 10px;
   min-width: 0;
   min-height: 0;
+  height: 100%;
+  align-self: stretch;
   padding: 20px 14px;
   box-sizing: border-box;
   border-radius: 10px;

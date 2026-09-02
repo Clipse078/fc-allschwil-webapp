@@ -38,6 +38,7 @@ import type { WeatherResult } from "@/lib/weather/weather-types";
 import { KioskShellFooter } from "@/components/infoboard/shared/KioskShellFooter";
 import { Screen2BodyShell } from "@/components/infoboard/screen2/Screen2BodyShell";
 import { AnlageplanMapScene } from "./AnlageplanMapScene";
+import styles from "./InfoboardAnlageplan.module.css";
 
 // ── Component props ───────────────────────────────────────────────────────────
 
@@ -138,23 +139,12 @@ export function InfoboardAnlageplan({
       />
 
       {/* ── BODY: sponsor rails + centered Anlageplan canvas ───────────── */}
-      <div data-testid="anlageplan-main-region" style={{ flex: 1, minHeight: 0, width: "100%" }}>
+      <div data-testid="anlageplan-main-region" className={styles.mainRegion}>
         <Screen2BodyShell
           center={
             <div
               data-testid="anlageplan-map-canvas"
-              style={{
-                width: "100%",
-                height: "100%",
-                maxWidth: "100%",
-                maxHeight: "100%",
-                aspectRatio: "16/9",
-                position: "relative",
-                borderRadius: "clamp(6px, 0.8vh, 14px)",
-                overflow: "hidden",
-                background: backgroundUrl ? "transparent" : "#0d1520",
-                border: "1px solid rgba(255,255,255,0.06)",
-              }}
+              className={`${styles.mapCanvas}${backgroundUrl ? "" : ` ${styles.mapCanvasNoBackground}`}`}
             >
               {/* Canonical shared map scene — identical geometry to designer + preview.
                   suppressedCodes: zones for hierarchy-suppressed resources are
