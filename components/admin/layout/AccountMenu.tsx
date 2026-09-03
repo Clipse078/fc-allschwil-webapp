@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRef, useState } from "react";
 import { LogOut, UserCircle2 } from "lucide-react";
-import { signOutAction } from "@/app/actions/auth-actions";
+import SignOutForm from "@/components/admin/layout/SignOutForm";
 import { PopoverContent } from "@/components/ui/Popover";
 import { cn } from "@/lib/cn";
 
@@ -96,7 +96,7 @@ export default function AccountMenu({
 
         <div className="border-t border-[var(--border)]" />
 
-        <form action={signOutAction}>
+        <SignOutForm>
           <button
             type="submit"
             className={cn(
@@ -109,7 +109,7 @@ export default function AccountMenu({
             <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
             Abmelden
           </button>
-        </form>
+        </SignOutForm>
       </PopoverContent>
     </>
   );

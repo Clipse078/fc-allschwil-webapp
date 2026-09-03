@@ -6,7 +6,7 @@
 
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import AccountMenu from "@/components/admin/layout/AccountMenu";
 
 vi.mock("@/app/actions/auth-actions", () => ({
@@ -18,6 +18,17 @@ vi.mock("next/image", () => ({
 }));
 
 describe("AccountMenu", () => {
+  const assignSpy = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    assignSpy.mockReset();
+    vi.stubGlobal("location", {
+      ...window.location,
+      assign: assignSpy,
+    });
+  });
+
   it("opens a dropdown with name, email, account link and logout", async () => {
     const user = userEvent.setup();
 
@@ -39,5 +50,25 @@ describe("AccountMenu", () => {
       "/dashboard/account",
     );
     expect(screen.getByRole("button", { name: "Abmelden" })).toBeInTheDocument();
+  });
+
+  it("uses canonical logout path and hard-navigates to /login", async () => {
+    const user = userEvent.setup();
+    const { signOutAction } = await import("@/app/actions/auth-actions");
+
+    render(
+      <AccountMenu
+        firstName="Michael"
+        lastName="Duijster"
+        email="it@fcallschwil.ch"
+        imageUrl={null}
+      />,
+    );
+
+    await user.click(screen.getByLabelText("Konto-Menü"));
+    await user.click(screen.getByRole("button", { name: "Abmelden" }));
+
+    expect(signOutAction).toHaveBeenCalledTimes(1);
+    expect(assignSpy).toHaveBeenCalledWith("/login");
   });
 });
