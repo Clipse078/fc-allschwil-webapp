@@ -383,7 +383,7 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     );
   });
 
-  it("uses lowest displayOrder series allocation when no occurrence override exists", async () => {
+  it("returns all series dressing rooms in displayOrder when no occurrence override exists", async () => {
     mocks.listTrainingSessions.mockResolvedValue([trainingSessionDto()]);
     mocks.trainingAllocationFindMany.mockResolvedValue([
       allocationRow("series-d7", "KR3B", "Kunstrasen 3 B", "HALF_PITCH", 1),
@@ -399,7 +399,10 @@ describe("getWeekplannerWeek — occurrence-specific training allocations", () =
     if (monday?.type !== "TRAINING") throw new Error("expected TRAINING");
     expect(monday.pitchAllocations).toHaveLength(1);
     expect(monday.pitchAllocations[0]?.name).toBe("Kunstrasen 3 A");
-    expect(monday.dressingRoomAllocations).toHaveLength(1);
-    expect(monday.dressingRoomAllocations[0]?.name).toBe("Garderobe E3");
+    expect(monday.dressingRoomAllocations).toHaveLength(2);
+    expect(monday.dressingRoomAllocations.map((room) => room.name)).toEqual([
+      "Garderobe E3",
+      "Garderobe O4",
+    ]);
   });
 });

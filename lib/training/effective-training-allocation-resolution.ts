@@ -10,13 +10,16 @@
  *   1. TrainingSessionAllocation rows for this occurrence + group
  *   2. TrainingSeries TrainingAllocation rows for this group
  *
- * Within each tier exactly one resource per group is returned:
- *   - Session overrides: when multiple siblings exist for the same group,
- *     the row with the highest displayOrder (then newest createdAt) is the
- *     occurrence's authored override — matching reassignment-service.ts,
- *     which deletes prior group rows before creating the next override.
- *   - Series defaults: lowest displayOrder (then oldest createdAt) — the
- *     canonical primary allocation for the recurring series.
+ * Within each tier:
+ *   - Session overrides: exactly one resource per group — when multiple
+ *     siblings exist for the same group, the row with the highest
+ *     displayOrder (then newest createdAt) is the occurrence's authored
+ *     override — matching reassignment-service.ts, which deletes prior
+ *     group rows before creating the next override.
+ *   - Series pitch defaults: exactly one resource (lowest displayOrder,
+ *     then oldest createdAt).
+ *   - Series dressing-room defaults: all assigned rooms in canonical
+ *     displayOrder (then createdAt), deduplicated by facilityResourceId.
  *
  * Timestamps MUST NOT determine cross-layer precedence between series and
  * occurrence tiers.
@@ -72,6 +75,22 @@ function pickCanonicalSeriesRow(
   return [sorted[0]!];
 }
 
+function pickAllSeriesRows(
+  rows: readonly TrainingAllocationResourceRow[],
+): TrainingAllocationResourceRow[] {
+  if (rows.length === 0) return [];
+  const sorted = [...rows].sort(compareSeriesAllocationRows);
+  const seen = new Set<string>();
+  const deduped: TrainingAllocationResourceRow[] = [];
+  for (const row of sorted) {
+    const resourceId = row.facilityResource.id;
+    if (seen.has(resourceId)) continue;
+    seen.add(resourceId);
+    deduped.push(row);
+  }
+  return deduped;
+}
+
 function pickCanonicalSessionOverrideRow(
   rows: readonly TrainingAllocationResourceRow[],
 ): TrainingAllocationResourceRow[] {
@@ -100,6 +119,9 @@ export function resolveTrainingOccurrenceAllocationGroup(
   const seriesForGroup = seriesRows.filter(
     (row) => classifyFacilityResourceType(row.facilityResource.type) === group,
   );
+  if (group === "DRESSING_ROOM") {
+    return pickAllSeriesRows(seriesForGroup);
+  }
   return pickCanonicalSeriesRow(seriesForGroup);
 }
 

@@ -207,4 +207,48 @@ describe("public weekplan TRAINING effective resource contract", () => {
     expect(mapped.seriesDisplayName).toBe("Junioren D-9 D1 Training");
     expect(mapped.title).toBe("Junioren D-9 D1 Training");
   });
+
+  it("G. series with multiple dressing rooms exposes all rooms in public projection", () => {
+    const mapped = resolveAndMapPublicTraining({
+      seriesRows: [
+        resource("KR2A", "Kunstrasen 2 A", "HALF_PITCH"),
+        resource("E1", "Garderobe E1", "DRESSING_ROOM", 0),
+        resource("O3", "Garderobe O3", "DRESSING_ROOM", 1),
+      ],
+      sessionOverrideRows: [],
+    });
+
+    expect(mapped.pitch?.name).toBe("Kunstrasen 2 A");
+    expect(mapped.dressingRooms).toEqual([
+      {
+        name: "Garderobe E1",
+        facilityName: "Garderobentrakt",
+        role: "TRAINING",
+      },
+      {
+        name: "Garderobe O3",
+        facilityName: "Garderobentrakt",
+        role: "TRAINING",
+      },
+    ]);
+  });
+
+  it("H. occurrence dressing-room override still replaces all series rooms", () => {
+    const mapped = resolveAndMapPublicTraining({
+      seriesRows: [
+        resource("KR2A", "Kunstrasen 2 A", "HALF_PITCH"),
+        resource("E1", "Garderobe E1", "DRESSING_ROOM", 0),
+        resource("O3", "Garderobe O3", "DRESSING_ROOM", 1),
+      ],
+      sessionOverrideRows: [resource("O4", "Garderobe O4", "DRESSING_ROOM")],
+    });
+
+    expect(mapped.dressingRooms).toEqual([
+      {
+        name: "Garderobe O4",
+        facilityName: "Garderobentrakt",
+        role: "TRAINING",
+      },
+    ]);
+  });
 });

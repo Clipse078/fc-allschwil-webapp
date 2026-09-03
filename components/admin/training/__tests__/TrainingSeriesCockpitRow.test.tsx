@@ -260,6 +260,23 @@ describe("TrainingSeriesCockpitRow — stable desktop columns", () => {
     expect(screen.getByTestId("training-series-cockpit-col-more-series-123:WEDNESDAY")).toBeTruthy();
   });
 
+  it("renders multiple dressing rooms joined in the dressing-room column", () => {
+    render(
+      <TrainingSeriesCockpitRow
+        row={makeRow({ dressingRoomName: "E1 · O3" })}
+        canManage={true}
+        canDelete={false}
+        isCoordinator={true}
+        pitchFacilityGroups={facilityGroups}
+        dressingRoomFacilityGroups={facilityGroups}
+      />,
+    );
+
+    expect(screen.getByTestId("training-series-cockpit-dressing_room-series-123:WEDNESDAY")).toHaveTextContent(
+      "E1 · O3",
+    );
+  });
+
   it("keeps the exception badge in its own column without removing the pitch column", () => {
     const { rerender } = render(
       <TrainingSeriesCockpitRow
