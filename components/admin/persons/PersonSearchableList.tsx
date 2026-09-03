@@ -121,7 +121,7 @@ export default function PersonSearchableList({
           description={`Für „${query}" wurden keine Personen gefunden.`}
         />
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+        <div className="sce-integrated-list">
           {filtered.map((person, idx) => {
             const assignmentLabel = getAssignmentLabel(person);
             const isLast = idx === filtered.length - 1;

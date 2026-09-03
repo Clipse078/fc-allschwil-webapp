@@ -16,7 +16,7 @@ export default function CreateSeasonForm({ suggestedStartYear }: Props) {
     <form
       id="create-season"
       action={createSeasonAction}
-      className="flex flex-wrap items-end gap-3 rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white p-4 shadow-[var(--shadow-sm)]"
+      className="flex flex-wrap items-end gap-3 rounded-[var(--radius-2xl)] border border-[var(--border)] bg-[var(--card)] p-4 shadow-[var(--shadow-sm)]"
     >
       <div>
         <label htmlFor="startYear" className="mb-1 block text-xs font-medium text-[var(--muted)]">

@@ -50,7 +50,7 @@ export default function OrgUnitSortControls({ orgUnitId, position, total }: Prop
           onClick={() => move("up")}
           disabled={isFirst || loading !== null}
           aria-label="Nach oben"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-white text-[var(--muted)] transition hover:border-[var(--blue)] hover:text-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[var(--blue)] hover:text-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading === "up" ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -63,7 +63,7 @@ export default function OrgUnitSortControls({ orgUnitId, position, total }: Prop
           onClick={() => move("down")}
           disabled={isLast || loading !== null}
           aria-label="Nach unten"
-          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-white text-[var(--muted)] transition hover:border-[var(--blue)] hover:text-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] transition hover:border-[var(--blue)] hover:text-[var(--blue)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           {loading === "down" ? (
             <Loader2 className="h-3.5 w-3.5 animate-spin" />

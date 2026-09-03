@@ -120,7 +120,7 @@ function QuickActionButton({
     disabled && "opacity-50 cursor-not-allowed",
     variant === "primary" && "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white hover:opacity-90",
     variant === "danger" && "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
-    variant === "default" && "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+    variant === "default" && "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
   );
   if (href && !disabled) {
     return (
@@ -174,7 +174,7 @@ function PersonCandidateRow({
       <div className="flex flex-shrink-0 items-center gap-1.5">
         <a
           href={`/dashboard/persons/${candidate.id}`}
-          className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-[var(--border)] bg-white text-[0.7rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+          className="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-[var(--border)] bg-[var(--surface)] text-[0.7rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
         >
           Öffnen
           <ExternalLink className="h-3 w-3" aria-hidden />
@@ -409,7 +409,7 @@ export default function RegistrationWorkflowPanel({
               <button
                 type="button"
                 onClick={() => setCreatePersonConfirming(false)}
-                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-[var(--border)] bg-white text-[0.72rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md border border-[var(--border)] bg-[var(--surface)] text-[0.72rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
               >
                 <X className="h-3 w-3" aria-hidden />
                 Abbrechen

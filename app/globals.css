@@ -8,9 +8,9 @@
   --color-brand-blue:       #0b4aa2;
   --color-brand-blue-dark:  #083580;
   --color-brand-blue-light: #1a2d4d;
-  --color-brand-orange:     #ff6a00;
-  --color-brand-orange-dark:#e55f00;
-  --color-brand-orange-light: rgba(255, 106, 0, 0.12);
+  --color-brand-orange:     #d4843a;
+  --color-brand-orange-dark:#be7232;
+  --color-brand-orange-light: rgba(212, 132, 58, 0.12);
   --color-brand-red:        #c7332c;
   --color-brand-red-dark:   #a62520;
   --color-brand-red-light:  rgba(199, 51, 44, 0.12);
@@ -35,9 +35,9 @@
   --blue-light:        #1a2d4d;
   --blue-mid:          #3f63b5;
   --blue-dark:         #284a97;
-  --orange:            #ff6a00;
-  --orange-hover:      #e55f00;
-  --orange-light:      rgba(255, 106, 0, 0.12);
+  --orange:            #d4843a;
+  --orange-hover:      #be7232;
+  --orange-light:      rgba(212, 132, 58, 0.12);
   --red:               #c7332c;
   --red-dark:          #a62520;
   --red-light:         rgba(199, 51, 44, 0.12);
@@ -137,7 +137,7 @@
   --sce-secondary-light: var(--red-light);
   --sce-accent:          var(--orange);
   --sce-accent-hover:    var(--orange-hover);
-  --sce-accent-subtle:   rgba(255, 106, 0, 0.10);
+  --sce-accent-subtle:   rgba(212, 132, 58, 0.10);
   --sce-focus-ring:      var(--orange);
 
   /* ── SCE Neutral Aliases ──────────────────────────────────────────────── */
@@ -393,6 +393,16 @@ button {
   box-shadow: var(--shadow-md);
   border-color: var(--border-strong);
 }
+
+/* Integrated list/table shell — dark operational surfaces */
+.sce-integrated-list {
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
 .sce-kpi-card {
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);

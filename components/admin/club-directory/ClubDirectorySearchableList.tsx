@@ -131,7 +131,7 @@ export default function ClubDirectorySearchableList({
           }
         />
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+        <div className="sce-integrated-list">
           {displayClubs.map((club, idx) => (
             <Link
               key={club.id}

@@ -48,7 +48,7 @@ export default function SeasonsTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+    <div className="sce-integrated-list">
       {seasons.map((season, idx) => {
         const isLast = idx === seasons.length - 1;
 
@@ -59,7 +59,7 @@ export default function SeasonsTable({
               !isLast ? "border-b border-[var(--border)]" : ""
             }`}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-white">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
               <CalendarDays className="h-4 w-4 text-[var(--blue)]" />
             </div>
 

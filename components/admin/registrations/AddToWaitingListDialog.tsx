@@ -163,7 +163,7 @@ export function AddToWaitingListDialog({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="inline-flex h-9 items-center rounded-lg border border-[var(--border)] bg-white px-4 text-sm font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
+            className="inline-flex h-9 items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
           >
             Abbrechen
           </button>
@@ -199,7 +199,7 @@ export function AddToWaitingListDialog({
                 className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-left text-xs font-semibold transition-colors ${
                   scopeType === opt.value
                     ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
-                    : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                 }`}
               >
                 {opt.label}
@@ -282,7 +282,7 @@ export function AddToWaitingListDialog({
                 className={`flex-1 rounded-[var(--radius-md)] border px-3 py-2 text-center text-xs font-semibold transition-colors ${
                   priority === opt.value
                     ? WAITING_LIST_PRIORITY_COLORS[opt.value]
-                    : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                    : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                 }`}
                 title={opt.desc}
               >

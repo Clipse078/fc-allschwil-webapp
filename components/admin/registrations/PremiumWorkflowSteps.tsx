@@ -94,8 +94,8 @@ export function PremiumWorkflowSteps({
                     isCurrent
                       ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)] text-white shadow-[0_0_0_4px_rgba(11,74,162,0.12)]"
                       : isCompleted
-                        ? "border-[var(--tenant-primary)] bg-white text-[var(--tenant-primary)]"
-                        : "border-[var(--border)] bg-white text-[var(--muted)]",
+                        ? "border-[var(--tenant-primary)] bg-[var(--surface)] text-[var(--tenant-primary)]"
+                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)]",
                   )}
                 >
                   {isCompleted && !isCurrent ? (
@@ -138,7 +138,7 @@ export function PremiumWorkflowSteps({
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3 py-2.5">
+      <div className="mt-4 rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
         <p className="text-[0.68rem] font-semibold uppercase tracking-[0.08em] text-[var(--muted)]">
           Nächster Schritt
         </p>

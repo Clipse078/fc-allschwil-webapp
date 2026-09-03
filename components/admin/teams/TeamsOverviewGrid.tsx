@@ -225,7 +225,7 @@ export default function TeamsOverviewGrid({
           </div>
 
           {/* Team cards */}
-          <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+          <div className="sce-integrated-list">
             {categoryTeams.map((team, idx) => {
               const isLast = idx === categoryTeams.length - 1;
               // TEAM-IDENTITY-01: canonical long-name fallback — prefer the

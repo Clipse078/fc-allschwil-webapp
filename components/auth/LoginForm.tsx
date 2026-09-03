@@ -66,7 +66,7 @@ export default function LoginForm() {
             width: 480,
             height: 480,
             background:
-              "radial-gradient(circle, rgba(255,106,0,0.06) 0%, transparent 70%)",
+              "radial-gradient(circle, color-mix(in srgb, var(--sce-primary) 6%, transparent) 0%, transparent 70%)",
           }}
         />
         <div
@@ -75,7 +75,7 @@ export default function LoginForm() {
             width: 360,
             height: 360,
             background:
-              "radial-gradient(circle, rgba(255,106,0,0.04) 0%, transparent 72%)",
+              "radial-gradient(circle, color-mix(in srgb, var(--sce-primary) 4%, transparent) 0%, transparent 72%)",
           }}
         />
       </div>

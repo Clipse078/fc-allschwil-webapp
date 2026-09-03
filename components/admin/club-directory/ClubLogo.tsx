@@ -56,7 +56,7 @@ export function ClubLogo({ logoUrl, name, size = "md", bare = false, className }
         className={cn(
           sizeClass,
           "shrink-0 object-contain",
-          !bare && "rounded-lg border border-[var(--border)] bg-white p-1",
+          !bare && "rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1",
           className,
         )}
       />
