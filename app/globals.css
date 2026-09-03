@@ -1155,6 +1155,12 @@ button {
 /* ─────────────────────────────────────────────────────────────────────────
    SCE LOGIN — Premium auth canvas (no card)
 ───────────────────────────────────────────────────────────────────────── */
+.sce-login {
+  --sce-login-input-bg: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  --sce-login-input-bg-hover: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --sce-login-input-bg-focus: color-mix(in srgb, var(--foreground) 5.5%, var(--background));
+}
+
 .sce-login-headline {
   line-height: 1.14;
 }
@@ -1173,11 +1179,12 @@ button {
   height: 2.75rem;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.035);
+  background-color: var(--sce-login-input-bg);
   color: var(--foreground);
   font-size: 0.9375rem;
   outline: none;
   padding: 0 0.875rem;
+  caret-color: var(--foreground);
   transition:
     border-color var(--transition-fast),
     background-color var(--transition-fast),
@@ -1190,40 +1197,49 @@ button {
 
 .sce-login-input:hover {
   border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
+  background-color: var(--sce-login-input-bg-hover);
 }
 
 .sce-login-input:focus {
   border-color: var(--sce-primary);
-  background: rgba(255, 255, 255, 0.055);
+  background-color: var(--sce-login-input-bg-focus);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent);
 }
 
 /* Chromium/WebKit autofill paints a light surface unless overridden in-place. */
 .sce-login-input:-webkit-autofill,
-.sce-login-input:-webkit-autofill:hover {
-  -webkit-text-fill-color: var(--foreground) !important;
-  caret-color: var(--foreground);
-  border-color: rgba(255, 255, 255, 0.1);
-  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.035) inset !important;
-  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.035) inset !important;
-  transition:
-    background-color 5000s ease-in-out 0s,
-    color var(--transition-fast),
-    border-color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
+.sce-login-input:-webkit-autofill:hover,
 .sce-login-input:-webkit-autofill:focus,
 .sce-login-input:-webkit-autofill:active {
   -webkit-text-fill-color: var(--foreground) !important;
   caret-color: var(--foreground);
+  color: var(--foreground);
+  background-color: var(--sce-login-input-bg) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--sce-login-input-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--sce-login-input-bg) inset !important;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s,
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sce-login-input:-webkit-autofill:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: var(--sce-login-input-bg-hover) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--sce-login-input-bg-hover) inset !important;
+  box-shadow: 0 0 0 1000px var(--sce-login-input-bg-hover) inset !important;
+}
+
+.sce-login-input:-webkit-autofill:focus,
+.sce-login-input:-webkit-autofill:active {
   border-color: var(--sce-primary);
+  background-color: var(--sce-login-input-bg-focus) !important;
   -webkit-box-shadow:
-    0 0 0 1000px rgba(255, 255, 255, 0.055) inset,
+    0 0 0 1000px var(--sce-login-input-bg-focus) inset,
     0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
   box-shadow:
-    0 0 0 1000px rgba(255, 255, 255, 0.055) inset,
+    0 0 0 1000px var(--sce-login-input-bg-focus) inset,
     0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
 }
 

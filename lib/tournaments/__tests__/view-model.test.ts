@@ -233,4 +233,20 @@ describe("buildTournamentCenterViewModel", () => {
       ["completed", "past-aug-23", "past-aug-29"].sort(),
     );
   });
+
+  it("classifies only the tournaments supplied by the caller (tenant-scoped upstream)", () => {
+    const tournaments = [
+      createTournament({ id: "tenant-a-upcoming", tenantId: "tenant-a" }),
+      createTournament({
+        id: "tenant-b-past",
+        tenantId: "tenant-b",
+        startAt: "2026-08-23T10:00:00.000Z",
+      }),
+    ];
+
+    const vm = buildTournamentCenterViewModel(tournaments, { now: REFERENCE_NOW });
+    expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["tenant-a-upcoming"]);
+    expect(vm.archiv.map((t) => t.id)).toEqual(["tenant-b-past"]);
+    expect(vm.kpis).toEqual({ anstehend: 1, offen: 0, bereit: 1, archiv: 1 });
+  });
 });
