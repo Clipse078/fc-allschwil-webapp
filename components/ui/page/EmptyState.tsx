@@ -52,8 +52,8 @@ export function EmptyState({
         <div
           className="flex h-16 w-16 items-center justify-center rounded-2xl"
           style={{
-            background: "var(--sce-accent)",
-            color: "var(--sce-primary)",
+            background: "var(--sce-accent-subtle)",
+            color: "var(--sce-accent)",
           }}
         >
           {icon}

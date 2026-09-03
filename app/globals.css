@@ -7,53 +7,64 @@
 @theme {
   --color-brand-blue:       #0b4aa2;
   --color-brand-blue-dark:  #083580;
-  --color-brand-blue-light: #e8f0fe;
+  --color-brand-blue-light: #1a2d4d;
+  --color-brand-orange:     #ff6a00;
+  --color-brand-orange-dark:#e55f00;
+  --color-brand-orange-light: rgba(255, 106, 0, 0.12);
   --color-brand-red:        #c7332c;
   --color-brand-red-dark:   #a62520;
-  --color-brand-red-light:  #fef2f2;
+  --color-brand-red-light:  rgba(199, 51, 44, 0.12);
 
-  --color-sce-base:         #f7f8fa;
-  --color-sce-surface:      #ffffff;
-  --color-sce-surface-2:    #f1f3f7;
-  --color-sce-border:       #e5e8ef;
-  --color-sce-border-strong:#ccd1dc;
-  --color-sce-text:         #111827;
-  --color-sce-text-2:       #4b5563;
-  --color-sce-text-muted:   #9ca3af;
+  --color-sce-base:         #0a0f1e;
+  --color-sce-surface:      #121a2e;
+  --color-sce-surface-2:    #1a2236;
+  --color-sce-border:       rgba(255, 255, 255, 0.08);
+  --color-sce-border-strong:rgba(255, 255, 255, 0.14);
+  --color-sce-text:         #f8fafc;
+  --color-sce-text-2:       #94a3b8;
+  --color-sce-text-muted:   #64748b;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    CSS CUSTOM PROPERTIES — Design Token System
 ───────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Brand Palette */
+  /* Brand Palette — canonical SportClubEvo navy + orange */
   --blue:              #0b4aa2;
   --blue-hover:        #083580;
-  --blue-light:        #e8f0fe;
+  --blue-light:        #1a2d4d;
   --blue-mid:          #3f63b5;
   --blue-dark:         #284a97;
+  --orange:            #ff6a00;
+  --orange-hover:      #e55f00;
+  --orange-light:      rgba(255, 106, 0, 0.12);
   --red:               #c7332c;
   --red-dark:          #a62520;
-  --red-light:         #fef2f2;
+  --red-light:         rgba(199, 51, 44, 0.12);
 
-  /* Backgrounds */
-  --background:        #F8FAFC;
-  --surface:           #ffffff;
-  --surface-2:         #f1f3f7;
-  --surface-3:         #e9ecf2;
+  /* Application environment — deep navy operational workspace */
+  --background:        #0a0f1e;
+  --surface:           #121a2e;
+  --surface-2:         #1a2236;
+  --surface-3:         #232d44;
 
-  /* Text */
-  --foreground:        #111827;
-  --text-2:            #4b5563;
-  --muted:             #9ca3af;
+  /* Text — warm white hierarchy */
+  --foreground:        #f8fafc;
+  --text-2:            #94a3b8;
+  --muted:             #64748b;
 
-  /* Borders */
-  --border:            #e5e8ef;
-  --border-strong:     #ccd1dc;
+  /* Borders — restrained graphite/navy separation */
+  --border:            rgba(255, 255, 255, 0.08);
+  --border-strong:     rgba(255, 255, 255, 0.14);
 
   /* Card */
-  --card:              #ffffff;
-  --card-hover:        #fafbfc;
+  --card:              #121a2e;
+  --card-hover:        #1a2236;
+
+  /* Shell surfaces */
+  --shell-bg:          #0a0f1e;
+  --sidebar-bg:        #0c1222;
+  --header-bg:         rgba(12, 18, 34, 0.92);
 
   /* Spacing Scale (4px base) */
   --space-1:  4px;
@@ -77,12 +88,12 @@
   --radius-3xl: 24px;
   --radius-pill: 9999px;
 
-  /* Shadow Tokens */
-  --shadow-xs:  0 1px 2px rgba(17, 24, 39, 0.05);
-  --shadow-sm:  0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 2px rgba(17, 24, 39, 0.04);
-  --shadow-md:  0 4px 12px rgba(17, 24, 39, 0.08), 0 2px 4px rgba(17, 24, 39, 0.04);
-  --shadow-lg:  0 8px 24px rgba(17, 24, 39, 0.10), 0 4px 8px rgba(17, 24, 39, 0.04);
-  --shadow-xl:  0 16px 48px rgba(17, 24, 39, 0.12), 0 8px 16px rgba(17, 24, 39, 0.06);
+  /* Shadow Tokens — restrained elevation on dark surfaces */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.16);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.32), 0 2px 4px rgba(0, 0, 0, 0.18);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.36), 0 4px 8px rgba(0, 0, 0, 0.20);
+  --shadow-xl:  0 16px 48px rgba(0, 0, 0, 0.44), 0 8px 16px rgba(0, 0, 0, 0.24);
 
   /* Sidebar */
   --sidebar-width:          224px;
@@ -118,13 +129,16 @@
    * overridden by tenant branding. Use --sce-* tokens inside the internal
    * WebApp shell. Use --tenant-* tokens only for tenant-facing surfaces.
    * ─────────────────────────────────────────────────────────────────────── */
-  --sce-primary:         var(--blue);
-  --sce-primary-hover:   var(--blue-hover);
-  --sce-primary-light:   var(--blue-light);
+  --sce-primary:         var(--orange);
+  --sce-primary-hover:   var(--orange-hover);
+  --sce-primary-light:   var(--orange-light);
   --sce-secondary:       var(--red);
   --sce-secondary-hover: var(--red-dark);
   --sce-secondary-light: var(--red-light);
-  --sce-accent:          color-mix(in srgb, var(--sce-primary) 10%, white);
+  --sce-accent:          var(--orange);
+  --sce-accent-hover:    var(--orange-hover);
+  --sce-accent-subtle:   rgba(255, 106, 0, 0.10);
+  --sce-focus-ring:      var(--orange);
 
   /* ── SCE Neutral Aliases ──────────────────────────────────────────────── */
   --sce-bg:            var(--background);
@@ -140,28 +154,28 @@
   --sce-card-hover:    var(--card-hover);
 
   /* ── SCE Semantic Tokens — Success ───────────────────────────────────── */
-  --sce-success:        #15803d;
-  --sce-success-hover:  #166534;
-  --sce-success-light:  #f0fdf4;
-  --sce-success-border: #bbf7d0;
+  --sce-success:        #4ade80;
+  --sce-success-hover:  #22c55e;
+  --sce-success-light:  rgba(74, 222, 128, 0.12);
+  --sce-success-border: rgba(74, 222, 128, 0.28);
 
   /* ── SCE Semantic Tokens — Warning ───────────────────────────────────── */
-  --sce-warning:        #b45309;
-  --sce-warning-hover:  #92400e;
-  --sce-warning-light:  #fffbeb;
-  --sce-warning-border: #fde68a;
+  --sce-warning:        #fbbf24;
+  --sce-warning-hover:  #f59e0b;
+  --sce-warning-light:  rgba(251, 191, 36, 0.12);
+  --sce-warning-border: rgba(251, 191, 36, 0.28);
 
   /* ── SCE Semantic Tokens — Danger ────────────────────────────────────── */
-  --sce-danger:         #dc2626;
-  --sce-danger-hover:   #b91c1c;
-  --sce-danger-light:   #fef2f2;
-  --sce-danger-border:  #fecaca;
+  --sce-danger:         #f87171;
+  --sce-danger-hover:   #ef4444;
+  --sce-danger-light:   rgba(248, 113, 113, 0.12);
+  --sce-danger-border:  rgba(248, 113, 113, 0.28);
 
   /* ── SCE Semantic Tokens — Info ──────────────────────────────────────── */
-  --sce-info:           #2563eb;
-  --sce-info-hover:     #1d4ed8;
-  --sce-info-light:     #eff6ff;
-  --sce-info-border:    #bfdbfe;
+  --sce-info:           #60a5fa;
+  --sce-info-hover:     #3b82f6;
+  --sce-info-light:     rgba(96, 165, 250, 0.12);
+  --sce-info-border:    rgba(96, 165, 250, 0.28);
 
   /* ── SCE Typography Tokens ───────────────────────────────────────────── */
   /* Display XL — Hero headers, landing sections */
@@ -264,12 +278,12 @@ button {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--tenant-primary) 12%, transparent);
+  background: color-mix(in srgb, var(--sce-accent) 24%, transparent);
 }
 
-/* Focus ring */
+/* Focus ring — SportClubEvo orange accent */
 :focus-visible {
-  outline: 2px solid var(--tenant-primary);
+  outline: 2px solid var(--sce-focus-ring);
   outline-offset: 2px;
 }
 
@@ -321,7 +335,7 @@ button {
 
 .sce-page-title {
   color: var(--foreground);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -343,8 +357,8 @@ button {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 3px;
-  background: var(--tenant-primary);
+  height: 2px;
+  background: color-mix(in srgb, var(--sce-accent) 70%, transparent);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
 }
 
@@ -362,7 +376,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: color-mix(in srgb, var(--tenant-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--sce-accent) 55%, transparent);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
@@ -379,20 +393,18 @@ button {
   box-shadow: var(--shadow-md);
   border-color: var(--border-strong);
 }
-
-/* KPI card — Screen 3 premium style */
 .sce-kpi-card {
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.07), 0 1px 2px rgba(17,24,39,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   padding: 20px 24px;
-  transition: box-shadow var(--transition-base), transform var(--transition-fast);
+  transition: box-shadow var(--transition-base), border-color var(--transition-fast);
 }
 
 .sce-kpi-card:hover {
-  box-shadow: 0 4px 16px rgba(17,24,39,0.10), 0 2px 4px rgba(17,24,39,0.05);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -417,8 +429,8 @@ button {
 .fca-input:focus,
 .fca-select:focus,
 .fca-textarea:focus {
-  border-color: var(--tenant-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  border-color: var(--sce-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .fca-input:disabled,
@@ -456,7 +468,7 @@ button {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--tenant-primary);
+  background: var(--sce-primary);
   color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -469,9 +481,9 @@ button {
 }
 
 .fca-button-primary:hover {
-  background: color-mix(in srgb, black 20%, var(--tenant-primary));
+  background: var(--sce-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--sce-primary) 28%, transparent);
 }
 
 .fca-button-primary:disabled {
@@ -533,10 +545,10 @@ button {
   min-width: 68px;
   height: 26px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sce-accent) 28%, transparent);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: var(--sce-accent-subtle);
+  color: var(--sce-accent);
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 700;
@@ -595,7 +607,7 @@ button {
 .fca-toggle-checkbox {
   height: 1rem;
   width: 1rem;
-  accent-color: var(--tenant-primary);
+  accent-color: var(--sce-primary);
   cursor: pointer;
 }
 
@@ -608,28 +620,27 @@ button {
   background: var(--background);
 }
 
-/* Legacy glow effects — kept for backwards compatibility */
+/* Legacy glow effects — subdued on dark shell */
 .fca-admin-glow {
   pointer-events: none;
   position: absolute;
   border-radius: 9999px;
   filter: blur(80px);
-  opacity: 0.18;
+  opacity: 0.08;
 }
 
 .fca-admin-glow-blue {
-  background: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
+  background: color-mix(in srgb, var(--blue) 20%, transparent);
 }
 
 .fca-admin-glow-red {
-  background: rgba(199, 51, 44, 0.20);
+  background: color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    SCE SIDEBAR — New minimal Linear-style sidebar
 ───────────────────────────────────────────────────────────────────────── */
 .sce-sidebar {
-  /* Flex child: participates in normal document flow */
   position: sticky;
   top: 0;
   height: 100vh;
@@ -640,7 +651,7 @@ button {
   width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   transition: width var(--transition-base);
 }
@@ -687,8 +698,8 @@ button {
 }
 
 .sce-nav-item.active {
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: var(--sce-accent-subtle);
+  color: var(--foreground);
   font-weight: 600;
 }
 
@@ -700,7 +711,7 @@ button {
   bottom: 6px;
   width: 2px;
   border-radius: 0 2px 2px 0;
-  background: var(--tenant-primary);
+  background: var(--sce-accent);
 }
 
 .sce-nav-child {
@@ -725,9 +736,9 @@ button {
 }
 
 .sce-nav-child.active {
-  color: var(--tenant-primary);
+  color: var(--foreground);
   font-weight: 500;
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
+  background: var(--sce-accent-subtle);
 }
 
 .sce-nav-section-label {
@@ -752,7 +763,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -868,8 +879,8 @@ button {
 }
 
 .sce-page-search:focus-within {
-  border-color: var(--tenant-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  border-color: var(--sce-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .sce-page-search input {
@@ -1019,8 +1030,8 @@ button {
   height: 22px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: var(--sce-accent-subtle);
+  color: var(--sce-accent);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -1030,15 +1041,15 @@ button {
    Apply .sce-filter-tab-active to the active tab button inside a tab group.
 ───────────────────────────────────────────────────────────────────────── */
 .sce-filter-tab-active {
-  color: var(--tenant-primary) !important;
+  color: var(--sce-accent) !important;
   font-weight: 600;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   PRIMARY ACTION LINK — Tenant-branded inline text link
+   PRIMARY ACTION LINK — SportClubEvo orange accent
 ───────────────────────────────────────────────────────────────────────── */
 .sce-link-primary {
-  color: var(--tenant-primary);
+  color: var(--sce-accent);
   font-weight: 500;
   text-decoration: none;
   transition: opacity var(--transition-fast);
@@ -1060,21 +1071,19 @@ button {
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   text-decoration: none;
   transition:
     box-shadow var(--transition-base),
-    border-color var(--transition-base),
-    transform var(--transition-fast);
+    border-color var(--transition-base);
 }
 
 .sce-quick-action-card:hover {
-  box-shadow: 0 4px 16px rgba(17,24,39,0.10);
-  border-color: #D1D5DB;
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 /* Activity item */
@@ -1083,7 +1092,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-activity-item:last-child {
@@ -1096,7 +1105,7 @@ button {
   align-items: flex-start;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-task-item:last-child {
@@ -1109,7 +1118,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-event-item:last-child {
@@ -1118,10 +1127,10 @@ button {
 
 /* Section card — Screen 3 style (rounded 16px, white, clean shadow) */
 .sce-section-card-v3 {
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
 
@@ -1130,7 +1139,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-section-card-v3-body {
@@ -1139,7 +1148,7 @@ button {
 
 .sce-section-card-v3-footer {
   padding: 12px 20px;
-  border-top: 1px solid #F3F4F6;
+  border-top: 1px solid var(--border);
 }
 
 /* Date chip for events */
@@ -1151,8 +1160,8 @@ button {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  border: 1px solid #E5E7EB;
-  background: #F8FAFC;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   flex-shrink: 0;
 }
 

@@ -33,7 +33,7 @@ const ICON_VARS: Record<
   success: { iconBg: "var(--sce-success-light)", iconColor: "var(--sce-success)" },
   warning: { iconBg: "var(--sce-warning-light)", iconColor: "var(--sce-warning)" },
   danger:  { iconBg: "var(--sce-danger-light)",  iconColor: "var(--sce-danger)" },
-  default: { iconBg: "var(--tenant-accent)",     iconColor: "var(--tenant-primary)" },
+  default: { iconBg: "var(--sce-accent-subtle)", iconColor: "var(--sce-accent)" },
 };
 
 /**
@@ -74,8 +74,8 @@ export function DashboardQuickActions({
               "group flex items-start gap-3 rounded-xl",
               "border border-[var(--border)] bg-[var(--surface)] p-4",
               "no-underline shadow-[var(--shadow-xs)]",
-              "transition-[box-shadow,border-color,transform] duration-[120ms]",
-              "hover:-translate-y-px hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]",
+              "transition-[box-shadow,border-color] duration-[120ms]",
+              "hover:border-[var(--border-strong)] hover:shadow-[var(--shadow-md)]",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-2",
             )}
           >

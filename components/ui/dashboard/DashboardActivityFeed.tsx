@@ -42,7 +42,7 @@ const ICON_VARS: Record<
   success: { iconBg: "var(--sce-success-light)", iconColor: "var(--sce-success)" },
   warning: { iconBg: "var(--sce-warning-light)", iconColor: "var(--sce-warning)" },
   danger:  { iconBg: "var(--sce-danger-light)",  iconColor: "var(--sce-danger)" },
-  default: { iconBg: "var(--tenant-accent)",     iconColor: "var(--tenant-primary)" },
+  default: { iconBg: "var(--sce-accent-subtle)", iconColor: "var(--sce-accent)" },
 };
 
 /**

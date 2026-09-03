@@ -81,7 +81,7 @@ export default function AppTopNav({ firstName, lastName, imageUrl }: AppTopNavPr
         <Link
           href="/dashboard/account"
           className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1 overflow-hidden"
-          style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
+          style={imageUrl ? undefined : { background: "var(--sce-accent)" }}
           title="Mein Konto"
           aria-label="Mein Konto"
         >

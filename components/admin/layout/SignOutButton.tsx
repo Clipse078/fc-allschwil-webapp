@@ -15,7 +15,7 @@ export default function SignOutButton({ collapsed = false }: SignOutButtonProps)
         type="submit"
         title={collapsed ? "Abmelden" : undefined}
         className={cn(
-          "sce-nav-item w-full text-[var(--muted)] hover:text-red-600 hover:bg-red-50",
+          "sce-nav-item w-full text-[var(--muted)] hover:text-[var(--sce-danger)] hover:bg-[var(--sce-danger-light)]",
           collapsed && "justify-center px-2",
         )}
       >

@@ -72,14 +72,14 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Impersonation banner */}
         {session.user.isImpersonating ? (
-          <div className="border-b border-amber-200 bg-amber-50/95 backdrop-blur-sm">
+          <div className="border-b border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] backdrop-blur-sm">
             <div className="px-5 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sce-warning)]">
                     Impersonation aktiv
                   </p>
-                  <p className="mt-0.5 text-xs text-amber-800">
+                  <p className="mt-0.5 text-xs text-[var(--text-2)]">
                     Eingeloggt als anderer Benutzer —{" "}
                     Admin: {session.user.actorName ?? session.user.actorEmail ?? "Unbekannt"}
                   </p>

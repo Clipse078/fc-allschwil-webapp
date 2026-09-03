@@ -314,7 +314,7 @@ export default function AdminSidebar({
           >
             <div
               className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white overflow-hidden"
-              style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
+              style={imageUrl ? undefined : { background: "var(--sce-accent)" }}
               aria-hidden="true"
             >
               {imageUrl ? (
@@ -346,7 +346,7 @@ export default function AdminSidebar({
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white transition-opacity hover:opacity-80 overflow-hidden",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
               )}
-              style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
+              style={imageUrl ? undefined : { background: "var(--sce-accent)" }}
               title="Mein Konto"
               aria-label="Mein Konto"
             >

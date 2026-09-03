@@ -34,7 +34,7 @@ export default function PoweredByBadge({
         alt="SportClubEvo"
         width={72}
         height={18}
-        className="h-[13px] w-auto object-contain opacity-70"
+        className="h-[13px] w-auto object-contain opacity-85"
       />
     </div>
   );
