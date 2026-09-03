@@ -723,6 +723,27 @@ describe("Training row", () => {
     expect(screen.getByText("A")).toBeTruthy();
   });
 
+  it("renders multiple training dressing rooms in the KABINE column", () => {
+    const feed = makeFeed({
+      current: [
+        makeEvent({
+          type: "TRAINING",
+          teamDisplayName: "Juniorinnen FF-14",
+          allocation: {
+            pitchLabel: "KR 2 - FELD A",
+            homeDressingRoomLabel: "E1 · O3",
+            awayDressingRoomLabel: null,
+            refereeDressingRoomLabel: null,
+          },
+        }),
+      ],
+      isEmpty: false,
+    });
+    render(<InfoboardScreen1 feed={feed} />);
+    expect(screen.getByText("E1 · O3")).toBeTruthy();
+    expect(screen.getAllByTestId("training-matrix-row")).toHaveLength(1);
+  });
+
   it("does not render GARDEROBE label", () => {
     const feed = makeFeed({
       current: [makeEvent({ type: "TRAINING", allocation: { pitchLabel: null, homeDressingRoomLabel: "Kabine A", awayDressingRoomLabel: null, refereeDressingRoomLabel: null } })],
