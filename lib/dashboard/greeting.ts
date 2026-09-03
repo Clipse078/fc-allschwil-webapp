@@ -13,7 +13,7 @@ const FALLBACK_NAME = "zusammen";
 
 /**
  * Returns a time-of-day appropriate German greeting for the given first
- * name, e.g. "Guten Morgen, Michael 👋".
+ * name, e.g. "Guten Morgen, Michael".
  *
  * @param firstName - The authenticated person's first name, if known.
  * @param now - Injectable clock for testing. Defaults to the current time.
@@ -25,9 +25,9 @@ export function getPersonalizedGreeting(
   const name = firstName?.trim() || FALLBACK_NAME;
   const hour = now.getHours();
 
-  if (hour >= 5 && hour < 12) return `Guten Morgen, ${name} 👋`;
-  if (hour >= 12 && hour < 18) return `Guten Tag, ${name} 👋`;
-  return `Guten Abend, ${name} 👋`;
+  if (hour >= 5 && hour < 12) return `Guten Morgen, ${name}`;
+  if (hour >= 12 && hour < 18) return `Guten Tag, ${name}`;
+  return `Guten Abend, ${name}`;
 }
 
 /**

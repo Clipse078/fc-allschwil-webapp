@@ -17,7 +17,7 @@ export type DashboardWelcomeProps = {
  *
  * Usage:
  *   <DashboardWelcome
- *     greeting="Guten Morgen, Michael 👋"
+ *     greeting="Guten Morgen, Michael"
  *     subtitle="Schön, dich wiederzusehen."
  *   />
  */

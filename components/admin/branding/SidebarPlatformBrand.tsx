@@ -9,7 +9,8 @@
 import Image from "next/image";
 import { cn } from "@/lib/cn";
 
-const PLATFORM_LOGO_SRC = "/images/branding/sportclubevo_logo.png";
+const PLATFORM_LOGO_SRC = "/images/branding/sportclubevo_logo_alt.png";
+const LOGO_ASPECT = 864 / 174;
 
 type SidebarPlatformBrandProps = {
   collapsed?: boolean;
@@ -32,11 +33,11 @@ export default function SidebarPlatformBrand({
       <Image
         src={PLATFORM_LOGO_SRC}
         alt="SportClubEvo"
-        width={collapsed ? 28 : 120}
-        height={collapsed ? 28 : 28}
+        width={collapsed ? 32 : Math.round(32 * LOGO_ASPECT)}
+        height={32}
         className={cn(
-          "object-contain opacity-90",
-          collapsed ? "h-7 w-7" : "h-7 w-auto max-w-[140px]",
+          "object-contain opacity-85 transition-opacity duration-[120ms] hover:opacity-100",
+          collapsed ? "h-8 w-8" : "h-8 w-auto max-w-[148px]",
         )}
       />
     </div>

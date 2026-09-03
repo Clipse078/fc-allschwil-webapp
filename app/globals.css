@@ -644,8 +644,7 @@ button {
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   flex-shrink: 0;
   z-index: 40;
   width: var(--sidebar-width);
@@ -733,9 +732,32 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 14px 12px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border);
   min-height: var(--topnav-height);
+  flex-shrink: 0;
+}
+
+.sce-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .sce-nav-item {
@@ -1128,6 +1150,84 @@ button {
   opacity: 0.8;
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCE LOGIN — Premium auth canvas (no card)
+───────────────────────────────────────────────────────────────────────── */
+.sce-login-headline {
+  line-height: 1.14;
+}
+
+.sce-login-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.sce-login-input {
+  width: 100%;
+  height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.035);
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  outline: none;
+  padding: 0 0.875rem;
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sce-login-input::placeholder {
+  color: var(--muted);
+}
+
+.sce-login-input:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sce-login-input:focus {
+  border-color: var(--sce-primary);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent);
+}
+
+.sce-login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--sce-primary);
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.sce-login-submit:hover:not(:disabled) {
+  background: var(--sce-primary-hover);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sce-primary) 24%, transparent);
+}
+
+.sce-login-submit:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 22%, transparent),
+    0 4px 16px color-mix(in srgb, var(--sce-primary) 20%, transparent);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────

@@ -28,7 +28,7 @@ function greetingFor(
 
 describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
   describe("linked Person firstName takes priority", () => {
-    it('renders "Guten Morgen, Michael 👋" when the linked Person is Michael, even though the User row and tenant are "FC Allschwil"', () => {
+    it('renders "Guten Morgen, Michael" when the linked Person is Michael, even though the User row and tenant are "FC Allschwil"', () => {
       const greeting = greetingFor(
         {
           linkedPersonFirstName: "Michael",
@@ -37,7 +37,7 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         },
         new Date(2026, 0, 1, 8, 0),
       );
-      expect(greeting).toBe("Guten Morgen, Michael 👋");
+      expect(greeting).toBe("Guten Morgen, Michael");
     });
 
     it("German day/evening variants still work for the resolved Person name", () => {
@@ -46,8 +46,8 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         sessionFirstName: "FC Allschwil",
         tenantName: "FC Allschwil",
       };
-      expect(greetingFor(candidates, new Date(2026, 0, 1, 14, 0))).toBe("Guten Tag, Michael 👋");
-      expect(greetingFor(candidates, new Date(2026, 0, 1, 20, 0))).toBe("Guten Abend, Michael 👋");
+      expect(greetingFor(candidates, new Date(2026, 0, 1, 14, 0))).toBe("Guten Tag, Michael");
+      expect(greetingFor(candidates, new Date(2026, 0, 1, 20, 0))).toBe("Guten Abend, Michael");
     });
   });
 
@@ -61,7 +61,7 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         },
         new Date(2026, 0, 1, 8, 0),
       );
-      expect(greeting).toBe("Guten Morgen, zusammen 👋");
+      expect(greeting).toBe("Guten Morgen, zusammen");
       expect(greeting).not.toContain("FC Allschwil");
     });
 
@@ -74,7 +74,7 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         },
         new Date(2026, 0, 1, 8, 0),
       );
-      expect(greeting).toBe("Guten Morgen, zusammen 👋");
+      expect(greeting).toBe("Guten Morgen, zusammen");
     });
 
     it('never renders "FC Allschwil" as the greeting identity, even if it leaked into session.user.firstName and no Person is linked', () => {
@@ -87,7 +87,7 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         new Date(2026, 0, 1, 8, 0),
       );
       expect(greeting).not.toContain("FC Allschwil");
-      expect(greeting).toBe("Guten Morgen, zusammen 👋");
+      expect(greeting).toBe("Guten Morgen, zusammen");
     });
 
     it("matches the tenant name case-insensitively when filtering out the tenant name", () => {
@@ -113,7 +113,7 @@ describe("DASHBOARD-SHELL-UX-01-C1 — dashboard greeting wiring", () => {
         },
         new Date(2026, 0, 1, 8, 0),
       );
-      expect(greeting).toBe("Guten Morgen, Peter 👋");
+      expect(greeting).toBe("Guten Morgen, Peter");
     });
   });
 });

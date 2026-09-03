@@ -217,7 +217,7 @@ export default function AdminSidebar({
         </button>
       </div>
 
-      <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
+      <nav className="sce-sidebar-nav flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {sections.map((section, sectionIdx) => (
           <div key={section.sectionLabel ?? `nav-section:${sectionIdx}`}>
             {section.sectionLabel && !isCollapsed && (
@@ -284,7 +284,7 @@ export default function AdminSidebar({
         ))}
       </nav>
 
-      <div className="border-t border-[var(--border)] px-2 py-3">
+      <div className="shrink-0 border-t border-[var(--border)] px-2 py-3">
         <SidebarPlatformBrand collapsed={isCollapsed} />
       </div>
 

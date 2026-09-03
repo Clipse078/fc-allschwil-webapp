@@ -5,15 +5,24 @@ import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
 
-function ScePlatformWordmark({ size = 36 }: { size?: number }) {
+const CANONICAL_LOGO_SRC = "/images/branding/sportclubevo_logo_alt.png";
+const LOGO_ASPECT = 864 / 174;
+
+function ScePlatformWordmark({
+  height = 40,
+  className,
+}: {
+  height?: number;
+  className?: string;
+}) {
   return (
     <Image
-      src="/images/branding/sportclubevo_logo.png"
+      src={CANONICAL_LOGO_SRC}
       alt="SportClubEvo"
-      width={Math.round(size * 5.2)}
-      height={size}
+      width={Math.round(height * LOGO_ASPECT)}
+      height={height}
       priority
-      className="h-auto w-auto max-w-[280px] object-contain"
+      className={cn("h-auto w-auto object-contain", className)}
     />
   );
 }
@@ -52,73 +61,69 @@ export default function LoginForm() {
         className="pointer-events-none absolute inset-0 overflow-hidden"
       >
         <div
-          className="absolute -top-40 left-1/4 rounded-full"
+          className="absolute -top-32 left-[18%] rounded-full"
           style={{
-            width: 520,
-            height: 520,
+            width: 480,
+            height: 480,
             background:
-              "radial-gradient(circle, rgba(255,106,0,0.07) 0%, transparent 68%)",
+              "radial-gradient(circle, rgba(255,106,0,0.06) 0%, transparent 70%)",
           }}
         />
         <div
-          className="absolute bottom-0 right-0 rounded-full"
+          className="absolute bottom-[-8%] right-[-4%] rounded-full"
           style={{
-            width: 400,
-            height: 400,
+            width: 360,
+            height: 360,
             background:
-              "radial-gradient(circle, rgba(255,106,0,0.05) 0%, transparent 70%)",
+              "radial-gradient(circle, rgba(255,106,0,0.04) 0%, transparent 72%)",
           }}
         />
       </div>
 
-      <div className="relative z-10 flex w-full flex-col lg:flex-row">
+      <div className="relative z-10 flex w-full flex-col lg:min-h-screen lg:flex-row">
         <div
           className={cn(
-            "hidden lg:flex lg:w-[44%] xl:w-[42%] flex-col justify-between",
-            "border-r border-[var(--border)] px-10 py-12 xl:px-14",
+            "hidden lg:flex lg:w-[46%] xl:w-[44%] flex-col",
+            "border-r border-[var(--border)] px-12 py-14 xl:px-16 xl:py-16",
           )}
         >
-          <ScePlatformWordmark size={32} />
+          <ScePlatformWordmark height={44} className="max-w-[300px]" />
 
-          <div className="max-w-md">
-            <h1
-              className="text-[2.25rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--foreground)] xl:text-[2.5rem]"
-            >
-              Das Betriebssystem
-              <br />
-              für moderne Sportvereine.
-            </h1>
-            <p className="mt-5 text-[0.9375rem] leading-relaxed text-[var(--text-2)]">
-              Teams, Events, News und Kommunikation — professionell verwaltet an einem Ort.
-            </p>
+          <div className="flex flex-1 flex-col justify-center py-16">
+            <div className="max-w-[26rem]">
+              <h1 className="sce-login-headline text-[2.125rem] font-bold tracking-[-0.03em] text-[var(--foreground)] xl:text-[2.375rem]">
+                Das Betriebssystem
+                <br />
+                für moderne
+                <br />
+                Sportvereine.
+              </h1>
+              <p className="mt-6 max-w-[22rem] text-[0.9375rem] leading-[1.65] text-[var(--text-2)]">
+                Teams, Events, News und Kommunikation — professionell verwaltet an einem Ort.
+              </p>
+            </div>
           </div>
 
-          <p className="text-[0.72rem] text-[var(--muted)]">
+          <p className="text-[0.6875rem] tracking-wide text-[var(--muted)]">
             © 2026 SportClubEvo
           </p>
         </div>
 
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10">
-          <div className="mb-10 flex flex-col items-center gap-2 lg:hidden">
-            <ScePlatformWordmark size={34} />
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-14 sm:px-10 lg:py-16">
+          <div className="mb-12 flex flex-col items-center lg:hidden">
+            <ScePlatformWordmark height={40} className="max-w-[260px]" />
           </div>
 
-          <div className="w-full max-w-[380px]">
-            <div className="mb-8">
-              <h2 className="text-[1.375rem] font-bold tracking-tight text-[var(--foreground)]">
+          <div className="w-full max-w-[400px]">
+            <div className="mb-9">
+              <h2 className="text-[1.5rem] font-bold tracking-[-0.02em] text-[var(--foreground)]">
                 Einloggen
               </h2>
-              <p className="mt-1.5 text-[0.875rem] text-[var(--text-2)]">
-                Bitte melde dich mit deinen Zugangsdaten an.
-              </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-6">
               <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-[0.8125rem] font-medium text-[var(--text-2)]"
-                >
+                <label htmlFor="email" className="sce-login-label">
                   E-Mail
                 </label>
                 <input
@@ -127,24 +132,20 @@ export default function LoginForm() {
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="fca-input"
+                  className="sce-login-input"
                   placeholder="name@verein.ch"
                   required
                 />
               </div>
 
               <div>
-                <div className="mb-1.5 flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="block text-[0.8125rem] font-medium text-[var(--text-2)]"
-                  >
+                <div className="mb-2 flex items-baseline justify-between gap-4">
+                  <label htmlFor="password" className="sce-login-label mb-0">
                     Passwort
                   </label>
                   <a
                     href="/forgot-password"
-                    className="sce-link-primary text-[0.75rem] font-medium"
-                    tabIndex={-1}
+                    className="sce-link-primary shrink-0 text-[0.75rem] font-medium leading-none"
                   >
                     Passwort vergessen?
                   </a>
@@ -155,7 +156,7 @@ export default function LoginForm() {
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="fca-input"
+                  className="sce-login-input"
                   placeholder="Passwort eingeben"
                   required
                 />
@@ -171,7 +172,7 @@ export default function LoginForm() {
                 type="submit"
                 disabled={isSubmitting}
                 className={cn(
-                  "fca-button-primary w-full h-11 text-[0.9375rem]",
+                  "sce-login-submit w-full",
                   "disabled:cursor-not-allowed disabled:opacity-55",
                 )}
               >

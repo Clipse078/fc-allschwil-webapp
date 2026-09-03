@@ -388,7 +388,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
 
       <DashboardHero
         greeting={greeting}
-        subtitle="Schön, dich wiederzusehen."
         clubName={ctx?.name ?? undefined}
         activeSeason={activeSeason}
         date={todayFormatted}
