@@ -660,6 +660,75 @@ button {
   width: var(--sidebar-collapsed-width);
 }
 
+.sce-sidebar-resizing {
+  transition: none;
+}
+
+.sce-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 50;
+  touch-action: none;
+}
+
+.sce-sidebar-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.sce-sidebar-resize-handle:hover::after,
+.sce-sidebar-resize-handle:focus-visible::after {
+  background: color-mix(in srgb, var(--sce-primary) 45%, transparent);
+}
+
+.sce-sidebar-resize-handle:focus-visible {
+  outline: none;
+}
+
+.sce-account-menu {
+  animation: sce-menu-in 140ms ease;
+}
+
+@keyframes sce-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sce-account-menu {
+    animation: none;
+  }
+
+  .sce-sidebar {
+    transition: none;
+  }
+
+  .fca-button-primary:hover,
+  .sce-nav-item,
+  .sce-nav-child,
+  .sce-card,
+  .sce-kpi-card {
+    transition: none;
+  }
+}
+
 .sce-sidebar-brand {
   display: flex;
   align-items: center;
@@ -698,7 +767,7 @@ button {
 }
 
 .sce-nav-item.active {
-  background: var(--sce-accent-subtle);
+  background: color-mix(in srgb, var(--sce-accent) 8%, transparent);
   color: var(--foreground);
   font-weight: 600;
 }
@@ -738,7 +807,7 @@ button {
 .sce-nav-child.active {
   color: var(--foreground);
   font-weight: 500;
-  background: var(--sce-accent-subtle);
+  background: color-mix(in srgb, var(--sce-accent) 6%, transparent);
 }
 
 .sce-nav-section-label {

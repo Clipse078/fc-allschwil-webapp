@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -48,19 +47,15 @@ import {
   Volleyball,
   Wallet,
 } from "lucide-react";
-import SignOutButton from "@/components/admin/layout/SignOutButton";
 import SidebarBrandHeader from "@/components/admin/branding/SidebarBrandHeader";
-import PoweredByBadge from "@/components/admin/branding/PoweredByBadge";
+import SidebarPlatformBrand from "@/components/admin/branding/SidebarPlatformBrand";
+import { useSidebarResize } from "@/hooks/useSidebarResize";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
 import { cn } from "@/lib/cn";
 
 type AdminSidebarProps = {
-  firstName: string;
-  lastName: string;
-  email: string;
-  imageUrl?: string | null;
   permissionKeys: string[];
   /** Tenant display name. Falls back to "SportClubEvo" when not provided. */
   clubName?: string;
@@ -72,7 +67,6 @@ type AdminSidebarProps = {
 
 function getNavIcon(label: string) {
   switch (label) {
-    // Top-level primary modules
     case "Dashboard":                   return LayoutDashboard;
     case "Organisation":                return Building2;
     case "Website":                     return Globe;
@@ -88,12 +82,10 @@ function getNavIcon(label: string) {
     case "Administration":              return Settings2;
     case "Kommunikation":               return Mail;
     case "Sponsoring":                  return Handshake;
-    // Organisation children
     case "Organisationseinheiten":      return Building2;
     case "Zielgruppen":                 return Target;
     case "Teams":                       return Users;
     case "Personen":                    return UserCircle2;
-    // Website children
     case "CMS Übersicht":               return Globe;
     case "News":                        return Newspaper;
     case "Seiten":                      return FileText;
@@ -105,17 +97,14 @@ function getNavIcon(label: string) {
     case "Veröffentlichungen":          return Layers;
     case "Wiederverwendbare Inhalte":   return BookCheck;
     case "Einstellungen":               return Settings2;
-    // Planung children
     case "TrainingCenter":              return Dumbbell;
     case "Veranstaltungen":             return CalendarDays;
     case "Anlagen":                     return MapPin;
-    // Legacy Planung labels (kept for any remaining references)
     case "Trainingsplaner":             return Dumbbell;
     case "Saisons":                     return CalendarRange;
     case "Saisonplanung":               return ClipboardList;
     case "Events":                      return CalendarDays;
     case "Feld & Ressourcen":           return Layers;
-    // Administration children
     case "Darstellung":                 return Palette;
     case "E-Mail-Absender":             return Mail;
     case "Anlagen & Ressourcen":        return Building2;
@@ -124,7 +113,6 @@ function getNavIcon(label: string) {
     case "Rollen & Berechtigungen":     return ShieldCheck;
     case "Berechtigungen":              return KeyRound;
     case "Tenants":                     return Globe;
-    // Legacy / fallback (keep so any remaining references resolve cleanly)
     case "Admin":                       return Settings2;
     case "Vereinsleitung":              return Briefcase;
     case "KPIs":                        return BarChart3;
@@ -136,10 +124,8 @@ function getNavIcon(label: string) {
     case "Spieler":                     return UserRound;
     case "Trainer":                     return BadgeIcon;
     case "Registrierungen":             return Inbox;
-    // DEMO-LAYER-03: new module nav entries
     case "Club Entwicklung":            return TrendingUp;
     case "Prozesse & Aufgaben":         return ClipboardList;
-    case "Initiativen":                 return Flag;
     case "Material & Inventar":         return Package;
     case "Finanzen":                    return Wallet;
     default:                            return LayoutDashboard;
@@ -155,18 +141,15 @@ const SEASON_CARRY_PREFIXES = [
 ];
 
 function shouldCarrySeason(href: string) {
-  return SEASON_CARRY_PREFIXES.some((prefix) => href === prefix || href.startsWith(prefix + "/") || href.startsWith(prefix + "?"));
-}
-
-function getInitials(firstName: string, lastName: string): string {
-  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  return SEASON_CARRY_PREFIXES.some(
+    (prefix) =>
+      href === prefix ||
+      href.startsWith(prefix + "/") ||
+      href.startsWith(prefix + "?"),
+  );
 }
 
 export default function AdminSidebar({
-  firstName,
-  lastName,
-  email,
-  imageUrl,
   permissionKeys,
   clubName,
   logoUrl,
@@ -187,6 +170,10 @@ export default function AdminSidebar({
       ? onToggle
       : () => setInternalCollapsed((c) => !c);
 
+  const { isResizing, onResizePointerDown, onResizeKeyDown } = useSidebarResize({
+    collapsed: isCollapsed,
+  });
+
   const sections: NavSection[] = getVisibleNavSections(
     permissionKeys as PermissionKey[],
   );
@@ -205,11 +192,11 @@ export default function AdminSidebar({
   return (
     <aside
       className={cn(
-        "sce-sidebar flex-shrink-0",
+        "sce-sidebar flex-shrink-0 relative",
         isCollapsed && "collapsed",
+        isResizing && "sce-sidebar-resizing",
       )}
     >
-      {/* Brand header — tenant identity is dominant (DASHBOARD-SHELL-UX-01) */}
       <div className="sce-sidebar-brand">
         <SidebarBrandHeader
           tenantName={displayClubName}
@@ -230,15 +217,13 @@ export default function AdminSidebar({
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
         {sections.map((section, sectionIdx) => (
           <div key={section.sectionLabel ?? `nav-section:${sectionIdx}`}>
-            {/* Section divider */}
             {section.sectionLabel && !isCollapsed && (
               <p
                 className={cn(
-                  "px-2 pb-1 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-[var(--muted)]",
+                  "sce-nav-section-label",
                   sectionIdx > 0 && "mt-4",
                 )}
               >
@@ -271,7 +256,6 @@ export default function AdminSidebar({
                       {!isCollapsed && <span>{item.label}</span>}
                     </Link>
 
-                    {/* Children (always expanded when sidebar is open) */}
                     {!isCollapsed && item.children && item.children.length > 0 && (
                       <ul className="mt-0.5 space-y-0.5">
                         {item.children.map((child) => {
@@ -300,76 +284,21 @@ export default function AdminSidebar({
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-[var(--border)] px-2 py-3 space-y-2">
-        {!isCollapsed && (
-          <Link
-            href="/dashboard/account"
-            className={cn(
-              "flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors",
-              "hover:bg-[var(--surface-2)]",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
-            )}
-            title="Mein Konto"
-          >
-            <div
-              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white overflow-hidden"
-              style={imageUrl ? undefined : { background: "var(--sce-accent)" }}
-              aria-hidden="true"
-            >
-              {imageUrl ? (
-                <Image
-                  src={imageUrl}
-                  alt={`${firstName} ${lastName}`}
-                  width={28}
-                  height={28}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                getInitials(firstName, lastName)
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-semibold text-[var(--foreground)]">
-                {firstName} {lastName}
-              </p>
-              <p className="truncate text-[0.7rem] text-[var(--muted)]">{email}</p>
-            </div>
-          </Link>
-        )}
-
-        {isCollapsed && (
-          <div className="flex justify-center">
-            <Link
-              href="/dashboard/account"
-              className={cn(
-                "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white transition-opacity hover:opacity-80 overflow-hidden",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)]",
-              )}
-              style={imageUrl ? undefined : { background: "var(--sce-accent)" }}
-              title="Mein Konto"
-              aria-label="Mein Konto"
-            >
-              {imageUrl ? (
-                <Image
-                  src={imageUrl}
-                  alt={`${firstName} ${lastName}`}
-                  width={28}
-                  height={28}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                getInitials(firstName, lastName)
-              )}
-            </Link>
-          </div>
-        )}
-
-        <SignOutButton collapsed={isCollapsed} />
-
-        {/* SportClubEvo platform attribution — subtle, secondary to the tenant brand */}
-        <PoweredByBadge collapsed={isCollapsed} />
+      <div className="border-t border-[var(--border)] px-2 py-3">
+        <SidebarPlatformBrand collapsed={isCollapsed} />
       </div>
+
+      {!isCollapsed && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Seitenleiste vergrössern oder verkleinern"
+          tabIndex={0}
+          className="sce-sidebar-resize-handle hidden md:block"
+          onMouseDown={onResizePointerDown}
+          onKeyDown={onResizeKeyDown}
+        />
+      )}
     </aside>
   );
 }

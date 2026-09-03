@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import { useState, type FormEvent } from "react";
 import { cn } from "@/lib/cn";
 
-function ScePlatformWordmark({ size = 42 }: { size?: number }) {
+function ScePlatformWordmark({ size = 36 }: { size?: number }) {
   return (
     <Image
       src="/images/branding/sportclubevo_logo.png"
@@ -13,7 +13,7 @@ function ScePlatformWordmark({ size = 42 }: { size?: number }) {
       width={Math.round(size * 5.2)}
       height={size}
       priority
-      className="h-auto w-auto max-w-[320px] object-contain"
+      className="h-auto w-auto max-w-[280px] object-contain"
     />
   );
 }
@@ -46,139 +46,88 @@ export default function LoginForm() {
   }
 
   return (
-    <main className="relative flex min-h-screen" style={{ background: "#F8FAFC" }}>
+    <main className="sce-login relative flex min-h-screen bg-[var(--background)]">
       <div
-        className="hidden lg:flex lg:w-[48%] xl:w-[45%] flex-col justify-between p-12 relative overflow-hidden"
-        style={{ background: "#ffffff", borderRight: "1px solid #E5E7EB" }}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
       >
         <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 overflow-hidden"
-        >
-          <div
-            className="absolute -top-32 -left-32 rounded-full"
-            style={{
-              width: 480,
-              height: 480,
-              background:
-                "radial-gradient(circle, rgba(255,106,0,0.08) 0%, transparent 70%)",
-            }}
-          />
-          <div
-            className="absolute bottom-0 right-0 rounded-full"
-            style={{
-              width: 320,
-              height: 320,
-              background:
-                "radial-gradient(circle, rgba(255,106,0,0.06) 0%, transparent 70%)",
-            }}
-          />
-        </div>
-
-        <div className="relative z-10">
-          <ScePlatformWordmark size={36} />
-        </div>
-
-        <div className="relative z-10">
-          <p
-            className="mb-4 text-[0.72rem] font-semibold uppercase tracking-[0.18em]"
-            style={{ color: "#FF6A00" }}
-          >
-            SportClubEvo Platform
-          </p>
-
-          <h1
-            className="text-[2.75rem] font-bold leading-[1.1] tracking-[-0.025em]"
-            style={{ color: "#111827" }}
-          >
-            Das Betriebssystem
-            <br />
-            <span style={{ color: "#FF6A00" }}>für moderne</span>
-            <br />
-            Sportvereine.
-          </h1>
-
-          <p
-            className="mt-6 max-w-[320px] text-[0.9375rem] leading-relaxed"
-            style={{ color: "#6B7280" }}
-          >
-            Teams, Events, News und Kommunikation — professionell verwaltet an einem Ort.
-          </p>
-
-          <ul className="mt-8 space-y-3">
-            {[
-              "Saisonplanung & Eventmanagement",
-              "News, Seiten & Publishing-Workflow",
-              "Anmeldungen & Mitgliederverwaltung",
-            ].map((feat) => (
-              <li key={feat} className="flex items-center gap-2.5">
-                <span
-                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-white text-[0.65rem] font-bold"
-                  style={{ background: "#FF6A00" }}
-                  aria-hidden="true"
-                >
-                  ✓
-                </span>
-                <span className="text-[0.875rem]" style={{ color: "#374151" }}>
-                  {feat}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="relative z-10">
-          <p className="text-[0.72rem]" style={{ color: "#9CA3AF" }}>
-            © 2026 SportClubEvo — Alle Rechte vorbehalten.
-          </p>
-        </div>
+          className="absolute -top-40 left-1/4 rounded-full"
+          style={{
+            width: 520,
+            height: 520,
+            background:
+              "radial-gradient(circle, rgba(255,106,0,0.07) 0%, transparent 68%)",
+          }}
+        />
+        <div
+          className="absolute bottom-0 right-0 rounded-full"
+          style={{
+            width: 400,
+            height: 400,
+            background:
+              "radial-gradient(circle, rgba(255,106,0,0.05) 0%, transparent 70%)",
+          }}
+        />
       </div>
 
-      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-12">
-        <div className="mb-8 flex flex-col items-center gap-1 lg:hidden">
-          <ScePlatformWordmark size={40} />
+      <div className="relative z-10 flex w-full flex-col lg:flex-row">
+        <div
+          className={cn(
+            "hidden lg:flex lg:w-[44%] xl:w-[42%] flex-col justify-between",
+            "border-r border-[var(--border)] px-10 py-12 xl:px-14",
+          )}
+        >
+          <ScePlatformWordmark size={32} />
+
+          <div className="max-w-md">
+            <h1
+              className="text-[2.25rem] font-bold leading-[1.12] tracking-[-0.025em] text-[var(--foreground)] xl:text-[2.5rem]"
+            >
+              Das Betriebssystem
+              <br />
+              für moderne Sportvereine.
+            </h1>
+            <p className="mt-5 text-[0.9375rem] leading-relaxed text-[var(--text-2)]">
+              Teams, Events, News und Kommunikation — professionell verwaltet an einem Ort.
+            </p>
+          </div>
+
+          <p className="text-[0.72rem] text-[var(--muted)]">
+            © 2026 SportClubEvo
+          </p>
         </div>
 
-        <div className="w-full max-w-[400px]">
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: "#ffffff",
-              border: "1px solid #E5E7EB",
-              boxShadow:
-                "0 4px 24px rgba(17,24,39,0.08), 0 1px 4px rgba(17,24,39,0.04)",
-            }}
-          >
-            <div className="mb-6">
-              <h2
-                className="text-[1.375rem] font-bold tracking-tight"
-                style={{ color: "#111827" }}
-              >
+        <div className="flex flex-1 flex-col items-center justify-center px-6 py-12 sm:px-10">
+          <div className="mb-10 flex flex-col items-center gap-2 lg:hidden">
+            <ScePlatformWordmark size={34} />
+          </div>
+
+          <div className="w-full max-w-[380px]">
+            <div className="mb-8">
+              <h2 className="text-[1.375rem] font-bold tracking-tight text-[var(--foreground)]">
                 Einloggen
               </h2>
-
-              <p className="mt-1 text-[0.875rem]" style={{ color: "#6B7280" }}>
+              <p className="mt-1.5 text-[0.875rem] text-[var(--text-2)]">
                 Bitte melde dich mit deinen Zugangsdaten an.
               </p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label
                   htmlFor="email"
-                  className="mb-1.5 block text-[0.8125rem] font-medium"
-                  style={{ color: "#374151" }}
+                  className="mb-1.5 block text-[0.8125rem] font-medium text-[var(--text-2)]"
                 >
                   E-Mail
                 </label>
-
                 <input
                   id="email"
                   type="email"
                   autoComplete="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className={cn("fca-input", "transition focus:ring-0")}
+                  className="fca-input"
                   placeholder="name@verein.ch"
                   required
                 />
@@ -188,21 +137,18 @@ export default function LoginForm() {
                 <div className="mb-1.5 flex items-center justify-between">
                   <label
                     htmlFor="password"
-                    className="block text-[0.8125rem] font-medium"
-                    style={{ color: "#374151" }}
+                    className="block text-[0.8125rem] font-medium text-[var(--text-2)]"
                   >
                     Passwort
                   </label>
                   <a
                     href="/forgot-password"
-                    className="text-[0.75rem] font-medium transition-colors"
-                    style={{ color: "#FF6A00" }}
+                    className="sce-link-primary text-[0.75rem] font-medium"
                     tabIndex={-1}
                   >
                     Passwort vergessen?
                   </a>
                 </div>
-
                 <input
                   id="password"
                   type="password"
@@ -225,30 +171,14 @@ export default function LoginForm() {
                 type="submit"
                 disabled={isSubmitting}
                 className={cn(
-                  "w-full h-11 rounded-xl font-semibold text-[0.9375rem] text-white transition",
-                  "disabled:cursor-not-allowed disabled:opacity-55"
+                  "fca-button-primary w-full h-11 text-[0.9375rem]",
+                  "disabled:cursor-not-allowed disabled:opacity-55",
                 )}
-                style={{
-                  background: isSubmitting
-                    ? "#FF8533"
-                    : "linear-gradient(135deg, #FF6A00 0%, #FF8533 100%)",
-                  boxShadow: "0 2px 10px rgba(255,106,0,0.30)",
-                }}
               >
                 {isSubmitting ? "Anmeldung läuft…" : "Einloggen"}
               </button>
             </form>
           </div>
-
-          <p
-            className="mt-6 text-center text-[0.72rem]"
-            style={{ color: "#9CA3AF" }}
-          >
-            Powered by{" "}
-            <span className="font-semibold" style={{ color: "#6B7280" }}>
-              SportClubEvo
-            </span>
-          </p>
         </div>
       </div>
     </main>

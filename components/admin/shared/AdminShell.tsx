@@ -32,9 +32,6 @@ export default function AdminShell({
         }
       >
         <AdminSidebar
-          firstName={firstName}
-          lastName={lastName}
-          email={email}
           permissionKeys={permissionKeys}
           collapsed={collapsed}
           onToggle={() => setCollapsed((current) => !current)}

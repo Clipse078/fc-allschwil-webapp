@@ -55,10 +55,6 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       {/* Fixed sidebar */}
       <Suspense fallback={null}>
         <AdminSidebar
-          firstName={shellIdentity.firstName}
-          lastName={shellIdentity.lastName}
-          email={session.user.email}
-          imageUrl={shellImageUrl}
           permissionKeys={session.user.permissionKeys}
           clubName={ctx?.name}
           logoUrl={ctx?.logoUrl}
@@ -94,11 +90,12 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         <AppTopNav
           firstName={shellIdentity.firstName}
           lastName={shellIdentity.lastName}
+          email={session.user.email}
           imageUrl={shellImageUrl}
         />
 
         {/* Page content */}
-        <main className="flex-1 px-6 py-6 lg:px-8 lg:py-7">
+        <main className="flex-1 px-5 py-6 lg:px-7 lg:py-7">
           {children}
         </main>
       </div>

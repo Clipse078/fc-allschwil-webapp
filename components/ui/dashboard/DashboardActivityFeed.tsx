@@ -3,63 +3,22 @@ import { Badge } from "@/components/ui/Badge";
 import type { BadgeVariant } from "@/components/ui/Badge";
 import { cn } from "@/lib/cn";
 
-type ActivityIconAccent =
-  | "primary"
-  | "info"
-  | "success"
-  | "warning"
-  | "danger"
-  | "default";
-
 export type DashboardActivityItem = {
   key: string;
   icon: ReactNode;
-  /** Semantic accent for the icon chip. Defaults to "default". */
-  iconAccent?: ActivityIconAccent;
   title: string;
   subtitle?: string;
-  /** Relative timestamp string (e.g. "Vor 3 Min."). */
   timestamp: string;
-  /** Optional category tag. */
   tag?: string;
-  /** Badge variant for the tag pill. Defaults to "default". */
   tagVariant?: BadgeVariant;
 };
 
 export type DashboardActivityFeedProps = {
   items: DashboardActivityItem[];
-  /** Rendered when items is empty. */
   emptyState?: ReactNode;
   className?: string;
 };
 
-const ICON_VARS: Record<
-  ActivityIconAccent,
-  { iconBg: string; iconColor: string }
-> = {
-  primary: { iconBg: "var(--sce-primary-light)", iconColor: "var(--sce-primary)" },
-  info:    { iconBg: "var(--sce-info-light)",    iconColor: "var(--sce-info)" },
-  success: { iconBg: "var(--sce-success-light)", iconColor: "var(--sce-success)" },
-  warning: { iconBg: "var(--sce-warning-light)", iconColor: "var(--sce-warning)" },
-  danger:  { iconBg: "var(--sce-danger-light)",  iconColor: "var(--sce-danger)" },
-  default: { iconBg: "var(--sce-accent-subtle)", iconColor: "var(--sce-accent)" },
-};
-
-/**
- * DashboardActivityFeed
- *
- * Structured activity timeline for dashboard pages.
- * Each row shows an icon chip, title, subtitle, timestamp, and optional tag Badge.
- *
- * Reuses existing activity data — does NOT change queries.
- * Uses only design tokens — no hardcoded colors.
- *
- * Usage:
- *   <DashboardActivityFeed
- *     items={activities}
- *     emptyState={<DashboardEmptyState title="Noch keine Aktivitäten" />}
- *   />
- */
 export function DashboardActivityFeed({
   items,
   emptyState,
@@ -72,20 +31,19 @@ export function DashboardActivityFeed({
   return (
     <div className={cn("flex flex-col", className)}>
       {items.map((item, idx) => {
-        const vars = ICON_VARS[item.iconAccent ?? "default"];
         const isLast = idx === items.length - 1;
 
         return (
           <div
             key={item.key}
             className={cn(
-              "flex items-center gap-3 py-3",
+              "group flex items-center gap-3 py-3.5 transition-colors duration-[120ms]",
+              "hover:bg-[var(--surface-2)] -mx-2 px-2 rounded-lg",
               !isLast && "border-b border-[var(--border)]",
             )}
           >
             <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)]"
-              style={{ background: vars.iconBg, color: vars.iconColor }}
+              className="flex h-8 w-8 shrink-0 items-center justify-center text-[var(--muted)]"
               aria-hidden="true"
             >
               {item.icon}
