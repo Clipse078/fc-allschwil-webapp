@@ -7,7 +7,7 @@ const buttonVariants = cva(
   [
     "inline-flex items-center justify-center gap-1.5",
     "whitespace-nowrap font-semibold",
-    "transition-all duration-[120ms]",
+    "sce-btn-motion",
     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)]",
     "disabled:pointer-events-none disabled:opacity-50",
     "shrink-0 select-none",
@@ -19,7 +19,6 @@ const buttonVariants = cva(
           "rounded-lg border border-transparent",
           "bg-[var(--sce-primary)] text-white",
           "hover:bg-[var(--sce-primary-hover)]",
-          "active:scale-[0.98]",
           "focus-visible:ring-[var(--sce-primary)]",
         ],
         secondary: [
@@ -38,7 +37,6 @@ const buttonVariants = cva(
           "rounded-lg border border-transparent",
           "bg-[var(--sce-danger)] text-white",
           "hover:bg-[var(--sce-danger-hover)]",
-          "active:scale-[0.98]",
           "focus-visible:ring-[var(--sce-danger)]",
         ],
         link: [

@@ -109,6 +109,12 @@
   --transition-base:   180ms ease;
   --transition-slow:   280ms ease;
 
+  /* SCE Motion — DESIGN-04 premium interaction tokens */
+  --sce-motion-duration-fast: 180ms;
+  --sce-motion-duration:      220ms;
+  --sce-motion-duration-slow: 300ms;
+  --sce-motion-ease:          cubic-bezier(0.25, 0.1, 0.25, 1);
+
   /* ── Tenant Branding — Sprint 4: Centralized Branding System ──────────────
    * Global fallback to SportClubEvo platform palette.
    * The admin layout (app/(admin)/layout.tsx) overrides --tenant-primary and
@@ -490,10 +496,15 @@ button {
     box-shadow var(--transition-fast);
 }
 
-.fca-button-primary:hover {
+.fca-button-primary:hover:not(:disabled) {
   background: var(--sce-primary-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--sce-primary) 28%, transparent);
+}
+
+.fca-button-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .fca-button-primary:disabled {
@@ -648,6 +659,273 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   SCE MOTION SYSTEM — DESIGN-04 premium micro-interactions
+   Motion explains what happens. It does not decorate the page.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Base motion icon — transform-only, no continuous animation */
+.sce-motion-icon {
+  transform-origin: center;
+  transition: transform var(--sce-motion-duration) var(--sce-motion-ease);
+  will-change: transform;
+}
+
+/* Intent: hover — subtle settle/scale (Dashboard default) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="hover"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="hover"] {
+  transform: scale(1.06);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="hover"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="hover"] {
+  transform: scale(0.94);
+}
+
+/* Intent: group — connected nodes converge (Organisation, Teams, Personen) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="group"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="group"] {
+  transform: scale(1.05) translateX(1px);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="group"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="group"] {
+  transform: scale(0.96);
+}
+
+/* Intent: globe — restrained rotation (Website) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="globe"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="globe"] {
+  transform: rotate(14deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="globe"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="globe"] {
+  transform: rotate(6deg) scale(0.96);
+}
+
+/* Intent: schedule — calendar/planning shift */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="schedule"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="schedule"] {
+  transform: translateY(-1.5px) rotate(-4deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="schedule"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="schedule"] {
+  transform: translateY(0) rotate(0deg) scale(0.96);
+}
+
+/* Intent: direction — subtle action movement (MatchCenter) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="direction"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="direction"] {
+  transform: translateX(2px) rotate(8deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="direction"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="direction"] {
+  transform: translateX(0) scale(0.96);
+}
+
+/* Intent: lift — controlled trophy lift (TournamentCenter) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="lift"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="lift"] {
+  transform: translateY(-2px) scale(1.04);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="lift"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="lift"] {
+  transform: translateY(0) scale(0.96);
+}
+
+/* Intent: open — folder/document opens slightly */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="open"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="open"] {
+  transform: scaleY(1.08) rotate(-3deg);
+  transform-origin: bottom center;
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="open"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="open"] {
+  transform: scaleY(0.96);
+}
+
+/* Intent: communicate — envelope/inbox enters */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="communicate"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="communicate"] {
+  transform: translateX(1.5px) translateY(-1px);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="communicate"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="communicate"] {
+  transform: translateX(0) scale(0.96);
+}
+
+/* Intent: publish — layers shift */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="publish"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="publish"] {
+  transform: translateY(-1px) scale(1.05);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="publish"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="publish"] {
+  transform: scale(0.96);
+}
+
+/* Intent: gear — small rotation, NOT full spin (Einstellungen) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="gear"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="gear"] {
+  transform: rotate(22deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="gear"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="gear"] {
+  transform: rotate(10deg) scale(0.96);
+}
+
+/* Active nav item — subtle settle, no perpetual motion */
+.sce-motion-icon--active {
+  color: inherit;
+}
+
+/* Success motion — one-shot check draw/scale */
+@keyframes sce-success-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.sce-motion-success-icon {
+  animation: sce-success-in var(--sce-motion-duration-slow) var(--sce-motion-ease) both;
+}
+
+/* Sync flow foundation — source → destination propagation */
+.sce-sync-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.sce-sync-flow__source {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.sce-sync-flow__connector {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0;
+}
+
+.sce-sync-flow__line {
+  display: block;
+  width: 1px;
+  height: 12px;
+  background: var(--border-strong);
+}
+
+.sce-sync-flow__destinations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sce-sync-flow__destination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  opacity: 0.5;
+  transition:
+    opacity var(--sce-motion-duration) var(--sce-motion-ease),
+    color var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-sync-flow__destination--pending {
+  opacity: 0.8;
+  color: var(--foreground);
+}
+
+.sce-sync-flow__destination--complete {
+  opacity: 1;
+  color: var(--sce-success);
+}
+
+.sce-sync-flow__check {
+  color: var(--sce-success);
+  animation: sce-success-in var(--sce-motion-duration) var(--sce-motion-ease) both;
+}
+
+@keyframes sce-sync-pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.sce-sync-flow--active .sce-sync-flow__destination--pending {
+  animation: sce-sync-pulse var(--sce-motion-duration-slow) var(--sce-motion-ease) 1;
+  animation-delay: calc(var(--sce-sync-index, 0) * 120ms);
+}
+
+.sce-sync-flow--active .sce-sync-flow__line {
+  background: linear-gradient(
+    to bottom,
+    var(--sce-primary),
+    var(--border-strong)
+  );
+  transition: background var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+/* Expand/collapse — restrained height/opacity transition */
+.sce-expand-content {
+  overflow: hidden;
+  transition:
+    max-height var(--sce-motion-duration-slow) var(--sce-motion-ease),
+    opacity var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-expand-content[data-expanded="false"] {
+  max-height: 0;
+  opacity: 0;
+}
+
+.sce-expand-content[data-expanded="true"] {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+.sce-expand-chevron {
+  transition: transform var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-expand-chevron[data-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* Button micro-motion — primary actions */
+.sce-btn-motion {
+  transition:
+    background-color var(--transition-fast),
+    transform var(--sce-motion-duration-fast) var(--sce-motion-ease),
+    box-shadow var(--transition-fast);
+}
+
+.sce-btn-motion:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.sce-btn-motion:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    SCE SIDEBAR — New minimal Linear-style sidebar
 ───────────────────────────────────────────────────────────────────────── */
 .sce-sidebar {
@@ -730,11 +1008,40 @@ button {
   }
 
   .fca-button-primary:hover,
+  .fca-button-primary:active,
   .sce-nav-item,
   .sce-nav-child,
   .sce-card,
   .sce-kpi-card {
     transition: none;
+  }
+
+  .sce-motion-icon,
+  .sce-motion-success-icon,
+  .sce-sync-flow__destination,
+  .sce-sync-flow__check,
+  .sce-expand-content,
+  .sce-expand-chevron,
+  .sce-btn-motion {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
+
+  .sce-nav-item:hover .sce-motion-icon,
+  .sce-nav-item:active .sce-motion-icon,
+  .sce-nav-child:hover .sce-motion-icon,
+  .sce-nav-child:active .sce-motion-icon {
+    transform: none;
+  }
+
+  .sce-sync-flow--active .sce-sync-flow__destination--pending {
+    animation: none;
+  }
+
+  .sce-btn-motion:hover:not(:disabled),
+  .sce-btn-motion:active:not(:disabled) {
+    transform: none;
   }
 }
 
@@ -884,13 +1191,18 @@ button {
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    transform var(--sce-motion-duration-fast) var(--sce-motion-ease);
 }
 
 .sce-icon-button:hover {
   background: var(--surface-2);
   color: var(--foreground);
   border-color: var(--border);
+}
+
+.sce-icon-button:active {
+  transform: scale(0.94);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -1274,7 +1586,13 @@ button {
 
 .sce-login-submit:hover:not(:disabled) {
   background: var(--sce-primary-hover);
+  transform: translateY(-1px);
   box-shadow: 0 4px 16px color-mix(in srgb, var(--sce-primary) 24%, transparent);
+}
+
+.sce-login-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sce-primary) 16%, transparent);
 }
 
 .sce-login-submit:focus-visible {

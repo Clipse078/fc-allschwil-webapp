@@ -44,12 +44,15 @@ import {
   UserCircle2,
   UserRound,
   Users,
+  Trophy,
   Volleyball,
   Wallet,
 } from "lucide-react";
 import SidebarBrandHeader from "@/components/admin/branding/SidebarBrandHeader";
 import SidebarPlatformBrand from "@/components/admin/branding/SidebarPlatformBrand";
+import { MotionIcon } from "@/components/ui/MotionIcon";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
+import { getNavMotionIntent } from "@/lib/motion/nav-intents";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -79,6 +82,7 @@ function getNavIcon(label: string) {
     case "Infoboard":                   return Monitor;
     case "Vorschau":                    return MonitorPlay;
     case "MatchCenter":                 return Volleyball;
+    case "TournamentCenter":            return Trophy;
     case "Administration":              return Settings2;
     case "Kommunikation":               return Mail;
     case "Sponsoring":                  return Handshake;
@@ -237,6 +241,7 @@ export default function AdminSidebar({
             <ul className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = getNavIcon(item.label);
+                const motionIntent = getNavMotionIntent(item.label);
                 const resolvedHref = buildHref(item.href);
                 const childActive = item.children?.some((c) => isItemActive(c.href)) ?? false;
                 const isActive = isItemActive(item.href) || childActive;
@@ -252,7 +257,12 @@ export default function AdminSidebar({
                         isCollapsed && "justify-center px-2",
                       )}
                     >
-                      <Icon className="h-4 w-4 shrink-0" />
+                      <MotionIcon
+                        icon={Icon}
+                        intent={motionIntent}
+                        active={isActive}
+                        className="h-4 w-4"
+                      />
                       {!isCollapsed && <span>{item.label}</span>}
                     </Link>
 
@@ -260,6 +270,7 @@ export default function AdminSidebar({
                       <ul className="mt-0.5 space-y-0.5">
                         {item.children.map((child) => {
                           const ChildIcon = getNavIcon(child.label);
+                          const childMotionIntent = getNavMotionIntent(child.label);
                           const childHref = buildHref(child.href);
                           const isChildActive = isItemActive(child.href);
                           return (
@@ -268,7 +279,12 @@ export default function AdminSidebar({
                                 href={childHref}
                                 className={cn("sce-nav-child", isChildActive && "active")}
                               >
-                                <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+                                <MotionIcon
+                                  icon={ChildIcon}
+                                  intent={childMotionIntent}
+                                  active={isChildActive}
+                                  className="h-3.5 w-3.5"
+                                />
                                 <span>{child.label}</span>
                               </Link>
                             </li>
