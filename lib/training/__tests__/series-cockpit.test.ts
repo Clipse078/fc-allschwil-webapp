@@ -119,6 +119,39 @@ describe("series cockpit grouping", () => {
     expect(rows[0]?.dressingRoomName).toBe("E4");
   });
 
+  it("joins multiple dressing rooms for the series overview", () => {
+    const rows = buildTrainingSeriesCockpitRows({
+      series: [makeSeries()],
+      teamDisplayNameByTeamSeasonId: new Map([["ts-1", "Juniorinnen FF-14"]]),
+      allocationsBySeriesId: new Map([
+        [
+          "series-1",
+          [
+            makeAllocation({ facilityResourceType: "HALF_PITCH", facilityResourceName: "Kunstrasen 2 A" }),
+            makeAllocation({
+              id: "alloc-e1",
+              facilityResourceId: "res-e1",
+              facilityResourceType: "DRESSING_ROOM",
+              facilityResourceName: "E1",
+              displayOrder: 0,
+            }),
+            makeAllocation({
+              id: "alloc-o3",
+              facilityResourceId: "res-o3",
+              facilityResourceType: "DRESSING_ROOM",
+              facilityResourceName: "O3",
+              displayOrder: 1,
+            }),
+          ],
+        ],
+      ]),
+    });
+
+    expect(rows[0]?.dressingRoomName).toBe("E1 · O3");
+    expect(rows[0]?.dressingRoomAllocationId).toBe("alloc-e1");
+    expect(rows[0]?.dressingRoomResourceId).toBe("res-e1");
+  });
+
   it("keeps archived series rows when included in input", () => {
     const rows = buildTrainingSeriesCockpitRows({
       series: [makeSeries({ status: "ARCHIVED" })],
@@ -151,6 +184,38 @@ describe("resolveSeriesAllocationDisplay", () => {
       dressingRoomAllocationId: null,
       pitchResourceId: null,
       dressingRoomResourceId: null,
+    });
+  });
+
+  it("joins multiple dressing rooms without duplicates", () => {
+    expect(
+      resolveSeriesAllocationDisplay([
+        makeAllocation({
+          id: "alloc-e1",
+          facilityResourceId: "res-e1",
+          facilityResourceType: "DRESSING_ROOM",
+          facilityResourceName: "E1",
+          displayOrder: 0,
+        }),
+        makeAllocation({
+          id: "alloc-o3",
+          facilityResourceId: "res-o3",
+          facilityResourceType: "DRESSING_ROOM",
+          facilityResourceName: "O3",
+          displayOrder: 1,
+        }),
+        makeAllocation({
+          id: "alloc-o4",
+          facilityResourceId: "res-o4",
+          facilityResourceType: "DRESSING_ROOM",
+          facilityResourceName: "O4",
+          displayOrder: 2,
+        }),
+      ]),
+    ).toMatchObject({
+      dressingRoomName: "E1 · O3 · O4",
+      dressingRoomAllocationId: "alloc-e1",
+      dressingRoomResourceId: "res-e1",
     });
   });
 });

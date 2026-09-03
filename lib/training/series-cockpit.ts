@@ -80,23 +80,55 @@ export type TrainingSeriesCockpitRow = {
   occurrenceExceptions: SeriesCockpitExceptionSummary;
 };
 
+function compareDressingRoomAllocations(
+  a: TrainingAllocationDto,
+  b: TrainingAllocationDto,
+): number {
+  const orderDiff = a.displayOrder - b.displayOrder;
+  if (orderDiff !== 0) return orderDiff;
+  return a.createdAt.localeCompare(b.createdAt);
+}
+
+function resolveDressingRoomAllocations(
+  allocations: readonly TrainingAllocationDto[],
+): TrainingAllocationDto[] {
+  const dressingRooms = allocations
+    .filter((allocation) => classifyFacilityResourceType(allocation.facilityResourceType) === "DRESSING_ROOM")
+    .sort(compareDressingRoomAllocations);
+
+  const seen = new Set<string>();
+  const deduped: TrainingAllocationDto[] = [];
+  for (const allocation of dressingRooms) {
+    if (seen.has(allocation.facilityResourceId)) continue;
+    seen.add(allocation.facilityResourceId);
+    deduped.push(allocation);
+  }
+  return deduped;
+}
+
+export function formatDressingRoomDisplayNames(allocations: readonly TrainingAllocationDto[]): string | null {
+  const names = resolveDressingRoomAllocations(allocations)
+    .map((allocation) => allocation.facilityResourceName.trim())
+    .filter((name) => name.length > 0);
+  return names.length > 0 ? names.join(" · ") : null;
+}
+
 export function resolveSeriesAllocationDisplay(
   allocations: readonly TrainingAllocationDto[],
 ): TrainingSeriesAllocationDisplay {
   const pitch = allocations.find(
     (allocation) => classifyFacilityResourceType(allocation.facilityResourceType) === "PITCH_HALL",
   );
-  const dressingRoom = allocations.find(
-    (allocation) => classifyFacilityResourceType(allocation.facilityResourceType) === "DRESSING_ROOM",
-  );
+  const dressingRooms = resolveDressingRoomAllocations(allocations);
+  const primaryDressingRoom = dressingRooms[0];
 
   return {
     pitchName: pitch?.facilityResourceName ?? null,
-    dressingRoomName: dressingRoom?.facilityResourceName ?? null,
+    dressingRoomName: formatDressingRoomDisplayNames(allocations),
     pitchAllocationId: pitch?.id ?? null,
-    dressingRoomAllocationId: dressingRoom?.id ?? null,
+    dressingRoomAllocationId: primaryDressingRoom?.id ?? null,
     pitchResourceId: pitch?.facilityResourceId ?? null,
-    dressingRoomResourceId: dressingRoom?.facilityResourceId ?? null,
+    dressingRoomResourceId: primaryDressingRoom?.facilityResourceId ?? null,
   };
 }
 

@@ -137,10 +137,10 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
     ).toBe("O3");
   });
 
-  it("resolves multiple series siblings deterministically by lowest displayOrder", () => {
+  it("resolves multiple series dressing rooms in canonical displayOrder", () => {
     const seriesRows = [
-      resource("O4", "Garderobe O4", "DRESSING_ROOM", 5, new Date("2026-01-02T00:00:00.000Z")),
-      resource("E3", "Garderobe E3", "DRESSING_ROOM", 0, new Date("2026-01-03T00:00:00.000Z")),
+      resource("O3", "Garderobe O3", "DRESSING_ROOM", 1, new Date("2026-01-02T00:00:00.000Z")),
+      resource("E1", "Garderobe E1", "DRESSING_ROOM", 0, new Date("2026-01-03T00:00:00.000Z")),
     ];
 
     const resolved = resolveTrainingOccurrenceAllocationGroup(
@@ -149,7 +149,39 @@ describe("resolveTrainingOccurrenceAllocationGroup", () => {
       [],
     );
 
-    expect(resolved[0]?.facilityResource.code).toBe("E3");
+    expect(resolved.map((row) => row.facilityResource.code)).toEqual(["E1", "O3"]);
+  });
+
+  it("deduplicates multiple series dressing rooms by facilityResourceId", () => {
+    const seriesRows = [
+      resource("E1", "Garderobe E1", "DRESSING_ROOM", 0),
+      resource("E1", "Garderobe E1", "DRESSING_ROOM", 1),
+      resource("O3", "Garderobe O3", "DRESSING_ROOM", 2),
+    ];
+
+    const resolved = resolveTrainingOccurrenceAllocationGroup(
+      "DRESSING_ROOM",
+      seriesRows,
+      [],
+    );
+
+    expect(resolved.map((row) => row.facilityResource.code)).toEqual(["E1", "O3"]);
+  });
+
+  it("returns all series dressing rooms when no occurrence override exists", () => {
+    const seriesRows = [
+      resource("KR3A", "Kunstrasen 3 A", "HALF_PITCH", 0),
+      resource("E1", "Garderobe E1", "DRESSING_ROOM", 0),
+      resource("O3", "Garderobe O3", "DRESSING_ROOM", 1),
+    ];
+
+    const resolved = resolveTrainingOccurrenceAllocations({
+      seriesRows,
+      sessionOverrideRows: [],
+    });
+
+    expect(resolved.pitch).toHaveLength(1);
+    expect(resolved.dressingRoom.map((row) => row.facilityResource.code)).toEqual(["E1", "O3"]);
   });
 
   it("resolves multiple session siblings deterministically by highest displayOrder", () => {
