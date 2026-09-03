@@ -1,0 +1,480 @@
+/**
+ * SCE-DESIGN-04C — Premium animated sidebar nav iconography
+ * Internal SVG element motion; no whole-icon transforms.
+ */
+
+/* ── Base animated nav icon ─────────────────────────────────────────────── */
+
+.sce-animated-nav-icon {
+  --sce-nav-icon-copper: #d4843a;
+  --sce-nav-icon-copper-hover: #be7232;
+  color: currentColor;
+  overflow: visible;
+  transform: none !important;
+  transition: color var(--sce-motion-duration-fast) var(--sce-motion-ease);
+}
+
+.sce-animated-nav-icon--child {
+  opacity: 0.92;
+}
+
+.sce-animated-nav-icon--active .sce-nav-stroke,
+.sce-animated-nav-icon--active .sce-nav-fill {
+  stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 35%, currentColor);
+}
+
+.sce-animated-nav-icon--active .sce-nav-copper-flow {
+  opacity: 0.85;
+}
+
+/* Internal strokes — smooth color on hover */
+.sce-nav-stroke,
+.sce-nav-fill {
+  transition:
+    stroke var(--sce-motion-duration) var(--sce-motion-ease),
+    fill var(--sce-motion-duration) var(--sce-motion-ease),
+    opacity var(--sce-motion-duration) var(--sce-motion-ease),
+    transform var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-nav-copper-flow {
+  opacity: 0;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: opacity var(--sce-motion-duration-fast) var(--sce-motion-ease);
+}
+
+/* Hover trigger — parent link drives animation with intent delay */
+.sce-nav-item:hover .sce-animated-nav-icon .sce-nav-stroke,
+.sce-nav-child:hover .sce-animated-nav-icon .sce-nav-stroke,
+.sce-nav-item:hover .sce-animated-nav-icon .sce-nav-fill,
+.sce-nav-child:hover .sce-animated-nav-icon .sce-nav-fill {
+  stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 55%, currentColor);
+}
+
+.sce-nav-item:focus-visible .sce-animated-nav-icon .sce-nav-stroke,
+.sce-nav-child:focus-visible .sce-animated-nav-icon .sce-nav-stroke {
+  stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 45%, currentColor);
+}
+
+/* ── Shared keyframes ───────────────────────────────────────────────────── */
+
+@keyframes sce-nav-settle-y {
+  from { transform: translateY(-3px); opacity: 0.5; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sce-nav-settle-x {
+  from { transform: translateX(-2px); opacity: 0.6; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes sce-nav-draw-stroke {
+  from { stroke-dashoffset: 24; opacity: 0.4; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes sce-nav-copper-travel {
+  from { stroke-dashoffset: 1; opacity: 0; }
+  15% { opacity: 1; }
+  to { stroke-dashoffset: 0; opacity: 0.9; }
+}
+
+@keyframes sce-nav-ring-tighten {
+  from { transform: scale(1.15); opacity: 0.5; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+@keyframes sce-nav-rotate-partial {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(24deg); }
+}
+
+@keyframes sce-nav-lift {
+  from { transform: translateY(2px); }
+  to { transform: translateY(-1px); }
+}
+
+@keyframes sce-nav-reveal {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes sce-nav-shift-queue {
+  from { transform: translateY(-3px); opacity: 0.5; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes sce-nav-check-draw {
+  from { stroke-dashoffset: 12; opacity: 0.3; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+
+@keyframes sce-nav-line-slide {
+  from { transform: translateX(-4px); opacity: 0.4; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes sce-nav-pulse-once {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.3); opacity: 1; }
+}
+
+@keyframes sce-nav-converge {
+  from { transform: translate(var(--ani-tx, 0), var(--ani-ty, 0)); opacity: 0.5; }
+  to { transform: translate(0, 0); opacity: 1; }
+}
+
+@keyframes sce-nav-open-flap {
+  from { transform: rotateX(0deg); }
+  to { transform: rotateX(-18deg); }
+}
+
+@keyframes sce-nav-loop-travel {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Hover animation application — delayed to avoid accidental triggers */
+.sce-nav-item:hover .sce-animated-nav-icon [class*="ani-"],
+.sce-nav-child:hover .sce-animated-nav-icon [class*="ani-"] {
+  animation-duration: var(--sce-motion-duration);
+  animation-timing-function: var(--sce-motion-ease);
+  animation-fill-mode: both;
+  animation-delay: 48ms;
+}
+
+/* ── Dashboard ──────────────────────────────────────────────────────────── */
+
+.sce-nav-item:hover .ani-dash-tile-1,
+.sce-nav-child:hover .ani-dash-tile-1 { animation-name: sce-nav-settle-y; animation-duration: 240ms; }
+.sce-nav-item:hover .ani-dash-tile-2,
+.sce-nav-child:hover .ani-dash-tile-2 { animation-name: sce-nav-settle-y; animation-duration: 280ms; animation-delay: 72ms; }
+.sce-nav-item:hover .ani-dash-tile-3,
+.sce-nav-child:hover .ani-dash-tile-3 { animation-name: sce-nav-settle-y; animation-duration: 320ms; animation-delay: 96ms; }
+.sce-nav-item:hover .ani-dash-tile-4,
+.sce-nav-child:hover .ani-dash-tile-4 { animation-name: sce-nav-settle-y; animation-duration: 300ms; animation-delay: 120ms; }
+.sce-nav-item:hover .ani-dash-copper,
+.sce-nav-child:hover .ani-dash-copper { animation-name: sce-nav-copper-travel; animation-duration: 420ms; animation-delay: 140ms; }
+
+/* ── Organisation / group icons ─────────────────────────────────────────── */
+
+.ani-org-node-1 { --ani-tx: -2px; --ani-ty: -1px; }
+.ani-org-node-2 { --ani-tx: 2px; --ani-ty: -1px; }
+.ani-org-node-3 { --ani-ty: 2px; }
+.sce-nav-item:hover .ani-org-node,
+.sce-nav-child:hover .ani-org-node { animation-name: sce-nav-converge; }
+.sce-nav-item:hover .ani-org-link,
+.sce-nav-child:hover .ani-org-link { animation-name: sce-nav-draw-stroke; stroke-dasharray: 8; }
+.sce-nav-item:hover .ani-org-copper,
+.sce-nav-child:hover .ani-org-copper { animation-name: sce-nav-copper-travel; animation-duration: 380ms; }
+
+/* Hierarchy */
+.sce-nav-item:hover .ani-hier-trunk,
+.sce-nav-child:hover .ani-hier-trunk { animation-name: sce-nav-draw-stroke; stroke-dasharray: 12; }
+.sce-nav-item:hover .ani-hier-branch,
+.sce-nav-child:hover .ani-hier-branch { animation-name: sce-nav-draw-stroke; stroke-dasharray: 10; }
+.sce-nav-item:hover .ani-hier-branch-2,
+.sce-nav-child:hover .ani-hier-branch-2 { animation-delay: 100ms; }
+.sce-nav-item:hover .ani-hier-node,
+.sce-nav-child:hover .ani-hier-node { animation-name: sce-nav-reveal; }
+
+/* Target rings */
+.ani-target-ring { transform-origin: 12px 12px; }
+.sce-nav-item:hover .ani-target-ring-outer,
+.sce-nav-child:hover .ani-target-ring-outer { animation-name: sce-nav-ring-tighten; animation-duration: 360ms; }
+.sce-nav-item:hover .ani-target-ring-mid,
+.sce-nav-child:hover .ani-target-ring-mid { animation-name: sce-nav-ring-tighten; animation-duration: 320ms; animation-delay: 60ms; }
+.sce-nav-item:hover .ani-target-center,
+.sce-nav-child:hover .ani-target-center { animation-name: sce-nav-pulse-once; animation-duration: 280ms; animation-delay: 120ms; }
+
+/* Teams */
+.ani-team-node-1 { --ani-tx: -3px; }
+.ani-team-node-2 { --ani-tx: 3px; }
+.sce-nav-item:hover .ani-team-node,
+.sce-nav-child:hover .ani-team-node { animation-name: sce-nav-converge; }
+.sce-nav-item:hover .ani-team-body,
+.sce-nav-child:hover .ani-team-body { animation-name: sce-nav-settle-y; }
+
+/* Mapping */
+.sce-nav-item:hover .ani-map-line,
+.sce-nav-child:hover .ani-map-line { animation-name: sce-nav-draw-stroke; stroke-dasharray: 12; }
+.sce-nav-item:hover .ani-map-copper,
+.sce-nav-child:hover .ani-map-copper { animation-name: sce-nav-copper-travel; animation-duration: 400ms; animation-delay: 100ms; }
+.sce-nav-item:hover .ani-map-endpoint,
+.sce-nav-child:hover .ani-map-endpoint { animation-name: sce-nav-pulse-once; animation-duration: 300ms; }
+
+/* Club / Vereine */
+.sce-nav-item:hover .ani-club-highlight,
+.sce-nav-child:hover .ani-club-highlight { animation-name: sce-nav-copper-travel; stroke: var(--sce-nav-icon-copper); stroke-dasharray: 8; }
+
+/* Person */
+.sce-nav-item:hover .ani-person-head,
+.sce-nav-child:hover .ani-person-head { animation-name: sce-nav-reveal; }
+.sce-nav-item:hover .ani-person-body,
+.sce-nav-child:hover .ani-person-body { animation-name: sce-nav-draw-stroke; stroke-dasharray: 20; animation-delay: 80ms; }
+
+/* Competition */
+.sce-nav-item:hover .ani-compete-left,
+.sce-nav-child:hover .ani-compete-left { animation-name: sce-nav-settle-x; --ani-tx: -4px; }
+.sce-nav-item:hover .ani-compete-right,
+.sce-nav-child:hover .ani-compete-right { animation-name: sce-nav-settle-x; animation-direction: reverse; }
+.sce-nav-item:hover .ani-compete-clash,
+.sce-nav-child:hover .ani-compete-clash { animation-name: sce-nav-pulse-once; animation-duration: 260ms; animation-delay: 120ms; }
+
+/* ── Website / globe ─────────────────────────────────────────────────────── */
+
+.sce-nav-item:hover .ani-globe-lat,
+.sce-nav-child:hover .ani-globe-lat { animation-name: sce-nav-draw-stroke; stroke-dasharray: 20; }
+.sce-nav-item:hover .ani-globe-lon,
+.sce-nav-child:hover .ani-globe-lon { animation-name: sce-nav-draw-stroke; stroke-dasharray: 24; }
+.sce-nav-item:hover .ani-globe-lon-2,
+.sce-nav-child:hover .ani-globe-lon-2 { animation-delay: 80ms; }
+.sce-nav-item:hover .ani-globe-copper,
+.sce-nav-child:hover .ani-globe-copper { animation-name: sce-nav-copper-travel; animation-duration: 480ms; animation-delay: 120ms; }
+
+/* Grid panels */
+.sce-nav-item:hover .ani-grid-panel-1,
+.sce-nav-child:hover .ani-grid-panel-1 { animation-name: sce-nav-settle-y; animation-duration: 220ms; }
+.sce-nav-item:hover .ani-grid-panel-2,
+.sce-nav-child:hover .ani-grid-panel-2 { animation-name: sce-nav-settle-y; animation-delay: 60ms; }
+.sce-nav-item:hover .ani-grid-panel-3,
+.sce-nav-child:hover .ani-grid-panel-3 { animation-name: sce-nav-settle-y; animation-delay: 100ms; }
+.sce-nav-item:hover .ani-grid-panel-4,
+.sce-nav-child:hover .ani-grid-panel-4 { animation-name: sce-nav-settle-y; animation-delay: 140ms; }
+
+/* News */
+.sce-nav-item:hover .ani-news-line,
+.sce-nav-child:hover .ani-news-line { animation-name: sce-nav-draw-stroke; stroke-dasharray: 10; }
+.sce-nav-item:hover .ani-news-line-2,
+.sce-nav-child:hover .ani-news-line-2 { animation-delay: 80ms; }
+.sce-nav-item:hover .ani-news-line-3,
+.sce-nav-child:hover .ani-news-line-3 { animation-delay: 140ms; }
+.sce-nav-item:hover .ani-news-pulse,
+.sce-nav-child:hover .ani-news-pulse { animation-name: sce-nav-pulse-once; animation-duration: 300ms; animation-delay: 180ms; }
+
+/* Pages */
+.sce-nav-item:hover .ani-page-layer,
+.sce-nav-child:hover .ani-page-layer { animation-name: sce-nav-line-slide; }
+.sce-nav-item:hover .ani-page-layer-2,
+.sce-nav-child:hover .ani-page-layer-2 { animation-delay: 80ms; }
+
+/* Blocks */
+.sce-nav-item:hover .ani-block,
+.sce-nav-child:hover .ani-block { animation-name: sce-nav-settle-y; }
+.sce-nav-item:hover .ani-block-2,
+.sce-nav-child:hover .ani-block-2 { animation-delay: 70ms; }
+.sce-nav-item:hover .ani-block-3,
+.sce-nav-child:hover .ani-block-3 { animation-delay: 120ms; }
+
+/* Menu lines */
+.sce-nav-item:hover .ani-menu-line,
+.sce-nav-child:hover .ani-menu-line { animation-name: sce-nav-line-slide; }
+.sce-nav-item:hover .ani-menu-line-2,
+.sce-nav-child:hover .ani-menu-line-2 { animation-delay: 60ms; }
+.sce-nav-item:hover .ani-menu-line-3,
+.sce-nav-child:hover .ani-menu-line-3 { animation-delay: 110ms; }
+
+/* Reveal blocks */
+.sce-nav-item:hover .ani-reveal-block,
+.sce-nav-child:hover .ani-reveal-block { animation-name: sce-nav-reveal; }
+.sce-nav-item:hover .ani-reveal-block-2,
+.sce-nav-child:hover .ani-reveal-block-2 { animation-delay: 70ms; }
+.sce-nav-item:hover .ani-reveal-block-3,
+.sce-nav-child:hover .ani-reveal-block-3 { animation-delay: 120ms; }
+.sce-nav-item:hover .ani-reveal-block-4,
+.sce-nav-child:hover .ani-reveal-block-4 { animation-delay: 170ms; }
+
+/* Media */
+.sce-nav-item:hover .ani-media-inner,
+.sce-nav-child:hover .ani-media-inner { animation-name: sce-nav-reveal; animation-delay: 100ms; }
+.sce-nav-item:hover .ani-media-reveal,
+.sce-nav-child:hover .ani-media-reveal { animation-name: sce-nav-draw-stroke; stroke-dasharray: 16; animation-delay: 140ms; }
+
+/* Pen */
+.sce-nav-item:hover .ani-pen-stroke,
+.sce-nav-child:hover .ani-pen-stroke { animation-name: sce-nav-draw-stroke; stroke-dasharray: 8; }
+
+/* Publish */
+.sce-nav-item:hover .ani-publish-arrow,
+.sce-nav-child:hover .ani-publish-arrow { animation-name: sce-nav-settle-x; }
+.sce-nav-item:hover .ani-publish-arrowhead,
+.sce-nav-child:hover .ani-publish-arrowhead { animation-name: sce-nav-line-slide; animation-delay: 80ms; }
+.sce-nav-item:hover .ani-publish-dest,
+.sce-nav-child:hover .ani-publish-dest { animation-name: sce-nav-pulse-once; animation-delay: 200ms; stroke: var(--sce-nav-icon-copper); }
+.sce-nav-item:hover .ani-publish-copper,
+.sce-nav-child:hover .ani-publish-copper { animation-name: sce-nav-copper-travel; animation-duration: 420ms; animation-delay: 100ms; }
+
+/* Reuse loop */
+.sce-nav-item:hover .ani-reuse-loop,
+.sce-nav-child:hover .ani-reuse-loop { animation-name: sce-nav-loop-travel; stroke-dasharray: 16; animation-duration: 400ms; }
+
+/* Gear */
+.ani-gear-teeth { transform-origin: 12px 12px; }
+.sce-nav-item:hover .ani-gear-teeth,
+.sce-nav-child:hover .ani-gear-teeth { animation-name: sce-nav-rotate-partial; animation-duration: 360ms; }
+
+/* ── Betrieb / planning ─────────────────────────────────────────────────── */
+
+.sce-nav-item:hover .ani-cal-marker,
+.sce-nav-child:hover .ani-cal-marker { animation-name: sce-nav-pulse-once; }
+.sce-nav-item:hover .ani-cal-copper,
+.sce-nav-child:hover .ani-cal-copper { animation-name: sce-nav-copper-travel; animation-duration: 400ms; animation-delay: 100ms; }
+.sce-nav-item:hover .ani-cal-pin,
+.sce-nav-child:hover .ani-cal-pin { animation-name: sce-nav-settle-y; }
+
+/* Training */
+.sce-nav-item:hover .ani-training-pulse,
+.sce-nav-child:hover .ani-training-pulse { animation-name: sce-nav-pulse-once; stroke: var(--sce-nav-icon-copper); }
+
+/* Match */
+.sce-nav-item:hover .ani-match-trajectory,
+.sce-nav-child:hover .ani-match-trajectory { animation-name: sce-nav-draw-stroke; stroke-dasharray: 14; }
+
+/* Trophy */
+.sce-nav-item:hover .ani-trophy-cup,
+.sce-nav-child:hover .ani-trophy-cup { animation-name: sce-nav-lift; animation-duration: 340ms; }
+.sce-nav-item:hover .ani-trophy-highlight,
+.sce-nav-child:hover .ani-trophy-highlight { animation-name: sce-nav-copper-travel; stroke: var(--sce-nav-icon-copper); stroke-dasharray: 8; animation-delay: 120ms; }
+
+/* Event page */
+.sce-nav-item:hover .ani-event-marker,
+.sce-nav-child:hover .ani-event-marker { animation-name: sce-nav-pulse-once; animation-delay: 160ms; }
+
+/* Week columns */
+.sce-nav-item:hover .ani-week-col,
+.sce-nav-child:hover .ani-week-col { animation-name: sce-nav-reveal; }
+.sce-nav-item:hover .ani-week-col-2,
+.sce-nav-child:hover .ani-week-col-2 { animation-delay: 60ms; }
+.sce-nav-item:hover .ani-week-col-3,
+.sce-nav-child:hover .ani-week-col-3 { animation-delay: 110ms; }
+.sce-nav-item:hover .ani-week-col-4,
+.sce-nav-child:hover .ani-week-col-4 { animation-delay: 160ms; }
+
+/* Folder */
+.sce-nav-item:hover .ani-folder-tab,
+.sce-nav-child:hover .ani-folder-tab { animation-name: sce-nav-open-flap; transform-origin: 11px 5px; }
+.sce-nav-item:hover .ani-folder-doc,
+.sce-nav-child:hover .ani-folder-doc { animation-name: sce-nav-reveal; animation-delay: 100ms; }
+.sce-nav-item:hover .ani-folder-copper,
+.sce-nav-child:hover .ani-folder-copper { animation-name: sce-nav-copper-travel; animation-delay: 140ms; }
+
+/* Inbox */
+.sce-nav-item:hover .ani-inbox-doc,
+.sce-nav-child:hover .ani-inbox-doc { animation-name: sce-nav-settle-y; animation-delay: 120ms; }
+.sce-nav-item:hover .ani-inbox-flap,
+.sce-nav-child:hover .ani-inbox-flap { animation-name: sce-nav-open-flap; transform-origin: 12px 6px; }
+
+/* Check / entry */
+.sce-nav-item:hover .ani-entry-check,
+.sce-nav-child:hover .ani-entry-check { animation-name: sce-nav-check-draw; stroke-dasharray: 12; }
+
+/* Queue */
+.sce-nav-item:hover .ani-queue-item,
+.sce-nav-child:hover .ani-queue-item { animation-name: sce-nav-shift-queue; }
+.sce-nav-item:hover .ani-queue-item-2,
+.sce-nav-child:hover .ani-queue-item-2 { animation-delay: 70ms; }
+.sce-nav-item:hover .ani-queue-item-3,
+.sce-nav-child:hover .ani-queue-item-3 { animation-delay: 130ms; }
+
+/* Archive */
+.sce-nav-item:hover .ani-archive-item,
+.sce-nav-child:hover .ani-archive-item { animation-name: sce-nav-settle-y; animation-delay: 100ms; }
+
+/* Envelope / communication */
+.sce-nav-item:hover .ani-envelope-flap,
+.sce-nav-child:hover .ani-envelope-flap { animation-name: sce-nav-open-flap; transform-origin: 12px 7px; }
+.sce-nav-item:hover .ani-envelope-wave,
+.sce-nav-child:hover .ani-envelope-wave { animation-name: sce-nav-copper-travel; animation-duration: 440ms; animation-delay: 120ms; }
+
+/* Send */
+.sce-nav-item:hover .ani-send-arrow,
+.sce-nav-child:hover .ani-send-arrow { animation-name: sce-nav-settle-x; }
+.sce-nav-item:hover .ani-send-copper,
+.sce-nav-child:hover .ani-send-copper { animation-name: sce-nav-copper-travel; animation-delay: 100ms; }
+
+/* ── System / Führung ───────────────────────────────────────────────────── */
+
+.sce-nav-item:hover .ani-monitor-content,
+.sce-nav-child:hover .ani-monitor-content { animation-name: sce-nav-line-slide; }
+
+.sce-nav-item:hover .ani-overview-tile,
+.sce-nav-child:hover .ani-overview-tile { animation-name: sce-nav-settle-y; }
+.sce-nav-item:hover .ani-overview-tile-2,
+.sce-nav-child:hover .ani-overview-tile-2 { animation-delay: 60ms; }
+.sce-nav-item:hover .ani-overview-tile-3,
+.sce-nav-child:hover .ani-overview-tile-3 { animation-delay: 110ms; }
+
+.sce-nav-item:hover .ani-preview-play,
+.sce-nav-child:hover .ani-preview-play { animation-name: sce-nav-reveal; }
+
+.sce-nav-item:hover .ani-scroll-line,
+.sce-nav-child:hover .ani-scroll-line { animation-name: sce-nav-draw-stroke; stroke-dasharray: 8; }
+.sce-nav-item:hover .ani-scroll-line-2,
+.sce-nav-child:hover .ani-scroll-line-2 { animation-delay: 80ms; }
+
+.sce-nav-item:hover .ani-trend-point,
+.sce-nav-child:hover .ani-trend-point { animation-name: sce-nav-pulse-once; }
+.sce-nav-item:hover .ani-trend-point-2,
+.sce-nav-child:hover .ani-trend-point-2 { animation-delay: 120ms; }
+
+.sce-nav-item:hover .ani-flag-cloth,
+.sce-nav-child:hover .ani-flag-cloth { animation-name: sce-nav-settle-x; }
+
+.sce-nav-item:hover .ani-clipboard-line,
+.sce-nav-child:hover .ani-clipboard-line { animation-name: sce-nav-draw-stroke; stroke-dasharray: 8; }
+
+.sce-nav-item:hover .ani-admin-gear,
+.sce-nav-child:hover .ani-admin-gear { animation-name: sce-nav-rotate-partial; transform-origin: 12px 12px; animation-duration: 320ms; }
+
+.sce-nav-item:hover .ani-shield-check,
+.sce-nav-child:hover .ani-shield-check { animation-name: sce-nav-check-draw; stroke-dasharray: 10; }
+
+.sce-nav-item:hover .ani-palette-dot,
+.sce-nav-child:hover .ani-palette-dot { animation-name: sce-nav-pulse-once; }
+.sce-nav-item:hover .ani-palette-dot-2,
+.sce-nav-child:hover .ani-palette-dot-2 { animation-delay: 70ms; }
+.sce-nav-item:hover .ani-palette-dot-3,
+.sce-nav-child:hover .ani-palette-dot-3 { animation-delay: 120ms; }
+
+.sce-nav-item:hover .ani-users-head,
+.sce-nav-child:hover .ani-users-head { animation-name: sce-nav-converge; }
+.ani-users-head-1 { --ani-tx: -2px; }
+.ani-users-head-2 { --ani-tx: 2px; }
+
+.sce-nav-item:hover .ani-plug-connector,
+.sce-nav-child:hover .ani-plug-connector { animation-name: sce-nav-draw-stroke; stroke-dasharray: 8; }
+.sce-nav-item:hover .ani-plug-node,
+.sce-nav-child:hover .ani-plug-node { animation-name: sce-nav-pulse-once; animation-delay: 140ms; }
+
+/* Child icons — quieter motion amplitude */
+.sce-nav-child:hover .sce-animated-nav-icon--child [class*="ani-"] {
+  animation-duration: calc(var(--sce-motion-duration) * 0.9);
+}
+
+/* ── Reduced motion ─────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .sce-animated-nav-icon [class*="ani-"] {
+    animation: none !important;
+    transform: none !important;
+    stroke-dashoffset: 0 !important;
+    opacity: 1 !important;
+  }
+
+  .sce-nav-copper-flow {
+    opacity: 0 !important;
+  }
+
+  .sce-nav-item:hover .sce-animated-nav-icon .sce-nav-stroke,
+  .sce-nav-child:hover .sce-animated-nav-icon .sce-nav-stroke,
+  .sce-nav-item:focus-visible .sce-animated-nav-icon .sce-nav-stroke,
+  .sce-nav-child:focus-visible .sce-animated-nav-icon .sce-nav-stroke {
+    stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 50%, currentColor);
+    transition: stroke var(--sce-motion-duration-fast) var(--sce-motion-ease);
+  }
+
+  .sce-animated-nav-icon--active .sce-nav-stroke {
+    stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 40%, currentColor);
+  }
+}

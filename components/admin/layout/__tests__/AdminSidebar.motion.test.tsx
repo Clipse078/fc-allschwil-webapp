@@ -1,13 +1,17 @@
 /**
  * @vitest-environment jsdom
  *
- * SCE-DESIGN-04 — AdminSidebar motion integration tests
+ * SCE-DESIGN-04C — AdminSidebar premium animated iconography tests
  */
 
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import {
+  getAllSidebarNavLabels,
+  getNavIconKey,
+} from "@/lib/motion/nav-icon-registry";
 
 vi.mock("next/navigation", () => ({
   usePathname: () => "/dashboard",
@@ -25,8 +29,8 @@ vi.mock("@/hooks/useSidebarResize", () => ({
 
 const CLUB_ADMIN_PERMISSIONS = Object.values(PERMISSIONS);
 
-describe("AdminSidebar motion (SCE-DESIGN-04)", () => {
-  it("renders nav icons with sce-motion-icon class and motion intents", () => {
+describe("AdminSidebar animated icons (SCE-DESIGN-04C)", () => {
+  it("renders premium animated nav icons for all visible items", () => {
     const { container } = render(
       <AdminSidebar
         permissionKeys={CLUB_ADMIN_PERMISSIONS}
@@ -35,18 +39,40 @@ describe("AdminSidebar motion (SCE-DESIGN-04)", () => {
       />,
     );
 
-    const motionIcons = container.querySelectorAll(".sce-motion-icon");
-    expect(motionIcons.length).toBeGreaterThan(0);
+    const animatedIcons = container.querySelectorAll(".sce-animated-nav-icon");
+    expect(animatedIcons.length).toBeGreaterThan(0);
 
-    const dashboardIcon = container.querySelector(
-      '[data-motion-intent="hover"]',
-    );
-    expect(dashboardIcon).toBeInTheDocument();
+    const navLinks = container.querySelectorAll(".sce-nav-item, .sce-nav-child");
+    expect(animatedIcons.length).toBe(navLinks.length);
+  });
 
-    const trainingIcon = container.querySelector(
-      '[data-motion-intent="schedule"]',
+  it("does not render legacy MotionIcon / Lucide fallback icons in sidebar", () => {
+    const { container } = render(
+      <AdminSidebar
+        permissionKeys={CLUB_ADMIN_PERMISSIONS}
+        clubName="FC Allschwil"
+        logoUrl={null}
+      />,
     );
-    expect(trainingIcon).toBeInTheDocument();
+
+    const legacyIcons = container.querySelectorAll(".sce-motion-icon");
+    expect(legacyIcons.length).toBe(0);
+  });
+
+  it("assigns data-nav-icon for every sidebar label", () => {
+    const { container } = render(
+      <AdminSidebar
+        permissionKeys={CLUB_ADMIN_PERMISSIONS}
+        clubName="FC Allschwil"
+        logoUrl={null}
+      />,
+    );
+
+    for (const label of getAllSidebarNavLabels()) {
+      const expectedKey = getNavIconKey(label);
+      const icon = container.querySelector(`[data-nav-icon="${expectedKey}"]`);
+      expect(icon, `missing icon for ${label}`).toBeTruthy();
+    }
   });
 
   it("preserves navigation links and hrefs", () => {
@@ -78,5 +104,20 @@ describe("AdminSidebar motion (SCE-DESIGN-04)", () => {
       '[class*="animate-spin"], [class*="animate-pulse"], [class*="animate-bounce"]',
     );
     expect(animatedElements.length).toBe(0);
+  });
+
+  it("marks active route icon with active class", () => {
+    const { container } = render(
+      <AdminSidebar
+        permissionKeys={CLUB_ADMIN_PERMISSIONS}
+        clubName="FC Allschwil"
+        logoUrl={null}
+      />,
+    );
+
+    const activeIcon = container.querySelector(
+      '.sce-nav-item.active .sce-animated-nav-icon--active[data-nav-icon="dashboard"]',
+    );
+    expect(activeIcon).toBeInTheDocument();
   });
 });

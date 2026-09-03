@@ -3,56 +3,11 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import {
-  BadgeIcon,
-  BarChart3,
-  BookCheck,
-  Briefcase,
-  Building2,
-  CalendarDays,
-  CalendarRange,
-  ChevronLeft,
-  ChevronRight,
-  ClipboardList,
-  Dumbbell,
-  FileText,
-  Flag,
-  FolderClosed,
-  Globe,
-  Handshake,
-  Home,
-  ImageIcon,
-  Inbox,
-  KeyRound,
-  Layers,
-  LayoutDashboard,
-  LayoutTemplate,
-  Mail,
-  MapPin,
-  Menu,
-  Monitor,
-  MonitorPlay,
-  Newspaper,
-  Package,
-  Palette,
-  PenLine,
-  ScrollText,
-  Settings2,
-  ShieldCheck,
-  Target,
-  TrendingUp,
-  UserCircle2,
-  UserRound,
-  Users,
-  Trophy,
-  Volleyball,
-  Wallet,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import SidebarBrandHeader from "@/components/admin/branding/SidebarBrandHeader";
 import SidebarPlatformBrand from "@/components/admin/branding/SidebarPlatformBrand";
-import { MotionIcon } from "@/components/ui/MotionIcon";
+import { AnimatedNavIcon } from "@/components/ui/motion/AnimatedNavIcon";
 import { useSidebarResize } from "@/hooks/useSidebarResize";
-import { getNavMotionIntent } from "@/lib/motion/nav-intents";
 import { getVisibleNavSections } from "@/lib/nav/nav-config";
 import type { NavSection } from "@/lib/nav/nav-config";
 import type { PermissionKey } from "@/lib/permissions/permissions";
@@ -67,74 +22,6 @@ type AdminSidebarProps = {
   collapsed?: boolean;
   onToggle?: () => void;
 };
-
-function getNavIcon(label: string) {
-  switch (label) {
-    case "Dashboard":                   return LayoutDashboard;
-    case "Organisation":                return Building2;
-    case "Website":                     return Globe;
-    case "Planung":                     return CalendarDays;
-    case "Workspace":                   return FolderClosed;
-    case "Dokumente":                   return FolderClosed;
-    case "Anmeldungen":                 return Inbox;
-    case "Meetings":                    return ScrollText;
-    case "Initiativen":                 return Flag;
-    case "Infoboard":                   return Monitor;
-    case "Vorschau":                    return MonitorPlay;
-    case "MatchCenter":                 return Volleyball;
-    case "TournamentCenter":            return Trophy;
-    case "Administration":              return Settings2;
-    case "Kommunikation":               return Mail;
-    case "Sponsoring":                  return Handshake;
-    case "Organisationseinheiten":      return Building2;
-    case "Zielgruppen":                 return Target;
-    case "Teams":                       return Users;
-    case "Personen":                    return UserCircle2;
-    case "CMS Übersicht":               return Globe;
-    case "News":                        return Newspaper;
-    case "Seiten":                      return FileText;
-    case "Homepage Builder":            return Home;
-    case "Navigation":                  return Menu;
-    case "Block-Bibliothek":            return LayoutTemplate;
-    case "Medien":                      return ImageIcon;
-    case "Redaktion":                   return PenLine;
-    case "Veröffentlichungen":          return Layers;
-    case "Wiederverwendbare Inhalte":   return BookCheck;
-    case "Einstellungen":               return Settings2;
-    case "TrainingCenter":              return Dumbbell;
-    case "Veranstaltungen":             return CalendarDays;
-    case "Anlagen":                     return MapPin;
-    case "Trainingsplaner":             return Dumbbell;
-    case "Saisons":                     return CalendarRange;
-    case "Saisonplanung":               return ClipboardList;
-    case "Events":                      return CalendarDays;
-    case "Feld & Ressourcen":           return Layers;
-    case "Darstellung":                 return Palette;
-    case "E-Mail-Absender":             return Mail;
-    case "Anlagen & Ressourcen":        return Building2;
-    case "Benutzer":                    return Users;
-    case "Rollen":                      return ShieldCheck;
-    case "Rollen & Berechtigungen":     return ShieldCheck;
-    case "Berechtigungen":              return KeyRound;
-    case "Tenants":                     return Globe;
-    case "Admin":                       return Settings2;
-    case "Vereinsleitung":              return Briefcase;
-    case "KPIs":                        return BarChart3;
-    case "Ziele":                       return Target;
-    case "Vorlagen":                    return FileText;
-    case "Saisonplanner":               return ClipboardList;
-    case "Wochenplanner":               return CalendarDays;
-    case "Tagesplanner":                return CalendarDays;
-    case "Spieler":                     return UserRound;
-    case "Trainer":                     return BadgeIcon;
-    case "Registrierungen":             return Inbox;
-    case "Club Entwicklung":            return TrendingUp;
-    case "Prozesse & Aufgaben":         return ClipboardList;
-    case "Material & Inventar":         return Package;
-    case "Finanzen":                    return Wallet;
-    default:                            return LayoutDashboard;
-  }
-}
 
 const SEASON_CARRY_PREFIXES = [
   "/dashboard",
@@ -240,8 +127,6 @@ export default function AdminSidebar({
 
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                const Icon = getNavIcon(item.label);
-                const motionIntent = getNavMotionIntent(item.label);
                 const resolvedHref = buildHref(item.href);
                 const childActive = item.children?.some((c) => isItemActive(c.href)) ?? false;
                 const isActive = isItemActive(item.href) || childActive;
@@ -257,11 +142,10 @@ export default function AdminSidebar({
                         isCollapsed && "justify-center px-2",
                       )}
                     >
-                      <MotionIcon
-                        icon={Icon}
-                        intent={motionIntent}
+                      <AnimatedNavIcon
+                        label={item.label}
                         active={isActive}
-                        className="h-4 w-4"
+                        variant="parent"
                       />
                       {!isCollapsed && <span>{item.label}</span>}
                     </Link>
@@ -269,8 +153,6 @@ export default function AdminSidebar({
                     {!isCollapsed && item.children && item.children.length > 0 && (
                       <ul className="mt-0.5 space-y-0.5">
                         {item.children.map((child) => {
-                          const ChildIcon = getNavIcon(child.label);
-                          const childMotionIntent = getNavMotionIntent(child.label);
                           const childHref = buildHref(child.href);
                           const isChildActive = isItemActive(child.href);
                           return (
@@ -279,11 +161,10 @@ export default function AdminSidebar({
                                 href={childHref}
                                 className={cn("sce-nav-child", isChildActive && "active")}
                               >
-                                <MotionIcon
-                                  icon={ChildIcon}
-                                  intent={childMotionIntent}
+                                <AnimatedNavIcon
+                                  label={child.label}
                                   active={isChildActive}
-                                  className="h-3.5 w-3.5"
+                                  variant="child"
                                 />
                                 <span>{child.label}</span>
                               </Link>
