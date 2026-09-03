@@ -674,6 +674,9 @@ function mapTrainingItem(
     pitchCodes: item.pitchAllocations.map((ref) => ref.code),
     homeDressingRoom: toAllocationCandidate(item.dressingRoomAllocations[0]),
     homeDressingRoomCodes: item.dressingRoomAllocations.map((ref) => ref.code),
+    homeDressingRooms: item.dressingRoomAllocations
+      .map((ref) => toAllocationCandidate(ref))
+      .filter((candidate) => candidate !== null),
     awayDressingRoom: null,
     refereeDressingRoom: null,
   };

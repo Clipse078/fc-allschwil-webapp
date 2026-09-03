@@ -330,6 +330,51 @@ describe("TRAINING cutover", () => {
     const events = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
     expect(events[0].status).toBe("CANCELLED");
   });
+
+  it("maps every effective training dressing-room allocation for Screen 1", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(
+      makeDay([
+        trainingItem({
+          dressingRoomAllocations: [
+            { facilityResourceId: "res-e1", code: "E1", name: "Kabine E1", facilityName: "Im Brüel" },
+            { facilityResourceId: "res-o3", code: "O3", name: "Kabine O3", facilityName: "Im Brüel" },
+          ],
+        }),
+      ]),
+    );
+    const loader = createCanonicalInfoboardSourceLoader(makeDatabase([], [trainingPolicyRow()]));
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.homeDressingRooms).toEqual([
+      { label: null, code: "E1", name: "Kabine E1", facilityName: "Im Brüel" },
+      { label: null, code: "O3", name: "Kabine O3", facilityName: "Im Brüel" },
+    ]);
+    expect(event.homeDressingRoomCodes).toEqual(["E1", "O3"]);
+  });
+
+  it("preserves occurrence override dressing rooms without series rooms", async () => {
+    mocks.getWeekplannerDay.mockResolvedValue(
+      makeDay([
+        trainingItem({
+          dressingRoomOverridden: true,
+          dressingRoomAllocations: [
+            { facilityResourceId: "res-e3", code: "E3", name: "Kabine E3", facilityName: "Im Brüel" },
+          ],
+          canonicalDressingRoomAllocations: [
+            { facilityResourceId: "res-e1", code: "E1", name: "Kabine E1", facilityName: "Im Brüel" },
+            { facilityResourceId: "res-o3", code: "O3", name: "Kabine O3", facilityName: "Im Brüel" },
+          ],
+        }),
+      ]),
+    );
+    const loader = createCanonicalInfoboardSourceLoader(makeDatabase([], [trainingPolicyRow()]));
+    const [event] = await loader({ tenantId: TENANT_A, dateFrom: DATE_FROM, dateTo: DATE_FROM });
+
+    expect(event.homeDressingRooms).toEqual([
+      { label: null, code: "E3", name: "Kabine E3", facilityName: "Im Brüel" },
+    ]);
+    expect(event.homeDressingRoom?.code).toBe("E3");
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -543,6 +543,91 @@ describe("mapScreen1Event — dressing rooms", () => {
   });
 });
 
+describe("mapScreen1Event — training multi-room dressing rooms", () => {
+  it("joins two training dressing rooms with the canonical separator", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRooms: [
+          { label: "E1", code: "E1", name: "Kabine E1" },
+          { label: "O3", code: "O3", name: "Kabine O3" },
+        ],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E1 · O3");
+  });
+
+  it("keeps a single training dressing room unchanged", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRooms: [{ label: "E1", code: "E1", name: "Kabine E1" }],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E1");
+  });
+
+  it("deduplicates duplicate training dressing-room allocations", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRooms: [
+          { label: "E1", code: "E1", name: "Kabine E1" },
+          { label: "E1", code: "E1", name: "Kabine E1" },
+        ],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E1");
+  });
+
+  it("uses occurrence override rooms without merging series rooms back in", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRoom: { label: "E3", code: "E3", name: "Kabine E3" },
+        homeDressingRooms: [{ label: "E3", code: "E3", name: "Kabine E3" }],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E3");
+  });
+
+  it("falls back to singular homeDressingRoom when homeDressingRooms is absent", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRoom: { label: "E1", code: "E1", name: "Kabine E1" },
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E1");
+  });
+
+  it("does not apply homeDressingRooms joining to MATCH events", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "MATCH",
+        homeAway: "HOME",
+        homeDressingRoom: { label: "E1", code: "E1", name: "Kabine E1" },
+        homeDressingRooms: [
+          { label: "E1", code: "E1", name: "Kabine E1" },
+          { label: "O3", code: "O3", name: "Kabine O3" },
+        ],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBe("E1");
+  });
+
+  it("returns null when training has no dressing-room allocations", () => {
+    const result = mapScreen1Event(
+      makeInput({
+        type: "TRAINING",
+        homeDressingRoom: null,
+        homeDressingRooms: [],
+      }),
+    );
+    expect(result.allocation.homeDressingRoomLabel).toBeNull();
+  });
+});
+
 // ── Allocation structure ───────────────────────────────────────────────────────
 
 describe("mapScreen1Event — allocation object", () => {

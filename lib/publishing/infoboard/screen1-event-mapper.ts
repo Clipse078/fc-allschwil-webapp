@@ -41,6 +41,8 @@ import {
 import {
   resolvePitchDisplay,
   resolveDressingRoomDisplay,
+  resolveAllocationList,
+  type AllocationResourceInput,
 } from "../presentation/allocation-display-resolver";
 import {
   resolveInfoboardMatchPresentation,
@@ -193,6 +195,16 @@ export type Screen1SourceEvent = {
   } | null;
 
   /**
+   * Full ordered list of home-side dressing-room candidates for TRAINING
+   * (INFOBOARD-TRAINING-MULTI-ROOM-01). Populated by the canonical source
+   * loader from every effective Weekplanner dressingRoomAllocation — never
+   * truncated to the first room. Screen 1 training cards join these into one
+   * KABINE label via resolveAllocationList(). MATCH continues to use the
+   * singular `homeDressingRoom` slot above.
+   */
+  readonly homeDressingRooms?: readonly AllocationResourceInput[];
+
+  /**
    * Full ordered list of home-side dressing-room FacilityResource codes
    * (INFOBOARD-INTEGRATION-01C). Same fallback contract as `pitchCodes`.
    */
@@ -238,6 +250,20 @@ export type MapScreen1EventInput = {
 };
 
 // ── mapScreen1Event ───────────────────────────────────────────────────────────
+
+function resolveTrainingHomeDressingRoomLabel(
+  event: Screen1SourceEvent,
+): string | null {
+  if (event.homeDressingRooms && event.homeDressingRooms.length > 0) {
+    return resolveAllocationList(event.homeDressingRooms);
+  }
+
+  return resolveDressingRoomDisplay({
+    label: event.homeDressingRoom?.label,
+    code: event.homeDressingRoom?.code,
+    name: event.homeDressingRoom?.name,
+  });
+}
 
 function infoboardContextForEventType(
   type: PublishingEventType,
@@ -307,11 +333,14 @@ export function mapScreen1Event(
   });
 
   // ── Dressing-room labels ────────────────────────────────────────────────
-  const homeDressingRoomLabel = resolveDressingRoomDisplay({
-    label: event.homeDressingRoom?.label,
-    code: event.homeDressingRoom?.code,
-    name: event.homeDressingRoom?.name,
-  });
+  const homeDressingRoomLabel =
+    event.type === "TRAINING"
+      ? resolveTrainingHomeDressingRoomLabel(event)
+      : resolveDressingRoomDisplay({
+          label: event.homeDressingRoom?.label,
+          code: event.homeDressingRoom?.code,
+          name: event.homeDressingRoom?.name,
+        });
 
   const awayDressingRoomLabel = resolveDressingRoomDisplay({
     label: event.awayDressingRoom?.label,
