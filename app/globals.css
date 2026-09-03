@@ -1199,6 +1199,34 @@ button {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent);
 }
 
+/* Chromium/WebKit autofill paints a light surface unless overridden in-place. */
+.sce-login-input:-webkit-autofill,
+.sce-login-input:-webkit-autofill:hover {
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground);
+  border-color: rgba(255, 255, 255, 0.1);
+  -webkit-box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.035) inset !important;
+  box-shadow: 0 0 0 1000px rgba(255, 255, 255, 0.035) inset !important;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sce-login-input:-webkit-autofill:focus,
+.sce-login-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground);
+  border-color: var(--sce-primary);
+  -webkit-box-shadow:
+    0 0 0 1000px rgba(255, 255, 255, 0.055) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
+  box-shadow:
+    0 0 0 1000px rgba(255, 255, 255, 0.055) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
+}
+
 .sce-login-submit {
   display: inline-flex;
   align-items: center;

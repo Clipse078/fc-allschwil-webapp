@@ -17,6 +17,7 @@
  * Pure, synchronous, no I/O.
  */
 
+import { getEffectiveEndAt } from "@/lib/publishing/time/temporal-grouping";
 import type { TournamentDto } from "./types";
 
 export type TournamentActionStatus = "READY" | "OPEN" | "NOT_APPLICABLE";
@@ -44,6 +45,39 @@ export function isTournamentCompletedOrInactive(tournament: Pick<TournamentDto, 
     tournament.status === "CANCELLED" ||
     tournament.status === "ARCHIVED"
   );
+}
+
+/** Canonical effective end for presentation — explicit endAt or TOURNAMENT default duration. */
+export function getTournamentEffectiveEndAt(
+  tournament: Pick<TournamentDto, "startAt" | "endAt">,
+): Date {
+  return getEffectiveEndAt({
+    startAt: new Date(tournament.startAt),
+    endAt: tournament.endAt ? new Date(tournament.endAt) : null,
+    type: "TOURNAMENT",
+  });
+}
+
+/** True when the tournament's canonical effective end is at or before `now`. */
+export function isTournamentPastByEffectiveEnd(
+  tournament: Pick<TournamentDto, "startAt" | "endAt">,
+  now: Date = new Date(),
+): boolean {
+  return getTournamentEffectiveEndAt(tournament).getTime() <= now.getTime();
+}
+
+/**
+ * TournamentCenter Archiv bucket — persisted inactive statuses OR past by
+ * canonical effective-end semantics. Presentation-only; never mutates status.
+ */
+export function isTournamentInArchivList(
+  tournament: Pick<TournamentDto, "status" | "startAt" | "endAt">,
+  now: Date = new Date(),
+): boolean {
+  if (isTournamentCompletedOrInactive(tournament)) {
+    return true;
+  }
+  return isTournamentPastByEffectiveEnd(tournament, now);
 }
 
 /**
