@@ -31,6 +31,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 import type { Prisma } from "@prisma/client";
 import type { CreateTournamentParticipantInput, TournamentParticipantDto } from "./types";
 import {
@@ -41,6 +42,10 @@ import {
   TournamentParticipantTenantMismatchError,
 } from "./errors";
 import { resolveTournamentParticipantLogoUrl } from "./club-identity";
+import {
+  loadTournamentLogoResolutionContext,
+  type TournamentLogoResolutionContext,
+} from "./logo-resolution-context";
 
 // TOURNAMENTCENTER-UX-03: canonical external-participant identity for NEW
 // participants is a Club-Directory ExternalClub (+ tournament-specific
@@ -68,11 +73,33 @@ const participantInclude = {
       shortName: true,
       categoryLabel: true,
       logoUrl: true,
-      externalClub: { select: { id: true, name: true, shortName: true, logoUrl: true } },
+      providerMappings: {
+        where: { provider: SFV_PROVIDER },
+        select: { providerClubId: true },
+      },
+      externalClub: {
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          alternativeName: true,
+          logoUrl: true,
+        },
+      },
     },
   },
   externalClub: {
-    select: { id: true, name: true, shortName: true, logoUrl: true },
+    select: {
+      id: true,
+      name: true,
+      shortName: true,
+      alternativeName: true,
+      logoUrl: true,
+      providerMappings: {
+        where: { provider: SFV_PROVIDER },
+        select: { providerClubId: true },
+      },
+    },
   },
   dressingRoomAllocations: {
     orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
@@ -122,9 +149,23 @@ type ParticipantRow = {
     shortName: string | null;
     categoryLabel: string | null;
     logoUrl: string | null;
-    externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null };
+    providerMappings: Array<{ providerClubId: number | null }>;
+    externalClub: {
+      id: string;
+      name: string;
+      shortName: string | null;
+      alternativeName: string | null;
+      logoUrl: string | null;
+    };
   } | null;
-  externalClub: { id: string; name: string; shortName: string | null; logoUrl: string | null } | null;
+  externalClub: {
+    id: string;
+    name: string;
+    shortName: string | null;
+    alternativeName: string | null;
+    logoUrl: string | null;
+    providerMappings: Array<{ providerClubId: number | null }>;
+  } | null;
   dressingRoomAllocations: Array<{
     id: string;
     notes: string | null;
@@ -140,8 +181,16 @@ type ParticipantRow = {
   }>;
 };
 
-function toDto(row: ParticipantRow, tenantLogoUrl: string | null = null): TournamentParticipantDto {
-  const logoUrl = resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
+function toDto(
+  row: ParticipantRow,
+  logoResolutionContext: TournamentLogoResolutionContext,
+  tenantLogoUrl: string | null = null,
+): TournamentParticipantDto {
+  const logoUrl = resolveTournamentParticipantLogoUrl(
+    row,
+    tenantLogoUrl,
+    logoResolutionContext,
+  );
   const dressingRoomAllocations = row.dressingRoomAllocations.map((allocation) => ({
     id: allocation.id,
     facilityResourceId: allocation.facilityResource.id,
@@ -283,13 +332,18 @@ export async function listTournamentParticipants(
 ): Promise<TournamentParticipantDto[]> {
   await requireTournament(tenantId, tournamentId);
 
-  const rows = await prisma.tournamentParticipant.findMany({
-    where: { tenantId, eventId: tournamentId },
-    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-    include: participantInclude,
-  });
+  const [rows, logoResolutionContext] = await Promise.all([
+    prisma.tournamentParticipant.findMany({
+      where: { tenantId, eventId: tournamentId },
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+      include: participantInclude,
+    }),
+    loadTournamentLogoResolutionContext(tenantId),
+  ]);
 
-  return (rows as unknown as ParticipantRow[]).map((row) => toDto(row));
+  return (rows as unknown as ParticipantRow[]).map((row) =>
+    toDto(row, logoResolutionContext),
+  );
 }
 
 /**
@@ -401,7 +455,12 @@ export async function addTournamentParticipant(
       include: participantInclude,
     });
 
-    return toDto(created as unknown as ParticipantRow);
+    const logoResolutionContext =
+      await loadTournamentLogoResolutionContext(tenantId);
+    return toDto(
+      created as unknown as ParticipantRow,
+      logoResolutionContext,
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (message.includes("Unique constraint")) {
@@ -442,7 +501,12 @@ export async function updateTournamentParticipantDisplayName(
     include: participantInclude,
   });
 
-  return toDto(updated as unknown as ParticipantRow);
+  const logoResolutionContext =
+    await loadTournamentLogoResolutionContext(tenantId);
+  return toDto(
+    updated as unknown as ParticipantRow,
+    logoResolutionContext,
+  );
 }
 
 /**
@@ -468,5 +532,9 @@ export async function getTournamentParticipant(
   tenantId: string,
   participantId: string,
 ): Promise<TournamentParticipantDto> {
-  return toDto(await requireParticipant(tenantId, participantId));
+  const [participant, logoResolutionContext] = await Promise.all([
+    requireParticipant(tenantId, participantId),
+    loadTournamentLogoResolutionContext(tenantId),
+  ]);
+  return toDto(participant, logoResolutionContext);
 }

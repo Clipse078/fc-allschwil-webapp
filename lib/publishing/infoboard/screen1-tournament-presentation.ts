@@ -20,6 +20,11 @@ import {
 } from "@/lib/tournaments/club-identity";
 import { resolveInfoboardTeamDisplayName } from "@/lib/publishing/presentation/infoboard-team-display-name";
 import type { TournamentHomeAway } from "@/lib/tournaments/types";
+import {
+  loadTournamentLogoResolutionContext,
+  type TournamentLogoResolutionContext,
+} from "@/lib/tournaments/logo-resolution-context";
+import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 
 export const TOURNAMENT_FEED_EVENT_ID_PREFIX = "tournament:" as const;
 
@@ -70,15 +75,24 @@ type TournamentParticipantRow = {
   readonly externalClub: {
     readonly name: string;
     readonly shortName: string | null;
+    readonly alternativeName?: string | null;
     readonly logoUrl: string | null;
+    readonly providerMappings?: readonly {
+      readonly providerClubId: number | null;
+    }[];
   } | null;
   readonly externalTeam: {
     readonly name: string;
     readonly shortName: string | null;
     readonly alternativeName: string | null;
     readonly logoUrl: string | null;
+    readonly providerMappings?: readonly {
+      readonly providerClubId: number | null;
+    }[];
     readonly externalClub: {
       readonly name: string;
+      readonly shortName?: string | null;
+      readonly alternativeName?: string | null;
       readonly logoUrl: string | null;
     };
   } | null;
@@ -116,7 +130,12 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
     select: {
       name: true,
       shortName: true,
+      alternativeName: true,
       logoUrl: true,
+      providerMappings: {
+        where: { provider: SFV_PROVIDER },
+        select: { providerClubId: true },
+      },
     },
   },
   externalTeam: {
@@ -125,9 +144,15 @@ export const SCREEN1_TOURNAMENT_PARTICIPANT_SELECT = {
       shortName: true,
       alternativeName: true,
       logoUrl: true,
+      providerMappings: {
+        where: { provider: SFV_PROVIDER },
+        select: { providerClubId: true },
+      },
       externalClub: {
         select: {
           name: true,
+          shortName: true,
+          alternativeName: true,
           logoUrl: true,
         },
       },
@@ -176,8 +201,13 @@ function resolveParticipantDisplayName(row: TournamentParticipantRow): string {
 function resolveParticipantLogoUrl(
   row: TournamentParticipantRow,
   tenantLogoUrl: string | null,
+  logoResolutionContext: TournamentLogoResolutionContext,
 ): string | null {
-  return resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
+  return resolveTournamentParticipantLogoUrl(
+    row,
+    tenantLogoUrl,
+    logoResolutionContext,
+  );
 }
 
 function resolveDressingRoomLabel(
@@ -193,6 +223,7 @@ function resolveDressingRoomLabel(
 function mapParticipantRows(
   participants: readonly TournamentParticipantRow[],
   tenantLogoUrl: string | null,
+  logoResolutionContext: TournamentLogoResolutionContext,
 ): readonly InfoboardTeamAllocationPresentation[] {
   const sortedParticipants = [...participants].sort(
     (a, b) => a.displayOrder - b.displayOrder,
@@ -201,7 +232,11 @@ function mapParticipantRows(
     id: row.id,
     teamDisplayName: resolveParticipantDisplayName(row),
     dressingRoomLabel: resolveDressingRoomLabel(row.dressingRoomAllocations),
-    clubLogoUrl: resolveParticipantLogoUrl(row, tenantLogoUrl),
+    clubLogoUrl: resolveParticipantLogoUrl(
+      row,
+      tenantLogoUrl,
+      logoResolutionContext,
+    ),
     ...(row.team ? { isHomeTeam: true } : {}),
   }));
 }
@@ -273,14 +308,17 @@ export async function loadScreen1TournamentPresentationExtensions(
 ): Promise<readonly InfoboardEventPresentationExtension[]> {
   if (canonicalTournamentEventIds.length === 0) return [];
 
-  const rows = await database.tournamentParticipant.findMany({
-    where: {
-      tenantId,
-      eventId: { in: [...canonicalTournamentEventIds] },
-    },
-    select: SCREEN1_TOURNAMENT_PARTICIPANT_SELECT,
-    orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
-  });
+  const [rows, logoResolutionContext] = await Promise.all([
+    database.tournamentParticipant.findMany({
+      where: {
+        tenantId,
+        eventId: { in: [...canonicalTournamentEventIds] },
+      },
+      select: SCREEN1_TOURNAMENT_PARTICIPANT_SELECT,
+      orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    loadTournamentLogoResolutionContext(tenantId),
+  ]);
 
   const byEventId = new Map<string, TournamentParticipantRow[]>();
   for (const row of rows) {
@@ -294,7 +332,11 @@ export async function loadScreen1TournamentPresentationExtensions(
 
   const extensions: InfoboardEventPresentationExtension[] = [];
   for (const [eventId, participants] of byEventId) {
-    const participantAllocations = mapParticipantRows(participants, tenantLogoUrl);
+    const participantAllocations = mapParticipantRows(
+      participants,
+      tenantLogoUrl,
+      logoResolutionContext,
+    );
     if (participantAllocations.length > 0) {
       extensions.push({ eventId, participantAllocations });
     }

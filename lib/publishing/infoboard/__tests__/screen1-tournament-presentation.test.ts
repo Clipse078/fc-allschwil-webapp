@@ -2,12 +2,40 @@
  * lib/publishing/infoboard/__tests__/screen1-tournament-presentation.test.ts
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { loadTournamentLogoResolutionContextMock } = vi.hoisted(() => ({
+  loadTournamentLogoResolutionContextMock: vi.fn(),
+}));
+
+vi.mock("@/lib/tournaments/logo-resolution-context", async (importOriginal) => {
+  const original =
+    await importOriginal<
+      typeof import("@/lib/tournaments/logo-resolution-context")
+    >();
+  return {
+    ...original,
+    loadTournamentLogoResolutionContext:
+      loadTournamentLogoResolutionContextMock,
+  };
+});
+
+import {
+  buildTournamentLogoResolutionContext,
+  EMPTY_TOURNAMENT_LOGO_RESOLUTION_CONTEXT,
+} from "@/lib/tournaments/logo-resolution-context";
 import {
   buildScreen1TournamentPresentationExtensions,
   loadScreen1TournamentPresentationExtensions,
   resolveCanonicalTournamentEventId,
 } from "../screen1-tournament-presentation";
+
+beforeEach(() => {
+  loadTournamentLogoResolutionContextMock.mockReset();
+  loadTournamentLogoResolutionContextMock.mockResolvedValue(
+    EMPTY_TOURNAMENT_LOGO_RESOLUTION_CONTEXT,
+  );
+});
 
 describe("loadScreen1TournamentPresentationExtensions", () => {
   it("maps participants in display order with logos and kabinen labels", async () => {
@@ -193,6 +221,62 @@ describe("loadScreen1TournamentPresentationExtensions", () => {
       expect.objectContaining({
         where: expect.objectContaining({ tenantId: "tenant-a" }),
       }),
+    );
+    expect(loadTournamentLogoResolutionContextMock).toHaveBeenCalledWith(
+      "tenant-a",
+    );
+  });
+
+  it("resolves a provider shell participant to the tenant canonical Verein logo", async () => {
+    loadTournamentLogoResolutionContextMock.mockResolvedValue(
+      buildTournamentLogoResolutionContext([
+        {
+          name: "Canonical Example FC",
+          shortName: null,
+          alternativeName: null,
+          logoUrl: "https://cdn.example.com/canonical.png",
+          providerMappings: [
+            {
+              providerClubId: 4242,
+              providerClubName: "Canonical Example FC",
+            },
+          ],
+        },
+      ]),
+    );
+    const database = {
+      tournamentParticipant: {
+        findMany: async () => [
+          {
+            id: "p-shell",
+            eventId: "evt-canonical",
+            displayName: "Canonical Example FC U15",
+            manualLabel: null,
+            displayOrder: 0,
+            team: null,
+            externalClub: {
+              name: "Provider Shell",
+              shortName: null,
+              alternativeName: null,
+              logoUrl: "https://cdn.example.com/stale-provider.png",
+              providerMappings: [{ providerClubId: 4242 }],
+            },
+            externalTeam: null,
+            dressingRoomAllocations: [],
+          },
+        ],
+      },
+    };
+
+    const extensions = await loadScreen1TournamentPresentationExtensions(
+      database,
+      "tenant-a",
+      ["evt-canonical"],
+      null,
+    );
+
+    expect(extensions[0]?.participantAllocations?.[0]?.clubLogoUrl).toBe(
+      "https://cdn.example.com/canonical.png",
     );
   });
 

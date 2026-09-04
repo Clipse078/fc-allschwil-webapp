@@ -20,18 +20,43 @@
 import { normalizeClubNameForLookup } from "@/lib/club-directory/club-name-normalization";
 import {
   resolveExternalClubLogoUrl,
-  resolveExternalTeamLogoUrl,
+  resolveExternalTeamCanonicalLogoUrl,
 } from "@/lib/club-directory/logo";
 import type { TournamentHomeAway } from "./types";
+import {
+  EMPTY_TOURNAMENT_LOGO_RESOLUTION_CONTEXT,
+  resolveMappedCanonicalTournamentLogo,
+  resolveNameMatchedCanonicalTournamentLogo,
+  type TournamentLogoResolutionContext,
+} from "./logo-resolution-context";
 
 export { normalizeClubNameForLookup };
 
 export type TournamentParticipantLogoSource = {
   readonly team: object | null;
-  readonly externalClub: { readonly logoUrl: string | null } | null;
-  readonly externalTeam: {
+  readonly externalClub: {
+    readonly name: string;
+    readonly shortName?: string | null;
+    readonly alternativeName?: string | null;
     readonly logoUrl: string | null;
-    readonly externalClub: { readonly logoUrl: string | null };
+    readonly providerMappings?: readonly {
+      readonly providerClubId: number | null;
+    }[];
+  } | null;
+  readonly externalTeam: {
+    readonly name: string;
+    readonly shortName?: string | null;
+    readonly alternativeName?: string | null;
+    readonly logoUrl: string | null;
+    readonly providerMappings?: readonly {
+      readonly providerClubId: number | null;
+    }[];
+    readonly externalClub: {
+      readonly name: string;
+      readonly shortName?: string | null;
+      readonly alternativeName?: string | null;
+      readonly logoUrl: string | null;
+    };
   } | null;
 };
 
@@ -50,15 +75,56 @@ function namesMatchForLookup(left: string, right: string): boolean {
 export function resolveTournamentParticipantLogoUrl(
   source: TournamentParticipantLogoSource,
   tenantLogoUrl: string | null | undefined,
+  context: TournamentLogoResolutionContext =
+    EMPTY_TOURNAMENT_LOGO_RESOLUTION_CONTEXT,
 ): string | null {
   if (source.team) {
     return tenantLogoUrl?.trim() || null;
   }
   if (source.externalClub) {
-    return resolveExternalClubLogoUrl(source.externalClub);
+    const mappedCanonicalLogo = resolveMappedCanonicalTournamentLogo(
+      source.externalClub.providerMappings,
+      context,
+    );
+    const nameMatchedCanonicalLogo =
+      resolveNameMatchedCanonicalTournamentLogo(
+        [
+          source.externalClub.name,
+          source.externalClub.shortName,
+          source.externalClub.alternativeName,
+        ],
+        context,
+      );
+    return resolveExternalTeamCanonicalLogoUrl(
+      { logoUrl: null },
+      source.externalClub,
+      { logoUrl: mappedCanonicalLogo },
+      { logoUrl: nameMatchedCanonicalLogo },
+    );
   }
   if (source.externalTeam) {
-    return resolveExternalTeamLogoUrl(source.externalTeam, source.externalTeam.externalClub);
+    const mappedCanonicalLogo = resolveMappedCanonicalTournamentLogo(
+      source.externalTeam.providerMappings,
+      context,
+    );
+    const nameMatchedCanonicalLogo =
+      resolveNameMatchedCanonicalTournamentLogo(
+        [
+          source.externalTeam.externalClub.name,
+          source.externalTeam.externalClub.shortName,
+          source.externalTeam.externalClub.alternativeName,
+          source.externalTeam.name,
+          source.externalTeam.shortName,
+          source.externalTeam.alternativeName,
+        ],
+        context,
+      );
+    return resolveExternalTeamCanonicalLogoUrl(
+      source.externalTeam,
+      source.externalTeam.externalClub,
+      { logoUrl: mappedCanonicalLogo },
+      { logoUrl: nameMatchedCanonicalLogo },
+    );
   }
   return null;
 }

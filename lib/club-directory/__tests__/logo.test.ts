@@ -59,12 +59,34 @@ describe("resolveExternalTeamCanonicalLogoUrl", () => {
     ).toBe(CANONICAL_LOGO);
   });
 
-  it("prefers direct club logo over canonical Verein logo", () => {
+  it("prefers the mapped canonical Verein over a stale direct shell-club logo", () => {
     expect(
       resolveExternalTeamCanonicalLogoUrl(
         { logoUrl: null },
         { logoUrl: "https://cdn.example.com/direct.png" },
         { logoUrl: CANONICAL_LOGO },
+      ),
+    ).toBe(CANONICAL_LOGO);
+  });
+
+  it("uses normalized-name canonical fallback before the direct club logo", () => {
+    expect(
+      resolveExternalTeamCanonicalLogoUrl(
+        { logoUrl: null },
+        { logoUrl: "https://cdn.example.com/direct.png" },
+        null,
+        { logoUrl: CANONICAL_LOGO },
+      ),
+    ).toBe(CANONICAL_LOGO);
+  });
+
+  it("falls back to the direct club when canonical resolution has no logo", () => {
+    expect(
+      resolveExternalTeamCanonicalLogoUrl(
+        { logoUrl: null },
+        { logoUrl: "https://cdn.example.com/direct.png" },
+        null,
+        null,
       ),
     ).toBe("https://cdn.example.com/direct.png");
   });
