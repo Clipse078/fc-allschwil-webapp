@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
-import { Mail, Search, UserPlus, Users, UserX, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Search, UserPlus, Users, UserX } from "lucide-react";
 import AdminAvatar from "@/components/admin/shared/AdminAvatar";
 import AdminStatusPill from "@/components/admin/shared/AdminStatusPill";
 import { EmptyState } from "@/components/ui/page/EmptyState";
@@ -29,7 +29,25 @@ function getRoleBadgeClass(roleKey: string): string {
   return "sce-role-badge sce-role-badge-member";
 }
 
-type StatusFilter = "all" | "active" | "inactive" | "pending" | "no_account";
+type StatusFilter = "all" | "active" | "deactivated" | "pending" | "not_invited";
+
+function getAccessStatusLabel(
+  user: TenantUserItem,
+): { label: string; tone: "success" | "warning" | "muted" } {
+  const isEffectivelyActive = user.membershipIsActive && user.userIsActive;
+  if (user.pendingInvitation) {
+    return { label: "Einladung ausstehend", tone: "warning" };
+  }
+  if (isEffectivelyActive) {
+    return { label: "Aktiv", tone: "success" };
+  }
+  return { label: "Deaktiviert", tone: "muted" };
+}
+
+function formatLastLogin(date: Date | null): string {
+  if (!date) return "—";
+  return date.toLocaleDateString("de-CH", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function TenantUsersSearchableList({
   initialUsers,
@@ -42,7 +60,6 @@ export default function TenantUsersSearchableList({
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");
-  const [showInviteDialog, setShowInviteDialog] = useState(false);
 
   const uniqueRoles = useMemo(() => {
     const seen = new Map<string, string>();
@@ -61,9 +78,9 @@ export default function TenantUsersSearchableList({
     return initialUsers.filter((u) => {
       const isEffectivelyActive = u.membershipIsActive && u.userIsActive;
       if (statusFilter === "active" && !isEffectivelyActive) return false;
-      if (statusFilter === "inactive" && (isEffectivelyActive || u.pendingInvitation)) return false;
+      if (statusFilter === "deactivated" && (isEffectivelyActive || u.pendingInvitation)) return false;
       if (statusFilter === "pending" && !u.pendingInvitation) return false;
-      if (statusFilter === "no_account") return false; // persons only
+      if (statusFilter === "not_invited") return false;
       if (roleFilter !== "all" && !u.roles.some((r) => r.id === roleFilter)) return false;
       if (q) {
         const matches =
@@ -77,7 +94,7 @@ export default function TenantUsersSearchableList({
   }, [initialUsers, query, statusFilter, roleFilter]);
 
   const filteredPersons = useMemo(() => {
-    if (statusFilter !== "all" && statusFilter !== "no_account") return [];
+    if (statusFilter !== "all" && statusFilter !== "not_invited") return [];
     const q = query.trim().toLowerCase();
     return personsWithoutUser.filter((p) => {
       if (q) {
@@ -126,7 +143,7 @@ export default function TenantUsersSearchableList({
           <p className="mt-1 text-xs text-[var(--muted)]">ausstehend</p>
         </div>
         <div className="sce-kpi-card">
-          <p className="sce-data-label">Inaktiv</p>
+          <p className="sce-data-label">Deaktiviert</p>
           <p
             className="mt-1.5 text-2xl font-bold text-[var(--muted)]"
             style={{ fontFamily: "var(--font-display)" }}
@@ -136,7 +153,7 @@ export default function TenantUsersSearchableList({
           <p className="mt-1 text-xs text-[var(--muted)]">ohne Zugriff</p>
         </div>
         <div className="sce-kpi-card">
-          <p className="sce-data-label">Kein Konto</p>
+          <p className="sce-data-label">Nicht eingeladen</p>
           <p
             className="mt-1.5 text-2xl font-bold text-[var(--foreground)]"
             style={{ fontFamily: "var(--font-display)" }}
@@ -180,8 +197,8 @@ export default function TenantUsersSearchableList({
           <option value="all">Alle Status</option>
           <option value="active">Aktiv ({activeCount})</option>
           <option value="pending">Einladung ausstehend ({pendingCount})</option>
-          <option value="inactive">Inaktiv ({inactiveCount})</option>
-          <option value="no_account">Kein Konto ({noAccountCount})</option>
+          <option value="deactivated">Deaktiviert ({inactiveCount})</option>
+          <option value="not_invited">Nicht eingeladen ({noAccountCount})</option>
         </select>
 
         {/* Role filter */}
@@ -203,21 +220,15 @@ export default function TenantUsersSearchableList({
 
         {/* Invite new person */}
         {canInvite ? (
-          <button
-            type="button"
-            onClick={() => setShowInviteDialog(true)}
+          <Link
+            href="/dashboard/admin/people-access/new"
             className="inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--blue,#2563EB)] px-3 text-sm font-medium text-white hover:opacity-90 transition"
           >
             <UserPlus className="h-4 w-4" />
-            Neue Person einladen
-          </button>
+            Person hinzufügen
+          </Link>
         ) : null}
       </div>
-
-      {/* New person invite dialog */}
-      {showInviteDialog ? (
-        <NewPersonInviteDialog onClose={() => setShowInviteDialog(false)} />
-      ) : null}
 
       {/* Result count */}
       {isFiltered ? (
@@ -230,8 +241,8 @@ export default function TenantUsersSearchableList({
       {grandTotal === 0 ? (
         <EmptyState
           icon={<Users className="h-10 w-10" />}
-          heading="Noch keine Benutzer"
-          description="Diesem Club sind noch keine Benutzerkonten oder Personen zugeordnet."
+          heading="Noch keine Personen mit Zugang"
+          description="Füge die erste Person hinzu, um Zugang zu SportClubEvo zu vergeben."
         />
       ) : totalShown === 0 ? (
         <EmptyState
@@ -257,27 +268,27 @@ export default function TenantUsersSearchableList({
       ) : (
         <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
           {/* Table header */}
-          <div className="hidden grid-cols-[1fr_140px_1fr_160px] gap-4 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] md:grid">
-            <span>Person / Benutzer</span>
+          <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_100px_40px] gap-4 border-b border-[var(--border)] bg-[var(--surface-2)] px-5 py-2.5 text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)] md:grid">
+            <span>Person</span>
+            <span>Zugriff</span>
             <span>Status</span>
-            <span>Rollen</span>
-            <span>Zugriff / Aktionen</span>
+            <span>Letzter Login</span>
+            <span />
           </div>
 
           {/* User rows */}
           {filteredUsers.map((user, idx) => {
             const isLast = idx === filteredUsers.length - 1 && filteredPersons.length === 0;
             const isCurrentUser = user.userId === currentUserId;
-            const isEffectivelyActive = user.membershipIsActive && user.userIsActive;
+            const status = getAccessStatusLabel(user);
 
             return (
               <div
                 key={user.userId}
-                className={`group relative flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_160px] md:items-center md:gap-4 hover:bg-[var(--surface-2)] transition-colors ${
+                className={`group relative flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_100px_40px] md:items-center md:gap-4 hover:bg-[var(--surface-2)] transition-colors ${
                   !isLast ? "border-b border-[var(--border)]" : ""
                 }`}
               >
-                {/* Full-row link (behind content) */}
                 <Link
                   href={`/dashboard/admin/users/${user.userId}`}
                   className="absolute inset-0"
@@ -285,7 +296,6 @@ export default function TenantUsersSearchableList({
                   tabIndex={-1}
                 />
 
-                {/* Benutzer column */}
                 <div className="relative flex min-w-0 items-center gap-3 pointer-events-none">
                   <AdminAvatar name={user.name} size="sm" />
                   <div className="min-w-0">
@@ -298,60 +308,41 @@ export default function TenantUsersSearchableList({
                           Ich
                         </span>
                       ) : null}
-                      {user.linkedPersonId ? (
-                        <span className="inline-flex h-5 items-center rounded-full border border-blue-200 bg-blue-50 px-2 text-[0.65rem] font-semibold text-blue-700">
-                          Person
-                        </span>
-                      ) : null}
                     </div>
                     <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{user.email}</p>
                   </div>
                 </div>
 
-                {/* Status column */}
-                <div className="relative pointer-events-none">
-                  {user.pendingInvitation ? (
-                    <AdminStatusPill label="Einladung ausstehend" tone="warning" />
-                  ) : (
-                    <AdminStatusPill
-                      label={isEffectivelyActive ? "Aktiv" : "Inaktiv"}
-                      tone={isEffectivelyActive ? "success" : "muted"}
-                    />
-                  )}
-                </div>
-
-                {/* Rollen column */}
-                <div className="relative flex flex-wrap gap-1.5 pointer-events-none">
-                  {user.roles.length > 0 ? (
-                    user.roles.map((role) => (
-                      <span key={role.id} className={getRoleBadgeClass(role.key)}>
-                        {role.name}
-                      </span>
-                    ))
-                  ) : (
-                    <span className="sce-role-badge sce-role-badge-member opacity-50">
-                      Keine Rolle
-                    </span>
-                  )}
-                </div>
-
-                {/* Zugriff / Aktionen column */}
-                <div className="relative flex items-center justify-between gap-2">
-                  <div className="flex flex-wrap gap-1.5 pointer-events-none">
-                    {user.pendingInvitation ? (
-                      <AdminStatusPill label="Einladung" tone="warning" />
-                    ) : isEffectivelyActive ? (
-                      <AdminStatusPill label="Mitglied" tone="success" />
-                    ) : !user.membershipIsActive && user.userIsActive ? (
-                      <AdminStatusPill label="Zugriff gesperrt" tone="muted" />
-                    ) : user.membershipIsActive && !user.userIsActive ? (
-                      <AdminStatusPill label="Konto inaktiv" tone="warning" />
+                <div className="relative space-y-1 pointer-events-none">
+                  <div className="flex flex-wrap gap-1.5">
+                    {user.roles.length > 0 ? (
+                      user.roles.map((role) => (
+                        <span key={role.id} className={getRoleBadgeClass(role.key)}>
+                          {role.name}
+                        </span>
+                      ))
                     ) : (
-                      <AdminStatusPill label="Inaktiv" tone="muted" />
+                      <span className="text-xs text-[var(--muted)]">Keine Rolle</span>
                     )}
                   </div>
+                  {user.scopedRoles && user.scopedRoles.length > 0 ? (
+                    <p className="text-[11px] text-[var(--muted)]">
+                      {user.scopedRoles
+                        .map((s) => `${s.name} · ${s.orgUnitName}`)
+                        .join(" · ")}
+                    </p>
+                  ) : null}
+                </div>
 
-                  {/* ••• actions menu — relative so it escapes the full-row link */}
+                <div className="relative pointer-events-none">
+                  <AdminStatusPill label={status.label} tone={status.tone} />
+                </div>
+
+                <div className="relative text-xs text-[var(--muted)] pointer-events-none">
+                  {formatLastLogin(user.lastLoginAt)}
+                </div>
+
+                <div className="relative flex justify-end">
                   <UserRowActionsMenu
                     userId={user.userId}
                     userName={user.name}
@@ -374,52 +365,46 @@ export default function TenantUsersSearchableList({
             return (
               <div
                 key={person.personId}
-                className={`flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[1fr_140px_1fr_160px] md:items-center md:gap-4 bg-[var(--surface-2)]/40 ${
+                className={`flex flex-col gap-3 px-5 py-4 md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_120px_100px_40px] md:items-center md:gap-4 bg-[var(--surface-2)]/40 ${
                   !isLast ? "border-b border-[var(--border)]" : ""
                 }`}
               >
-                {/* Person column */}
                 <div className="flex min-w-0 items-center gap-3">
                   <AdminAvatar name={person.name} size="sm" />
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="truncate text-sm font-semibold text-[var(--foreground)]">
-                        {person.name}
-                      </span>
-                      <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-100 px-2 text-[0.65rem] font-semibold text-slate-600">
-                        Nur Person
-                      </span>
-                    </div>
+                    <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                      {person.name}
+                    </span>
                     {person.email ? (
                       <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{person.email}</p>
                     ) : (
-                      <p className="mt-0.5 truncate text-xs text-[var(--muted)] italic">
-                        Keine E-Mail
-                      </p>
+                      <p className="mt-0.5 truncate text-xs text-[var(--muted)] italic">Keine E-Mail</p>
                     )}
                   </div>
                 </div>
 
-                {/* Status column */}
+                <div className="text-xs text-[var(--muted)]">—</div>
+
                 <div>
-                  <AdminStatusPill label="Kein Konto" tone="muted" />
+                  <AdminStatusPill label="Nicht eingeladen" tone="muted" />
                 </div>
 
-                {/* Rollen column */}
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="text-xs text-[var(--muted)]">—</span>
-                </div>
+                <div className="text-xs text-[var(--muted)]">—</div>
 
-                {/* Actions column */}
-                <div className="flex flex-wrap items-center gap-2">
-                  {canInvite && person.email ? (
-                    <PersonInviteButton personId={person.personId} personName={person.name} />
+                <div className="flex justify-end">
+                  {canInvite ? (
+                    <Link
+                      href={`/dashboard/admin/people-access/new?personId=${person.personId}`}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-[var(--blue,#2563EB)] hover:underline"
+                    >
+                      Zugang einrichten
+                    </Link>
                   ) : (
                     <Link
                       href={`/dashboard/persons/${person.personId}`}
-                      className="inline-flex items-center gap-1 text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+                      className="text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
                     >
-                      Person öffnen →
+                      Öffnen
                     </Link>
                   )}
                 </div>
@@ -428,245 +413,6 @@ export default function TenantUsersSearchableList({
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-// ── New person invite dialog ──────────────────────────────────────────────────
-
-/**
- * Dialog for creating a new Person + sending an invitation in one step.
- * Calls POST /api/admin/users/invite with { firstName, lastName, email }.
- */
-function NewPersonInviteDialog({ onClose }: { onClose: () => void }) {
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [email, setEmail] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const dialogRef = useRef<HTMLDivElement>(null);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setPending(true);
-    try {
-      const res = await fetch("/api/admin/users/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          firstName: firstName.trim(),
-          lastName: lastName.trim(),
-          email: email.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Fehler beim Senden der Einladung.");
-        return;
-      }
-      setSuccess(true);
-    } catch {
-      setError("Netzwerkfehler. Bitte versuche es erneut.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Neue Person einladen"
-      onClick={(e) => {
-        if (dialogRef.current && !dialogRef.current.contains(e.target as Node)) {
-          onClose();
-        }
-      }}
-    >
-      <div
-        ref={dialogRef}
-        className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-white p-6 shadow-xl"
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--foreground)]">
-            Neue Person einladen
-          </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-1 text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] transition"
-            aria-label="Schließen"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        {success ? (
-          <div className="space-y-4 text-center">
-            <p className="text-sm text-emerald-600">
-              Einladung wurde erfolgreich gesendet.
-            </p>
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] transition"
-            >
-              Schließen
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <p className="text-sm text-[var(--muted)]">
-              Eine neue Person wird angelegt und erhält eine Einladungs-E-Mail.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label
-                  htmlFor="inv-firstName"
-                  className="mb-1 block text-xs font-medium text-[var(--foreground)]"
-                >
-                  Vorname <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="inv-firstName"
-                  type="text"
-                  required
-                  autoComplete="given-name"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  className="fca-input w-full"
-                  placeholder="Anna"
-                />
-              </div>
-              <div>
-                <label
-                  htmlFor="inv-lastName"
-                  className="mb-1 block text-xs font-medium text-[var(--foreground)]"
-                >
-                  Nachname <span aria-hidden="true">*</span>
-                </label>
-                <input
-                  id="inv-lastName"
-                  type="text"
-                  required
-                  autoComplete="family-name"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  className="fca-input w-full"
-                  placeholder="Müller"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label
-                htmlFor="inv-email"
-                className="mb-1 block text-xs font-medium text-[var(--foreground)]"
-              >
-                E-Mail-Adresse <span aria-hidden="true">*</span>
-              </label>
-              <input
-                id="inv-email"
-                type="email"
-                required
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="fca-input w-full"
-                placeholder="anna@example.com"
-              />
-            </div>
-
-            {error ? (
-              <p className="text-xs text-red-600">{error}</p>
-            ) : null}
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={pending}
-                className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-4 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
-              >
-                Abbrechen
-              </button>
-              <button
-                type="submit"
-                disabled={pending || !firstName.trim() || !lastName.trim() || !email.trim()}
-                className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] bg-[var(--blue,#2563EB)] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50 transition"
-              >
-                <Mail className="h-3.5 w-3.5" />
-                {pending ? "Wird gesendet…" : "Einladen"}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Inline person invite button ───────────────────────────────────────────────
-
-function PersonInviteButton({
-  personId,
-  personName,
-}: {
-  personId: string;
-  personName: string;
-}) {
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [sent, setSent] = useState(false);
-
-  async function handleInvite() {
-    if (!confirm(`Einladung an ${personName} senden?`)) return;
-    setPending(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/admin/users/invite", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ personId }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Fehler beim Senden der Einladung.");
-        return;
-      }
-      setSent(true);
-    } catch {
-      setError("Netzwerkfehler.");
-    } finally {
-      setPending(false);
-    }
-  }
-
-  if (sent) {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs text-emerald-600">
-        <Mail className="h-3 w-3" />
-        Einladung gesendet
-      </span>
-    );
-  }
-
-  return (
-    <div className="space-y-1">
-      <button
-        type="button"
-        onClick={handleInvite}
-        disabled={pending}
-        className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] disabled:opacity-50 transition"
-      >
-        <UserPlus className="h-3 w-3" />
-        {pending ? "Einladen…" : "Einladen"}
-      </button>
-      {error ? <p className="text-[11px] text-red-600">{error}</p> : null}
     </div>
   );
 }

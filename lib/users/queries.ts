@@ -28,10 +28,14 @@ export async function getTenantUsersListData(tenantId: string) {
           isActive: true,
           lastLoginAt: true,
           userRoles: {
-            where: { tenantId, orgUnitId: null },
+            where: { tenantId },
             select: {
+              orgUnitId: true,
               role: {
                 select: { id: true, name: true, key: true },
+              },
+              orgUnit: {
+                select: { name: true },
               },
             },
           },
@@ -73,11 +77,20 @@ export async function getTenantUsersListData(tenantId: string) {
       membershipIsActive: m.isActive,
       joinedAt: m.joinedAt,
       lastLoginAt: m.user.lastLoginAt ?? null,
-      roles: m.user.userRoles.map((ur) => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        key: ur.role.key,
-      })),
+      roles: m.user.userRoles
+        .filter((ur) => ur.orgUnitId === null)
+        .map((ur) => ({
+          id: ur.role.id,
+          name: ur.role.name,
+          key: ur.role.key,
+        })),
+      scopedRoles: m.user.userRoles
+        .filter((ur) => ur.orgUnitId !== null)
+        .map((ur) => ({
+          id: ur.role.id,
+          name: ur.role.name,
+          orgUnitName: ur.orgUnit?.name ?? "",
+        })),
       linkedPersonId: hasLinkedPerson ? (m.user.person as { id: string }).id : null,
       linkedPersonName: hasLinkedPerson
         ? `${(m.user.person as { firstName: string; lastName: string }).firstName} ${(m.user.person as { firstName: string; lastName: string }).lastName}`

@@ -264,6 +264,24 @@ function getHeaderContent(pathname: string): HeaderContent {
     };
   }
 
+  if (pathname === "/dashboard/admin/people-access" || pathname.startsWith("/dashboard/admin/people-access/")) {
+    return {
+      eyebrow: "Administration",
+      title: "Personen & Zugänge",
+      description:
+        "Personen mit Zugang zu SportClubEvo verwalten — Rollen, Bereiche, Einladungen und effektiven Zugriff.",
+    };
+  }
+
+  if (pathname === "/dashboard/admin/users" || pathname.startsWith("/dashboard/admin/users/")) {
+    return {
+      eyebrow: "Personen & Zugänge",
+      title: "Zugangsdetails",
+      description:
+        "Identität, Rollen, Einladung und Club-Zugriff für eine Person.",
+    };
+  }
+
   if (pathname === "/dashboard/users" || pathname.startsWith("/dashboard/users/")) {
     return {
       eyebrow: "Benutzer & Rechte",

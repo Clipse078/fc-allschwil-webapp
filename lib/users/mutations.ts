@@ -1,9 +1,12 @@
 import crypto from "crypto";
+import type { OrgUnitScopeMode } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import { logAction } from "@/lib/audit/log-action";
 import { hashResetToken } from "@/lib/auth/password-reset";
 import { hashPassword } from "@/lib/auth/password";
+import { setTenantUserRoles } from "@/lib/roles/mutations";
+import { assignScopedRoleToUser } from "@/lib/roles/scoped-mutations";
 
 // ── Error types ───────────────────────────────────────────────────────────────
 
@@ -259,8 +262,48 @@ export async function removeTenantMembership(
 
 export type InvitePersonResult = {
   userId: string;
-  rawToken: string;
+  /** Present only when an invitation token was issued. */
+  rawToken?: string;
 };
+
+export type OnboardScopedRoleInput = {
+  roleId: string;
+  orgUnitId: string;
+  scopeMode?: OrgUnitScopeMode;
+};
+
+export type OnboardPersonOptions = {
+  /** When false, creates access without issuing an invitation token or email. */
+  sendInvitation?: boolean;
+  roleIds?: string[];
+  scopedRoles?: OnboardScopedRoleInput[];
+};
+
+/** Assign tenant-wide and scoped roles after person/user onboarding. */
+export async function applyOnboardRoleAssignments(
+  tenantId: string,
+  userId: string,
+  actorUserId: string,
+  options?: Pick<OnboardPersonOptions, "roleIds" | "scopedRoles">,
+): Promise<void> {
+  const roleIds = options?.roleIds ?? [];
+  const scopedRoles = options?.scopedRoles ?? [];
+
+  if (roleIds.length > 0) {
+    await setTenantUserRoles({ tenantId, userId, roleIds, actorUserId });
+  }
+
+  for (const scoped of scopedRoles) {
+    await assignScopedRoleToUser({
+      tenantId,
+      userId,
+      roleId: scoped.roleId,
+      orgUnitId: scoped.orgUnitId,
+      scopeMode: scoped.scopeMode ?? "THIS_ORG_UNIT",
+      actorUserId,
+    });
+  }
+}
 
 /**
  * USER-ADMIN-02 — Invite an existing Person in the tenant to create a user account.
@@ -289,7 +332,9 @@ export async function invitePersonToTenant(
   tenantId: string,
   personId: string,
   actorUserId: string,
+  options?: OnboardPersonOptions,
 ): Promise<InvitePersonResult> {
+  const sendInvitation = options?.sendInvitation ?? true;
   // 1. Load the Person — must belong to this tenant.
   const person = await prisma.person.findUnique({
     where: { id: personId },
@@ -318,7 +363,15 @@ export async function invitePersonToTenant(
       await prisma.person.update({ where: { id: personId }, data: { userId: null } });
     } else {
       // Already linked; check membership state and resend invitation.
-      return _ensureMembershipAndResendInvitation(tenantId, existingUser.id, personId, actorUserId);
+      const result = await _ensureMembershipAndResendInvitation(
+        tenantId,
+        existingUser.id,
+        personId,
+        actorUserId,
+        sendInvitation,
+      );
+      await applyOnboardRoleAssignments(tenantId, existingUser.id, actorUserId, options);
+      return result;
     }
   }
 
@@ -356,12 +409,15 @@ export async function invitePersonToTenant(
         where: { id: personId },
         data: { userId: emailConflict.id },
       });
-      return _ensureMembershipAndResendInvitation(
+      const result = await _ensureMembershipAndResendInvitation(
         tenantId,
         emailConflict.id,
         personId,
         actorUserId,
+        sendInvitation,
       );
+      await applyOnboardRoleAssignments(tenantId, emailConflict.id, actorUserId, options);
+      return result;
     }
   }
 
@@ -398,18 +454,23 @@ export async function invitePersonToTenant(
     },
   });
 
-  // 7. Create invitation token (stores tenantId for exact membership activation at acceptance).
-  const rawToken = await _createInvitationToken(newUser.id, tenantId);
+  // 7. Create invitation token when requested.
+  let rawToken: string | undefined;
+  if (sendInvitation) {
+    rawToken = await _createInvitationToken(newUser.id, tenantId);
+  }
 
   await logAction({
     actorUserId,
     moduleKey: "users",
     entityType: "User",
     entityId: newUser.id,
-    action: "INVITATION_SENT",
+    action: sendInvitation ? "INVITATION_SENT" : "ACCESS_CREATED_WITHOUT_INVITATION",
     afterJson: { tenantId, personId, email },
     metadataJson: { tenantId },
   });
+
+  await applyOnboardRoleAssignments(tenantId, newUser.id, actorUserId, options);
 
   return { userId: newUser.id, rawToken };
 }
@@ -431,7 +492,9 @@ export async function createPersonAndInvite(
   tenantId: string,
   personData: { firstName: string; lastName: string; email: string },
   actorUserId: string,
+  options?: OnboardPersonOptions,
 ): Promise<InvitePersonResult & { personId: string }> {
+  const sendInvitation = options?.sendInvitation ?? true;
   const { firstName, lastName, email } = personData;
   const normalizedEmail = email.toLowerCase().trim();
 
@@ -470,14 +533,17 @@ export async function createPersonAndInvite(
       existingUser.id,
       person.id,
       actorUserId,
+      sendInvitation,
     );
+
+    await applyOnboardRoleAssignments(tenantId, existingUser.id, actorUserId, options);
 
     await logAction({
       actorUserId,
       moduleKey: "users",
       entityType: "User",
       entityId: existingUser.id,
-      action: "INVITATION_SENT",
+      action: sendInvitation ? "INVITATION_SENT" : "ACCESS_CREATED_WITHOUT_INVITATION",
       afterJson: { tenantId, personId: person.id, email: normalizedEmail, existingUser: true },
       metadataJson: { tenantId },
     });
@@ -517,15 +583,20 @@ export async function createPersonAndInvite(
     data: { tenantId, userId: newUser.id, isActive: false },
   });
 
-  // 6. Create invitation token (stores tenantId for exact membership activation at acceptance).
-  const rawToken = await _createInvitationToken(newUser.id, tenantId);
+  // 6. Create invitation token when requested.
+  let rawToken: string | undefined;
+  if (sendInvitation) {
+    rawToken = await _createInvitationToken(newUser.id, tenantId);
+  }
+
+  await applyOnboardRoleAssignments(tenantId, newUser.id, actorUserId, options);
 
   await logAction({
     actorUserId,
     moduleKey: "users",
     entityType: "User",
     entityId: newUser.id,
-    action: "INVITATION_SENT",
+    action: sendInvitation ? "INVITATION_SENT" : "ACCESS_CREATED_WITHOUT_INVITATION",
     afterJson: { tenantId, personId: person.id, email: normalizedEmail, newPerson: true },
     metadataJson: { tenantId },
   });
@@ -678,6 +749,7 @@ async function _ensureMembershipAndResendInvitation(
   userId: string,
   personId: string,
   actorUserId: string,
+  sendInvitation = true,
 ): Promise<InvitePersonResult> {
   // Check if membership exists.
   const existing = await prisma.tenantMembership.findUnique({
@@ -700,6 +772,9 @@ async function _ensureMembershipAndResendInvitation(
         "User is already an active member of this tenant.",
       );
     }
+    if (!sendInvitation) {
+      return { userId };
+    }
     // Has a pending invitation — resend it.
     const rawToken = await _createInvitationToken(userId, tenantId);
     await logAction({
@@ -720,6 +795,10 @@ async function _ensureMembershipAndResendInvitation(
     await prisma.tenantMembership.create({
       data: { tenantId, userId, isActive: false },
     });
+  }
+
+  if (!sendInvitation) {
+    return { userId };
   }
 
   const rawToken = await _createInvitationToken(userId, tenantId);
