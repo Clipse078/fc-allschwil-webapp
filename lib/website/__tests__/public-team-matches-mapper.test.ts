@@ -138,13 +138,30 @@ describe("public-team-matches-mapper", () => {
       ).toBe(true);
     });
 
-    it("C. includes POSTPONED unresolved fixtures", () => {
+    it("C. includes POSTPONED fixtures with a future effective kickoff", () => {
       expect(
         isPublicTeamNextMatch(
-          createMatchItem({ lifecycle: "POSTPONED", status: "POSTPONED" }),
+          createMatchItem({
+            lifecycle: "POSTPONED",
+            status: "POSTPONED",
+            startAt: new Date("2026-09-01T18:00:00.000Z"),
+          }),
           NOW,
         ),
       ).toBe(true);
+    });
+
+    it("C2. excludes past POSTPONED fixtures without a replacement kickoff", () => {
+      expect(
+        isPublicTeamNextMatch(
+          createMatchItem({
+            lifecycle: "POSTPONED",
+            status: "POSTPONED",
+            startAt: new Date("2026-08-02T12:00:00.000Z"),
+          }),
+          NOW,
+        ),
+      ).toBe(false);
     });
 
     it("D. excludes COMPLETED fixtures", () => {

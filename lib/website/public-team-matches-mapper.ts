@@ -14,7 +14,10 @@
  */
 
 import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
-import { isSportingMatchPastKickoff } from "@/lib/sporting-data/lifecycle";
+import {
+  isSportingMatchInUpcomingList,
+  isSportingMatchPastKickoff,
+} from "@/lib/sporting-data/lifecycle";
 import type {
   TeamMatchSideIdentity,
   TeamSeasonMatchCompetitionContext,
@@ -88,8 +91,16 @@ export function isPublicTeamNextMatch(
     return false;
   }
 
-  if (item.lifecycle === "LIVE" || item.lifecycle === "POSTPONED") {
+  if (item.lifecycle === "LIVE") {
     return true;
+  }
+
+  if (item.lifecycle === "POSTPONED") {
+    return isSportingMatchInUpcomingList("POSTPONED", {
+      includePostponed: true,
+      startAt: item.startAt,
+      now,
+    });
   }
 
   if (item.lifecycle === "UPCOMING") {
