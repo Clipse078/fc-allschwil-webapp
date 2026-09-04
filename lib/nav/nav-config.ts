@@ -491,13 +491,10 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
-            // USER-ADMIN-02A: tenant-scoped Benutzer overview.
-            // Gated by USERS_VIEW | USERS_MANAGE so Club Admins with
-            // view-only rights can also reach the page. The page itself
-            // enforces the same live permission check via requireAnyPermission.
-            key: "admin-users",
-            label: "Benutzer",
-            href: "/dashboard/admin/users",
+            // ACCESS-ONBOARDING-03: canonical Club Admin People & Access hub.
+            key: "admin-people-access",
+            label: "Personen & Zugänge",
+            href: "/dashboard/admin/people-access",
             permissionKeys: [PERMISSIONS.USERS_VIEW, PERMISSIONS.USERS_MANAGE],
           },
           {

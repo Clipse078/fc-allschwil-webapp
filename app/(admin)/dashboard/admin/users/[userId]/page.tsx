@@ -22,6 +22,7 @@ import MembershipAccessControl from "@/components/admin/users/MembershipAccessCo
 import TenantRoleAssignmentControl from "@/components/admin/users/TenantRoleAssignmentControl";
 import ScopedRoleManagementControl from "@/components/admin/users/ScopedRoleManagementControl";
 import InvitePersonControl from "@/components/admin/users/InvitePersonControl";
+import PersonEffectiveAccessCard from "@/components/admin/users/PersonEffectiveAccessCard";
 
 type Props = {
   params: Promise<{ userId: string }>;
@@ -102,15 +103,15 @@ export default async function AdminUserDetailPage({ params }: Props) {
   return (
     <div className="space-y-8">
       <AdminSectionHeader
-        eyebrow="Administration · Benutzer"
+        eyebrow="Personen & Zugänge"
         title={displayName}
         actions={
           <Link
-            href="/dashboard/admin/users"
+            href="/dashboard/admin/people-access"
             className="inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border)] bg-white px-3.5 py-2 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)] transition"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
-            Benutzer
+            Übersicht
           </Link>
         }
       />
@@ -125,7 +126,7 @@ export default async function AdminUserDetailPage({ params }: Props) {
               <div className="flex items-center gap-2">
                 <UserCircle2 className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Benutzerkonto
+                  Identität
                 </p>
               </div>
             </div>
@@ -169,15 +170,15 @@ export default async function AdminUserDetailPage({ params }: Props) {
                     )}
                   </div>
 
-                  {/* Account + invitation status */}
+                  {/* Access status */}
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs text-[var(--muted)]">Konto:</span>
+                    <span className="text-xs text-[var(--muted)]">Status:</span>
                     {pendingInvitation ? (
                       <AdminStatusPill label="Einladung ausstehend" tone="warning" />
-                    ) : user.isActive ? (
+                    ) : isEffectivelyActive ? (
                       <AdminStatusPill label="Aktiv" tone="success" />
                     ) : (
-                      <AdminStatusPill label="Inaktiv" tone="muted" />
+                      <AdminStatusPill label="Deaktiviert" tone="muted" />
                     )}
                   </div>
 
@@ -201,13 +202,13 @@ export default async function AdminUserDetailPage({ params }: Props) {
             </div>
           </div>
 
-          {/* Rollen & Zuständigkeiten — consolidated view */}
+          {/* Zugriff — consolidated view */}
           <div className="sce-detail-section">
             <div className="sce-detail-section-header">
               <div className="flex items-center gap-2">
                 <Shield className="h-4 w-4 text-[var(--muted)]" />
                 <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--muted)]">
-                  Rollen &amp; Zuständigkeiten
+                  Zugriff
                 </p>
                 <span className="sce-count-badge">
                   {user.userRoles.length + scopedAssignments.length}
@@ -243,6 +244,8 @@ export default async function AdminUserDetailPage({ params }: Props) {
               </div>
             </div>
           </div>
+
+          <PersonEffectiveAccessCard tenantId={tenantId} userId={userId} />
         </div>
 
         {/* ── Sidebar ──────────────────────────────────────────────────── */}

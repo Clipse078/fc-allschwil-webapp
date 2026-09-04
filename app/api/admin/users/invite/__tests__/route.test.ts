@@ -148,7 +148,11 @@ describe("POST /api/admin/users/invite — invite existing person", () => {
 
   it("PERSON-2. calls invitePersonToTenant with session tenantId", async () => {
     await POST(makeRequest({ personId: "person-001" }) as never);
-    expect(mockInvitePersonToTenant).toHaveBeenCalledWith(TENANT_ID, "person-001", ACTOR_ID);
+    expect(mockInvitePersonToTenant).toHaveBeenCalledWith(TENANT_ID, "person-001", ACTOR_ID, {
+      sendInvitation: true,
+      roleIds: undefined,
+      scopedRoles: undefined,
+    });
   });
 
   it("PERSON-3. returns 404 on PERSON_NOT_FOUND", async () => {
@@ -209,6 +213,11 @@ describe("POST /api/admin/users/invite — create person + invite", () => {
       TENANT_ID,
       { firstName: "Anna", lastName: "Müller", email: "anna@example.invalid" },
       ACTOR_ID,
+      {
+        sendInvitation: true,
+        roleIds: undefined,
+        scopedRoles: undefined,
+      },
     );
   });
 
