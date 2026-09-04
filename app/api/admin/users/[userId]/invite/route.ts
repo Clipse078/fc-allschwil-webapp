@@ -34,6 +34,8 @@ import {
 import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
 import { prisma } from "@/lib/db/prisma";
+import { createRateLimitResponse } from "@/lib/security/rate-limit-response";
+import { INVITATION_RESEND_COOLDOWN_MS } from "@/lib/security/abuse-policy";
 
 type RouteContext = { params: Promise<{ userId: string }> };
 
@@ -89,6 +91,9 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
           { error: "Benutzer ist kein Mitglied dieses Clubs." },
           { status: 404 },
         );
+      }
+      if (error.code === "INVITATION_RESEND_COOLDOWN") {
+        return createRateLimitResponse(INVITATION_RESEND_COOLDOWN_MS);
       }
     }
     console.error("[resend-invite] Unexpected error:", error);

@@ -151,6 +151,16 @@ describe("POST /invite — success", () => {
       ACTOR_ID,
     );
   });
+
+  it("RESEND-3. returns 429 when resend cooldown is active", async () => {
+    const { InvitationDomainError } = await import("@/lib/users/mutations");
+    mockResendTenantInvitation.mockRejectedValue(
+      new InvitationDomainError("INVITATION_RESEND_COOLDOWN"),
+    );
+    const res = await POST(makeRequest() as never, makeParams());
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBeTruthy();
+  });
 });
 
 describe("POST /invite — not found", () => {
