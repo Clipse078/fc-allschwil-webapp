@@ -35,6 +35,7 @@ export { normalizeClubNameForLookup };
 export type TournamentParticipantLogoSource = {
   readonly team: object | null;
   readonly externalClub: {
+    readonly id?: string;
     readonly name: string;
     readonly shortName?: string | null;
     readonly alternativeName?: string | null;
@@ -52,6 +53,7 @@ export type TournamentParticipantLogoSource = {
       readonly providerClubId: number | null;
     }[];
     readonly externalClub: {
+      readonly id?: string;
       readonly name: string;
       readonly shortName?: string | null;
       readonly alternativeName?: string | null;
