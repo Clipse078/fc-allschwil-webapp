@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * SCE-DESIGN-04C — Pointer enter/leave interaction tests
+ * SCE-DESIGN-04C/04D — Pointer enter/leave interaction tests
  */
 
 import { render, fireEvent } from "@testing-library/react";

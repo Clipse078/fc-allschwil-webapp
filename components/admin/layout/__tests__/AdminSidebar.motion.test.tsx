@@ -1,9 +1,11 @@
 /**
  * @vitest-environment jsdom
  *
- * SCE-DESIGN-04C — AdminSidebar premium animated iconography tests
+ * SCE-DESIGN-04C/04D — AdminSidebar premium animated iconography tests
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import AdminSidebar from "@/components/admin/layout/AdminSidebar";
@@ -91,22 +93,16 @@ describe("AdminSidebar animated icons (SCE-DESIGN-04C)", () => {
     expect(matchCenterLink).toHaveAttribute("href", "/dashboard/matchcenter");
   });
 
-  it("does not render continuous animation classes", () => {
-    const { container } = render(
-      <AdminSidebar
-        permissionKeys={CLUB_ADMIN_PERMISSIONS}
-        clubName="FC Allschwil"
-        logoUrl={null}
-      />,
+  it("applies continuous hover loop CSS (infinite iteration while hovered)", () => {
+    const css = readFileSync(
+      join(process.cwd(), "app/nav-icon-animations.css"),
+      "utf8",
     );
-
-    const animatedElements = container.querySelectorAll(
-      '[class*="animate-spin"], [class*="animate-pulse"], [class*="animate-bounce"]',
-    );
-    expect(animatedElements.length).toBe(0);
+    expect(css).toContain("animation-iteration-count: infinite");
+    expect(css).toContain("sce-nav-loop-copper-travel");
   });
 
-  it("marks active route icon with active class", () => {
+  it("active route icon is not continuously animated without hover", () => {
     const { container } = render(
       <AdminSidebar
         permissionKeys={CLUB_ADMIN_PERMISSIONS}
@@ -119,5 +115,6 @@ describe("AdminSidebar animated icons (SCE-DESIGN-04C)", () => {
       '.sce-nav-item.active .sce-animated-nav-icon--active[data-nav-icon="dashboard"]',
     );
     expect(activeIcon).toBeInTheDocument();
+    expect(activeIcon?.parentElement?.matches(":hover")).toBe(false);
   });
 });

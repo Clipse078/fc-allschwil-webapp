@@ -14,7 +14,7 @@ export type AnimatedNavIconProps = {
 };
 
 /**
- * SceAnimatedNavIcon — premium sidebar navigation iconography.
+ * SCE-DESIGN-04C/04D — Premium sidebar navigation iconography.
  *
  * Bespoke inline SVG with internal element motion driven by CSS.
  * Hover is triggered by parent `.sce-nav-item` / `.sce-nav-child`.

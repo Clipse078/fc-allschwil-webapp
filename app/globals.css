@@ -116,6 +116,13 @@
   --sce-motion-duration-slow: 300ms;
   --sce-motion-ease:          cubic-bezier(0.25, 0.1, 0.25, 1);
 
+  /* SCE-DESIGN-04D — continuous hover loop cadence */
+  --sce-nav-loop-duration:        2s;
+  --sce-nav-loop-duration-short:  1.6s;
+  --sce-nav-loop-duration-long:   2.6s;
+  --sce-nav-loop-duration-child:  2.2s;
+  --sce-nav-hover-intent-delay:   48ms;
+
   /* ── Tenant Branding — Sprint 4: Centralized Branding System ──────────────
    * Global fallback to SportClubEvo platform palette.
    * The admin layout (app/(admin)/layout.tsx) overrides --tenant-primary and
