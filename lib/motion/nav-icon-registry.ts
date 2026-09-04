@@ -58,6 +58,7 @@ const NAV_LABEL_TO_ICON_KEY: Record<string, NavIconKey> = {
   "Anlagen & Ressourcen": "anlagen-ressourcen",
   Darstellung: "darstellung",
   Benutzer: "benutzer",
+  "Personen & Zugänge": "benutzer",
   Rollen: "rollen",
   Tenants: "tenants",
   Integrationen: "integrationen",

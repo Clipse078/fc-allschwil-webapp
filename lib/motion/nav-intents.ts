@@ -13,6 +13,7 @@ const NAV_LABEL_INTENTS: Record<string, MotionIntent> = {
   Spieler: "group",
   Trainer: "group",
   Benutzer: "group",
+  "Personen & Zugänge": "group",
   Website: "globe",
   "CMS Übersicht": "globe",
   Tenants: "globe",
