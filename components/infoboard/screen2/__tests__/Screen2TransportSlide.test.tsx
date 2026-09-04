@@ -600,6 +600,21 @@ describe("Screen2TransportSlide UX5 premium color hierarchy", () => {
   });
 });
 
+describe("Screen2TransportSlide INFOBOARD-TRANSPORT-03 destination legibility", () => {
+  it("increases compact destination typography without changing row or badge geometry", () => {
+    const css = readRepoFile("components/infoboard/screen2/Screen2TransportSlide.module.css");
+
+    expect(css).toMatch(/\.compact \.destination[\s\S]*font-size: 13\.5px/);
+    expect(css).toMatch(/\.compact \.destination[\s\S]*font-weight: 700/);
+    expect(css).toMatch(/\.destination[\s\S]*min-width: 0/);
+    expect(css).toMatch(/\.destination[\s\S]*text-overflow: ellipsis/);
+    expect(css).toMatch(/\.compact \.lineBadge[\s\S]*font-size: 11px/);
+    expect(css).toMatch(/\.compact \.minutes[\s\S]*font-size: 13px/);
+    expect(css).toMatch(/\.compact \.absoluteTime[\s\S]*font-size: 10px/);
+    expect(css).toMatch(/\.compact \.row[\s\S]*height: var\(--screen2-transport-row-height/);
+  });
+});
+
 describe("Screen2TransportSlide UX4 sizing contract", () => {
   it("defines deterministic compact panel and row geometry for 1920x1080", () => {
     expect(SCREEN2_TRANSPORT_PANEL_HEIGHT_PX).toBeGreaterThan(0);

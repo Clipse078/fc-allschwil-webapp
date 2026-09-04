@@ -144,6 +144,7 @@
   font-size: clamp(18px, 1.25vw, 24px);
   font-weight: 600;
   line-height: 1.15;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -297,8 +298,9 @@
 }
 
 .compact .destination {
-  font-size: 11px;
-  line-height: 1;
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.05;
 }
 
 .compact .minutes {
