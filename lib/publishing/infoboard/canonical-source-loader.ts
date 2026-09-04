@@ -140,6 +140,7 @@ export type CanonicalEventPolicyRow = {
     readonly shortName: string | null;
     readonly alternativeName: string | null;
     readonly logoUrl: string | null;
+    readonly logoContrastMode: string;
   } | null;
   readonly matchExternalMapping?: {
     readonly homeTeam: CanonicalInfoboardTeamDisplayNameRow | null;
@@ -153,6 +154,7 @@ export type CanonicalEventPolicyRow = {
         readonly name: string;
         readonly shortName: string | null;
         readonly logoUrl: string | null;
+        readonly logoContrastMode: string;
       };
       readonly providerMappings?: ReadonlyArray<{
         readonly providerClubId: number | null;
@@ -167,6 +169,7 @@ export type CanonicalEventPolicyRow = {
         readonly name: string;
         readonly shortName: string | null;
         readonly logoUrl: string | null;
+        readonly logoContrastMode: string;
       };
       readonly providerMappings?: ReadonlyArray<{
         readonly providerClubId: number | null;
@@ -252,6 +255,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
       shortName: true,
       alternativeName: true,
       logoUrl: true,
+      logoContrastMode: true,
     },
   },
   matchExternalMapping: {
@@ -273,6 +277,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
               name: true,
               shortName: true,
               logoUrl: true,
+              logoContrastMode: true,
             },
           },
           providerMappings: {
@@ -292,6 +297,7 @@ export const CANONICAL_EVENT_POLICY_SELECT = {
               name: true,
               shortName: true,
               logoUrl: true,
+              logoContrastMode: true,
             },
           },
           providerMappings: {

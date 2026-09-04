@@ -46,6 +46,7 @@ export default async function EditClubPage({ params }: Props) {
             website: club.website ?? "",
             location: club.location ?? "",
             notes: club.notes ?? "",
+            logoContrastMode: club.logoContrastMode,
           }}
         />
       </FormPagePattern>

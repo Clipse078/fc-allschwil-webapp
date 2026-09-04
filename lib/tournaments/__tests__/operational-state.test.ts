@@ -211,7 +211,13 @@ describe("assessTournamentOperationalState", () => {
             name: "BSC Old Boys E1",
             shortName: null,
             categoryLabel: "E1",
-            club: { id: "club-1", name: "BSC Old Boys", shortName: null, logoUrl: null },
+            club: {
+              id: "club-1",
+              name: "BSC Old Boys",
+              shortName: null,
+              logoUrl: null,
+              logoContrastMode: "NORMAL",
+            },
           },
           kind: "EXTERNAL_TEAM",
           dressingRoomAllocations: [

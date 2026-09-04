@@ -4,6 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
+import {
+  LOGO_CONTRAST_MODES,
+  type LogoContrastMode,
+} from "@/lib/club-directory/logo-contrast-mode";
+
 type ClubFormProps = {
   mode: "create" | "edit";
   clubId?: string;
@@ -14,12 +19,18 @@ type ClubFormProps = {
     website?: string;
     location?: string;
     notes?: string;
+    logoContrastMode?: LogoContrastMode;
   };
 };
 
 const fieldClass =
   "w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0b4aa2]/30";
 const labelClass = "block text-[12px] font-semibold uppercase tracking-[0.1em] text-slate-500 mb-1.5";
+
+const LOGO_CONTRAST_MODE_OPTIONS: { value: LogoContrastMode; label: string }[] = [
+  { value: LOGO_CONTRAST_MODES.NORMAL, label: "Normal" },
+  { value: LOGO_CONTRAST_MODES.INVERT_ON_DARK, label: "Invertieren" },
+];
 
 export default function ClubForm({ mode, clubId, defaultValues }: ClubFormProps) {
   const router = useRouter();
@@ -29,6 +40,9 @@ export default function ClubForm({ mode, clubId, defaultValues }: ClubFormProps)
   const [website, setWebsite] = useState(defaultValues?.website ?? "");
   const [location, setLocation] = useState(defaultValues?.location ?? "");
   const [notes, setNotes] = useState(defaultValues?.notes ?? "");
+  const [logoContrastMode, setLogoContrastMode] = useState<LogoContrastMode>(
+    defaultValues?.logoContrastMode ?? LOGO_CONTRAST_MODES.NORMAL,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +67,7 @@ export default function ClubForm({ mode, clubId, defaultValues }: ClubFormProps)
           website: website || null,
           location: location || null,
           notes: notes || null,
+          logoContrastMode,
         }),
       });
 
@@ -144,6 +159,26 @@ export default function ClubForm({ mode, clubId, defaultValues }: ClubFormProps)
               placeholder="Optionale interne Notiz…"
               className={fieldClass}
             />
+          </div>
+          <div className="md:col-span-2">
+            <label htmlFor="logo-contrast-mode" className={labelClass}>
+              Logo auf dunklem Hintergrund
+            </label>
+            <select
+              id="logo-contrast-mode"
+              value={logoContrastMode}
+              onChange={(e) => setLogoContrastMode(e.target.value as LogoContrastMode)}
+              className={fieldClass}
+            >
+              {LOGO_CONTRAST_MODE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Für sehr dunkle Logos auf dunklen Flächen.
+            </p>
           </div>
         </div>
       </section>

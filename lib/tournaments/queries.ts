@@ -96,12 +96,12 @@ export const tournamentEventSelect = {
           categoryLabel: true,
           logoUrl: true,
           externalClub: {
-            select: { id: true, name: true, shortName: true, logoUrl: true },
+            select: { id: true, name: true, shortName: true, logoUrl: true, logoContrastMode: true },
           },
         },
       },
       externalClub: {
-        select: { id: true, name: true, shortName: true, logoUrl: true },
+        select: { id: true, name: true, shortName: true, logoUrl: true, logoContrastMode: true },
       },
       dressingRoomAllocations: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],

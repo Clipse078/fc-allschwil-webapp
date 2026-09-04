@@ -74,6 +74,9 @@ export async function POST(request: NextRequest) {
       website: body?.website ?? null,
       location: body?.location ?? null,
       notes: body?.notes ?? null,
+      ...(body?.logoContrastMode !== undefined
+        ? { logoContrastMode: body.logoContrastMode }
+        : {}),
     });
 
     return NextResponse.json({ club }, { status: 201 });

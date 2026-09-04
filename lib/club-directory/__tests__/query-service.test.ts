@@ -20,6 +20,7 @@ function createClubListRecord(overrides: Record<string, unknown> = {}) {
     shortName: "Muttenz",
     alternativeName: null,
     logoUrl: null,
+    logoContrastMode: "NORMAL",
     source: "MANUAL",
     archivedAt: null,
     createdAt: new Date("2026-07-01T00:00:00.000Z"),
@@ -281,6 +282,23 @@ describe("getExternalClubById — tenant isolation", () => {
     const club = await getExternalClubById(database, { tenantId: "tenant-1", id: "club-1" });
     expect(club?.teams).toHaveLength(1);
     expect(club?.teams[0]?.providerMappings[0]?.provider).toBe("SFV");
+  });
+
+  it("serializes logoContrastMode and normalizes unknown persisted values to NORMAL", async () => {
+    const database = createDatabase({
+      clubDetail: createClubDetailRecord({ logoContrastMode: "INVERT_ON_DARK" }),
+    });
+    const inverted = await getExternalClubById(database, { tenantId: "tenant-1", id: "club-1" });
+    expect(inverted?.logoContrastMode).toBe("INVERT_ON_DARK");
+
+    const unknownDatabase = createDatabase({
+      clubDetail: createClubDetailRecord({ logoContrastMode: "legacy" }),
+    });
+    const normalized = await getExternalClubById(unknownDatabase, {
+      tenantId: "tenant-1",
+      id: "club-1",
+    });
+    expect(normalized?.logoContrastMode).toBe("NORMAL");
   });
 
   it("CLUB-DIRECTORY-04: distinguishes multiple identically-named teams under one club by real sporting context", async () => {
