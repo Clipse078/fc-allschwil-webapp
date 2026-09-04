@@ -240,7 +240,7 @@ export default function RegistrationsInboxTable({
           description={`Für „${query}" wurden keine Registrierungen gefunden.`}
         />
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+        <div className="sce-integrated-list">
           {filtered.map((reg, idx) => {
             const isLast = idx === filtered.length - 1;
             const detailHref = `/tenant/${tenantSlug}/cockpit/registrations/${reg.id}`;

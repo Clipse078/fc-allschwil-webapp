@@ -1,15 +1,14 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Menu } from "lucide-react";
 import { Suspense } from "react";
-import Link from "next/link";
-import Image from "next/image";
 import AdminPageActions from "@/components/admin/layout/AdminPageActions";
+import AccountMenu from "@/components/admin/layout/AccountMenu";
 
 type AppTopNavProps = {
   firstName: string;
   lastName: string;
+  email: string;
   imageUrl?: string | null;
 };
 
@@ -42,34 +41,25 @@ function getPageMeta(pathname: string): PageMeta {
   return { eyebrow: "SportClubEvo", title: "Übersicht" };
 }
 
-export default function AppTopNav({ firstName, lastName, imageUrl }: AppTopNavProps) {
+export default function AppTopNav({
+  firstName,
+  lastName,
+  email,
+  imageUrl,
+}: AppTopNavProps) {
   const pathname = usePathname();
   const { eyebrow, title } = getPageMeta(pathname);
-  const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 
   return (
     <header className="sce-topnav">
-      {/* Left: hamburger + breadcrumb */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {/* Hamburger — decorative, sidebar toggle is in AdminSidebar */}
-        <button
-          type="button"
-          className="sce-icon-button shrink-0"
-          aria-label="Menü"
-          tabIndex={-1}
-        >
-          <Menu className="h-4 w-4" />
-        </button>
-
-        {/* Breadcrumb */}
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 min-w-0">
-          <span className="text-[0.8rem] text-[var(--muted)]">{eyebrow}</span>
-          <span className="text-[var(--muted)] text-[0.8rem]">›</span>
-          <span className="text-[0.8rem] font-semibold text-[var(--foreground)]">{title}</span>
+          <span className="text-[0.8125rem] text-[var(--muted)]">{eyebrow}</span>
+          <span className="text-[var(--muted)] text-[0.8125rem]" aria-hidden="true">›</span>
+          <span className="text-[0.8125rem] font-semibold text-[var(--foreground)]">{title}</span>
         </nav>
       </div>
 
-      {/* Right: page actions + user identity */}
       <div className="flex shrink-0 items-center gap-1">
         <div className="hidden xl:flex items-center gap-1">
           <Suspense fallback={null}>
@@ -77,26 +67,12 @@ export default function AppTopNav({ firstName, lastName, imageUrl }: AppTopNavPr
           </Suspense>
         </div>
 
-        {/* User avatar — links to Mein Konto */}
-        <Link
-          href="/dashboard/account"
-          className="ml-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[0.7rem] font-bold text-white select-none transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sce-primary)] focus-visible:ring-offset-1 overflow-hidden"
-          style={imageUrl ? undefined : { background: "var(--tenant-primary)" }}
-          title="Mein Konto"
-          aria-label="Mein Konto"
-        >
-          {imageUrl ? (
-            <Image
-              src={imageUrl}
-              alt={`${firstName} ${lastName}`}
-              width={28}
-              height={28}
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            initials
-          )}
-        </Link>
+        <AccountMenu
+          firstName={firstName}
+          lastName={lastName}
+          email={email}
+          imageUrl={imageUrl}
+        />
       </div>
     </header>
   );

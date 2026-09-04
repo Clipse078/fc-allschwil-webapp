@@ -174,12 +174,13 @@ describe("buildTournamentCenterViewModel", () => {
   });
 
   it("sorts anstehend ascending by startAt", () => {
+    const referenceNow = new Date("2026-08-01T00:00:00.000Z");
     const tournaments = [
       createTournament({ id: "later", startAt: "2026-10-01T10:00:00.000Z" }),
       createTournament({ id: "earlier", startAt: "2026-09-01T10:00:00.000Z" }),
     ];
 
-    const vm = buildTournamentCenterViewModel(tournaments);
+    const vm = buildTournamentCenterViewModel(tournaments, { now: referenceNow });
     expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["earlier", "later"]);
   });
 
@@ -191,5 +192,61 @@ describe("buildTournamentCenterViewModel", () => {
 
     const vm = buildTournamentCenterViewModel(tournaments);
     expect(vm.archiv.map((t) => t.id)).toEqual(["newer", "older"]);
+  });
+
+  const REFERENCE_NOW = new Date("2026-09-03T12:00:00.000Z");
+
+  it("classifies a future tournament as anstehend", () => {
+    const tournaments = [
+      createTournament({ id: "future", startAt: "2026-09-05T16:00:00.000Z" }),
+    ];
+
+    const vm = buildTournamentCenterViewModel(tournaments, { now: REFERENCE_NOW });
+    expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["future"]);
+    expect(vm.kpis.anstehend).toBe(1);
+    expect(vm.kpis.archiv).toBe(0);
+  });
+
+  it("classifies a past SCHEDULED tournament as not anstehend", () => {
+    const tournaments = [
+      createTournament({ id: "past", startAt: "2026-08-23T10:00:00.000Z" }),
+      createTournament({ id: "future", startAt: "2026-09-05T16:00:00.000Z" }),
+    ];
+
+    const vm = buildTournamentCenterViewModel(tournaments, { now: REFERENCE_NOW });
+    expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["future"]);
+    expect(vm.archiv.map((t) => t.id)).toContain("past");
+  });
+
+  it("shows past tournaments in archiv and keeps counts aligned", () => {
+    const tournaments = [
+      createTournament({ id: "past-aug-23", startAt: "2026-08-23T10:00:00.000Z" }),
+      createTournament({ id: "past-aug-29", startAt: "2026-08-29T10:00:00.000Z" }),
+      createTournament({ id: "future", startAt: "2026-09-10T10:00:00.000Z" }),
+      createTournament({ id: "completed", status: "COMPLETED", startAt: "2026-07-01T10:00:00.000Z" }),
+    ];
+
+    const vm = buildTournamentCenterViewModel(tournaments, { now: REFERENCE_NOW });
+    expect(vm.kpis).toEqual({ anstehend: 1, offen: 0, bereit: 1, archiv: 3 });
+    expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["future"]);
+    expect(vm.archiv.map((t) => t.id).sort()).toEqual(
+      ["completed", "past-aug-23", "past-aug-29"].sort(),
+    );
+  });
+
+  it("classifies only the tournaments supplied by the caller (tenant-scoped upstream)", () => {
+    const tournaments = [
+      createTournament({ id: "tenant-a-upcoming", tenantId: "tenant-a" }),
+      createTournament({
+        id: "tenant-b-past",
+        tenantId: "tenant-b",
+        startAt: "2026-08-23T10:00:00.000Z",
+      }),
+    ];
+
+    const vm = buildTournamentCenterViewModel(tournaments, { now: REFERENCE_NOW });
+    expect(vm.anstehend.map((r) => r.tournament.id)).toEqual(["tenant-a-upcoming"]);
+    expect(vm.archiv.map((t) => t.id)).toEqual(["tenant-b-past"]);
+    expect(vm.kpis).toEqual({ anstehend: 1, offen: 0, bereit: 1, archiv: 1 });
   });
 });

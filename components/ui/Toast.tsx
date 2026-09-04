@@ -23,7 +23,12 @@ const variantConfig: Record<
   { icon: ReactNode; className: string }
 > = {
   success: {
-    icon: <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />,
+    icon: (
+      <CheckCircle2
+        className="sce-motion-success-icon h-4 w-4 shrink-0"
+        aria-hidden="true"
+      />
+    ),
     className: [
       "border-[var(--sce-success-border)] bg-[var(--sce-success-light)]",
       "text-[var(--sce-success)]",

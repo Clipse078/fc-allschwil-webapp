@@ -297,7 +297,7 @@ export function CoordinatorFilterBar({ eligibleCoordinators, value, onChange, cu
           "inline-flex h-8 items-center gap-2 rounded-lg border px-2.5 text-xs font-medium transition-colors",
           value
             ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
-            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
         )}
         aria-haspopup="listbox"
         aria-expanded={open}

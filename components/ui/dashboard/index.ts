@@ -17,6 +17,13 @@ export type { DashboardWelcomeProps } from "./DashboardWelcome";
 export { DashboardKpiCard } from "./DashboardKpiCard";
 export type { DashboardKpiCardProps, DashboardKpiAccent } from "./DashboardKpiCard";
 
+export { DashboardMetricStrip } from "./DashboardMetricStrip";
+export type {
+  DashboardMetricStripProps,
+  DashboardMetric,
+  DashboardMetricAccent,
+} from "./DashboardMetricStrip";
+
 export { DashboardQuickActions } from "./DashboardQuickActions";
 export type { DashboardQuickActionsProps, QuickAction } from "./DashboardQuickActions";
 
@@ -30,7 +37,7 @@ export { DashboardSmartNudges } from "./DashboardSmartNudges";
 export type { DashboardSmartNudgesProps } from "./DashboardSmartNudges";
 
 export { DashboardSection } from "./DashboardSection";
-export type { DashboardSectionProps } from "./DashboardSection";
+export type { DashboardSectionProps, DashboardSectionVariant } from "./DashboardSection";
 
 export { DashboardGrid } from "./DashboardGrid";
 export type { DashboardGridProps } from "./DashboardGrid";

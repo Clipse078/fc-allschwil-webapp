@@ -39,8 +39,8 @@ const ACCENT_VARS: Record<
     subtextColor: "var(--sce-danger)",
   },
   default: {
-    iconBg: "var(--tenant-accent)",
-    iconColor: "var(--tenant-primary)",
+    iconBg: "var(--sce-accent-subtle)",
+    iconColor: "var(--sce-accent)",
     subtextColor: "var(--text-2)",
   },
 };

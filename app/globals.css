@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./nav-icon-animations.css";
 
 /* ─────────────────────────────────────────────────────────────────────────
    SPORTCLUBEVO DESIGN TOKENS — Tailwind v4 @theme extension
@@ -7,53 +8,64 @@
 @theme {
   --color-brand-blue:       #0b4aa2;
   --color-brand-blue-dark:  #083580;
-  --color-brand-blue-light: #e8f0fe;
+  --color-brand-blue-light: #1a2d4d;
+  --color-brand-orange:     #d4843a;
+  --color-brand-orange-dark:#be7232;
+  --color-brand-orange-light: rgba(212, 132, 58, 0.12);
   --color-brand-red:        #c7332c;
   --color-brand-red-dark:   #a62520;
-  --color-brand-red-light:  #fef2f2;
+  --color-brand-red-light:  rgba(199, 51, 44, 0.12);
 
-  --color-sce-base:         #f7f8fa;
-  --color-sce-surface:      #ffffff;
-  --color-sce-surface-2:    #f1f3f7;
-  --color-sce-border:       #e5e8ef;
-  --color-sce-border-strong:#ccd1dc;
-  --color-sce-text:         #111827;
-  --color-sce-text-2:       #4b5563;
-  --color-sce-text-muted:   #9ca3af;
+  --color-sce-base:         #0a0f1e;
+  --color-sce-surface:      #121a2e;
+  --color-sce-surface-2:    #1a2236;
+  --color-sce-border:       rgba(255, 255, 255, 0.08);
+  --color-sce-border-strong:rgba(255, 255, 255, 0.14);
+  --color-sce-text:         #f8fafc;
+  --color-sce-text-2:       #94a3b8;
+  --color-sce-text-muted:   #64748b;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    CSS CUSTOM PROPERTIES — Design Token System
 ───────────────────────────────────────────────────────────────────────── */
 :root {
-  /* Brand Palette */
+  /* Brand Palette — canonical SportClubEvo navy + orange */
   --blue:              #0b4aa2;
   --blue-hover:        #083580;
-  --blue-light:        #e8f0fe;
+  --blue-light:        #1a2d4d;
   --blue-mid:          #3f63b5;
   --blue-dark:         #284a97;
+  --orange:            #d4843a;
+  --orange-hover:      #be7232;
+  --orange-light:      rgba(212, 132, 58, 0.12);
   --red:               #c7332c;
   --red-dark:          #a62520;
-  --red-light:         #fef2f2;
+  --red-light:         rgba(199, 51, 44, 0.12);
 
-  /* Backgrounds */
-  --background:        #F8FAFC;
-  --surface:           #ffffff;
-  --surface-2:         #f1f3f7;
-  --surface-3:         #e9ecf2;
+  /* Application environment — deep navy operational workspace */
+  --background:        #0a0f1e;
+  --surface:           #121a2e;
+  --surface-2:         #1a2236;
+  --surface-3:         #232d44;
 
-  /* Text */
-  --foreground:        #111827;
-  --text-2:            #4b5563;
-  --muted:             #9ca3af;
+  /* Text — warm white hierarchy */
+  --foreground:        #f8fafc;
+  --text-2:            #94a3b8;
+  --muted:             #64748b;
 
-  /* Borders */
-  --border:            #e5e8ef;
-  --border-strong:     #ccd1dc;
+  /* Borders — restrained graphite/navy separation */
+  --border:            rgba(255, 255, 255, 0.08);
+  --border-strong:     rgba(255, 255, 255, 0.14);
 
   /* Card */
-  --card:              #ffffff;
-  --card-hover:        #fafbfc;
+  --card:              #121a2e;
+  --card-hover:        #1a2236;
+
+  /* Shell surfaces */
+  --shell-bg:          #0a0f1e;
+  --sidebar-bg:        #0c1222;
+  --header-bg:         rgba(12, 18, 34, 0.92);
 
   /* Spacing Scale (4px base) */
   --space-1:  4px;
@@ -77,12 +89,12 @@
   --radius-3xl: 24px;
   --radius-pill: 9999px;
 
-  /* Shadow Tokens */
-  --shadow-xs:  0 1px 2px rgba(17, 24, 39, 0.05);
-  --shadow-sm:  0 1px 3px rgba(17, 24, 39, 0.08), 0 1px 2px rgba(17, 24, 39, 0.04);
-  --shadow-md:  0 4px 12px rgba(17, 24, 39, 0.08), 0 2px 4px rgba(17, 24, 39, 0.04);
-  --shadow-lg:  0 8px 24px rgba(17, 24, 39, 0.10), 0 4px 8px rgba(17, 24, 39, 0.04);
-  --shadow-xl:  0 16px 48px rgba(17, 24, 39, 0.12), 0 8px 16px rgba(17, 24, 39, 0.06);
+  /* Shadow Tokens — restrained elevation on dark surfaces */
+  --shadow-xs:  0 1px 2px rgba(0, 0, 0, 0.24);
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.28), 0 1px 2px rgba(0, 0, 0, 0.16);
+  --shadow-md:  0 4px 12px rgba(0, 0, 0, 0.32), 0 2px 4px rgba(0, 0, 0, 0.18);
+  --shadow-lg:  0 8px 24px rgba(0, 0, 0, 0.36), 0 4px 8px rgba(0, 0, 0, 0.20);
+  --shadow-xl:  0 16px 48px rgba(0, 0, 0, 0.44), 0 8px 16px rgba(0, 0, 0, 0.24);
 
   /* Sidebar */
   --sidebar-width:          224px;
@@ -97,6 +109,23 @@
   --transition-fast:   120ms ease;
   --transition-base:   180ms ease;
   --transition-slow:   280ms ease;
+
+  /* SCE Motion — DESIGN-04 premium interaction tokens */
+  --sce-motion-duration-fast: 160ms;
+  --sce-motion-duration:      220ms;
+  --sce-motion-duration-slow: 360ms;
+  --sce-motion-ease:          cubic-bezier(0.33, 1, 0.68, 1);
+  --sce-motion-ease-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --sce-motion-ease-loop:     cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* SCE-DESIGN-04E — faster continuous hover loop cadence */
+  --sce-nav-loop-duration:        1.2s;
+  --sce-nav-loop-duration-short:  1s;
+  --sce-nav-loop-duration-long:   1.4s;
+  --sce-nav-loop-duration-child:  1.3s;
+  --sce-nav-loop-duration-copper: 0.95s;
+  --sce-nav-hover-intent-delay:   16ms;
+  --sce-nav-leave-settle:         130ms;
 
   /* ── Tenant Branding — Sprint 4: Centralized Branding System ──────────────
    * Global fallback to SportClubEvo platform palette.
@@ -118,13 +147,16 @@
    * overridden by tenant branding. Use --sce-* tokens inside the internal
    * WebApp shell. Use --tenant-* tokens only for tenant-facing surfaces.
    * ─────────────────────────────────────────────────────────────────────── */
-  --sce-primary:         var(--blue);
-  --sce-primary-hover:   var(--blue-hover);
-  --sce-primary-light:   var(--blue-light);
+  --sce-primary:         var(--orange);
+  --sce-primary-hover:   var(--orange-hover);
+  --sce-primary-light:   var(--orange-light);
   --sce-secondary:       var(--red);
   --sce-secondary-hover: var(--red-dark);
   --sce-secondary-light: var(--red-light);
-  --sce-accent:          color-mix(in srgb, var(--sce-primary) 10%, white);
+  --sce-accent:          var(--orange);
+  --sce-accent-hover:    var(--orange-hover);
+  --sce-accent-subtle:   rgba(212, 132, 58, 0.10);
+  --sce-focus-ring:      var(--orange);
 
   /* ── SCE Neutral Aliases ──────────────────────────────────────────────── */
   --sce-bg:            var(--background);
@@ -140,28 +172,28 @@
   --sce-card-hover:    var(--card-hover);
 
   /* ── SCE Semantic Tokens — Success ───────────────────────────────────── */
-  --sce-success:        #15803d;
-  --sce-success-hover:  #166534;
-  --sce-success-light:  #f0fdf4;
-  --sce-success-border: #bbf7d0;
+  --sce-success:        #4ade80;
+  --sce-success-hover:  #22c55e;
+  --sce-success-light:  rgba(74, 222, 128, 0.12);
+  --sce-success-border: rgba(74, 222, 128, 0.28);
 
   /* ── SCE Semantic Tokens — Warning ───────────────────────────────────── */
-  --sce-warning:        #b45309;
-  --sce-warning-hover:  #92400e;
-  --sce-warning-light:  #fffbeb;
-  --sce-warning-border: #fde68a;
+  --sce-warning:        #fbbf24;
+  --sce-warning-hover:  #f59e0b;
+  --sce-warning-light:  rgba(251, 191, 36, 0.12);
+  --sce-warning-border: rgba(251, 191, 36, 0.28);
 
   /* ── SCE Semantic Tokens — Danger ────────────────────────────────────── */
-  --sce-danger:         #dc2626;
-  --sce-danger-hover:   #b91c1c;
-  --sce-danger-light:   #fef2f2;
-  --sce-danger-border:  #fecaca;
+  --sce-danger:         #f87171;
+  --sce-danger-hover:   #ef4444;
+  --sce-danger-light:   rgba(248, 113, 113, 0.12);
+  --sce-danger-border:  rgba(248, 113, 113, 0.28);
 
   /* ── SCE Semantic Tokens — Info ──────────────────────────────────────── */
-  --sce-info:           #2563eb;
-  --sce-info-hover:     #1d4ed8;
-  --sce-info-light:     #eff6ff;
-  --sce-info-border:    #bfdbfe;
+  --sce-info:           #60a5fa;
+  --sce-info-hover:     #3b82f6;
+  --sce-info-light:     rgba(96, 165, 250, 0.12);
+  --sce-info-border:    rgba(96, 165, 250, 0.28);
 
   /* ── SCE Typography Tokens ───────────────────────────────────────────── */
   /* Display XL — Hero headers, landing sections */
@@ -264,12 +296,12 @@ button {
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--tenant-primary) 12%, transparent);
+  background: color-mix(in srgb, var(--sce-accent) 24%, transparent);
 }
 
-/* Focus ring */
+/* Focus ring — SportClubEvo orange accent */
 :focus-visible {
-  outline: 2px solid var(--tenant-primary);
+  outline: 2px solid var(--sce-focus-ring);
   outline-offset: 2px;
 }
 
@@ -321,7 +353,7 @@ button {
 
 .sce-page-title {
   color: var(--foreground);
-  font-size: 0.9rem;
+  font-size: 0.9375rem;
   font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.2;
@@ -343,8 +375,8 @@ button {
   content: "";
   position: absolute;
   inset: 0 0 auto 0;
-  height: 3px;
-  background: var(--tenant-primary);
+  height: 2px;
+  background: color-mix(in srgb, var(--sce-accent) 70%, transparent);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
 }
 
@@ -362,7 +394,7 @@ button {
   position: absolute;
   inset: 0 0 auto 0;
   height: 2px;
-  background: color-mix(in srgb, var(--tenant-primary) 70%, transparent);
+  background: color-mix(in srgb, var(--sce-accent) 55%, transparent);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
@@ -380,19 +412,27 @@ button {
   border-color: var(--border-strong);
 }
 
-/* KPI card — Screen 3 premium style */
+/* Integrated list/table shell — dark operational surfaces */
+.sce-integrated-list {
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+}
+
 .sce-kpi-card {
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.07), 0 1px 2px rgba(17,24,39,0.04);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   padding: 20px 24px;
-  transition: box-shadow var(--transition-base), transform var(--transition-fast);
+  transition: box-shadow var(--transition-base), border-color var(--transition-fast);
 }
 
 .sce-kpi-card:hover {
-  box-shadow: 0 4px 16px rgba(17,24,39,0.10), 0 2px 4px rgba(17,24,39,0.05);
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -417,8 +457,8 @@ button {
 .fca-input:focus,
 .fca-select:focus,
 .fca-textarea:focus {
-  border-color: var(--tenant-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  border-color: var(--sce-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .fca-input:disabled,
@@ -456,7 +496,7 @@ button {
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--tenant-primary);
+  background: var(--sce-primary);
   color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 600;
@@ -468,10 +508,15 @@ button {
     box-shadow var(--transition-fast);
 }
 
-.fca-button-primary:hover {
-  background: color-mix(in srgb, black 20%, var(--tenant-primary));
+.fca-button-primary:hover:not(:disabled) {
+  background: var(--sce-primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--tenant-primary) 20%, transparent);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--sce-primary) 28%, transparent);
+}
+
+.fca-button-primary:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .fca-button-primary:disabled {
@@ -533,10 +578,10 @@ button {
   min-width: 68px;
   height: 26px;
   padding: 0 10px;
-  border: 1px solid color-mix(in srgb, var(--tenant-primary) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sce-accent) 28%, transparent);
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: var(--sce-accent-subtle);
+  color: var(--sce-accent);
   font-family: var(--font-display);
   font-size: 0.875rem;
   font-weight: 700;
@@ -595,7 +640,7 @@ button {
 .fca-toggle-checkbox {
   height: 1rem;
   width: 1rem;
-  accent-color: var(--tenant-primary);
+  accent-color: var(--sce-primary);
   cursor: pointer;
 }
 
@@ -608,39 +653,304 @@ button {
   background: var(--background);
 }
 
-/* Legacy glow effects — kept for backwards compatibility */
+/* Legacy glow effects — subdued on dark shell */
 .fca-admin-glow {
   pointer-events: none;
   position: absolute;
   border-radius: 9999px;
   filter: blur(80px);
-  opacity: 0.18;
+  opacity: 0.08;
 }
 
 .fca-admin-glow-blue {
-  background: color-mix(in srgb, var(--tenant-primary) 25%, transparent);
+  background: color-mix(in srgb, var(--blue) 20%, transparent);
 }
 
 .fca-admin-glow-red {
-  background: rgba(199, 51, 44, 0.20);
+  background: color-mix(in srgb, var(--sce-primary) 18%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SCE MOTION SYSTEM — DESIGN-04 premium micro-interactions
+   Motion explains what happens. It does not decorate the page.
+───────────────────────────────────────────────────────────────────────── */
+
+/* Base motion icon — transform-only, no continuous animation */
+.sce-motion-icon {
+  transform-origin: center;
+  transition: transform var(--sce-motion-duration) var(--sce-motion-ease);
+  will-change: transform;
+}
+
+/* Intent: hover — subtle settle/scale (Dashboard default) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="hover"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="hover"] {
+  transform: scale(1.06);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="hover"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="hover"] {
+  transform: scale(0.94);
+}
+
+/* Intent: group — connected nodes converge (Organisation, Teams, Personen) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="group"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="group"] {
+  transform: scale(1.05) translateX(1px);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="group"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="group"] {
+  transform: scale(0.96);
+}
+
+/* Intent: globe — restrained rotation (Website) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="globe"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="globe"] {
+  transform: rotate(14deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="globe"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="globe"] {
+  transform: rotate(6deg) scale(0.96);
+}
+
+/* Intent: schedule — calendar/planning shift */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="schedule"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="schedule"] {
+  transform: translateY(-1.5px) rotate(-4deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="schedule"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="schedule"] {
+  transform: translateY(0) rotate(0deg) scale(0.96);
+}
+
+/* Intent: direction — subtle action movement (MatchCenter) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="direction"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="direction"] {
+  transform: translateX(2px) rotate(8deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="direction"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="direction"] {
+  transform: translateX(0) scale(0.96);
+}
+
+/* Intent: lift — controlled trophy lift (TournamentCenter) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="lift"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="lift"] {
+  transform: translateY(-2px) scale(1.04);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="lift"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="lift"] {
+  transform: translateY(0) scale(0.96);
+}
+
+/* Intent: open — folder/document opens slightly */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="open"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="open"] {
+  transform: scaleY(1.08) rotate(-3deg);
+  transform-origin: bottom center;
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="open"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="open"] {
+  transform: scaleY(0.96);
+}
+
+/* Intent: communicate — envelope/inbox enters */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="communicate"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="communicate"] {
+  transform: translateX(1.5px) translateY(-1px);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="communicate"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="communicate"] {
+  transform: translateX(0) scale(0.96);
+}
+
+/* Intent: publish — layers shift */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="publish"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="publish"] {
+  transform: translateY(-1px) scale(1.05);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="publish"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="publish"] {
+  transform: scale(0.96);
+}
+
+/* Intent: gear — small rotation, NOT full spin (Einstellungen) */
+.sce-nav-item:hover .sce-motion-icon[data-motion-intent="gear"],
+.sce-nav-child:hover .sce-motion-icon[data-motion-intent="gear"] {
+  transform: rotate(22deg);
+}
+.sce-nav-item:active .sce-motion-icon[data-motion-intent="gear"],
+.sce-nav-child:active .sce-motion-icon[data-motion-intent="gear"] {
+  transform: rotate(10deg) scale(0.96);
+}
+
+/* Active nav item — subtle settle, no perpetual motion */
+.sce-motion-icon--active {
+  color: inherit;
+}
+
+/* Success motion — one-shot check draw/scale */
+@keyframes sce-success-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.sce-motion-success-icon {
+  animation: sce-success-in var(--sce-motion-duration-slow) var(--sce-motion-ease) both;
+}
+
+/* Sync flow foundation — source → destination propagation */
+.sce-sync-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-2);
+}
+
+.sce-sync-flow__source {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.sce-sync-flow__connector {
+  display: flex;
+  justify-content: center;
+  padding: 2px 0;
+}
+
+.sce-sync-flow__line {
+  display: block;
+  width: 1px;
+  height: 12px;
+  background: var(--border-strong);
+}
+
+.sce-sync-flow__destinations {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sce-sync-flow__destination {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 0;
+  opacity: 0.5;
+  transition:
+    opacity var(--sce-motion-duration) var(--sce-motion-ease),
+    color var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-sync-flow__destination--pending {
+  opacity: 0.8;
+  color: var(--foreground);
+}
+
+.sce-sync-flow__destination--complete {
+  opacity: 1;
+  color: var(--sce-success);
+}
+
+.sce-sync-flow__check {
+  color: var(--sce-success);
+  animation: sce-success-in var(--sce-motion-duration) var(--sce-motion-ease) both;
+}
+
+@keyframes sce-sync-pulse {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.sce-sync-flow--active .sce-sync-flow__destination--pending {
+  animation: sce-sync-pulse var(--sce-motion-duration-slow) var(--sce-motion-ease) 1;
+  animation-delay: calc(var(--sce-sync-index, 0) * 120ms);
+}
+
+.sce-sync-flow--active .sce-sync-flow__line {
+  background: linear-gradient(
+    to bottom,
+    var(--sce-primary),
+    var(--border-strong)
+  );
+  transition: background var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+/* Expand/collapse — restrained height/opacity transition */
+.sce-expand-content {
+  overflow: hidden;
+  transition:
+    max-height var(--sce-motion-duration-slow) var(--sce-motion-ease),
+    opacity var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-expand-content[data-expanded="false"] {
+  max-height: 0;
+  opacity: 0;
+}
+
+.sce-expand-content[data-expanded="true"] {
+  max-height: 2000px;
+  opacity: 1;
+}
+
+.sce-expand-chevron {
+  transition: transform var(--sce-motion-duration) var(--sce-motion-ease);
+}
+
+.sce-expand-chevron[data-expanded="true"] {
+  transform: rotate(90deg);
+}
+
+/* Button micro-motion — primary actions */
+.sce-btn-motion {
+  transition:
+    background-color var(--transition-fast),
+    transform var(--sce-motion-duration-fast) var(--sce-motion-ease),
+    box-shadow var(--transition-fast);
+}
+
+.sce-btn-motion:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.sce-btn-motion:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
    SCE SIDEBAR — New minimal Linear-style sidebar
 ───────────────────────────────────────────────────────────────────────── */
 .sce-sidebar {
-  /* Flex child: participates in normal document flow */
   position: sticky;
   top: 0;
   height: 100vh;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   flex-shrink: 0;
   z-index: 40;
   width: var(--sidebar-width);
   display: flex;
   flex-direction: column;
-  background: var(--surface);
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--border);
   transition: width var(--transition-base);
 }
@@ -649,13 +959,134 @@ button {
   width: var(--sidebar-collapsed-width);
 }
 
+.sce-sidebar-resizing {
+  transition: none;
+}
+
+.sce-sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 50;
+  touch-action: none;
+}
+
+.sce-sidebar-resize-handle::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.sce-sidebar-resize-handle:hover::after,
+.sce-sidebar-resize-handle:focus-visible::after {
+  background: color-mix(in srgb, var(--sce-primary) 45%, transparent);
+}
+
+.sce-sidebar-resize-handle:focus-visible {
+  outline: none;
+}
+
+.sce-account-menu {
+  animation: sce-menu-in 140ms ease;
+}
+
+@keyframes sce-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sce-account-menu {
+    animation: none;
+  }
+
+  .sce-sidebar {
+    transition: none;
+  }
+
+  .fca-button-primary:hover,
+  .fca-button-primary:active,
+  .sce-nav-item,
+  .sce-nav-child,
+  .sce-card,
+  .sce-kpi-card {
+    transition: none;
+  }
+
+  .sce-motion-icon,
+  .sce-motion-success-icon,
+  .sce-sync-flow__destination,
+  .sce-sync-flow__check,
+  .sce-expand-content,
+  .sce-expand-chevron,
+  .sce-btn-motion {
+    transition: none;
+    animation: none;
+    transform: none;
+  }
+
+  .sce-nav-item:hover .sce-motion-icon,
+  .sce-nav-item:active .sce-motion-icon,
+  .sce-nav-child:hover .sce-motion-icon,
+  .sce-nav-child:active .sce-motion-icon {
+    transform: none;
+  }
+
+  .sce-sync-flow--active .sce-sync-flow__destination--pending {
+    animation: none;
+  }
+
+  .sce-btn-motion:hover:not(:disabled),
+  .sce-btn-motion:active:not(:disabled) {
+    transform: none;
+  }
+}
+
 .sce-sidebar-brand {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px 14px 12px;
+  padding: 14px 14px 12px;
   border-bottom: 1px solid var(--border);
   min-height: var(--topnav-height);
+  flex-shrink: 0;
+}
+
+.sce-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 9999px;
+}
+
+.sce-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
 }
 
 .sce-nav-item {
@@ -687,8 +1118,8 @@ button {
 }
 
 .sce-nav-item.active {
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: color-mix(in srgb, var(--sce-accent) 8%, transparent);
+  color: var(--foreground);
   font-weight: 600;
 }
 
@@ -700,7 +1131,7 @@ button {
   bottom: 6px;
   width: 2px;
   border-radius: 0 2px 2px 0;
-  background: var(--tenant-primary);
+  background: var(--sce-accent);
 }
 
 .sce-nav-child {
@@ -725,9 +1156,9 @@ button {
 }
 
 .sce-nav-child.active {
-  color: var(--tenant-primary);
+  color: var(--foreground);
   font-weight: 500;
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
+  background: color-mix(in srgb, var(--sce-accent) 6%, transparent);
 }
 
 .sce-nav-section-label {
@@ -752,7 +1183,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--header-bg);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -772,13 +1203,18 @@ button {
   transition:
     background-color var(--transition-fast),
     color var(--transition-fast),
-    border-color var(--transition-fast);
+    border-color var(--transition-fast),
+    transform var(--sce-motion-duration-fast) var(--sce-motion-ease);
 }
 
 .sce-icon-button:hover {
   background: var(--surface-2);
   color: var(--foreground);
   border-color: var(--border);
+}
+
+.sce-icon-button:active {
+  transform: scale(0.94);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -868,8 +1304,8 @@ button {
 }
 
 .sce-page-search:focus-within {
-  border-color: var(--tenant-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tenant-primary) 10%, transparent);
+  border-color: var(--sce-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent);
 }
 
 .sce-page-search input {
@@ -1019,8 +1455,8 @@ button {
   height: 22px;
   padding: 0 6px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--tenant-primary) 10%, white);
-  color: var(--tenant-primary);
+  background: var(--sce-accent-subtle);
+  color: var(--sce-accent);
   font-size: 0.72rem;
   font-weight: 700;
 }
@@ -1030,15 +1466,15 @@ button {
    Apply .sce-filter-tab-active to the active tab button inside a tab group.
 ───────────────────────────────────────────────────────────────────────── */
 .sce-filter-tab-active {
-  color: var(--tenant-primary) !important;
+  color: var(--sce-accent) !important;
   font-weight: 600;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   PRIMARY ACTION LINK — Tenant-branded inline text link
+   PRIMARY ACTION LINK — SportClubEvo orange accent
 ───────────────────────────────────────────────────────────────────────── */
 .sce-link-primary {
-  color: var(--tenant-primary);
+  color: var(--sce-accent);
   font-weight: 500;
   text-decoration: none;
   transition: opacity var(--transition-fast);
@@ -1051,6 +1487,134 @@ button {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
+   SCE LOGIN — Premium auth canvas (no card)
+───────────────────────────────────────────────────────────────────────── */
+.sce-login {
+  --sce-login-input-bg: color-mix(in srgb, var(--foreground) 3.5%, var(--background));
+  --sce-login-input-bg-hover: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --sce-login-input-bg-focus: color-mix(in srgb, var(--foreground) 5.5%, var(--background));
+}
+
+.sce-login-headline {
+  line-height: 1.14;
+}
+
+.sce-login-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-2);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.sce-login-input {
+  width: 100%;
+  height: 2.75rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  background-color: var(--sce-login-input-bg);
+  color: var(--foreground);
+  font-size: 0.9375rem;
+  outline: none;
+  padding: 0 0.875rem;
+  caret-color: var(--foreground);
+  transition:
+    border-color var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sce-login-input::placeholder {
+  color: var(--muted);
+}
+
+.sce-login-input:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: var(--sce-login-input-bg-hover);
+}
+
+.sce-login-input:focus {
+  border-color: var(--sce-primary);
+  background-color: var(--sce-login-input-bg-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent);
+}
+
+/* Chromium/WebKit autofill paints a light surface unless overridden in-place. */
+.sce-login-input:-webkit-autofill,
+.sce-login-input:-webkit-autofill:hover,
+.sce-login-input:-webkit-autofill:focus,
+.sce-login-input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground);
+  color: var(--foreground);
+  background-color: var(--sce-login-input-bg) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--sce-login-input-bg) inset !important;
+  box-shadow: 0 0 0 1000px var(--sce-login-input-bg) inset !important;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s,
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sce-login-input:-webkit-autofill:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  background-color: var(--sce-login-input-bg-hover) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--sce-login-input-bg-hover) inset !important;
+  box-shadow: 0 0 0 1000px var(--sce-login-input-bg-hover) inset !important;
+}
+
+.sce-login-input:-webkit-autofill:focus,
+.sce-login-input:-webkit-autofill:active {
+  border-color: var(--sce-primary);
+  background-color: var(--sce-login-input-bg-focus) !important;
+  -webkit-box-shadow:
+    0 0 0 1000px var(--sce-login-input-bg-focus) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
+  box-shadow:
+    0 0 0 1000px var(--sce-login-input-bg-focus) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 16%, transparent) !important;
+}
+
+.sce-login-submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.75rem;
+  padding: 0 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: var(--sce-primary);
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.sce-login-submit:hover:not(:disabled) {
+  background: var(--sce-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sce-primary) 24%, transparent);
+}
+
+.sce-login-submit:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sce-primary) 16%, transparent);
+}
+
+.sce-login-submit:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 22%, transparent),
+    0 4px 16px color-mix(in srgb, var(--sce-primary) 20%, transparent);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
    SCREEN 3 — Dashboard premium cards
 ───────────────────────────────────────────────────────────────────────── */
 
@@ -1060,21 +1624,19 @@ button {
   align-items: flex-start;
   gap: 12px;
   padding: 16px;
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   text-decoration: none;
   transition:
     box-shadow var(--transition-base),
-    border-color var(--transition-base),
-    transform var(--transition-fast);
+    border-color var(--transition-base);
 }
 
 .sce-quick-action-card:hover {
-  box-shadow: 0 4px 16px rgba(17,24,39,0.10);
-  border-color: #D1D5DB;
-  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 /* Activity item */
@@ -1083,7 +1645,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 12px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-activity-item:last-child {
@@ -1096,7 +1658,7 @@ button {
   align-items: flex-start;
   gap: 10px;
   padding: 10px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-task-item:last-child {
@@ -1109,7 +1671,7 @@ button {
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-event-item:last-child {
@@ -1118,10 +1680,10 @@ button {
 
 /* Section card — Screen 3 style (rounded 16px, white, clean shadow) */
 .sce-section-card-v3 {
-  border: 1px solid #E5E7EB;
-  border-radius: 16px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(17,24,39,0.06);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
   overflow: hidden;
 }
 
@@ -1130,7 +1692,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid #F3F4F6;
+  border-bottom: 1px solid var(--border);
 }
 
 .sce-section-card-v3-body {
@@ -1139,7 +1701,7 @@ button {
 
 .sce-section-card-v3-footer {
   padding: 12px 20px;
-  border-top: 1px solid #F3F4F6;
+  border-top: 1px solid var(--border);
 }
 
 /* Date chip for events */
@@ -1151,8 +1713,8 @@ button {
   width: 44px;
   height: 44px;
   border-radius: 10px;
-  border: 1px solid #E5E7EB;
-  background: #F8FAFC;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
   flex-shrink: 0;
 }
 

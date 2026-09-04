@@ -11,7 +11,7 @@
 import type { TournamentDto } from "./types";
 import {
   assessTournamentOperationalState,
-  isTournamentCompletedOrInactive,
+  isTournamentInArchivList,
   type TournamentOperationalAssessment,
 } from "./operational-state";
 
@@ -68,15 +68,16 @@ export function normalizeTournamentTab(value: string | null | undefined): Tourna
  */
 export function buildTournamentCenterViewModel(
   tournaments: readonly TournamentDto[],
-  options: { actionFilter?: TournamentActionFilter } = {},
+  options: { actionFilter?: TournamentActionFilter; now?: Date } = {},
 ): TournamentCenterViewModel {
   const actionFilter = options.actionFilter ?? "ALLE";
+  const now = options.now ?? new Date();
 
   const upcoming: TournamentRowViewModel[] = [];
   const archived: TournamentDto[] = [];
 
   for (const tournament of tournaments) {
-    if (isTournamentCompletedOrInactive(tournament)) {
+    if (isTournamentInArchivList(tournament, now)) {
       archived.push(tournament);
       continue;
     }

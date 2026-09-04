@@ -3,7 +3,7 @@
  *
  * DASHBOARD-SHELL-UX-01 — tenant-first sidebar shell:
  *   - tenant identity (name) is rendered prominently in the header
- *   - SportClubEvo platform branding is present only as a subtle footer badge
+ *   - SportClubEvo platform branding at footer (not "Powered by")
  *   - MatchCenter renders nested under Planung (not as a standalone item)
  *   - permission-driven visibility is preserved
  */
@@ -18,11 +18,13 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => new URLSearchParams(),
 }));
 
-// SignOutButton transitively imports "@/auth" (next-auth) — irrelevant to
-// this shell/nav-focused suite and incompatible with the vitest/jsdom
-// module resolver, so it is mocked out at the server-action boundary.
-vi.mock("@/app/actions/auth-actions", () => ({
-  signOutAction: vi.fn(),
+vi.mock("@/hooks/useSidebarResize", () => ({
+  useSidebarResize: () => ({
+    width: 224,
+    isResizing: false,
+    onResizePointerDown: vi.fn(),
+    onResizeKeyDown: vi.fn(),
+  }),
 }));
 
 const CLUB_ADMIN_PERMISSIONS = Object.values(PERMISSIONS);
@@ -31,9 +33,6 @@ describe("AdminSidebar", () => {
   it("renders the tenant name prominently in the brand header", () => {
     render(
       <AdminSidebar
-        firstName="Michael"
-        lastName="Duft"
-        email="michael@fc-allschwil.ch"
         permissionKeys={CLUB_ADMIN_PERMISSIONS}
         clubName="FC Allschwil"
         logoUrl={null}
@@ -42,28 +41,35 @@ describe("AdminSidebar", () => {
     expect(screen.getByText("FC Allschwil")).toBeInTheDocument();
   });
 
-  it("shows SportClubEvo only as a subtle 'Powered by' footer attribution, not as the primary brand", () => {
+  it("shows SportClubEvo platform brand at the footer, not a Powered by attribution", () => {
     render(
       <AdminSidebar
-        firstName="Michael"
-        lastName="Duft"
-        email="michael@fc-allschwil.ch"
         permissionKeys={CLUB_ADMIN_PERMISSIONS}
         clubName="FC Allschwil"
         logoUrl={null}
       />,
     );
-    // Exactly one subtle platform attribution, not a competing header brand.
-    expect(screen.getByTitle("Powered by SportClubEvo")).toBeInTheDocument();
-    expect(screen.getByText("Powered by")).toBeInTheDocument();
+
+    expect(screen.getByLabelText("SportClubEvo")).toBeInTheDocument();
+    expect(screen.queryByText("Powered by")).not.toBeInTheDocument();
+  });
+
+  it("does not render user identity or logout in the sidebar footer", () => {
+    render(
+      <AdminSidebar
+        permissionKeys={CLUB_ADMIN_PERMISSIONS}
+        clubName="FC Allschwil"
+        logoUrl={null}
+      />,
+    );
+
+    expect(screen.queryByText("Abmelden")).not.toBeInTheDocument();
+    expect(screen.queryByText("it@fcallschwil.ch")).not.toBeInTheDocument();
   });
 
   it("renders MatchCenter nested under Planung, not as a standalone top-level item", () => {
     render(
       <AdminSidebar
-        firstName="Michael"
-        lastName="Duft"
-        email="michael@fc-allschwil.ch"
         permissionKeys={CLUB_ADMIN_PERMISSIONS}
         clubName="FC Allschwil"
         logoUrl={null}
@@ -72,11 +78,8 @@ describe("AdminSidebar", () => {
 
     const matchCenterLink = screen.getByRole("link", { name: /MatchCenter/i });
     expect(matchCenterLink).toHaveAttribute("href", "/dashboard/matchcenter");
-
-    // It must render as an indented child (sce-nav-child), not a top-level item.
     expect(matchCenterLink.className).toContain("sce-nav-child");
 
-    // Planung's operational trio appears together, in the canonical order.
     const labels = screen
       .getAllByRole("link")
       .map((el) => el.textContent?.trim())
@@ -92,9 +95,6 @@ describe("AdminSidebar", () => {
   it("renders Kommunikation and Sponsoring once in the Club Admin runtime sidebar groups", () => {
     render(
       <AdminSidebar
-        firstName="Michael"
-        lastName="Duft"
-        email="michael@fc-allschwil.ch"
         permissionKeys={[
           PERMISSIONS.USERS_MANAGE_MEMBERSHIPS,
           PERMISSIONS.ROLES_VIEW,
@@ -135,9 +135,6 @@ describe("AdminSidebar", () => {
   it("hides permission-gated sections the user lacks access to (Club Admin still sees Administration)", () => {
     render(
       <AdminSidebar
-        firstName="Michael"
-        lastName="Duft"
-        email="michael@fc-allschwil.ch"
         permissionKeys={[PERMISSIONS.ROLES_VIEW, PERMISSIONS.SEASONS_VIEW]}
         clubName="FC Allschwil"
         logoUrl={null}

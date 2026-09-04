@@ -47,20 +47,20 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  CLUB: "border-blue-200 bg-blue-50 text-blue-700",
-  DIVISION: "border-indigo-200 bg-indigo-50 text-indigo-700",
-  DEPARTMENT: "border-violet-200 bg-violet-50 text-violet-700",
-  SUB_DEPARTMENT: "border-purple-200 bg-purple-50 text-purple-700",
-  TEAM: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  COMMITTEE: "border-amber-200 bg-amber-50 text-amber-700",
-  PROJECT_GROUP: "border-orange-200 bg-orange-50 text-orange-700",
-  CUSTOM: "border-slate-200 bg-slate-50 text-slate-600",
+  CLUB: "border-[var(--sce-info-border)] bg-[var(--sce-info-light)] text-[var(--sce-info)]",
+  DIVISION: "border-[var(--sce-info-border)] bg-[var(--sce-info-light)] text-[var(--sce-info)]",
+  DEPARTMENT: "border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] text-[var(--sce-warning)]",
+  SUB_DEPARTMENT: "border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] text-[var(--sce-warning)]",
+  TEAM: "border-[var(--sce-success-border)] bg-[var(--sce-success-light)] text-[var(--sce-success)]",
+  COMMITTEE: "border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] text-[var(--sce-warning)]",
+  PROJECT_GROUP: "border-[var(--border)] bg-[var(--sce-primary-light)] text-[var(--sce-primary)]",
+  CUSTOM: "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text-2)]",
 };
 
 const STATUS_CLASSES: Record<string, string> = {
-  ACTIVE: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  INACTIVE: "border-amber-200 bg-amber-50 text-amber-700",
-  ARCHIVED: "border-slate-200 bg-slate-50 text-slate-400",
+  ACTIVE: "border-[var(--sce-success-border)] bg-[var(--sce-success-light)] text-[var(--sce-success)]",
+  INACTIVE: "border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] text-[var(--sce-warning)]",
+  ARCHIVED: "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -267,7 +267,7 @@ export default function OrgUnitSearchableList({
             }
           />
         ) : (
-          <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+          <div className="sce-integrated-list">
             {displayUnits.map((unit, idx) => {
               const isLast = idx === displayUnits.length - 1;
               const statusLabel = STATUS_LABELS[unit.status] ?? unit.status;
@@ -369,12 +369,12 @@ export default function OrgUnitSearchableList({
               return (
                 <div
                   key={unit.id}
-                  className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]"
+                  className="sce-integrated-list"
                 >
                   <div className="flex items-center gap-3 px-5 py-3.5">
                     {/* Icon */}
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-                      <Archive className="h-4 w-4 text-slate-400" />
+                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
+                      <Archive className="h-4 w-4 text-[var(--muted)]" />
                     </div>
 
                     {/* Name + meta */}
@@ -387,7 +387,7 @@ export default function OrgUnitSearchableList({
                         <code className="rounded border border-[var(--border)] bg-[var(--surface-2)] px-1.5 py-0 text-[0.65rem] font-mono text-[var(--muted)]">
                           {unit.key}
                         </code>
-                        <span className="inline-flex h-5 items-center rounded-full border border-slate-200 bg-slate-50 px-2 text-[0.65rem] font-semibold text-slate-400">
+                        <span className="inline-flex h-5 items-center rounded-full border border-[var(--border)] bg-[var(--surface-2)] px-2 text-[0.65rem] font-semibold text-[var(--muted)]">
                           Archiviert
                         </span>
                       </div>

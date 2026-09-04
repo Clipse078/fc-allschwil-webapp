@@ -457,7 +457,7 @@ export function WaitingListDetailDrawer({
                             "flex-1 rounded-[var(--radius-md)] border px-2 py-1.5 text-center text-xs font-semibold transition-colors disabled:opacity-50",
                             entry.priority === priority
                               ? WAITING_LIST_PRIORITY_COLORS[priority]
-                              : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                              : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
                           )}
                         >
                           {WAITING_LIST_PRIORITY_LABELS[priority]}
@@ -554,7 +554,7 @@ export function WaitingListDetailDrawer({
                         type="button"
                         disabled={!!busy}
                         onClick={() => patch({ status: "CONTACTED" }, "status-contacted")}
-                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] disabled:opacity-50"
                       >
                         Kontaktiert
                       </button>
@@ -618,7 +618,7 @@ export function WaitingListDetailDrawer({
               <div className="mt-3">
                 <a
                   href={`/tenant/${tenantSlug}/cockpit/registrations/${entry.registrationId}`}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                 >
                   <ExternalLink className="h-3.5 w-3.5" aria-hidden />
                   Anmeldung öffnen
@@ -699,7 +699,7 @@ export function WaitingListDetailDrawer({
                           <button
                             type="button"
                             onClick={() => setShowPlacePanel(false)}
-                            className="inline-flex h-8 items-center rounded-lg border border-[var(--border)] bg-white px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                            className="inline-flex h-8 items-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                           >
                             Abbrechen
                           </button>
@@ -759,7 +759,7 @@ export function WaitingListDetailDrawer({
                       <button
                         type="button"
                         onClick={() => setDeleteConfirming(false)}
-                        className="inline-flex h-7 items-center rounded-md border border-[var(--border)] bg-white px-2.5 text-[0.72rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+                        className="inline-flex h-7 items-center rounded-md border border-[var(--border)] bg-[var(--surface)] px-2.5 text-[0.72rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
                       >
                         Abbrechen
                       </button>

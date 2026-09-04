@@ -92,7 +92,7 @@ export default function SeasonRowCard({
     <div className="sce-detail-section">
       <div className="sce-detail-section-header">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-white">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-2)]">
             <CalendarDays className="h-4 w-4 text-[var(--blue)]" />
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -110,7 +110,7 @@ export default function SeasonRowCard({
             <button
               type="button"
               onClick={() => setIsEditing((prev) => !prev)}
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-white px-3 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
             >
               {isEditing ? <X className="h-3.5 w-3.5" /> : <Pencil className="h-3.5 w-3.5" />}
               {isEditing ? "Abbrechen" : "Bearbeiten"}
@@ -119,7 +119,7 @@ export default function SeasonRowCard({
               <button
                 type="button"
                 onClick={() => setDeleteDialogOpen(true)}
-                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3 text-xs font-medium text-rose-600 transition hover:bg-rose-50"
+                className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--sce-danger-border)] bg-[var(--surface)] px-3 text-xs font-medium text-[var(--sce-danger)] transition hover:bg-[var(--sce-danger-light)]"
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 Löschen
@@ -249,7 +249,7 @@ export default function SeasonRowCard({
             <button
               type="button"
               onClick={() => setDeleteDialogOpen(false)}
-              className="inline-flex h-9 items-center rounded-lg border border-[var(--border-strong)] bg-white px-4 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
+              className="inline-flex h-9 items-center rounded-lg border border-[var(--border-strong)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text-2)] transition hover:bg-[var(--surface-2)]"
             >
               Abbrechen
             </button>

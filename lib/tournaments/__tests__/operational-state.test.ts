@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   assessTournamentOperationalState,
+  getTournamentEffectiveEndAt,
   isTournamentCompletedOrInactive,
+  isTournamentInArchivList,
   isTournamentOperationallyOpen,
+  isTournamentPastByEffectiveEnd,
 } from "../operational-state";
 import type { TournamentDto, TournamentParticipantDto } from "../types";
 
@@ -294,5 +297,70 @@ describe("isTournamentOperationallyOpen", () => {
   it("mirrors assessTournamentOperationalState().status === 'OPEN'", () => {
     expect(isTournamentOperationallyOpen(createTournament({ organizerName: null }))).toBe(true);
     expect(isTournamentOperationallyOpen(createTournament())).toBe(false);
+  });
+});
+
+describe("getTournamentEffectiveEndAt", () => {
+  it("uses explicit endAt when present", () => {
+    const tournament = createTournament({
+      startAt: "2026-08-23T10:00:00.000Z",
+      endAt: "2026-08-23T14:00:00.000Z",
+    });
+
+    expect(getTournamentEffectiveEndAt(tournament).toISOString()).toBe("2026-08-23T14:00:00.000Z");
+  });
+
+  it("falls back to the TOURNAMENT default duration when endAt is absent", () => {
+    const tournament = createTournament({
+      startAt: "2026-08-23T10:00:00.000Z",
+      endAt: null,
+    });
+
+    expect(getTournamentEffectiveEndAt(tournament).toISOString()).toBe("2026-08-23T14:00:00.000Z");
+  });
+});
+
+describe("isTournamentPastByEffectiveEnd", () => {
+  const referenceNow = new Date("2026-09-03T12:00:00.000Z");
+
+  it("is true once the canonical effective end has passed", () => {
+    const tournament = createTournament({ startAt: "2026-08-29T10:00:00.000Z" });
+    expect(isTournamentPastByEffectiveEnd(tournament, referenceNow)).toBe(true);
+  });
+
+  it("is false while the canonical effective end is still in the future", () => {
+    const tournament = createTournament({ startAt: "2026-09-05T16:00:00.000Z" });
+    expect(isTournamentPastByEffectiveEnd(tournament, referenceNow)).toBe(false);
+  });
+});
+
+describe("isTournamentInArchivList", () => {
+  const referenceNow = new Date("2026-09-03T12:00:00.000Z");
+
+  it("includes persisted inactive statuses", () => {
+    expect(isTournamentInArchivList(createTournament({ status: "COMPLETED" }), referenceNow)).toBe(
+      true,
+    );
+    expect(isTournamentInArchivList(createTournament({ status: "ARCHIVED" }), referenceNow)).toBe(
+      true,
+    );
+  });
+
+  it("includes SCHEDULED tournaments whose effective end is already past", () => {
+    const tournament = createTournament({
+      status: "SCHEDULED",
+      startAt: "2026-08-23T10:00:00.000Z",
+    });
+
+    expect(isTournamentInArchivList(tournament, referenceNow)).toBe(true);
+  });
+
+  it("keeps future SCHEDULED tournaments out of Archiv", () => {
+    const tournament = createTournament({
+      status: "SCHEDULED",
+      startAt: "2026-09-10T10:00:00.000Z",
+    });
+
+    expect(isTournamentInArchivList(tournament, referenceNow)).toBe(false);
   });
 });

@@ -2,7 +2,6 @@
 import {
   CalendarDays,
   CalendarRange,
-  CheckSquare,
   FileText,
   Globe,
   Monitor,
@@ -18,7 +17,7 @@ import { getPersonalizedGreeting, resolveDashboardFirstName } from "@/lib/dashbo
 import { getPersonFirstNameByUserId } from "@/lib/people/queries";
 import {
   DashboardHero,
-  DashboardKpiCard,
+  DashboardMetricStrip,
   DashboardQuickActions,
   DashboardActivityFeed,
   DashboardActivityItem,
@@ -151,19 +150,17 @@ type TaskItemProps = {
 
 function TaskItem({ title, subtitle, dueLabel, urgent = false }: TaskItemProps) {
   return (
-    <div className="flex items-start gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
+    <div className="flex items-start gap-3 py-3 border-b border-[var(--border)] last:border-b-0">
       <div className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border border-[var(--border-strong)]" />
       <div className="min-w-0 flex-1">
         <p className="text-[0.8125rem] font-medium leading-tight text-[var(--foreground)]">
           {title}
         </p>
-        <p className="mt-0.5 truncate text-xs text-[var(--text-2)]">{subtitle}</p>
+        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{subtitle}</p>
       </div>
       <span
-        className="shrink-0 text-xs font-semibold"
-        style={{
-          color: urgent ? "var(--sce-warning)" : "var(--muted)",
-        }}
+        className="shrink-0 text-xs font-medium"
+        style={{ color: urgent ? "var(--sce-warning)" : "var(--muted)" }}
       >
         {dueLabel}
       </span>
@@ -181,20 +178,20 @@ type EventItemProps = {
 
 function EventItem({ day, month, title, location, time }: EventItemProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-[var(--border)] py-3 last:border-b-0">
-      <div className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-[var(--radius-md)] border border-[var(--border)] bg-[var(--surface-2)]">
+    <div className="flex items-center gap-3 py-3 border-b border-[var(--border)] last:border-b-0">
+      <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center">
         <span className="text-sm font-bold leading-none text-[var(--foreground)]">{day}</span>
-        <span className="mt-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-[var(--text-2)]">
+        <span className="mt-0.5 text-[0.6rem] font-medium uppercase tracking-wide text-[var(--muted)]">
           {month}
         </span>
       </div>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[0.8125rem] font-semibold leading-tight text-[var(--foreground)]">
+        <p className="truncate text-[0.8125rem] font-medium leading-tight text-[var(--foreground)]">
           {title}
         </p>
-        <p className="mt-0.5 truncate text-xs text-[var(--text-2)]">{location}</p>
+        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">{location}</p>
       </div>
-      <span className="shrink-0 text-xs font-medium text-[var(--text-2)]">{time}</span>
+      <span className="shrink-0 text-xs text-[var(--muted)]">{time}</span>
     </div>
   );
 }
@@ -239,7 +236,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   type ActivityEntry = {
     key: string;
     icon: React.ReactNode;
-    iconAccent: DashboardActivityItem["iconAccent"];
     title: string;
     subtitle: string;
     date: Date;
@@ -251,7 +247,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     ...dash.recentNews.map((n) => ({
       key: `news-${n.id}`,
       icon: <Newspaper className="h-4 w-4" />,
-      iconAccent: "info" as const,
       title: n.title,
       subtitle: n.authorName ? `von ${n.authorName}` : "Newsartikel",
       date: n.updatedAt,
@@ -261,7 +256,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     ...dash.recentRegistrations.map((r) => ({
       key: `reg-${r.id}`,
       icon: <Users className="h-4 w-4" />,
-      iconAccent: "warning" as const,
       title: `Neue Anmeldung von ${r.firstName} ${r.lastName}`,
       subtitle: r.type === "PROBETRAINING" ? "Probetraining" : "Spieleranmeldung",
       date: r.createdAt,
@@ -271,7 +265,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     ...dash.recentEvents.map((e) => ({
       key: `event-${e.id}`,
       icon: <CalendarDays className="h-4 w-4" />,
-      iconAccent: "success" as const,
       title: `${e.title} wurde aktualisiert`,
       subtitle: e.type === "TRAINING" ? "Training" : e.type === "MATCH" ? "Spiel" : "Event",
       date: e.updatedAt,
@@ -281,7 +274,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     ...dash.recentMeetings.map((m) => ({
       key: `meeting-${m.id}`,
       icon: <ScrollText className="h-4 w-4" />,
-      iconAccent: "primary" as const,
       title: `Meeting "${m.title}" erstellt`,
       subtitle: "Neues Meeting geplant",
       date: m.createdAt,
@@ -295,7 +287,6 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   const activityItems: DashboardActivityItem[] = rawActivities.map((a) => ({
     key: a.key,
     icon: a.icon,
-    iconAccent: a.iconAccent,
     title: a.title,
     subtitle: a.subtitle,
     timestamp: timeAgo(a.date),
@@ -393,57 +384,57 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
   const greeting = getPersonalizedGreeting(firstName);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <DashboardHero
         greeting={greeting}
-        subtitle="Schön, dich wiederzusehen."
         clubName={ctx?.name ?? undefined}
         activeSeason={activeSeason}
         date={todayFormatted}
       />
 
-      {/* ── KPI Strip ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <DashboardKpiCard
-          title="Offene Anmeldungen"
-          value={String(dash.openRegistrationCount)}
-          description="+3 seit gestern"
-          accent="warning"
-          icon={<Users className="h-5 w-5" />}
-        />
-        <DashboardKpiCard
-          title="News in Prüfung"
-          value={String(dash.newsInReviewCount)}
-          description="2 fällig heute"
-          accent="info"
-          icon={<Newspaper className="h-5 w-5" />}
-        />
-        <DashboardKpiCard
-          title="Veröffentlichungen geplant"
-          value={String(dash.scheduledNewsCount)}
-          description="Diese Woche"
-          accent="success"
-          icon={<Monitor className="h-5 w-5" />}
-        />
-        <DashboardKpiCard
-          title="Events diese Woche"
-          value={String(dash.weekEventsCount)}
-          description={`${dash.todayEventsCount} heute`}
-          accent="primary"
-          icon={<CalendarDays className="h-5 w-5" />}
-        />
-      </div>
+      <DashboardMetricStrip
+        metrics={[
+          {
+            key: "registrations",
+            label: "Offene Anmeldungen",
+            value: String(dash.openRegistrationCount),
+            description: "+3 seit gestern",
+            accent: "warning",
+            icon: <Users className="h-4 w-4" />,
+          },
+          {
+            key: "news-review",
+            label: "News in Prüfung",
+            value: String(dash.newsInReviewCount),
+            description: "2 fällig heute",
+            accent: "info",
+            icon: <Newspaper className="h-4 w-4" />,
+          },
+          {
+            key: "scheduled",
+            label: "Veröffentlichungen geplant",
+            value: String(dash.scheduledNewsCount),
+            description: "Diese Woche",
+            accent: "success",
+            icon: <Monitor className="h-4 w-4" />,
+          },
+          {
+            key: "events",
+            label: "Events diese Woche",
+            value: String(dash.weekEventsCount),
+            description: `${dash.todayEventsCount} heute`,
+            accent: "primary",
+            icon: <CalendarDays className="h-4 w-4" />,
+          },
+        ]}
+      />
 
-      {/* ── Main content + sidebar ────────────────────────────────────────── */}
       <DashboardGrid
         sidebar={
           <>
-            {/* Meine Aufgaben */}
             <DashboardSection
               title="Meine Aufgaben"
-              actions={<CheckSquare className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />}
               noPadding
               footer={
                 <Link href="/dashboard/registrations" className="sce-link-primary text-[0.8125rem]">
@@ -451,23 +442,19 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
                 </Link>
               }
             >
-              <div className="px-5 pt-1">
-                {tasks.map((t, i) => (
-                  <TaskItem
-                    key={i}
-                    title={t.title}
-                    subtitle={t.subtitle}
-                    dueLabel={t.dueLabel}
-                    urgent={t.urgent}
-                  />
-                ))}
-              </div>
+              {tasks.map((t, i) => (
+                <TaskItem
+                  key={i}
+                  title={t.title}
+                  subtitle={t.subtitle}
+                  dueLabel={t.dueLabel}
+                  urgent={t.urgent}
+                />
+              ))}
             </DashboardSection>
 
-            {/* Nächste Termine */}
             <DashboardSection
               title="Nächste Termine"
-              actions={<CalendarDays className="h-4 w-4 text-[var(--muted)]" aria-hidden="true" />}
               noPadding
               footer={
                 <Link href="/dashboard/events" className="sce-link-primary text-[0.8125rem]">
@@ -475,69 +462,59 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
                 </Link>
               }
             >
-              <div className="px-5 pt-1">
-                {upcomingEntries.length > 0 ? (
-                  upcomingEntries.map((e) => (
-                    <EventItem
-                      key={e.key}
-                      day={e.day}
-                      month={e.month}
-                      title={e.title}
-                      location={e.location}
-                      time={e.time}
-                    />
-                  ))
-                ) : (
-                  <DashboardEmptyState
-                    icon={<CalendarDays className="h-6 w-6" />}
-                    title="Keine bevorstehenden Termine"
-                    className="py-6"
+              {upcomingEntries.length > 0 ? (
+                upcomingEntries.map((e) => (
+                  <EventItem
+                    key={e.key}
+                    day={e.day}
+                    month={e.month}
+                    title={e.title}
+                    location={e.location}
+                    time={e.time}
                   />
-                )}
-              </div>
+                ))
+              ) : (
+                <DashboardEmptyState
+                  icon={<CalendarDays className="h-6 w-6" />}
+                  title="Keine bevorstehenden Termine"
+                  className="py-6"
+                />
+              )}
             </DashboardSection>
           </>
         }
       >
-        {/* Schnellaktionen */}
         <DashboardSection title="Schnellaktionen" noPadding>
-          <div className="p-4">
-            <DashboardQuickActions
-              actions={[
-                {
-                  href: "/dashboard/website/news/new",
-                  icon: <Newspaper className="h-4 w-4" />,
-                  title: "Neue News",
-                  subtitle: "Artikel erstellen",
-                  accent: "info",
-                },
-                {
-                  href: "/dashboard/website/pages/new",
-                  icon: <FileText className="h-4 w-4" />,
-                  title: "Neue Seite",
-                  subtitle: "Webseite erstellen",
-                  accent: "primary",
-                },
-                {
-                  href: "/dashboard/website/publishing",
-                  icon: <Monitor className="h-4 w-4" />,
-                  title: "Homepage",
-                  subtitle: "Vorschau öffnen",
-                  accent: "success",
-                },
-                {
-                  href: "/dashboard/planner",
-                  icon: <CalendarRange className="h-4 w-4" />,
-                  title: "Wochenplanung",
-                  subtitle: "Zur Planung",
-                  accent: "warning",
-                },
-              ]}
-            />
-          </div>
+          <DashboardQuickActions
+            actions={[
+              {
+                href: "/dashboard/website/news/new",
+                icon: <Newspaper className="h-4 w-4" />,
+                title: "Neue News",
+                subtitle: "Artikel erstellen",
+              },
+              {
+                href: "/dashboard/website/pages/new",
+                icon: <FileText className="h-4 w-4" />,
+                title: "Neue Seite",
+                subtitle: "Webseite erstellen",
+              },
+              {
+                href: "/dashboard/website/publishing",
+                icon: <Monitor className="h-4 w-4" />,
+                title: "Homepage",
+                subtitle: "Vorschau öffnen",
+              },
+              {
+                href: "/dashboard/planner",
+                icon: <CalendarRange className="h-4 w-4" />,
+                title: "Wochenplanung",
+                subtitle: "Zur Planung",
+              },
+            ]}
+          />
         </DashboardSection>
 
-        {/* Aktuelle Aktivitäten */}
         <DashboardSection
           title="Aktuelle Aktivitäten"
           noPadding
@@ -547,18 +524,16 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
             </Link>
           }
         >
-          <div className="px-5 pt-1">
-            <DashboardActivityFeed
-              items={activityItems}
-              emptyState={
-                <DashboardEmptyState
-                  icon={<Globe className="h-7 w-7" />}
-                  title="Noch keine Aktivitäten"
-                  description="Aktivitäten erscheinen hier sobald Inhalte erstellt werden."
-                />
-              }
-            />
-          </div>
+          <DashboardActivityFeed
+            items={activityItems}
+            emptyState={
+              <DashboardEmptyState
+                icon={<Globe className="h-7 w-7" />}
+                title="Noch keine Aktivitäten"
+                description="Aktivitäten erscheinen hier sobald Inhalte erstellt werden."
+              />
+            }
+          />
         </DashboardSection>
       </DashboardGrid>
     </div>

@@ -45,6 +45,19 @@ export type { SheetProps } from "./Sheet";
 export { Toast } from "./Toast";
 export type { ToastItem, ToastVariant } from "./Toast";
 
+export { MotionIcon } from "./MotionIcon";
+export type { MotionIconProps } from "./MotionIcon";
+
+export { AnimatedNavIcon } from "./motion/AnimatedNavIcon";
+export type { AnimatedNavIconProps } from "./motion/AnimatedNavIcon";
+
+export { SyncFlowIndicator } from "./SyncFlowIndicator";
+export type {
+  SyncFlowIndicatorProps,
+  SyncDestination,
+  SyncDestinationStatus,
+} from "./SyncFlowIndicator";
+
 export { ToastProvider, ToastContext } from "./ToastProvider";
 export type { ToastContextValue } from "./ToastProvider";
 

@@ -144,7 +144,7 @@ function CompactFilterSelect<T extends string>({
           "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
           active || value
             ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
-            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
         )}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -405,7 +405,7 @@ export function WaitingListWorkspace({
         )}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="border-b border-[var(--border)] bg-white px-6 py-4">
+        <div className="border-b border-[var(--border)] bg-[var(--card)] px-6 py-4">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h1
@@ -515,7 +515,7 @@ export function WaitingListWorkspace({
                 <button
                   type="button"
                   onClick={clearFilters}
-                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 text-xs text-[var(--muted)] hover:bg-white hover:text-[var(--foreground)]"
+                  className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
                   aria-label="Alle Filter zurücksetzen"
                 >
                   <X className="h-3 w-3" aria-hidden />
@@ -673,7 +673,7 @@ export function WaitingListWorkspace({
       </div>
 
       {selectedEntry ? (
-        <div className="w-full flex-shrink-0 overflow-hidden border-l border-[var(--border)] bg-white lg:w-[480px]">
+        <div className="w-full flex-shrink-0 overflow-hidden border-l border-[var(--border)] bg-[var(--card)] lg:w-[480px]">
           <WaitingListDetailDrawer
             key={selectedEntry.id}
             entry={selectedEntry}

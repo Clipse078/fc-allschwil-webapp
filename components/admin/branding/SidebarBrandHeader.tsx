@@ -28,19 +28,19 @@ export default function SidebarBrandHeader({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-2.5",
+        "flex min-w-0 items-center gap-3",
         collapsed ? "justify-center" : "justify-start",
       )}
     >
       <TenantLogo
         logoUrl={logoUrl}
-        size={collapsed ? 30 : 34}
+        size={collapsed ? 34 : 42}
         alt={`${tenantName} Logo`}
       />
 
       {!collapsed && (
         <p
-          className="truncate text-[0.9375rem] font-bold leading-tight tracking-tight"
+          className="min-w-0 truncate text-[1.0625rem] font-bold leading-snug tracking-[-0.01em]"
           style={{ color: "var(--foreground)" }}
         >
           {tenantName}

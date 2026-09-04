@@ -18,7 +18,7 @@ type KpiCardProps = {
 };
 
 const ACCENT_STYLES: Record<KpiAccent, { bg: string; color: string }> = {
-  orange: { bg: "rgba(255,106,0,0.10)", color: "#FF6A00" },
+  orange: { bg: "var(--sce-primary-light)", color: "var(--sce-primary)" },
   blue:   { bg: "rgba(59,130,246,0.10)", color: "#3B82F6" },
   green:  { bg: "rgba(16,185,129,0.10)", color: "#10B981" },
   purple: { bg: "rgba(139,92,246,0.10)", color: "#8B5CF6" },
@@ -35,7 +35,7 @@ export function KpiCard({ label, value, subtext, accent = "tenant", icon }: KpiC
           <p className="text-[0.72rem] font-medium uppercase tracking-[0.10em] text-[var(--muted)]">
             {label}
           </p>
-          <p className="mt-2 text-[1.9rem] font-bold leading-none tracking-tight text-[#111827]">
+          <p className="mt-2 text-[1.9rem] font-bold leading-none tracking-tight text-[var(--foreground)]">
             {value}
           </p>
           {subtext && (

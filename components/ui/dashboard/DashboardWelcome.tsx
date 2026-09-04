@@ -17,7 +17,7 @@ export type DashboardWelcomeProps = {
  *
  * Usage:
  *   <DashboardWelcome
- *     greeting="Guten Morgen, Michael 👋"
+ *     greeting="Guten Morgen, Michael"
  *     subtitle="Schön, dich wiederzusehen."
  *   />
  */
@@ -28,7 +28,7 @@ export function DashboardWelcome({
 }: DashboardWelcomeProps) {
   return (
     <div className={cn("flex flex-col gap-1", className)}>
-      <h1 className="text-[1.5rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
+      <h1 className="text-[1.625rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
         {greeting}
       </h1>
       {subtitle && (

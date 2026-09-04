@@ -227,7 +227,7 @@ export default function RegistrationInboxCard({
         "focus-visible:ring-2 focus-visible:ring-[var(--tenant-primary)] focus-visible:ring-inset",
         isSelected
           ? "bg-[color-mix(in_srgb,var(--tenant-primary)_7%,white)] border-l-[3px] border-l-[var(--tenant-primary)] pl-[13px]"
-          : "bg-white hover:bg-[var(--surface-2)]",
+          : "bg-[var(--card)] hover:bg-[var(--surface-2)]",
       )}
     >
       <div className="flex items-start gap-3">
@@ -347,11 +347,11 @@ export default function RegistrationInboxCard({
               href={`mailto:${registration.email}`}
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => e.stopPropagation()}
-              className="inline-flex items-center h-6 px-2.5 rounded-md border border-[var(--border)] bg-white text-[0.7rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] transition-colors"
+              className="inline-flex items-center h-6 px-2.5 rounded-md border border-[var(--border)] bg-[var(--surface)] text-[0.7rem] font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)] transition-colors"
             >
               Kontaktieren
             </a>
-            <span className="inline-flex items-center h-6 px-2.5 rounded-md border border-[var(--border)] bg-white text-[0.7rem] font-medium text-[var(--text-2)]">
+            <span className="inline-flex items-center h-6 px-2.5 rounded-md border border-[var(--border)] bg-[var(--surface)] text-[0.7rem] font-medium text-[var(--text-2)]">
               Öffnen →
             </span>
           </div>

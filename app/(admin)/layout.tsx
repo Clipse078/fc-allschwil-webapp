@@ -55,10 +55,6 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       {/* Fixed sidebar */}
       <Suspense fallback={null}>
         <AdminSidebar
-          firstName={shellIdentity.firstName}
-          lastName={shellIdentity.lastName}
-          email={session.user.email}
-          imageUrl={shellImageUrl}
           permissionKeys={session.user.permissionKeys}
           clubName={ctx?.name}
           logoUrl={ctx?.logoUrl}
@@ -72,14 +68,14 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
 
         {/* Impersonation banner */}
         {session.user.isImpersonating ? (
-          <div className="border-b border-amber-200 bg-amber-50/95 backdrop-blur-sm">
+          <div className="border-b border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] backdrop-blur-sm">
             <div className="px-5 py-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sce-warning)]">
                     Impersonation aktiv
                   </p>
-                  <p className="mt-0.5 text-xs text-amber-800">
+                  <p className="mt-0.5 text-xs text-[var(--text-2)]">
                     Eingeloggt als anderer Benutzer —{" "}
                     Admin: {session.user.actorName ?? session.user.actorEmail ?? "Unbekannt"}
                   </p>
@@ -94,11 +90,12 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
         <AppTopNav
           firstName={shellIdentity.firstName}
           lastName={shellIdentity.lastName}
+          email={session.user.email}
           imageUrl={shellImageUrl}
         />
 
         {/* Page content */}
-        <main className="flex-1 px-6 py-6 lg:px-8 lg:py-7">
+        <main className="flex-1 px-5 py-6 lg:px-7 lg:py-7">
           {children}
         </main>
       </div>

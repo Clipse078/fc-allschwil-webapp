@@ -121,7 +121,7 @@ export function Sheet({ open, onClose, title, description, children, footer }: S
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/65 backdrop-blur-[3px]"
         aria-hidden="true"
       />
 

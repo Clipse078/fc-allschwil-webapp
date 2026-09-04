@@ -268,7 +268,7 @@ export default function RegistrationDetailCard({
   return (
     <div className="space-y-5">
       {/* ── Page header ────────────────────────────────────────────────────── */}
-      <div className="rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+      <div className="rounded-[var(--radius-2xl)] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-sm)]">
         <div className="flex items-start gap-4 px-6 py-5">
           {/* Avatar */}
           <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border-2 bg-gradient-to-br from-[color-mix(in_srgb,var(--tenant-primary)_10%,white)] to-[color-mix(in_srgb,var(--tenant-primary)_20%,white)] font-bold uppercase tracking-wide text-[var(--tenant-primary)] border-[color-mix(in_srgb,var(--tenant-primary)_20%,white)]">
@@ -329,7 +329,7 @@ export default function RegistrationDetailCard({
 
           <Link
             href={backHref}
-            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
+            className="inline-flex flex-shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-medium text-[var(--text-2)] hover:bg-[var(--surface-2)]"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             Zurück zur Inbox

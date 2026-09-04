@@ -351,7 +351,7 @@ export default function PersonDirectory({
           description="Passe die Suche oder die Filter an."
         />
       ) : (
-        <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+        <div className="sce-integrated-list">
           {filtered.map((person, idx) => {
             const isLast = idx === filtered.length - 1;
             const activeAssignments = person.assignments.filter(

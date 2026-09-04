@@ -9,12 +9,12 @@ export default function AdminStatusPill({
 }: AdminStatusPillProps) {
   const className =
     tone === "success"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+      ? "border-[var(--sce-success-border)] bg-[var(--sce-success-light)] text-[var(--sce-success)]"
       : tone === "muted"
-        ? "border-slate-200 bg-slate-50 text-slate-500"
+        ? "border-[var(--border)] bg-[var(--surface-2)] text-[var(--muted)]"
         : tone === "warning"
-          ? "border-amber-200 bg-amber-50 text-amber-700"
-          : "border-blue-200 bg-blue-50 text-blue-700";
+          ? "border-[var(--sce-warning-border)] bg-[var(--sce-warning-light)] text-[var(--sce-warning)]"
+          : "border-[var(--sce-info-border)] bg-[var(--sce-info-light)] text-[var(--sce-info)]";
 
   return (
     <span

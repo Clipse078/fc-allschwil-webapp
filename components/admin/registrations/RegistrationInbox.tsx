@@ -164,7 +164,7 @@ function CompactFilterSelect<T extends string>({
           "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
           active || value
             ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
-            : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
         )}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -568,7 +568,7 @@ export default function RegistrationInbox({
                 "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors",
                 toggleFilters.size > 0 || ageGroupFilter || recommendedTeamFilter
                   ? "border-[var(--tenant-primary)] bg-[var(--tenant-primary)]/10 text-[var(--tenant-primary)]"
-                  : "border-[var(--border)] bg-white text-[var(--text-2)] hover:bg-[var(--surface-2)]",
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-2)] hover:bg-[var(--surface-2)]",
               )}
               aria-expanded={moreFiltersOpen}
               aria-label="Weitere Filter"
@@ -651,7 +651,7 @@ export default function RegistrationInbox({
             <button
               type="button"
               onClick={clearFilters}
-              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] bg-white px-2.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
+              className="inline-flex h-8 items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 text-xs text-[var(--muted)] hover:text-[var(--foreground)]"
             >
               <X className="h-3 w-3" aria-hidden />
               Zurücksetzen
@@ -671,7 +671,7 @@ export default function RegistrationInbox({
         ) : null}
       </div>
 
-      <div className="overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border)] bg-white shadow-[var(--shadow-sm)]">
+      <div className="sce-integrated-list">
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
             <Filter className="h-8 w-8 text-[var(--muted)]" aria-hidden />
