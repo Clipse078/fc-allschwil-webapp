@@ -9,20 +9,23 @@
  */
 
 import { render, screen, act } from "@testing-library/react";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from "vitest";
 import { InboardRoutePreview } from "../InboardRoutePreview";
 
 describe("InboardRoutePreview", () => {
-  let observeMock: ReturnType<typeof vi.fn>;
-  let disconnectMock: ReturnType<typeof vi.fn>;
+  let observeMock: Mock<(target: Element) => void>;
+  let unobserveMock: Mock<(target: Element) => void>;
+  let disconnectMock: Mock<() => void>;
   let intersectionCallback: IntersectionObserverCallback | null = null;
 
-  let resizeObserveMock: ReturnType<typeof vi.fn>;
-  let resizeDisconnectMock: ReturnType<typeof vi.fn>;
+  let resizeObserveMock: Mock<(target: Element, options?: ResizeObserverOptions) => void>;
+  let resizeUnobserveMock: Mock<(target: Element) => void>;
+  let resizeDisconnectMock: Mock<() => void>;
   let resizeCallback: ResizeObserverCallback | null = null;
 
   beforeEach(() => {
     disconnectMock = vi.fn();
+    unobserveMock = vi.fn();
     observeMock = vi.fn();
 
     class MockIntersectionObserver implements IntersectionObserver {
@@ -34,13 +37,25 @@ describe("InboardRoutePreview", () => {
         intersectionCallback = callback;
       }
 
-      observe = observeMock;
-      unobserve = vi.fn();
-      disconnect = disconnectMock;
-      takeRecords = vi.fn().mockReturnValue([]);
+      observe(target: Element): void {
+        observeMock(target);
+      }
+
+      unobserve(target: Element): void {
+        unobserveMock(target);
+      }
+
+      disconnect(): void {
+        disconnectMock();
+      }
+
+      takeRecords(): IntersectionObserverEntry[] {
+        return [];
+      }
     }
 
     resizeDisconnectMock = vi.fn();
+    resizeUnobserveMock = vi.fn();
     resizeObserveMock = vi.fn();
 
     class MockResizeObserver implements ResizeObserver {
@@ -48,10 +63,17 @@ describe("InboardRoutePreview", () => {
         resizeCallback = callback;
       }
 
-      observe = resizeObserveMock;
-      unobserve = vi.fn();
-      disconnect = resizeDisconnectMock;
-      takeRecords = vi.fn().mockReturnValue([]);
+      observe(target: Element, options?: ResizeObserverOptions): void {
+        resizeObserveMock(target, options);
+      }
+
+      unobserve(target: Element): void {
+        resizeUnobserveMock(target);
+      }
+
+      disconnect(): void {
+        resizeDisconnectMock();
+      }
     }
 
     vi.stubGlobal("IntersectionObserver", MockIntersectionObserver);
