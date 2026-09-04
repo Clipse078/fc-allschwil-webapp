@@ -21,6 +21,7 @@ import {
   type PermissionUnit,
   type StandardControl,
 } from "@/lib/roles/nav-permission-presentation";
+import { AnimatedNavIcon } from "@/components/ui/motion/AnimatedNavIcon";
 import { SwitchThumb } from "@/components/ui/SwitchToggle";
 import { cn } from "@/lib/cn";
 
@@ -49,7 +50,7 @@ const SECTION_META: Record<
     icon: Building2,
   },
   Website: {
-    description: "Öffentliche Inhalte, News und Website-Verwaltung.",
+    description: "Inhalte, News und Website-Verwaltung.",
     icon: Globe2,
   },
   Betrieb: {
@@ -94,6 +95,32 @@ function sectionSelectionCount(
   );
 }
 
+function PermissionUnitIcon({
+  unit,
+  active,
+}: {
+  unit: PermissionUnit;
+  active: boolean;
+}) {
+  return (
+    <span
+      className={cn(
+        "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+        active
+          ? "bg-[var(--sce-primary)]/10 text-[var(--sce-primary)]"
+          : "bg-[var(--surface-2)] text-[var(--text-2)]",
+      )}
+    >
+      <AnimatedNavIcon
+        label={unit.iconLabel}
+        variant="child"
+        active={active}
+        className="pointer-events-none"
+      />
+    </span>
+  );
+}
+
 function InlineControl({
   unit,
   control,
@@ -111,7 +138,7 @@ function InlineControl({
 }) {
   if (!control) {
     return (
-      <span className="flex h-8 items-center justify-center text-xs text-[var(--muted)]">
+      <span className="flex h-8 items-center justify-center text-sm text-[var(--muted)]/60">
         —
       </span>
     );
@@ -156,18 +183,16 @@ function AdvancedPermissions({
   ).length;
 
   return (
-    <details className="group">
-      <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-[var(--text-2)] transition-colors hover:text-[var(--foreground)]">
-        <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" />
+    <details className="group mt-2">
+      <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[0.7rem] font-medium text-[var(--muted)] transition-colors hover:text-[var(--text-2)]">
+        <ChevronRight className="h-3 w-3 transition-transform group-open:rotate-90" />
         Erweiterte Rechte
         {selectedCount > 0 ? (
-          <span className="rounded-full bg-[var(--sce-primary)]/10 px-1.5 py-0.5 text-[0.65rem] font-semibold text-[var(--sce-primary)]">
-            {selectedCount}
-          </span>
+          <span className="text-[var(--sce-primary)]">({selectedCount})</span>
         ) : null}
       </summary>
 
-      <div className="mt-3 space-y-2 border-l border-[var(--border)] pl-4">
+      <div className="mt-2 space-y-1 border-l border-[var(--border)] pl-3">
         {unit.advancedPermissions.map((advanced) => {
           const id = `advanced-${unit.id}-${advanced.key}`;
           const checked = selectedKeys.has(advanced.key);
@@ -177,30 +202,30 @@ function AdvancedPermissions({
             <div
               key={advanced.key}
               className={cn(
-                "flex items-start justify-between gap-4 rounded-lg px-3 py-2.5",
-                advanced.dangerous && checked
-                  ? "bg-amber-500/5"
-                  : "bg-[var(--surface-2)]/45",
+                "flex items-center justify-between gap-3 py-1.5",
                 disabled || locked ? "opacity-50" : "",
               )}
             >
               <div className="min-w-0">
                 <label
                   htmlFor={id}
-                  className="flex cursor-pointer flex-wrap items-center gap-2 text-xs font-semibold text-[var(--foreground)]"
+                  className={cn(
+                    "flex cursor-pointer items-center gap-1.5 text-xs font-medium",
+                    advanced.dangerous && checked
+                      ? "text-amber-800"
+                      : "text-[var(--foreground)]",
+                  )}
                 >
                   {advanced.label}
                   {advanced.dangerous ? (
-                    <span className="inline-flex items-center gap-1 text-[0.62rem] font-semibold text-amber-700">
-                      <AlertTriangle className="h-3 w-3" />
-                      Kritisch
-                    </span>
+                    <AlertTriangle className="h-3 w-3 shrink-0 text-amber-600" aria-hidden="true" />
                   ) : null}
                 </label>
-
-                <p className="mt-0.5 max-w-xl text-xs leading-relaxed text-[var(--muted)]">
-                  {advanced.description}
-                </p>
+                {advanced.description ? (
+                  <p className="mt-0.5 text-[0.68rem] leading-snug text-[var(--muted)]">
+                    {advanced.description}
+                  </p>
+                ) : null}
               </div>
 
               <SwitchThumb
@@ -232,12 +257,14 @@ function PermissionUnitRow({
   lockedKeys,
   disabled,
   onChange,
+  hideLabel = false,
 }: {
   unit: PermissionUnit;
   selectedKeys: Set<string>;
   lockedKeys: Set<string>;
   disabled: boolean;
   onChange: (next: Set<string>) => void;
+  hideLabel?: boolean;
 }) {
   const viewControl = unit.standardControls.find(
     (control) => control.kind === "view",
@@ -253,56 +280,52 @@ function PermissionUnitRow({
   return (
     <div
       className={cn(
-        "border-t border-[var(--border)] px-4 py-3.5 first:border-t-0 sm:px-5",
-        selectedCount > 0 ? "bg-[var(--sce-primary)]/[0.025]" : "",
+        "grid items-center gap-x-3 gap-y-2 border-b border-[var(--border)] px-4 py-3 last:border-b-0 sm:grid-cols-[2rem_minmax(0,1fr)_5rem_5rem] sm:px-5",
+        selectedCount > 0 ? "bg-[var(--sce-primary)]/[0.02]" : "",
       )}
     >
-      <div className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem]">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-[var(--foreground)]">
-              {unit.label}
-            </p>
+      <div className="hidden sm:block">
+        <PermissionUnitIcon unit={unit} active={selectedCount > 0} />
+      </div>
 
-            {selectedCount > 0 ? (
-              <span className="rounded-full bg-[var(--sce-primary)]/10 px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--sce-primary)]">
-                Aktiv
-              </span>
+      <div className="min-w-0 sm:col-start-2">
+        <div className="flex items-start gap-2.5 sm:gap-0">
+          <span className="sm:hidden">
+            <PermissionUnitIcon unit={unit} active={selectedCount > 0} />
+          </span>
+
+          <div className="min-w-0">
+            {!hideLabel ? (
+              <p className="text-sm font-medium text-[var(--foreground)]">
+                {unit.label}
+              </p>
             ) : null}
-          </div>
 
-          {unit.childLabels && unit.childLabels.length > 0 ? (
-            <p className="mt-0.5 text-xs text-[var(--text-2)]">
-              {unit.childLabels.join(" · ")}
-            </p>
-          ) : unit.parentLabel ? (
-            <p className="mt-0.5 text-xs text-[var(--muted)]">
-              {unit.parentLabel}
-            </p>
-          ) : null}
+            {unit.description && !hideLabel ? (
+              <p className="mt-0.5 text-xs leading-snug text-[var(--muted)]">
+                {unit.description}
+              </p>
+            ) : hideLabel && unit.description ? (
+              <p className="text-xs leading-snug text-[var(--muted)]">
+                {unit.description}
+              </p>
+            ) : null}
 
-          {unit.sharedNote ? (
-            <p className="mt-1 text-xs leading-relaxed text-[var(--muted)]">
-              {unit.sharedNote}
-            </p>
-          ) : null}
+            {unit.isDerived ? (
+              <p
+                className={cn(
+                  "mt-1 text-xs",
+                  derivedAvailable
+                    ? "font-medium text-emerald-700"
+                    : "text-[var(--muted)]",
+                )}
+              >
+                {derivedAvailable ? "Automatisch verfügbar" : "Noch nicht verfügbar"}
+                {unit.derivedNote ? ` — ${unit.derivedNote}` : ""}
+              </p>
+            ) : null}
 
-          {unit.isDerived ? (
-            <p
-              className={cn(
-                "mt-2 text-xs",
-                derivedAvailable
-                  ? "font-medium text-emerald-700"
-                  : "text-[var(--muted)]",
-              )}
-            >
-              {derivedAvailable ? "Automatisch verfügbar" : "Noch nicht verfügbar"}
-              {unit.derivedNote ? ` · ${unit.derivedNote}` : ""}
-            </p>
-          ) : null}
-
-          {!unit.isDerived && unit.advancedPermissions.length > 0 ? (
-            <div className="mt-2.5">
+            {!unit.isDerived && unit.advancedPermissions.length > 0 ? (
               <AdvancedPermissions
                 unit={unit}
                 selectedKeys={selectedKeys}
@@ -310,13 +333,38 @@ function PermissionUnitRow({
                 disabled={disabled}
                 onChange={onChange}
               />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
+      </div>
 
-        {!unit.isDerived ? (
-          <>
-            <div className="hidden sm:block">
+      {!unit.isDerived ? (
+        <>
+          <div className="hidden sm:block">
+            <InlineControl
+              unit={unit}
+              control={viewControl}
+              selectedKeys={selectedKeys}
+              lockedKeys={lockedKeys}
+              disabled={disabled}
+              onChange={onChange}
+            />
+          </div>
+
+          <div className="hidden sm:block">
+            <InlineControl
+              unit={unit}
+              control={manageControl}
+              selectedKeys={selectedKeys}
+              lockedKeys={lockedKeys}
+              disabled={disabled}
+              onChange={onChange}
+            />
+          </div>
+
+          <div className="col-span-full space-y-1.5 sm:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[var(--text-2)]">Ansehen</span>
               <InlineControl
                 unit={unit}
                 control={viewControl}
@@ -326,8 +374,8 @@ function PermissionUnitRow({
                 onChange={onChange}
               />
             </div>
-
-            <div className="hidden sm:block">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-[var(--text-2)]">Verwalten</span>
               <InlineControl
                 unit={unit}
                 control={manageControl}
@@ -337,39 +385,9 @@ function PermissionUnitRow({
                 onChange={onChange}
               />
             </div>
-
-            <div className="space-y-2 sm:hidden">
-              <div className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-3 py-2">
-                <span className="text-xs font-medium text-[var(--foreground)]">
-                  Ansehen
-                </span>
-                <InlineControl
-                  unit={unit}
-                  control={viewControl}
-                  selectedKeys={selectedKeys}
-                  lockedKeys={lockedKeys}
-                  disabled={disabled}
-                  onChange={onChange}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-3 py-2">
-                <span className="text-xs font-medium text-[var(--foreground)]">
-                  Verwalten
-                </span>
-                <InlineControl
-                  unit={unit}
-                  control={manageControl}
-                  selectedKeys={selectedKeys}
-                  lockedKeys={lockedKeys}
-                  disabled={disabled}
-                  onChange={onChange}
-                />
-              </div>
-            </div>
-          </>
-        ) : null}
-      </div>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -400,27 +418,30 @@ function PermissionSection({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-2xl border bg-[var(--surface)] transition-colors",
+        "overflow-hidden rounded-xl border bg-[var(--surface)] transition-colors",
         selectionCount > 0
-          ? "border-[var(--sce-primary)]/35"
+          ? "border-[var(--sce-primary)]/25"
           : "border-[var(--border)]",
       )}
     >
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
-        className="flex w-full items-center gap-4 px-4 py-4 text-left sm:px-5"
+        className={cn(
+          "flex w-full items-center gap-3 px-4 py-3 text-left sm:px-5",
+          selectionCount > 0 ? "bg-[var(--sce-primary)]/[0.03]" : "",
+        )}
         aria-expanded={open}
       >
         <span
           className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
             selectionCount > 0
               ? "bg-[var(--sce-primary)]/10 text-[var(--sce-primary)]"
               : "bg-[var(--surface-2)] text-[var(--text-2)]",
           )}
         >
-          <Icon className="h-5 w-5" />
+          <Icon className="h-4 w-4" />
         </span>
 
         <span className="min-w-0 flex-1">
@@ -430,8 +451,8 @@ function PermissionSection({
             </span>
 
             {selectionCount > 0 ? (
-              <span className="rounded-full bg-[var(--sce-primary)]/10 px-2 py-0.5 text-[0.65rem] font-semibold text-[var(--sce-primary)]">
-                {selectionCount} aktiv
+              <span className="rounded-full bg-[var(--sce-primary)]/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-[var(--sce-primary)]">
+                {selectionCount}
               </span>
             ) : null}
           </span>
@@ -451,14 +472,15 @@ function PermissionSection({
 
       {open ? (
         <div className="border-t border-[var(--border)]">
-          <div className="hidden grid-cols-[minmax(0,1fr)_5.5rem_5.5rem] items-center bg-[var(--surface-2)]/45 px-5 py-2 sm:grid">
-            <span className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <div className="hidden grid-cols-[2rem_minmax(0,1fr)_5rem_5rem] items-center gap-x-3 border-b border-[var(--border)] bg-[var(--surface-2)]/35 px-5 py-2 sm:grid">
+            <span aria-hidden="true" />
+            <span className="text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
               Modul
             </span>
-            <span className="text-center text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span className="text-center text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
               Ansehen
             </span>
-            <span className="text-center text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <span className="text-center text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
               Verwalten
             </span>
           </div>
@@ -476,6 +498,49 @@ function PermissionSection({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function SupplementalPermissions({
+  unit,
+  selectedKeys,
+  lockedKeys,
+  disabled,
+  onChange,
+}: {
+  unit: PermissionUnit;
+  selectedKeys: Set<string>;
+  lockedKeys: Set<string>;
+  disabled: boolean;
+  onChange: (next: Set<string>) => void;
+}) {
+  const selectionCount = countUnitSelections(unit, selectedKeys);
+
+  return (
+    <details className="group rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+      <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-left sm:px-5">
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--muted)] transition-transform group-open:rotate-90" />
+        <span className="text-xs font-medium text-[var(--text-2)]">
+          Weitere Zugriffsrechte
+        </span>
+        {selectionCount > 0 ? (
+          <span className="rounded-full bg-[var(--sce-primary)]/10 px-1.5 py-0.5 text-[0.62rem] font-semibold text-[var(--sce-primary)]">
+            {selectionCount}
+          </span>
+        ) : null}
+      </summary>
+
+      <div className="border-t border-[var(--border)]">
+        <PermissionUnitRow
+          unit={unit}
+          selectedKeys={selectedKeys}
+          lockedKeys={lockedKeys}
+          disabled={disabled}
+          onChange={onChange}
+          hideLabel
+        />
+      </div>
+    </details>
   );
 }
 
@@ -502,28 +567,28 @@ export default function NavAlignedPermissionEditor({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-end justify-between gap-4 px-1 pb-1">
+    <div className="space-y-2.5">
+      <div className="flex items-end justify-between gap-4 px-1 pb-0.5">
         <div>
           <p className="text-sm font-semibold text-[var(--foreground)]">
             Module & Berechtigungen
           </p>
           <p className="mt-0.5 text-xs text-[var(--muted)]">
-            Lege fest, welche Bereiche diese Rolle ansehen oder verwalten darf.
+            Entspricht der SCE-Navigation — Ansehen und Verwalten pro Modul.
           </p>
         </div>
 
         <div className="hidden grid-cols-2 gap-4 text-center sm:grid">
-          <span className="w-[5.5rem] text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <span className="w-[5rem] text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
             Ansehen
           </span>
-          <span className="w-[5.5rem] text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
+          <span className="w-[5rem] text-[0.62rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
             Verwalten
           </span>
         </div>
       </div>
 
-      {presentation.sections.map((section, index) => (
+      {presentation.sections.map((section) => (
         <PermissionSection
           key={section.key}
           section={section}
@@ -531,29 +596,18 @@ export default function NavAlignedPermissionEditor({
           lockedKeys={lockedKeys}
           disabled={disabled}
           onChange={onChange}
-          defaultOpen={index === 0}
+          defaultOpen={section.label === "Organisation"}
         />
       ))}
 
       {presentation.supplementalUnit ? (
-        <section className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-            Weitere Berechtigungen
-          </p>
-          <p className="mt-1 text-xs text-[var(--muted)]">
-            Technische oder noch keinem Navigationsbereich zugeordnete Rechte.
-          </p>
-
-          <div className="mt-3 border-t border-[var(--border)]">
-            <PermissionUnitRow
-              unit={presentation.supplementalUnit}
-              selectedKeys={selectedKeys}
-              lockedKeys={lockedKeys}
-              disabled={disabled}
-              onChange={onChange}
-            />
-          </div>
-        </section>
+        <SupplementalPermissions
+          unit={presentation.supplementalUnit}
+          selectedKeys={selectedKeys}
+          lockedKeys={lockedKeys}
+          disabled={disabled}
+          onChange={onChange}
+        />
       ) : null}
     </div>
   );

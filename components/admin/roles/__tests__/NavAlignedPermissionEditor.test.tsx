@@ -157,12 +157,53 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
 
     expect(betriebToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Spielbetrieb")).toBeTruthy();
-    expect(screen.getAllByText(/MatchCenter/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/TournamentCenter/).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Veranstaltungen/).length).toBeGreaterThan(0);
+    expect(screen.getByText(/MatchCenter · TournamentCenter · Veranstaltungen/)).toBeTruthy();
+  });
+
+  it("expands Organisation by default and keeps other sections collapsed", () => {
+    renderEditor();
+
+    const organisationToggle = screen.getByRole("button", { name: /Organisation/i });
+    const websiteToggle = screen.getByRole("button", { name: /Website/i });
+    const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
+
+    expect(organisationToggle).toHaveAttribute("aria-expanded", "true");
+    expect(websiteToggle).toHaveAttribute("aria-expanded", "false");
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByText("Vereinsstruktur")).toBeTruthy();
+  });
+
+  it("shows concise product labels instead of long technical joins", () => {
+    renderEditor();
+
+    expect(screen.getByText("Vereinsstruktur")).toBeTruthy();
     expect(
-      screen.getAllByText(/Diese Berechtigung gilt gemeinsam/i).length,
-    ).toBeGreaterThan(0);
+      screen.queryByText(/Organisationseinheiten · Zielgruppen · Vereine/),
+    ).toBeNull();
+  });
+
+  it("shows selected count on collapsed sections with active permissions", () => {
+    renderEditor([PERMISSIONS.EVENTS_MANAGE]);
+
+    const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
+    expect(betriebToggle.textContent).toMatch(/2/);
+  });
+
+  it("renders advanced permissions behind Erweiterte Rechte disclosure", () => {
+    renderEditor();
+
+    fireEvent.click(screen.getByRole("button", { name: /Betrieb/i }));
+
+    const advancedDisclosure = screen.getAllByText("Erweiterte Rechte")[0]!;
+    expect(advancedDisclosure.closest("details")).toBeTruthy();
+  });
+
+  it("renders supplemental permissions in a secondary disclosure", () => {
+    renderEditor();
+
+    expect(screen.getAllByText("Weitere Zugriffsrechte").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Weitere Berechtigungen")).toBeNull();
   });
 
   it("create and edit flows share the same toggle-only PermissionMatrixFields wrapper", () => {

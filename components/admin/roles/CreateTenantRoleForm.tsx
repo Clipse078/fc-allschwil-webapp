@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowRight,
-  ChevronRight,
   Loader2,
   Shield,
 } from "lucide-react";
@@ -309,25 +308,9 @@ function AccessSummaryList({ sections, dangerousCount }: AccessSummaryProps) {
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
             {section.label}
           </p>
-          <ul className="mt-2 space-y-1.5">
-            {section.items.map((item, index) => (
-              <li
-                key={`${section.label}-${item.label}-${index}`}
-                className={`flex items-center gap-2 text-sm ${
-                  item.advanced ? "text-amber-800" : "text-[var(--foreground)]"
-                }`}
-              >
-                {item.advanced ? (
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                ) : (
-                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" aria-hidden="true" />
-                )}
-                <span>
-                  {item.label} — {item.access}
-                </span>
-              </li>
-            ))}
-          </ul>
+          <p className="mt-1 text-sm text-[var(--foreground)]">
+            {section.modules.join(" · ")}
+          </p>
         </div>
       ))}
     </div>
@@ -348,6 +331,11 @@ function RolePreviewPanel({
   accessSummary,
 }: RolePreviewPanelProps) {
   const displayName = name.trim() || "Neue Rolle";
+  const sectionCount = accessSummary.length;
+  const permissionCount = accessSummary.reduce(
+    (sum, section) => sum + section.items.length,
+    0,
+  );
 
   return (
     <SectionCard title="Rolle" accent={accessSummary.length > 0}>
@@ -371,28 +359,18 @@ function RolePreviewPanel({
 
         {accessSummary.length > 0 ? (
           <div className="max-h-72 space-y-3 overflow-y-auto border-t border-[var(--border)] pt-3">
+            <p className="text-[0.68rem] font-medium text-[var(--text-2)]">
+              {sectionCount} Bereich{sectionCount === 1 ? "" : "e"} · {permissionCount} Berechtigung
+              {permissionCount === 1 ? "" : "en"}
+            </p>
             {accessSummary.map((section) => (
               <div key={section.label}>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
                   {section.label}
                 </p>
-                <ul className="mt-1 space-y-0.5">
-                  {section.items.slice(0, 5).map((item, index) => (
-                    <li
-                      key={`${section.label}-${item.label}-${index}`}
-                      className={`truncate text-xs ${
-                        item.advanced ? "text-amber-700" : "text-[var(--text-2)]"
-                      }`}
-                    >
-                      {item.label} — {item.access}
-                    </li>
-                  ))}
-                  {section.items.length > 5 ? (
-                    <li className="text-xs text-[var(--muted)]">
-                      +{section.items.length - 5} weitere
-                    </li>
-                  ) : null}
-                </ul>
+                <p className="mt-0.5 text-xs text-[var(--text-2)]">
+                  {section.modules.join(" · ")}
+                </p>
               </div>
             ))}
           </div>

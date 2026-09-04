@@ -75,6 +75,19 @@ describe("nav-permission-presentation", () => {
     expect(betrieb?.units.some((unit) => unit.label === "Wochenplanner" && unit.isDerived)).toBe(
       true,
     );
+
+    const organisation = presentation.sections.find((section) => section.label === "Organisation");
+    expect(organisation?.units.some((unit) => unit.label === "Vereinsstruktur")).toBe(true);
+    expect(
+      organisation?.units.some((unit) =>
+        unit.label.includes("Organisationseinheiten · Zielgruppen"),
+      ),
+    ).toBe(false);
+
+    const website = presentation.sections.find((section) => section.label === "Website");
+    expect(website?.units.some((unit) => unit.label === "Inhalte & Veröffentlichungen")).toBe(
+      true,
+    );
   });
 
   it("groups shared events permissions into a single Spielbetrieb unit", () => {
@@ -90,7 +103,8 @@ describe("nav-permission-presentation", () => {
       PERMISSIONS.EVENTS_VIEW,
       PERMISSIONS.EVENTS_MANAGE,
     ]);
-    expect(spielbetrieb?.sharedNote).toContain("MatchCenter");
+    expect(spielbetrieb?.description).toContain("MatchCenter");
+    expect(spielbetrieb?.iconLabel).toBe("MatchCenter");
   });
 
   it("keeps tournaments.delete as an advanced permission on Spielbetrieb", () => {
@@ -140,6 +154,9 @@ describe("nav-permission-presentation", () => {
     expect(serialized).not.toContain("events.manage");
     expect(serialized).not.toContain("trainings.view");
     expect(summary.some((section) => section.label === "Betrieb")).toBe(true);
+    expect(
+      summary.find((section) => section.label === "Betrieb")?.modules,
+    ).toEqual(expect.arrayContaining(["TrainingCenter", "Spielbetrieb"]));
     expect(
       summary
         .flatMap((section) => section.items)
@@ -220,5 +237,29 @@ describe("nav-permission-presentation", () => {
     const next = toggleStandardControl(new Set(), control, true);
     expect(next.has(PERMISSIONS.EVENTS_VIEW)).toBe(true);
     expect(next.has(PERMISSIONS.EVENTS_MANAGE)).toBe(true);
+  });
+
+  it("assigns icon labels and concise descriptions to permission units", () => {
+    const presentation = buildNavPermissionPresentation(buildCatalog(TENANT_CATALOG_KEYS));
+    const vereinsstruktur = presentation.sections
+      .find((section) => section.label === "Organisation")
+      ?.units.find((unit) => unit.label === "Vereinsstruktur");
+
+    expect(vereinsstruktur?.iconLabel).toBe("Organisationseinheiten");
+    expect(vereinsstruktur?.description).toContain("Zielgruppen");
+
+    const anmeldungen = presentation.sections
+      .find((section) => section.label === "Betrieb")
+      ?.units.find((unit) => unit.label === "Anmeldungen");
+
+    expect(anmeldungen?.iconLabel).toBe("Anmeldungen");
+  });
+
+  it("renames supplemental fallback to Weitere Zugriffsrechte", () => {
+    const presentation = buildNavPermissionPresentation(
+      buildCatalog([...TENANT_CATALOG_KEYS, PERMISSIONS.FUNCTIONS_MANAGE]),
+    );
+
+    expect(presentation.supplementalUnit?.label).toBe("Weitere Zugriffsrechte");
   });
 });

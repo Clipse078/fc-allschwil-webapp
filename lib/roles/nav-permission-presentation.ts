@@ -38,6 +38,10 @@ export type AdvancedPermission = {
 export type PermissionUnit = {
   id: string;
   label: string;
+  /** Concise supporting copy — one line only when it adds meaning. */
+  description?: string;
+  /** Sidebar nav label used to resolve the SCE module icon. */
+  iconLabel: string;
   childLabels?: string[];
   parentLabel?: string;
   sharedNote?: string;
@@ -67,12 +71,141 @@ export type NavPermissionSummaryItem = {
 
 export type NavPermissionSummarySection = {
   label: string;
+  /** Concise module names for role preview, e.g. "Teams · Personen". */
+  modules: string[];
   items: NavPermissionSummaryItem[];
 };
 
 const SPIELBETRIEB_CHILD_KEYS = new Set(["matchcenter", "tournamentcenter", "veranstaltungen"]);
 const WOCHENPLANNER_KEY = "wochenplanner";
 const TRAININGCENTER_KEY = "trainingcenter";
+
+type UnitPresentation = {
+  label: string;
+  description?: string;
+  iconLabel: string;
+};
+
+/** Product-language labels and icons for nav-aligned permission units. */
+const UNIT_DESCRIPTION_BY_NAV_KEY: Record<string, string> = {
+  teams: "Mannschaften und Kader",
+  "provider-mapping": "Externe Anbieter und Team-Zuordnungen",
+  personen: "Personenstammdaten",
+  competitions: "Ligen und Wettbewerbe",
+  trainingcenter: "Trainingsplanung und Serien",
+  wochenplanner: "Aggregierter Wochenüberblick",
+  workspace: "Dokumente und Vereinsarbeitsbereich",
+  sponsoring: "Sponsoring und Partnerschaften",
+  "admin-tenant-roles": "Rollen und Berechtigungen im Verein",
+  "admin-seasons": "Saisons und Planungsperioden",
+  "admin-facilities": "Anlagen, Plätze und Ressourcen",
+  "admin-people-access": "Benutzer, Einladungen und Zugänge",
+  "admin-tenants": "Mandantenverwaltung (Plattform)",
+  "admin-integrations": "Externe Systemanbindungen",
+};
+
+function presentationForNavChild(child: NavItemChild): UnitPresentation {
+  const description = UNIT_DESCRIPTION_BY_NAV_KEY[child.key];
+  if (child.key === "competitions") {
+    return { label: "Wettbewerbe", description, iconLabel: "Wettkämpfe" };
+  }
+  if (child.key === "communication-email-sender") {
+    return {
+      label: "Kommunikation",
+      description: "E-Mail-Absender und Vereinskommunikation",
+      iconLabel: "Kommunikation",
+    };
+  }
+  return {
+    label: child.label,
+    description,
+    iconLabel: child.label,
+  };
+}
+
+function presentationForChildGroup(children: NavItemChild[]): UnitPresentation {
+  const keys = new Set(children.map((child) => child.key));
+
+  if (keys.has("org-units") && keys.has("target-groups") && keys.has("vereine")) {
+    return {
+      label: "Vereinsstruktur",
+      description: "Organisationseinheiten, Zielgruppen und Vereinsstruktur",
+      iconLabel: "Organisationseinheiten",
+    };
+  }
+
+  if (
+    keys.has("website-overview") &&
+    keys.has("website-news") &&
+    keys.has("website-media") &&
+    keys.has("website-publishing")
+  ) {
+    return {
+      label: "Inhalte & Veröffentlichungen",
+      description: "News, Medien und Veröffentlichungen",
+      iconLabel: "News",
+    };
+  }
+
+  if (
+    keys.has("website-pages") &&
+    keys.has("website-homepage") &&
+    keys.has("website-navigation")
+  ) {
+    return {
+      label: "Website & Seiten",
+      description: "Seiten, Homepage, Navigation und Einstellungen",
+      iconLabel: "Seiten",
+    };
+  }
+
+  if (keys.has("registrierungen") && keys.has("warteliste") && keys.has("archiv")) {
+    return {
+      label: "Anmeldungen",
+      description: "Registrierungen, Warteliste und Archiv",
+      iconLabel: "Anmeldungen",
+    };
+  }
+
+  if (keys.has("infoboard-overview") && keys.has("infoboard-preview")) {
+    return {
+      label: "Infoboard",
+      description: "Übersicht und Vorschau",
+      iconLabel: "Infoboard",
+    };
+  }
+
+  if (keys.has("admin-branding") && keys.has("admin-roles")) {
+    return {
+      label: "Darstellung & Rollen",
+      description: "Club-Darstellung und interne Rollenzuweisung",
+      iconLabel: "Darstellung",
+    };
+  }
+
+  if (children.length === 1) {
+    return presentationForNavChild(children[0]!);
+  }
+
+  const primary = children[0]!;
+  return {
+    label: primary.label,
+    description: children.map((child) => child.label).join(", "),
+    iconLabel: primary.label,
+  };
+}
+
+function presentationForTopLevelItem(item: NavItem): UnitPresentation {
+  const description = UNIT_DESCRIPTION_BY_NAV_KEY[item.key];
+  if (item.key === "workspace") {
+    return { label: "Dokumente", description, iconLabel: "Dokumente" };
+  }
+  return {
+    label: item.label,
+    description,
+    iconLabel: item.label,
+  };
+}
 
 const MANAGE_REQUIRES_VIEW: Record<string, string> = {
   [PERMISSIONS.ORG_MANAGE]: PERMISSIONS.ORG_VIEW,
@@ -206,7 +339,18 @@ function createUnit(
   label: string,
   keys: string[],
   catalog: Map<string, PermissionCatalogRow>,
-  options: Partial<Pick<PermissionUnit, "childLabels" | "parentLabel" | "sharedNote" | "derivedNote" | "isDerived">> = {},
+  options: Partial<
+    Pick<
+      PermissionUnit,
+      | "description"
+      | "iconLabel"
+      | "childLabels"
+      | "parentLabel"
+      | "sharedNote"
+      | "derivedNote"
+      | "isDerived"
+    >
+  > = {},
 ): PermissionUnit | null {
   const grantableKeys = keys.filter((key) => catalog.has(key));
   if (grantableKeys.length === 0 && !options.isDerived) return null;
@@ -220,6 +364,8 @@ function createUnit(
   return {
     id,
     label,
+    description: options.description,
+    iconLabel: options.iconLabel ?? label,
     childLabels: options.childLabels,
     parentLabel: options.parentLabel,
     sharedNote: options.sharedNote,
@@ -243,12 +389,17 @@ function groupChildrenUnits(
 
   const trainingChild = children.find((c) => c.key === TRAININGCENTER_KEY);
   if (trainingChild) {
+    const presentation = presentationForNavChild(trainingChild);
     const unit = createUnit(
       `${parentItem.key}-${trainingChild.key}`,
-      trainingChild.label,
+      presentation.label,
       filterGrantableKeys(trainingChild.permissionKeys, catalog),
       catalog,
-      { parentLabel: parentItem.label },
+      {
+        description: presentation.description,
+        iconLabel: presentation.iconLabel,
+        parentLabel: parentItem.label,
+      },
     );
     if (unit) units.push(unit);
   }
@@ -266,10 +417,10 @@ function groupChildrenUnits(
       Array.from(keys),
       catalog,
       {
+        description: "MatchCenter · TournamentCenter · Veranstaltungen",
+        iconLabel: "MatchCenter",
         parentLabel: parentItem.label,
         childLabels: spielbetriebChildren.map((c) => c.label),
-        sharedNote:
-          "Diese Berechtigung gilt gemeinsam für MatchCenter, TournamentCenter und Veranstaltungen.",
       },
     );
     if (unit) units.push(unit);
@@ -277,13 +428,16 @@ function groupChildrenUnits(
 
   const wochenplannerChild = children.find((c) => c.key === WOCHENPLANNER_KEY);
   if (wochenplannerChild) {
+    const presentation = presentationForNavChild(wochenplannerChild);
     units.push({
       id: `${parentItem.key}-${WOCHENPLANNER_KEY}`,
-      label: wochenplannerChild.label,
+      label: presentation.label,
+      description: presentation.description,
+      iconLabel: presentation.iconLabel,
       parentLabel: parentItem.label,
       isDerived: true,
       derivedNote:
-        "Der Wochenplanner ist verfügbar, wenn Zugriff auf TrainingCenter oder Spielbetrieb besteht.",
+        "Verfügbar bei Zugriff auf TrainingCenter oder Spielbetrieb.",
       standardControls: [],
       advancedPermissions: [],
     });
@@ -301,22 +455,20 @@ function groupChildrenUnits(
   }
 
   for (const [signature, group] of signatureGroups) {
-    const label =
-      group.children.length === 1
-        ? group.children[0]!.label
-        : group.children.map((c) => c.label).join(" · ");
+    const presentation = presentationForChildGroup(group.children);
 
     const unit = createUnit(
       `${parentItem.key}-${signature}`,
-      label,
+      presentation.label,
       group.keys,
       catalog,
       {
+        description: presentation.description,
+        iconLabel: presentation.iconLabel,
         parentLabel: parentItem.label,
-        childLabels: group.children.length > 1 ? group.children.map((c) => c.label) : undefined,
-        sharedNote:
-          group.children.length > 1
-            ? "Diese Berechtigung gilt gemeinsam für die aufgeführten Bereiche."
+        childLabels:
+          group.children.length > 1 && presentation.label === group.children.map((c) => c.label).join(" · ")
+            ? group.children.map((c) => c.label)
             : undefined,
       },
     );
@@ -336,7 +488,11 @@ function processNavItem(
   }
 
   const keys = filterGrantableKeys(item.permissionKeys, catalog);
-  const unit = createUnit(item.key, item.label, keys, catalog);
+  const presentation = presentationForTopLevelItem(item);
+  const unit = createUnit(item.key, presentation.label, keys, catalog, {
+    description: presentation.description,
+    iconLabel: presentation.iconLabel,
+  });
   return unit ? [unit] : [];
 }
 
@@ -440,7 +596,10 @@ export function buildNavPermissionPresentation(
 
   const supplementalUnit =
     supplementalKeys.length > 0
-      ? createUnit("supplemental", "Weitere Berechtigungen", supplementalKeys, catalog)
+      ? createUnit("supplemental", "Weitere Zugriffsrechte", supplementalKeys, catalog, {
+          description: "Technische Rechte ohne direkten Navigationsbezug",
+          iconLabel: "Administration",
+        })
       : null;
 
   return { sections, supplementalUnit };
@@ -552,18 +711,30 @@ export function buildNavPermissionSummary(
 
   for (const section of presentation.sections) {
     const items: NavPermissionSummaryItem[] = [];
+    const modules: string[] = [];
+
     for (const unit of section.units) {
-      items.push(...describeUnitAccess(unit, selectedKeys));
+      const unitItems = describeUnitAccess(unit, selectedKeys);
+      items.push(...unitItems);
+
+      if (unitItems.length > 0 && !modules.includes(unit.label)) {
+        modules.push(unit.label);
+      }
     }
+
     if (items.length > 0) {
-      summary.push({ label: section.label, items });
+      summary.push({ label: section.label, modules, items });
     }
   }
 
   if (presentation.supplementalUnit) {
     const items = describeUnitAccess(presentation.supplementalUnit, selectedKeys);
     if (items.length > 0) {
-      summary.push({ label: "Weitere Berechtigungen", items });
+      summary.push({
+        label: "Weitere Zugriffsrechte",
+        modules: ["Weitere Zugriffsrechte"],
+        items,
+      });
     }
   }
 
