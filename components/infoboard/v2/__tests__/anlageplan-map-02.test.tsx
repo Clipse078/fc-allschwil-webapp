@@ -22,10 +22,9 @@
  *   - facility markers render
  *   - next activity respects showNextActivity config
  *
- * OVERVIEW MINI PREVIEWS:
- * INFOBOARD-MAP-02-C1 (updated):
- *   - ANLAGENUEBERSICHT board shows AnlageplanConfigPreview (canonical real-config renderer)
- *   - other board type shows InboardMiniPreview
+ * OVERVIEW LIVE PREVIEWS:
+ * INFOBOARD-OVERVIEW-01:
+ *   - InboardCard embeds canonical kiosk routes via InboardRoutePreview iframe
  */
 
 import { render, screen, fireEvent } from "@testing-library/react";

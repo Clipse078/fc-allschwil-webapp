@@ -150,7 +150,7 @@ export function InboardOverview({
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-5 sm:grid-cols-2">
               {filteredBoards.map((board) => (
                 <InboardCard
                   key={board.id}
@@ -160,26 +160,26 @@ export function InboardOverview({
                   onToggleStatus={handleToggleStatus}
                 />
               ))}
-              {/* "Infoboard erstellen" tile — only on "all" filter */}
-              {statusFilter === "all" && (
-                <button
-                  onClick={() => setCreateOpen(true)}
-                  className="group flex flex-col items-center justify-center gap-2 rounded-[var(--radius-xl)] border border-dashed border-[var(--border)] bg-[var(--surface)] p-5 text-center transition-colors hover:border-[var(--sce-primary)] hover:bg-[var(--surface-3)] min-h-[180px]"
-                >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full border border-dashed border-[var(--border)] group-hover:border-[var(--sce-primary)] transition-colors">
-                    <Plus className="h-4 w-4 text-[var(--muted)] group-hover:text-[var(--sce-primary)] transition-colors" />
-                  </div>
-                  <div>
-                    <p className="text-[0.82rem] font-medium text-[var(--text-2)] group-hover:text-[var(--foreground)] transition-colors">
-                      Infoboard erstellen
-                    </p>
-                    <p className="mt-0.5 text-[0.72rem] text-[var(--muted)]">
-                      Neue Anzeige anlegen
-                    </p>
-                  </div>
-                </button>
-              )}
             </div>
+          )}
+          {/* Subordinate create tile — below active board previews */}
+          {statusFilter === "all" && filteredBoards.length > 0 && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="group mt-1 flex w-full max-w-sm items-center gap-3 rounded-[var(--radius-lg)] border border-dashed border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left transition-colors hover:border-[var(--sce-primary)] hover:bg-[var(--surface-3)]"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-[var(--border)] group-hover:border-[var(--sce-primary)] transition-colors">
+                <Plus className="h-3.5 w-3.5 text-[var(--muted)] group-hover:text-[var(--sce-primary)] transition-colors" />
+              </div>
+              <div>
+                <p className="text-[0.8rem] font-medium text-[var(--text-2)] group-hover:text-[var(--foreground)] transition-colors">
+                  Infoboard erstellen
+                </p>
+                <p className="text-[0.7rem] text-[var(--muted)]">
+                  Neue Anzeige anlegen
+                </p>
+              </div>
+            </button>
           )}
         </>
       )}

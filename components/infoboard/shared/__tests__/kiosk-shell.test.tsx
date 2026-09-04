@@ -15,9 +15,8 @@
  *   - InfoboardScreen1 uses KioskShellFooter (kiosk-shell-footer or announcement-bar)
  *   - InfoboardAnlageplan uses KioskShellFooter (same)
  *
- *   OVERVIEW MINI PREVIEWS:
- *   - InboardCard with TAGESUEBERSICHT uses InboardMiniPreview
- *   - InboardCard with ANLAGENUEBERSICHT uses AnlageplanConfigPreview (canonical)
+ *   OVERVIEW LIVE PREVIEWS:
+ *   - InboardCard embeds canonical kiosk routes via InboardRoutePreview iframe
  */
 
 import { render, screen } from "@testing-library/react";
