@@ -239,4 +239,20 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
 
     expect(screen.getByText("Spielbetrieb")).toBeTruthy();
   });
+
+  it("renders Funktionen with a registered module icon (ACCESS-ONBOARDING-03K1)", () => {
+    const groups = buildModuleGroups([...ROLE_EDITOR_CATALOG, PERMISSIONS.FUNCTIONS_MANAGE]);
+
+    expect(() =>
+      render(
+        <NavAlignedPermissionEditor
+          moduleGroups={groups}
+          selectedKeys={new Set()}
+          onChange={vi.fn()}
+        />,
+      ),
+    ).not.toThrow();
+
+    expect(screen.getByText("Funktionen")).toBeTruthy();
+  });
 });

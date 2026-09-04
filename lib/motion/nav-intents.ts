@@ -9,6 +9,7 @@ const NAV_LABEL_INTENTS: Record<string, MotionIntent> = {
   Organisation: "group",
   Organisationseinheiten: "group",
   Teams: "group",
+  Funktionen: "group",
   Personen: "group",
   Spieler: "group",
   Trainer: "group",
