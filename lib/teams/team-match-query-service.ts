@@ -5,6 +5,7 @@ import {
   getMatchcenterResultLabel,
 } from "@/lib/matchcenter/match-lifecycle";
 import {
+  isSportingMatchInUpcomingList,
   isSportingMatchPastKickoff,
   type SportingMatchLifecycle,
 } from "@/lib/sporting-data/lifecycle";
@@ -577,16 +578,21 @@ function compareDescending(left: TeamSeasonMatchItem, right: TeamSeasonMatchItem
 
 /**
  * Team-page "Nächste Spiele" semantics on top of canonical lifecycle classification.
- * Excludes stale historical non-completed fixtures while preserving LIVE,
- * POSTPONED, and CANCELLED continuity.
+ * Excludes stale historical non-completed fixtures while preserving LIVE and
+ * future-kickoff POSTPONED continuity. CANCELLED fixtures remain in the raw
+ * upcoming bucket for internal continuity but are filtered out by the public mapper.
  */
 function isTeamSeasonUpcomingItem(item: TeamSeasonMatchItem, now: Date): boolean {
-  if (
-    item.lifecycle === "LIVE" ||
-    item.lifecycle === "POSTPONED" ||
-    item.lifecycle === "CANCELLED"
-  ) {
+  if (item.lifecycle === "CANCELLED") {
     return true;
+  }
+
+  if (item.lifecycle === "LIVE" || item.lifecycle === "POSTPONED") {
+    return isSportingMatchInUpcomingList(item.lifecycle, {
+      includePostponed: true,
+      startAt: item.startAt,
+      now,
+    });
   }
 
   if (item.lifecycle === "NEEDS_RECONCILIATION") {

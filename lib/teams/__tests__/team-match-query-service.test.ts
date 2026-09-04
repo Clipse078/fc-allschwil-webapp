@@ -564,6 +564,32 @@ describe("listTeamSeasonMatches", () => {
     expect(result.upcoming[0]?.lifecycle).toBe("POSTPONED");
   });
 
+  it("I2. past POSTPONED without replacement kickoff is excluded from upcoming", async () => {
+    const database = createDatabase({
+      events: [
+        createEvent({
+          id: "past-postponed",
+          status: "POSTPONED",
+          startAt: new Date("2026-08-02T12:00:00.000Z"),
+          matchExternalMapping: createMapping({
+            providerMatchStateName: "verschoben",
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+        }),
+      ],
+    });
+
+    const result = await listTeamSeasonMatches(database, {
+      tenantId: TENANT_ID,
+      teamSeasonId: TEAM_SEASON_ID,
+      now: NOW,
+    });
+
+    expect(result.upcoming).toHaveLength(0);
+    expect(result.completed).toHaveLength(0);
+  });
+
   it("J. CANCELED/CANCELLED does not become a fake result", async () => {
     const database = createDatabase({
       events: [
