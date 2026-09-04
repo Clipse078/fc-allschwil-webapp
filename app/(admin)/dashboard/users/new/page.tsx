@@ -1,10 +1,15 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowLeft, UserPlus } from "lucide-react";
 import UserForm from "@/components/admin/users/UserForm";
 import { requirePermission } from "@/lib/permissions/require-permission";
 
 export default async function NewUserPage() {
-  await requirePermission("users.manage");
+  const session = await requirePermission("users.manage");
+
+  if (session.user?.activeTenantId) {
+    redirect("/dashboard/admin/people-access/new");
+  }
 
   return (
     <div className="space-y-6">

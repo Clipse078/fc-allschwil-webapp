@@ -30,12 +30,14 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { OrgUnitScopeMode } from "@prisma/client";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
   invitePersonToTenant,
   createPersonAndInvite,
   InvitationDomainError,
+  type OnboardPersonOptions,
 } from "@/lib/users/mutations";
 import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
@@ -74,6 +76,41 @@ export async function POST(request: NextRequest) {
 
   const b = body as Record<string, unknown>;
 
+  const sendInvitation = b.sendInvitation !== false;
+  const roleIds = Array.isArray(b.roleIds)
+    ? (b.roleIds.filter((id) => typeof id === "string") as string[])
+    : undefined;
+  const scopedRoles = Array.isArray(b.scopedRoles)
+    ? b.scopedRoles
+        .filter(
+          (item) =>
+            typeof item === "object" &&
+            item !== null &&
+            typeof (item as { roleId?: unknown }).roleId === "string" &&
+            typeof (item as { orgUnitId?: unknown }).orgUnitId === "string",
+        )
+        .map((item) => {
+          const row = item as {
+            roleId: string;
+            orgUnitId: string;
+            scopeMode?: string;
+          };
+          return {
+            roleId: row.roleId,
+            orgUnitId: row.orgUnitId,
+            scopeMode: (row.scopeMode === "THIS_ORG_UNIT_AND_DESCENDANTS"
+              ? "THIS_ORG_UNIT_AND_DESCENDANTS"
+              : "THIS_ORG_UNIT") as OrgUnitScopeMode,
+          };
+        })
+    : undefined;
+
+  const onboardOptions: OnboardPersonOptions = {
+    sendInvitation,
+    roleIds,
+    scopedRoles,
+  };
+
   try {
     let userId: string;
     let recipientEmail: string;
@@ -81,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     if (typeof b.personId === "string" && b.personId.trim()) {
       // Invite existing Person
-      const result = await invitePersonToTenant(tenantId, b.personId.trim(), actorUserId);
+      const result = await invitePersonToTenant(tenantId, b.personId.trim(), actorUserId, onboardOptions);
       userId = result.userId;
       const rawToken = result.rawToken;
 
@@ -96,7 +133,9 @@ export async function POST(request: NextRequest) {
       recipientEmail = user.email;
       recipientFirstName = user.firstName;
 
-      await _sendInvitationEmail(tenantId, recipientEmail, recipientFirstName, rawToken);
+      if (rawToken) {
+        await _sendInvitationEmail(tenantId, recipientEmail, recipientFirstName, rawToken);
+      }
     } else if (
       typeof b.firstName === "string" && b.firstName.trim() &&
       typeof b.lastName === "string" && b.lastName.trim() &&
@@ -111,12 +150,15 @@ export async function POST(request: NextRequest) {
           email: b.email.trim(),
         },
         actorUserId,
+        onboardOptions,
       );
       userId = result.userId;
       recipientEmail = b.email.trim();
       recipientFirstName = b.firstName.trim();
 
-      await _sendInvitationEmail(tenantId, recipientEmail, recipientFirstName, result.rawToken);
+      if (result.rawToken) {
+        await _sendInvitationEmail(tenantId, recipientEmail, recipientFirstName, result.rawToken);
+      }
     } else {
       return NextResponse.json(
         {
@@ -127,7 +169,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, userId });
+    return NextResponse.json({ success: true, userId, invitationSent: sendInvitation && Boolean(userId) });
   } catch (error) {
     if (error instanceof InvitationDomainError) {
       return _invitationErrorResponse(error);
@@ -151,8 +193,9 @@ async function _sendInvitationEmail(
   tenantId: string,
   email: string,
   firstName: string,
-  rawToken: string,
+  rawToken: string | undefined,
 ) {
+  if (!rawToken) return;
   const appBaseUrl = (process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
   const inviteUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
 

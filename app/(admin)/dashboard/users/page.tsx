@@ -1,4 +1,5 @@
 ﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 import { UserPlus } from "lucide-react";
 import UsersSearchableList from "@/components/admin/users/UsersSearchableList";
 import RoleManagementCard from "@/components/admin/users/RoleManagementCard";
@@ -9,6 +10,11 @@ import { getPlatformRolesListData, getUsersListData } from "@/lib/users/queries"
 
 export default async function UsersPage() {
   const session = await requirePermission(PERMISSIONS.USERS_MANAGE);
+
+  // Club Admins with an active tenant context use the tenant People & Access flow.
+  if (session.user?.activeTenantId) {
+    redirect("/dashboard/admin/people-access");
+  }
   const currentUserId = session.user.effectiveUserId ?? session.user.id;
   const users = await getUsersListData();
   // RPERM-05-C1: this platform-only card mutates roles through
