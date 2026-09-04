@@ -16,9 +16,10 @@ import WizardStepIndicator from "@/components/admin/teams/registration/WizardSte
 import { SectionCard } from "@/components/ui/page/SectionCard";
 import { SwitchToggle } from "@/components/ui/SwitchToggle";
 import {
-  buildSelectedPermissionSummary,
-  isDangerousPermission,
-} from "@/lib/roles/permission-metadata";
+  buildNavPermissionPresentationFromModuleGroups,
+  buildNavPermissionSummary,
+} from "@/lib/roles/nav-permission-presentation";
+import { isDangerousPermission } from "@/lib/roles/permission-metadata";
 
 type CreateTenantRoleFormProps = {
   moduleGroups: PermissionMatrixModuleGroup[];
@@ -44,12 +45,16 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const permissionSummary = useMemo(
-    () => buildSelectedPermissionSummary(moduleGroups, selectedKeys),
-    [moduleGroups, selectedKeys],
+  const presentation = useMemo(
+    () => buildNavPermissionPresentationFromModuleGroups(moduleGroups),
+    [moduleGroups],
   );
 
-  const selectedCount = selectedKeys.size;
+  const accessSummary = useMemo(
+    () => buildNavPermissionSummary(presentation, selectedKeys),
+    [presentation, selectedKeys],
+  );
+
   const dangerousCount = Array.from(selectedKeys).filter(isDangerousPermission).length;
 
   async function handleSubmit() {
@@ -107,7 +112,7 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
       <div className="grid gap-8 lg:grid-cols-12 lg:items-start">
         <div className="space-y-6 lg:col-span-8">
           {step === 0 && (
-            <SectionCard title="Rollenidentität" description="Grundlegende Angaben zur neuen Rolle.">
+            <SectionCard title="Basisdaten">
               <div className="space-y-4">
                 <div>
                   <label htmlFor="role-name" className="sce-data-label">
@@ -141,8 +146,7 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
 
                 <SwitchToggle
                   id="role-is-active"
-                  label="Rolle ist aktiv"
-                  description="Inaktive Rollen können nicht zugewiesen werden."
+                  label="Aktiv"
                   checked={isActive}
                   onChange={setIsActive}
                 />
@@ -162,7 +166,7 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
           )}
 
           {step === 1 && (
-            <SectionCard>
+            <SectionCard title="Berechtigungen">
               <PermissionMatrixFields
                 moduleGroups={moduleGroups}
                 selectedKeys={selectedKeys}
@@ -193,10 +197,7 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
           )}
 
           {step === 2 && (
-            <SectionCard
-              title="Angaben überprüfen"
-              description="Prüfe die Rollendetails und Berechtigungen vor dem Erstellen."
-            >
+            <SectionCard title="Überprüfen">
               <div className="space-y-6">
                 <dl className="grid gap-4 sm:grid-cols-2">
                   <div>
@@ -211,59 +212,26 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
                       {isActive ? "Aktiv" : "Inaktiv"}
                     </dd>
                   </div>
-                  <div className="sm:col-span-2">
-                    <dt className="text-xs font-medium text-[var(--muted)]">Beschreibung</dt>
-                    <dd className="mt-1 text-sm text-[var(--foreground)]">
-                      {description.trim() || "Keine Beschreibung"}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-medium text-[var(--muted)]">Berechtigungen</dt>
-                    <dd className="mt-1 text-sm font-semibold text-[var(--foreground)]">
-                      {selectedCount} ausgewählt
-                      {dangerousCount > 0 ? (
-                        <span className="ml-2 text-xs font-medium text-amber-700">
-                          ({dangerousCount} kritisch)
-                        </span>
-                      ) : null}
-                    </dd>
-                  </div>
+                  {description.trim() ? (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-medium text-[var(--muted)]">Beschreibung</dt>
+                      <dd className="mt-1 text-sm text-[var(--foreground)]">{description.trim()}</dd>
+                    </div>
+                  ) : null}
                 </dl>
 
-                {permissionSummary.length > 0 ? (
-                  <div className="space-y-4">
-                    {permissionSummary.map((group) => (
-                      <div key={group.module}>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
-                          {group.moduleLabel}
-                        </p>
-                        <ul className="mt-2 space-y-1.5">
-                          {group.items.map((item) => (
-                            <li
-                              key={item.key}
-                              className={`flex items-center gap-2 text-sm ${
-                                item.dangerous
-                                  ? "text-amber-800"
-                                  : "text-[var(--foreground)]"
-                              }`}
-                            >
-                              {item.dangerous ? (
-                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                              ) : (
-                                <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" aria-hidden="true" />
-                              )}
-                              {item.label}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-[var(--muted)]">
-                    Keine Berechtigungen ausgewählt. Die Rolle wird ohne Zugriffsrechte erstellt.
-                  </p>
-                )}
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    Zugriff
+                  </h4>
+                  {accessSummary.length > 0 ? (
+                    <AccessSummaryList sections={accessSummary} dangerousCount={dangerousCount} />
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      Keine Berechtigungen ausgewählt. Die Rolle wird ohne Zugriffsrechte erstellt.
+                    </p>
+                  )}
+                </div>
 
                 {error ? (
                   <div className="flex items-start gap-3 rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3">
@@ -313,13 +281,7 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
               name={name}
               description={description}
               isActive={isActive}
-              selectedCount={selectedCount}
-              permissionSummary={permissionSummary}
-              step={step}
-              onContinue={() => {
-                if (step === 0) goToPermissions();
-                else if (step === 1) setStep(2);
-              }}
+              accessSummary={accessSummary}
             />
           </div>
         </aside>
@@ -328,33 +290,67 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
   );
 }
 
+type AccessSummaryProps = {
+  sections: ReturnType<typeof buildNavPermissionSummary>;
+  dangerousCount: number;
+};
+
+function AccessSummaryList({ sections, dangerousCount }: AccessSummaryProps) {
+  return (
+    <div className="mt-3 space-y-4">
+      {dangerousCount > 0 ? (
+        <p className="text-xs font-medium text-amber-700">
+          {dangerousCount} erweiterte Berechtigung{dangerousCount === 1 ? "" : "en"} mit dauerhaftem
+          Löschen
+        </p>
+      ) : null}
+      {sections.map((section) => (
+        <div key={section.label}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {section.label}
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {section.items.map((item, index) => (
+              <li
+                key={`${section.label}-${item.label}-${index}`}
+                className={`flex items-center gap-2 text-sm ${
+                  item.advanced ? "text-amber-800" : "text-[var(--foreground)]"
+                }`}
+              >
+                {item.advanced ? (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                ) : (
+                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[var(--muted)]" aria-hidden="true" />
+                )}
+                <span>
+                  {item.label} — {item.access}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type RolePreviewPanelProps = {
   name: string;
   description: string;
   isActive: boolean;
-  selectedCount: number;
-  permissionSummary: ReturnType<typeof buildSelectedPermissionSummary>;
-  step: number;
-  onContinue: () => void;
+  accessSummary: ReturnType<typeof buildNavPermissionSummary>;
 };
 
 function RolePreviewPanel({
   name,
   description,
   isActive,
-  selectedCount,
-  permissionSummary,
-  step,
-  onContinue,
+  accessSummary,
 }: RolePreviewPanelProps) {
   const displayName = name.trim() || "Neue Rolle";
 
   return (
-    <SectionCard
-      title="Rolle"
-      description="Vorschau der gewählten Berechtigungen."
-      accent={selectedCount > 0}
-    >
+    <SectionCard title="Rolle" accent={accessSummary.length > 0}>
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--sce-primary)]/10 text-[var(--sce-primary)]">
@@ -364,37 +360,36 @@ function RolePreviewPanel({
             <p className="truncate text-sm font-semibold text-[var(--foreground)]">
               {displayName}
             </p>
-            <p className="mt-0.5 text-xs text-[var(--text-2)] line-clamp-3">
-              {description.trim() || "Noch keine Beschreibung"}
-            </p>
+            {description.trim() ? (
+              <p className="mt-0.5 text-xs text-[var(--text-2)] line-clamp-3">{description.trim()}</p>
+            ) : null}
             <p className="mt-2 text-[0.68rem] font-medium text-[var(--muted)]">
-              {isActive ? "Aktiv" : "Inaktiv"} · {selectedCount} Berechtigung
-              {selectedCount === 1 ? "" : "en"}
+              {isActive ? "Aktiv" : "Inaktiv"}
             </p>
           </div>
         </div>
 
-        {permissionSummary.length > 0 ? (
-          <div className="max-h-64 space-y-3 overflow-y-auto border-t border-[var(--border)] pt-3">
-            {permissionSummary.map((group) => (
-              <div key={group.module}>
+        {accessSummary.length > 0 ? (
+          <div className="max-h-72 space-y-3 overflow-y-auto border-t border-[var(--border)] pt-3">
+            {accessSummary.map((section) => (
+              <div key={section.label}>
                 <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--muted)]">
-                  {group.moduleLabel}
+                  {section.label}
                 </p>
                 <ul className="mt-1 space-y-0.5">
-                  {group.items.slice(0, 4).map((item) => (
+                  {section.items.slice(0, 5).map((item, index) => (
                     <li
-                      key={item.key}
+                      key={`${section.label}-${item.label}-${index}`}
                       className={`truncate text-xs ${
-                        item.dangerous ? "text-amber-700" : "text-[var(--text-2)]"
+                        item.advanced ? "text-amber-700" : "text-[var(--text-2)]"
                       }`}
                     >
-                      {item.label}
+                      {item.label} — {item.access}
                     </li>
                   ))}
-                  {group.items.length > 4 ? (
+                  {section.items.length > 5 ? (
                     <li className="text-xs text-[var(--muted)]">
-                      +{group.items.length - 4} weitere
+                      +{section.items.length - 5} weitere
                     </li>
                   ) : null}
                 </ul>
@@ -403,28 +398,9 @@ function RolePreviewPanel({
           </div>
         ) : (
           <p className="border-t border-[var(--border)] pt-3 text-xs text-[var(--muted)]">
-            Noch keine Berechtigungen ausgewählt.
+            Noch kein Zugriff ausgewählt.
           </p>
         )}
-
-        {step < 2 ? (
-          <div className="border-t border-[var(--border)] pt-4">
-            <p className="text-xs font-semibold text-[var(--foreground)]">Nächster Schritt</p>
-            <p className="mt-1 text-xs text-[var(--text-2)]">
-              {step === 0
-                ? "Wähle die passenden Berechtigungen für diese Rolle."
-                : "Überprüfe die Angaben und erstelle die Rolle."}
-            </p>
-            <button
-              type="button"
-              onClick={onContinue}
-              className="fca-button-primary mt-3 w-full"
-            >
-              {step === 0 ? "Weiter zu Berechtigungen" : "Weiter zur Überprüfung"}
-              <ArrowRight className="h-4 w-4" />
-            </button>
-          </div>
-        ) : null}
       </div>
     </SectionCard>
   );
