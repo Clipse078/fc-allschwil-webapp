@@ -97,9 +97,15 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
   it("uses shared toggles for advanced binary permissions", () => {
     renderEditor();
 
+    const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(betriebToggle);
+
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Spielbetrieb")).toBeTruthy();
 
-    const advancedSections = screen.getAllByText("Erweiterte Berechtigungen");
+    const advancedSections = screen.getAllByText(/Erweiterte (Berechtigungen|Rechte)/);
     fireEvent.click(advancedSections[0]!);
 
     const switches = document.querySelectorAll('[role="switch"]');
@@ -139,19 +145,27 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
     expect(nextKeys.has(PERMISSIONS.TEAMS_MANAGE)).toBe(false);
   });
 
-  it("preserves Spielbetrieb shared events permission grouping", () => {
+  it("preserves Spielbetrieb shared events permission grouping inside Betrieb", () => {
     renderEditor();
 
+    expect(screen.queryByText("Spielbetrieb")).toBeNull();
+
+    const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(betriebToggle);
+
+    expect(betriebToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Spielbetrieb")).toBeTruthy();
+    expect(screen.getAllByText(/MatchCenter/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/TournamentCenter/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Veranstaltungen/).length).toBeGreaterThan(0);
     expect(
-      screen.getByText(
-        "Diese Berechtigung gilt gemeinsam für MatchCenter, TournamentCenter und Veranstaltungen.",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByText(/MatchCenter · TournamentCenter · Veranstaltungen/)).toBeTruthy();
+      screen.getAllByText(/Diese Berechtigung gilt gemeinsam/i).length,
+    ).toBeGreaterThan(0);
   });
 
-  it("create and edit flows share the same PermissionMatrixFields wrapper", () => {
+  it("create and edit flows share the same toggle-only PermissionMatrixFields wrapper", () => {
     const onChange = vi.fn();
     render(
       <PermissionMatrixFields
@@ -162,7 +176,11 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
     );
 
     expect(document.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    expect(screen.getByText("Spielbetrieb")).toBeTruthy();
     expect(document.querySelectorAll('[role="switch"]').length).toBeGreaterThan(0);
+
+    const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
+    fireEvent.click(betriebToggle);
+
+    expect(screen.getByText("Spielbetrieb")).toBeTruthy();
   });
 });
