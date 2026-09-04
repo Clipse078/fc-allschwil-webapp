@@ -46,6 +46,10 @@ import {
   TournamentInvalidTransitionError,
 } from "./errors";
 import { resolveTournamentTeamSeasonId } from "./team-season-resolution";
+import {
+  loadTournamentLogoResolutionContext,
+  type TournamentLogoResolutionContext,
+} from "./logo-resolution-context";
 import type {
   TournamentDto,
   TournamentParticipantDto,
@@ -71,8 +75,13 @@ function normalizeHomeAway(value: string | null): TournamentHomeAway {
 function toParticipantDto(
   row: TournamentEventRow["tournamentParticipants"][number],
   tenantLogoUrl: string | null,
+  logoResolutionContext: TournamentLogoResolutionContext,
 ): TournamentParticipantDto {
-  const logoUrl = resolveTournamentParticipantLogoUrl(row, tenantLogoUrl);
+  const logoUrl = resolveTournamentParticipantLogoUrl(
+    row,
+    tenantLogoUrl,
+    logoResolutionContext,
+  );
   const dressingRoomAllocations = row.dressingRoomAllocations.map((allocation) => ({
     id: allocation.id,
     facilityResourceId: allocation.facilityResource.id,
@@ -216,6 +225,7 @@ function toDto(
   row: TournamentEventRow,
   tenantContext: TournamentTenantContext,
   organizerClub: ResolvedOrganizerClub | null,
+  logoResolutionContext: TournamentLogoResolutionContext,
 ): TournamentDto {
   if (row.tenantId === null) {
     throw new Error(`Tournament event ${row.id} has no tenantId.`);
@@ -252,7 +262,11 @@ function toDto(
     teamLogoUrl: row.team ? tenantContext.logoUrl?.trim() || null : null,
     homeAway,
     participants: row.tournamentParticipants.map((participant) =>
-      toParticipantDto(participant, tenantContext.logoUrl),
+      toParticipantDto(
+        participant,
+        tenantContext.logoUrl,
+        logoResolutionContext,
+      ),
     ),
     resourceAllocations: row.tournamentResourceAllocations.map(toResourceAllocationDto),
     visibility: {
@@ -326,9 +340,10 @@ export async function listTournaments(
   tenantId: string,
   filter: ListTournamentsFilter = {},
 ): Promise<TournamentDto[]> {
-  const [rows, tenantContext] = await Promise.all([
+  const [rows, tenantContext, logoResolutionContext] = await Promise.all([
     findAllTournamentEvents(tenantId, { status: filter.status }),
     loadTournamentTenantContext(tenantId),
+    loadTournamentLogoResolutionContext(tenantId),
   ]);
 
   const organizerClubs = await resolveOrganizerClubsByName(
@@ -343,6 +358,7 @@ export async function listTournaments(
       row.organizerName?.trim()
         ? organizerClubs.get(row.organizerName.trim()) ?? null
         : null,
+      logoResolutionContext,
     ),
   );
 }
@@ -357,7 +373,7 @@ export async function listTournamentsByIds(
 ): Promise<TournamentDto[]> {
   if (tournamentIds.length === 0) return [];
 
-  const [rows, tenantContext] = await Promise.all([
+  const [rows, tenantContext, logoResolutionContext] = await Promise.all([
     prisma.event.findMany({
       where: {
         tenantId,
@@ -368,6 +384,7 @@ export async function listTournamentsByIds(
       select: tournamentEventSelect,
     }),
     loadTournamentTenantContext(tenantId),
+    loadTournamentLogoResolutionContext(tenantId),
   ]);
 
   const organizerClubs = await resolveOrganizerClubsByName(
@@ -382,6 +399,7 @@ export async function listTournamentsByIds(
       row.organizerName?.trim()
         ? organizerClubs.get(row.organizerName.trim()) ?? null
         : null,
+      logoResolutionContext,
     ),
   );
 }
@@ -392,9 +410,10 @@ export async function listTournamentsByIds(
  * @throws {TournamentNotFoundError} Not found, cross-tenant, or not a TOURNAMENT event.
  */
 export async function getTournament(tenantId: string, tournamentId: string): Promise<TournamentDto> {
-  const [row, tenantContext] = await Promise.all([
+  const [row, tenantContext, logoResolutionContext] = await Promise.all([
     findTournamentEventById(tenantId, tournamentId),
     loadTournamentTenantContext(tenantId),
+    loadTournamentLogoResolutionContext(tenantId),
   ]);
   if (!row) {
     throw new TournamentNotFoundError(tournamentId);
@@ -411,6 +430,7 @@ export async function getTournament(tenantId: string, tournamentId: string): Pro
     row.organizerName?.trim()
       ? organizerClubs.get(row.organizerName.trim()) ?? null
       : null,
+    logoResolutionContext,
   );
 }
 
@@ -467,7 +487,10 @@ export async function updateTournament(
   if (input.teamPageVisible !== undefined) data.teamPageVisible = input.teamPageVisible;
 
   if (Object.keys(data).length === 0) {
-    const tenantContext = await loadTournamentTenantContext(tenantId);
+    const [tenantContext, logoResolutionContext] = await Promise.all([
+      loadTournamentTenantContext(tenantId),
+      loadTournamentLogoResolutionContext(tenantId),
+    ]);
     const organizerClubs = await resolveOrganizerClubsByName(
       tenantId,
       existing.organizerName?.trim() ? [existing.organizerName.trim()] : [],
@@ -478,6 +501,7 @@ export async function updateTournament(
       existing.organizerName?.trim()
         ? organizerClubs.get(existing.organizerName.trim()) ?? null
         : null,
+      logoResolutionContext,
     );
   }
 

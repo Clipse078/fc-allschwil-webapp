@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCanonicalClubLogoIndex,
+  buildCanonicalClubLogoNameIndex,
   collectProviderClubIdsFromEventPolicies,
   pickProviderClubId,
+  resolveCanonicalClubLogoByName,
   resolveExternalTeamLogoWithCanonicalFallback,
 } from "../canonical-logo-resolution";
 
@@ -26,7 +28,20 @@ describe("canonical-logo-resolution", () => {
     expect(index.get(483)).toBe(CANONICAL_LOGO);
   });
 
-  it("FC Black Stars D7A resolves canonical Verein logo without team-level duplicate", () => {
+  it("resolves canonical Verein logos across normalized club-name variants", () => {
+    const index = buildCanonicalClubLogoNameIndex([
+      {
+        logoUrl: CANONICAL_LOGO,
+        names: ["Example-Town FC", "Example Town Football Club"],
+      },
+    ]);
+
+    expect(resolveCanonicalClubLogoByName(["Example Town FC"], index)).toBe(
+      CANONICAL_LOGO,
+    );
+  });
+
+  it("resolves the mapped canonical Verein ahead of stale shell-club imagery", () => {
     const index = buildCanonicalClubLogoIndex([
       { providerClubId: 483, externalClub: { logoUrl: CANONICAL_LOGO } },
     ]);
@@ -34,7 +49,7 @@ describe("canonical-logo-resolution", () => {
     const logoUrl = resolveExternalTeamLogoWithCanonicalFallback(
       {
         team: { logoUrl: null },
-        directClub: { logoUrl: null },
+        directClub: { logoUrl: "https://example.test/stale-provider.png" },
         providerMappings: [{ providerClubId: 483 }],
       },
       index,

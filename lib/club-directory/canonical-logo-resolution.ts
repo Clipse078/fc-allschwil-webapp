@@ -12,6 +12,7 @@
 
 import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 import { prisma } from "@/lib/db/prisma";
+import { normalizeClubNameForLookup } from "./club-name-normalization";
 import {
   resolveExternalClubLogoUrl,
   resolveExternalTeamCanonicalLogoUrl,
@@ -25,6 +26,11 @@ export type ProviderClubIdMappingRow = {
 export type CanonicalClubLogoMappingRow = {
   readonly providerClubId: number;
   readonly externalClub: LogoSource;
+};
+
+export type CanonicalClubLogoNameRow = {
+  readonly logoUrl: string | null | undefined;
+  readonly names: readonly (string | null | undefined)[];
 };
 
 /**
@@ -54,6 +60,40 @@ export function buildCanonicalClubLogoIndex(
     index.set(row.providerClubId, resolveExternalClubLogoUrl(row.externalClub));
   }
   return index;
+}
+
+/**
+ * Indexes canonical Verein logos by normalized tenant-managed/provider names.
+ */
+export function buildCanonicalClubLogoNameIndex(
+  rows: readonly CanonicalClubLogoNameRow[],
+): ReadonlyMap<string, string | null> {
+  const index = new Map<string, string | null>();
+  for (const row of rows) {
+    const logoUrl = resolveExternalClubLogoUrl(row);
+    for (const name of row.names) {
+      const trimmed = name?.trim();
+      if (!trimmed) continue;
+      const normalized = normalizeClubNameForLookup(trimmed);
+      if (normalized && !index.has(normalized)) {
+        index.set(normalized, logoUrl);
+      }
+    }
+  }
+  return index;
+}
+
+export function resolveCanonicalClubLogoByName(
+  names: readonly (string | null | undefined)[],
+  index: ReadonlyMap<string, string | null>,
+): string | null {
+  for (const name of names) {
+    const trimmed = name?.trim();
+    if (!trimmed) continue;
+    const logoUrl = index.get(normalizeClubNameForLookup(trimmed));
+    if (logoUrl) return logoUrl;
+  }
+  return null;
 }
 
 export type ExternalTeamLogoResolutionInput = {

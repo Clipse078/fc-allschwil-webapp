@@ -21,7 +21,7 @@ vi.mock("@/lib/db/prisma", () => ({
     event: { findFirst: vi.fn() },
     team: { findFirst: vi.fn() },
     externalTeam: { findFirst: vi.fn() },
-    externalClub: { findFirst: vi.fn() },
+    externalClub: { findFirst: vi.fn(), findMany: vi.fn() },
     tournamentParticipant: {
       findFirst: vi.fn(),
       findMany: vi.fn(),
@@ -101,6 +101,7 @@ function participantRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(prisma.event.findFirst).mockResolvedValue({ id: TOURNAMENT_ID } as never);
+  vi.mocked(prisma.externalClub.findMany).mockResolvedValue([] as never);
 });
 
 describe("addTournamentParticipant", () => {

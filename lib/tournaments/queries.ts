@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
+import { SFV_PROVIDER } from "@/lib/integrations/sfv/season-bridge";
 import type { EventStatus, Prisma } from "@prisma/client";
 
 /** Shared team reference select — mirrors TournamentTeamReference. */
@@ -95,13 +96,33 @@ export const tournamentEventSelect = {
           shortName: true,
           categoryLabel: true,
           logoUrl: true,
+          providerMappings: {
+            where: { provider: SFV_PROVIDER },
+            select: { providerClubId: true },
+          },
           externalClub: {
-            select: { id: true, name: true, shortName: true, logoUrl: true },
+            select: {
+              id: true,
+              name: true,
+              shortName: true,
+              alternativeName: true,
+              logoUrl: true,
+            },
           },
         },
       },
       externalClub: {
-        select: { id: true, name: true, shortName: true, logoUrl: true },
+        select: {
+          id: true,
+          name: true,
+          shortName: true,
+          alternativeName: true,
+          logoUrl: true,
+          providerMappings: {
+            where: { provider: SFV_PROVIDER },
+            select: { providerClubId: true },
+          },
+        },
       },
       dressingRoomAllocations: {
         orderBy: [{ displayOrder: "asc" }, { createdAt: "asc" }],
