@@ -40,6 +40,16 @@ describe("nav-icon-registry (SCE-DESIGN-04C)", () => {
     }
   });
 
+  it("maps Personen & Zugänge to the benutzer animated icon", () => {
+    expect(getNavIconKey("Personen & Zugänge")).toBe("benutzer");
+  });
+
+  it("throws for genuinely unknown sidebar labels", () => {
+    expect(() => getNavIconKey("Not A Real Nav Item")).toThrow(
+      '[nav-icon-registry] Missing animated icon for sidebar label: "Not A Real Nav Item"',
+    );
+  });
+
   it("defines copper-flow only for semantically appropriate icons", () => {
     expect(COPPER_FLOW_ICON_KEYS.has("website")).toBe(true);
     expect(COPPER_FLOW_ICON_KEYS.has("kommunikation")).toBe(true);
