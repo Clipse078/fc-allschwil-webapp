@@ -5,7 +5,6 @@ import { AlertTriangle } from "lucide-react";
 import {
   buildNavPermissionPresentationFromModuleGroups,
   isControlChecked,
-  isControlPartiallyChecked,
   isWochenplannerAvailable,
   togglePermissionKey,
   toggleStandardControl,
@@ -13,6 +12,7 @@ import {
   type PermissionUnit,
   type StandardControl,
 } from "@/lib/roles/nav-permission-presentation";
+import { SwitchThumb } from "@/components/ui/SwitchToggle";
 import { cn } from "@/lib/cn";
 
 export type PermissionMatrixModuleGroup = {
@@ -28,42 +28,43 @@ type NavAlignedPermissionEditorProps = {
   disabled?: boolean;
 };
 
-function PermissionCheckbox({
+function PermissionToggleRow({
   id,
   label,
   checked,
-  indeterminate,
   disabled,
   onChange,
 }: {
   id: string;
   label: string;
   checked: boolean;
-  indeterminate?: boolean;
   disabled?: boolean;
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label
-      htmlFor={id}
+    <div
       className={cn(
-        "inline-flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition",
-        disabled ? "cursor-not-allowed opacity-50" : "hover:bg-[var(--surface-2)]",
+        "flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-2)]/60 px-3 py-2",
+        disabled ? "opacity-50" : "",
       )}
     >
-      <input
+      <label
+        htmlFor={id}
+        className={cn(
+          "min-w-0 text-sm font-medium text-[var(--foreground)]",
+          disabled ? "cursor-not-allowed" : "cursor-pointer",
+        )}
+      >
+        {label}
+      </label>
+      <SwitchThumb
         id={id}
-        type="checkbox"
         checked={checked}
-        ref={(el) => {
-          if (el) el.indeterminate = Boolean(indeterminate);
-        }}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 shrink-0 cursor-pointer rounded accent-[var(--sce-primary)] disabled:cursor-not-allowed"
+        onChange={onChange}
+        aria-label={label}
       />
-      <span className="font-medium text-[var(--foreground)]">{label}</span>
-    </label>
+    </div>
   );
 }
 
@@ -83,16 +84,14 @@ function StandardControlsRow({
   onChange: (next: Set<string>) => void;
 }) {
   const checked = isControlChecked(control, selectedKeys);
-  const partial = isControlPartiallyChecked(control, selectedKeys);
   const isLocked = control.permissionKeys.every((key) => lockedKeys.has(key));
   const controlId = `${unit.id}-${control.kind}`;
 
   return (
-    <PermissionCheckbox
+    <PermissionToggleRow
       id={controlId}
       label={control.label}
       checked={checked}
-      indeterminate={partial}
       disabled={disabled || isLocked}
       onChange={(nextChecked) => onChange(toggleStandardControl(selectedKeys, control, nextChecked))}
     />
@@ -154,7 +153,7 @@ function PermissionUnitCard({
             {derivedAvailable ? "Verfügbar" : "Nicht verfügbar"} — {unit.derivedNote}
           </p>
         ) : (
-          <div className="flex flex-wrap gap-1">
+          <div className="space-y-1.5">
             {unit.standardControls.map((control) => (
               <StandardControlsRow
                 key={`${unit.id}-${control.kind}`}
@@ -178,44 +177,54 @@ function PermissionUnitCard({
               ) : null}
             </summary>
             <div className="space-y-2 border-t border-[var(--border)] px-3 py-3">
-              {unit.advancedPermissions.map((advanced) => (
-                <label
-                  key={advanced.key}
-                  htmlFor={`advanced-${unit.id}-${advanced.key}`}
-                  className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5",
-                    advanced.dangerous && selectedKeys.has(advanced.key)
-                      ? "border-amber-500/30 bg-amber-500/5"
-                      : "border-[var(--border)] bg-[var(--surface)]",
-                    lockedKeys.has(advanced.key) ? "cursor-not-allowed opacity-50" : "",
-                  )}
-                >
-                  <input
-                    id={`advanced-${unit.id}-${advanced.key}`}
-                    type="checkbox"
-                    checked={selectedKeys.has(advanced.key)}
-                    disabled={disabled || lockedKeys.has(advanced.key)}
-                    onChange={(e) =>
-                      onChange(togglePermissionKey(selectedKeys, advanced.key, e.target.checked))
-                    }
-                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer rounded accent-[var(--sce-primary)]"
-                  />
-                  <span className="min-w-0">
-                    <span className="flex flex-wrap items-center gap-1.5 text-sm font-medium text-[var(--foreground)]">
-                      {advanced.label}
-                      {advanced.dangerous ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">
-                          <AlertTriangle className="h-3 w-3" aria-hidden="true" />
-                          Dauerhaft löschen
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="mt-0.5 block text-xs leading-relaxed text-[var(--text-2)]">
-                      {advanced.description}
-                    </span>
-                  </span>
-                </label>
-              ))}
+              {unit.advancedPermissions.map((advanced) => {
+                const advancedId = `advanced-${unit.id}-${advanced.key}`;
+                const isAdvancedLocked = lockedKeys.has(advanced.key);
+                const isAdvancedDisabled = disabled || isAdvancedLocked;
+
+                return (
+                  <div
+                    key={advanced.key}
+                    className={cn(
+                      "flex items-start justify-between gap-3 rounded-lg border px-3 py-2.5",
+                      advanced.dangerous && selectedKeys.has(advanced.key)
+                        ? "border-amber-500/30 bg-amber-500/5"
+                        : "border-[var(--border)] bg-[var(--surface)]",
+                      isAdvancedDisabled ? "opacity-50" : "",
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <label
+                        htmlFor={advancedId}
+                        className={cn(
+                          "flex flex-wrap items-center gap-1.5 text-sm font-medium text-[var(--foreground)]",
+                          isAdvancedDisabled ? "cursor-not-allowed" : "cursor-pointer",
+                        )}
+                      >
+                        {advanced.label}
+                        {advanced.dangerous ? (
+                          <span className="inline-flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[0.6rem] font-semibold uppercase tracking-wide text-amber-700">
+                            <AlertTriangle className="h-3 w-3" aria-hidden="true" />
+                            Dauerhaft löschen
+                          </span>
+                        ) : null}
+                      </label>
+                      <p className="mt-0.5 text-xs leading-relaxed text-[var(--text-2)]">
+                        {advanced.description}
+                      </p>
+                    </div>
+                    <SwitchThumb
+                      id={advancedId}
+                      checked={selectedKeys.has(advanced.key)}
+                      disabled={isAdvancedDisabled}
+                      onChange={(nextChecked) =>
+                        onChange(togglePermissionKey(selectedKeys, advanced.key, nextChecked))
+                      }
+                      aria-label={advanced.label}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </details>
         ) : null}

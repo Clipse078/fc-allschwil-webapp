@@ -193,6 +193,24 @@ describe("nav-permission-presentation", () => {
     );
   });
 
+  it("labels registrations edit as Verwalten, not Bearbeiten", () => {
+    const presentation = buildNavPermissionPresentation(buildCatalog(TENANT_CATALOG_KEYS));
+    const registrationsUnit = presentation.sections
+      .flatMap((section) => section.units)
+      .find((unit) => unit.standardControls.some((control) =>
+        control.permissionKeys.includes(PERMISSIONS.REGISTRATIONS_EDIT),
+      ));
+
+    expect(
+      registrationsUnit?.standardControls.find((control) =>
+        control.permissionKeys.includes(PERMISSIONS.REGISTRATIONS_EDIT),
+      )?.label,
+    ).toBe("Verwalten");
+    expect(
+      registrationsUnit?.standardControls.some((control) => control.label === "Bearbeiten"),
+    ).toBe(false);
+  });
+
   it("toggles all keys in a shared standard control together", () => {
     const control = {
       kind: "manage" as const,

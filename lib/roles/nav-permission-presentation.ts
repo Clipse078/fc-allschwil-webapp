@@ -20,7 +20,7 @@ export type PermissionCatalogRow = {
   module: string;
 };
 
-export type StandardControlKind = "view" | "manage" | "edit";
+export type StandardControlKind = "view" | "manage";
 
 export type StandardControl = {
   kind: StandardControlKind;
@@ -169,7 +169,6 @@ function buildControlsFromKeys(
 ): { standardControls: StandardControl[]; advancedPermissions: AdvancedPermission[] } {
   const viewKeys: string[] = [];
   const manageKeys: string[] = [];
-  const editKeys: string[] = [];
   const advancedPermissions: AdvancedPermission[] = [];
 
   for (const key of keys) {
@@ -185,8 +184,7 @@ function buildControlsFromKeys(
       continue;
     }
     if (isStandardManageKey(key) || MANAGE_ONLY_KEYS.has(key)) {
-      if (key === PERMISSIONS.REGISTRATIONS_EDIT) editKeys.push(key);
-      else manageKeys.push(key);
+      manageKeys.push(key);
       continue;
     }
     advancedPermissions.push(toAdvancedPermission(row));
@@ -198,9 +196,6 @@ function buildControlsFromKeys(
   }
   if (manageKeys.length > 0) {
     standardControls.push({ kind: "manage", label: "Verwalten", permissionKeys: manageKeys });
-  }
-  if (editKeys.length > 0) {
-    standardControls.push({ kind: "edit", label: "Bearbeiten", permissionKeys: editKeys });
   }
 
   return { standardControls, advancedPermissions };
