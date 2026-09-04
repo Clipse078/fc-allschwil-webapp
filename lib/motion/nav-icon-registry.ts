@@ -12,6 +12,7 @@ const NAV_LABEL_TO_ICON_KEY: Record<string, NavIconKey> = {
   Organisationseinheiten: "organisationseinheiten",
   Zielgruppen: "zielgruppen",
   Teams: "teams",
+  Funktionen: "rollen",
   "Anbieter-Mapping": "anbieter-mapping",
   Vereine: "vereine",
   Personen: "personen",

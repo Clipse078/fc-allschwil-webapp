@@ -20,7 +20,7 @@ type Props = {
  * Tenant role permission matrix editor. Every write goes through
  * `PUT /api/tenant/roles/[id]/permissions`, which re-validates scope,
  * ownership, and essential-permission locks server-side — the locked
- * checkboxes here are a UX convenience, not the enforcement boundary.
+ * locked toggles here are a UX convenience, not the enforcement boundary.
  */
 export default function TenantRolePermissionEditor({
   roleId,

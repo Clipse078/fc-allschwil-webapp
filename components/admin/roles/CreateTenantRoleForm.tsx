@@ -1,37 +1,67 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2, Save } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Loader2,
+} from "lucide-react";
 import PermissionMatrixFields, {
   type PermissionMatrixModuleGroup,
 } from "@/components/admin/roles/PermissionMatrixFields";
+import RolePermissionPreviewPanel from "@/components/admin/roles/RolePermissionPreviewPanel";
+import WizardStepIndicator from "@/components/admin/teams/registration/WizardStepIndicator";
+import { SectionCard } from "@/components/ui/page/SectionCard";
+import { SwitchToggle } from "@/components/ui/SwitchToggle";
+import {
+  buildNavPermissionPresentationFromModuleGroups,
+  buildNavPermissionSummary,
+} from "@/lib/roles/nav-permission-presentation";
+import { isDangerousPermission } from "@/lib/roles/permission-metadata";
 
 type CreateTenantRoleFormProps = {
   moduleGroups: PermissionMatrixModuleGroup[];
 };
 
+const STEPS = [
+  { index: 0, label: "Basisdaten" },
+  { index: 1, label: "Berechtigungen" },
+  { index: 2, label: "Überprüfen" },
+] as const;
+
 /**
- * Tenant custom role creation. Posts to `POST /api/tenant/roles` — scope
- * and tenant id are always forced server-side, this form never sends them.
- * Create + permission assignment happens in a single atomic request.
+ * Premium three-step tenant role creation flow. Posts to `POST /api/tenant/roles`
+ * — scope and tenant id are always forced server-side.
  */
 export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleFormProps) {
   const router = useRouter();
+  const [step, setStep] = useState(0);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [dirty, setDirty] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  const presentation = useMemo(
+    () => buildNavPermissionPresentationFromModuleGroups(moduleGroups),
+    [moduleGroups],
+  );
+
+  const accessSummary = useMemo(
+    () => buildNavPermissionSummary(presentation, selectedKeys),
+    [presentation, selectedKeys],
+  );
+
+  const dangerousCount = Array.from(selectedKeys).filter(isDangerousPermission).length;
+
+  async function handleSubmit() {
     setError(null);
 
     if (!name.trim()) {
       setError("Der Rollenname ist erforderlich.");
+      setStep(0);
       return;
     }
 
@@ -53,7 +83,6 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
         setSubmitting(false);
         return;
       }
-      setDirty(false);
       router.push(`/dashboard/administration/roles/${data.role.id}`);
       router.refresh();
     } catch {
@@ -62,91 +91,228 @@ export default function CreateTenantRoleForm({ moduleGroups }: CreateTenantRoleF
     }
   }
 
+  function goToPermissions() {
+    if (!name.trim()) {
+      setError("Der Rollenname ist erforderlich.");
+      return;
+    }
+    setError(null);
+    setStep(1);
+  }
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="sce-detail-section">
-        <div className="sce-detail-section-header">
-          <p className="text-sm font-semibold text-[var(--foreground)]">Rollendetails</p>
+    <div className="space-y-8">
+      <WizardStepIndicator
+        steps={[...STEPS]}
+        currentStep={step}
+        completedUpTo={step - 1}
+      />
+
+      <div className="grid gap-8 lg:grid-cols-3 lg:items-start">
+        <div className="space-y-6 lg:col-span-2">
+          {step === 0 && (
+            <SectionCard title="Basisdaten">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="role-name" className="sce-data-label">
+                    Rollenname
+                  </label>
+                  <input
+                    id="role-name"
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="fca-input mt-1 w-full"
+                    placeholder="z. B. Platzkoordinator"
+                    maxLength={120}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="role-description" className="sce-data-label">
+                    Beschreibung (optional)
+                  </label>
+                  <textarea
+                    id="role-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="fca-input mt-1 w-full"
+                    rows={3}
+                    placeholder="Kurze Beschreibung, wofür diese Rolle gedacht ist."
+                  />
+                </div>
+
+                <SwitchToggle
+                  id="role-is-active"
+                  label="Aktiv"
+                  checked={isActive}
+                  onChange={setIsActive}
+                />
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={goToPermissions}
+                  className="fca-button-primary"
+                >
+                  Weiter zu Berechtigungen
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </SectionCard>
+          )}
+
+          {step === 1 && (
+            <SectionCard title="Berechtigungen">
+              <PermissionMatrixFields
+                moduleGroups={moduleGroups}
+                selectedKeys={selectedKeys}
+                onChange={setSelectedKeys}
+              />
+
+              <div className="mt-6 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="fca-button-secondary"
+                >
+                  Zurück
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError(null);
+                    setStep(2);
+                  }}
+                  className="fca-button-primary"
+                >
+                  Weiter zur Überprüfung
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
+            </SectionCard>
+          )}
+
+          {step === 2 && (
+            <SectionCard title="Überprüfen">
+              <div className="space-y-6">
+                <dl className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-medium text-[var(--muted)]">Rollenname</dt>
+                    <dd className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                      {name.trim() || "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium text-[var(--muted)]">Status</dt>
+                    <dd className="mt-1 text-sm font-semibold text-[var(--foreground)]">
+                      {isActive ? "Aktiv" : "Inaktiv"}
+                    </dd>
+                  </div>
+                  {description.trim() ? (
+                    <div className="sm:col-span-2">
+                      <dt className="text-xs font-medium text-[var(--muted)]">Beschreibung</dt>
+                      <dd className="mt-1 text-sm text-[var(--foreground)]">{description.trim()}</dd>
+                    </div>
+                  ) : null}
+                </dl>
+
+                <div>
+                  <h4 className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    Zugriff
+                  </h4>
+                  {accessSummary.length > 0 ? (
+                    <AccessSummaryList sections={accessSummary} dangerousCount={dangerousCount} />
+                  ) : (
+                    <p className="mt-2 text-sm text-[var(--muted)]">
+                      Keine Berechtigungen ausgewählt. Die Rolle wird ohne Zugriffsrechte erstellt.
+                    </p>
+                  )}
+                </div>
+
+                {error ? (
+                  <div className="flex items-start gap-3 rounded-[var(--radius-xl)] border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+                    <p className="text-[12px] font-medium text-rose-300">{error}</p>
+                  </div>
+                ) : null}
+
+                <div className="flex items-center justify-between gap-3 border-t border-[var(--border)] pt-4">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="fca-button-secondary"
+                    disabled={submitting}
+                  >
+                    Zurück
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="fca-button-primary disabled:opacity-50"
+                  >
+                    {submitting ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : null}
+                    {submitting ? "Wird erstellt…" : "Rolle erstellen"}
+                  </button>
+                </div>
+              </div>
+            </SectionCard>
+          )}
+
+          {error && step !== 2 ? (
+            <div className="flex items-start gap-3 rounded-[var(--radius-xl)] border border-rose-500/30 bg-rose-500/10 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-400" />
+              <p className="text-[12px] font-medium text-rose-300">{error}</p>
+            </div>
+          ) : null}
         </div>
-        <div className="sce-detail-section-body space-y-4">
-          <div>
-            <label htmlFor="role-name" className="sce-data-label">
-              Rollenname
-            </label>
-            <input
-              id="role-name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setDirty(true);
-              }}
-              className="fca-input mt-1 w-full"
-              placeholder="z. B. Dokumente Manager"
-              maxLength={120}
+
+        <aside className="lg:col-span-1">
+          <div className="lg:sticky lg:top-6">
+            <RolePermissionPreviewPanel
+              name={name}
+              description={description}
+              isActive={isActive}
+              onActiveChange={setIsActive}
+              presentation={presentation}
+              selectedKeys={selectedKeys}
             />
           </div>
-          <div>
-            <label htmlFor="role-description" className="sce-data-label">
-              Beschreibung (optional)
-            </label>
-            <textarea
-              id="role-description"
-              value={description}
-              onChange={(e) => {
-                setDescription(e.target.value);
-                setDirty(true);
-              }}
-              className="fca-input mt-1 w-full"
-              rows={2}
-            />
-          </div>
-          <label className="flex cursor-pointer items-center gap-2.5">
-            <input
-              type="checkbox"
-              checked={isActive}
-              onChange={(e) => {
-                setIsActive(e.target.checked);
-                setDirty(true);
-              }}
-              className="h-4 w-4 cursor-pointer rounded accent-[var(--blue)]"
-            />
-            <span className="text-sm font-medium text-[var(--foreground)]">Rolle ist aktiv</span>
-          </label>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+type AccessSummaryProps = {
+  sections: ReturnType<typeof buildNavPermissionSummary>;
+  dangerousCount: number;
+};
+
+function AccessSummaryList({ sections, dangerousCount }: AccessSummaryProps) {
+  return (
+    <div className="mt-3 space-y-4">
+      {dangerousCount > 0 ? (
+        <p className="text-xs font-medium text-amber-400">
+          {dangerousCount} erweiterte Berechtigung{dangerousCount === 1 ? "" : "en"} mit dauerhaftem
+          Löschen
+        </p>
+      ) : null}
+      {sections.map((section) => (
+        <div key={section.label}>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {section.label}
+          </p>
+          <p className="mt-1 text-sm text-[var(--foreground)]">
+            {section.modules.join(" · ")}
+          </p>
         </div>
-      </div>
-
-      <div>
-        <p className="mb-3 text-sm font-semibold text-[var(--foreground)]">Berechtigungen / Module</p>
-        <PermissionMatrixFields
-          moduleGroups={moduleGroups}
-          selectedKeys={selectedKeys}
-          onChange={(next) => {
-            setSelectedKeys(next);
-            setDirty(true);
-          }}
-        />
-      </div>
-
-      {error && (
-        <div className="flex items-start gap-3 rounded-[var(--radius-xl)] border border-rose-200 bg-rose-50 px-4 py-3">
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
-          <p className="text-[12px] font-medium text-rose-700">{error}</p>
-        </div>
-      )}
-
-      <div className="flex items-center justify-end gap-3">
-        {dirty && (
-          <span className="text-[0.72rem] font-semibold text-amber-700">
-            Ungespeicherte Änderungen
-          </span>
-        )}
-        <button type="submit" disabled={submitting} className="fca-button-primary disabled:opacity-50">
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          {submitting ? "Wird erstellt…" : "Rolle erstellen"}
-        </button>
-      </div>
-    </form>
+      ))}
+    </div>
   );
 }

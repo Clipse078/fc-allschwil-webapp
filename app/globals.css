@@ -469,6 +469,49 @@ button {
   cursor: not-allowed;
 }
 
+/* Chromium/WebKit autofill paints a light surface unless overridden in-place. */
+.fca-input:-webkit-autofill,
+.fca-input:-webkit-autofill:hover,
+.fca-input:-webkit-autofill:focus,
+.fca-input:-webkit-autofill:active,
+.fca-textarea:-webkit-autofill,
+.fca-textarea:-webkit-autofill:hover,
+.fca-textarea:-webkit-autofill:focus,
+.fca-textarea:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--foreground) !important;
+  caret-color: var(--foreground);
+  color: var(--foreground);
+  background-color: var(--surface) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  transition:
+    background-color 5000s ease-in-out 0s,
+    color 5000s ease-in-out 0s,
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.fca-input:-webkit-autofill:hover,
+.fca-textarea:-webkit-autofill:hover {
+  background-color: var(--surface) !important;
+  -webkit-box-shadow: 0 0 0 1000px var(--surface) inset !important;
+  box-shadow: 0 0 0 1000px var(--surface) inset !important;
+}
+
+.fca-input:-webkit-autofill:focus,
+.fca-input:-webkit-autofill:active,
+.fca-textarea:-webkit-autofill:focus,
+.fca-textarea:-webkit-autofill:active {
+  border-color: var(--sce-primary);
+  background-color: var(--surface) !important;
+  -webkit-box-shadow:
+    0 0 0 1000px var(--surface) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent) !important;
+  box-shadow:
+    0 0 0 1000px var(--surface) inset,
+    0 0 0 3px color-mix(in srgb, var(--sce-primary) 18%, transparent) !important;
+}
+
 .fca-search-input {
   padding-top: 0;
   padding-bottom: 0;
