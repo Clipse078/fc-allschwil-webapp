@@ -9,6 +9,7 @@ export type CommunicationAttachmentMetadata = {
   contentDisposition: string | null;
   contentId: string | null;
   size: number | null;
+  processingStatus?: "PENDING" | "FAILED";
 };
 
 export type CommunicationAttachmentMetadataList = CommunicationAttachmentMetadata[];
@@ -44,6 +45,10 @@ export function readLegacyCommunicationAttachments(
       contentDisposition: nullableString(item.contentDisposition),
       contentId: nullableString(item.contentId),
       size: nullableSize(item.size),
+      processingStatus:
+        item.processingStatus === "PENDING" || item.processingStatus === "FAILED"
+          ? item.processingStatus
+          : undefined,
     }];
   });
 }

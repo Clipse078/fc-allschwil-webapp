@@ -4,10 +4,12 @@ import { createHash } from "node:crypto";
 const mocks = vi.hoisted(() => ({
   tenantMembershipFindFirst: vi.fn(),
   attachmentCreate: vi.fn(),
+  attachmentDelete: vi.fn(),
   attachmentFindFirst: vi.fn(),
   attachmentFindMany: vi.fn(),
   messageFindFirst: vi.fn(),
   messageFindMany: vi.fn(),
+  linkFindFirst: vi.fn(),
   linkFindMany: vi.fn(),
   linkCreate: vi.fn(),
   linkCreateMany: vi.fn(),
@@ -35,10 +37,15 @@ vi.mock("@/lib/db/prisma", () => ({
     tenantMembership: { findFirst: mocks.tenantMembershipFindFirst },
     communicationAttachment: {
       create: mocks.attachmentCreate,
+      delete: mocks.attachmentDelete,
       findFirst: mocks.attachmentFindFirst,
       findMany: mocks.attachmentFindMany,
     },
-    communicationMessageAttachment: { findMany: mocks.linkFindMany },
+    communicationMessage: { findFirst: mocks.messageFindFirst },
+    communicationMessageAttachment: {
+      findFirst: mocks.linkFindFirst,
+      findMany: mocks.linkFindMany,
+    },
     workspaceDocumentVersion: { findFirst: mocks.versionFindFirst },
     $transaction: vi.fn((callback) => callback(tx)),
   },
@@ -51,6 +58,7 @@ import {
   attachToMessage,
   cloneMessageAttachmentsForRetry,
   createUploadedAttachment,
+  ingestInboundAttachment,
   loadMessageAttachmentsForDelivery,
   snapshotWorkspaceDocumentVersion,
   validateOutboundAttachmentSelection,
@@ -67,13 +75,15 @@ function storage() {
       sizeBytes: buffer.byteLength,
     })),
     download: vi.fn(),
-    delete: vi.fn(),
+    delete: vi.fn().mockResolvedValue(undefined),
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.tenantMembershipFindFirst.mockResolvedValue({ id: "membership-a" });
+  mocks.attachmentDelete.mockResolvedValue({ id: "attachment-a" });
+  mocks.linkFindFirst.mockResolvedValue(null);
   mocks.logAction.mockResolvedValue(undefined);
 });
 
@@ -104,6 +114,131 @@ describe("communication attachment domain service", () => {
     );
     expect(result.checksumSha256).toHaveLength(64);
     expect(result).not.toHaveProperty("storageUrl");
+  });
+
+  it("ingests inbound bytes through canonical validation and private storage", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    mocks.attachmentCreate.mockImplementation(async ({ data }) => data);
+    mocks.linkFindMany.mockResolvedValue([]);
+    mocks.linkCreate.mockImplementation(async ({ data }) => data);
+
+    const result = await ingestInboundAttachment({
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      provider: "resend",
+      providerMessageId: "email-a",
+      providerAttachmentId: "provider-attachment-a",
+      filename: "../Antwort Final.pdf",
+      declaredContentType: "application/pdf",
+      buffer: pdf,
+      sortOrder: 0,
+      storage: provider,
+    });
+
+    expect(result.attachment).toMatchObject({
+      tenantId: "tenant-a",
+      sanitizedFilename: "Antwort Final.pdf",
+      sourceType: "INBOUND",
+      createdByUserId: null,
+      lifecycleStatus: "READY",
+    });
+    expect(result.link).toMatchObject({
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      attachmentId: result.attachment.id,
+      sortOrder: 0,
+    });
+    expect(provider.upload).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storageKey: expect.stringMatching(/^communication\/tenant-a\//),
+        buffer: pdf,
+      }),
+    );
+    expect(mocks.tenantMembershipFindFirst).not.toHaveBeenCalled();
+  });
+
+  it("reuses the existing inbound provider attachment on webhook replay", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    const existingAttachment = {
+      id: "attachment-existing",
+      tenantId: "tenant-a",
+      sourceType: "INBOUND",
+    };
+    mocks.linkFindFirst.mockResolvedValue({
+      id: "link-existing",
+      tenantId: "tenant-a",
+      messageId: "message-inbound",
+      attachmentId: "attachment-existing",
+      sortOrder: 0,
+      attachment: existingAttachment,
+    });
+
+    await expect(
+      ingestInboundAttachment({
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        provider: "resend",
+        providerMessageId: "email-a",
+        providerAttachmentId: "provider-attachment-a",
+        filename: "Antwort.pdf",
+        declaredContentType: "application/pdf",
+        buffer: pdf,
+        sortOrder: 0,
+        storage: provider,
+      }),
+    ).resolves.toMatchObject({
+      attachment: existingAttachment,
+      link: { id: "link-existing" },
+    });
+    expect(provider.upload).not.toHaveBeenCalled();
+    expect(mocks.attachmentCreate).not.toHaveBeenCalled();
+    expect(mocks.linkCreate).not.toHaveBeenCalled();
+  });
+
+  it("cleans up a raced blob and reuses the winning inbound link", async () => {
+    const provider = storage();
+    mocks.messageFindFirst.mockResolvedValue({ id: "message-inbound" });
+    mocks.attachmentCreate.mockImplementation(async ({ data }) => data);
+    mocks.linkFindMany.mockResolvedValue([
+      {
+        id: "link-winner",
+        attachmentId: "attachment-winner",
+        sortOrder: 0,
+        attachment: { sizeBytes: pdf.byteLength },
+      },
+    ]);
+    mocks.linkFindFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        id: "link-winner",
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        attachmentId: "attachment-winner",
+        sortOrder: 0,
+        attachment: { id: "attachment-winner", sourceType: "INBOUND" },
+      });
+
+    await expect(
+      ingestInboundAttachment({
+        tenantId: "tenant-a",
+        messageId: "message-inbound",
+        provider: "resend",
+        providerMessageId: "email-a",
+        providerAttachmentId: "provider-attachment-a",
+        filename: "Antwort.pdf",
+        declaredContentType: "application/pdf",
+        buffer: pdf,
+        sortOrder: 0,
+        storage: provider,
+      }),
+    ).resolves.toMatchObject({
+      attachment: { id: "attachment-winner" },
+      link: { id: "link-winner" },
+    });
+    expect(mocks.attachmentDelete).toHaveBeenCalled();
+    expect(provider.delete).toHaveBeenCalled();
   });
 
   it("best-effort deletes the private object when metadata persistence fails", async () => {

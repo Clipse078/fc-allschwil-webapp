@@ -161,8 +161,17 @@ function EmailHistoryCard({
                     Herunterladen
                   </a>
                 ) : (
-                  <span className="flex-shrink-0 text-[var(--muted)]">
-                    Nur Metadaten verfügbar
+                  <span
+                    className={cn(
+                      "flex-shrink-0",
+                      attachment.processingFailed
+                        ? "text-rose-600"
+                        : "text-[var(--muted)]",
+                    )}
+                  >
+                    {attachment.processingFailed
+                      ? "Anhang konnte nicht verarbeitet werden"
+                      : "Nur Metadaten verfügbar"}
                   </span>
                 )}
               </li>

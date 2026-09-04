@@ -805,6 +805,108 @@ describe("COMM-01C email communication UX", () => {
     expect(screen.getByText("Nur Metadaten verfügbar")).toBeInTheDocument();
   });
 
+  it("renders inbound attachments and a non-sensitive failure state in the same card", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-a" } });
+      }
+      return jsonResponse({
+        recipient: baseRecipient,
+        messages: [
+          {
+            id: "m-inbound",
+            direction: "INBOUND",
+            subject: "Re: Unterlagen",
+            body: "Hier sind die Unterlagen.",
+            from: "anna@example.com",
+            to: null,
+            status: "RECEIVED",
+            senderDisplayName: null,
+            sentAt: null,
+            receivedAt: "2026-08-23T07:30:00.000Z",
+            createdAt: "2026-08-23T07:30:00.000Z",
+            deliveryError: null,
+            attachmentCount: 2,
+            attachments: [
+              {
+                id: "inbound-ready",
+                filename: "Anmeldung.pdf",
+                contentType: "application/pdf",
+                size: 2048,
+                downloadAvailable: true,
+              },
+              {
+                id: "inbound-failed",
+                filename: "unsicher.exe",
+                contentType: "application/octet-stream",
+                size: 128,
+                downloadAvailable: false,
+                processingFailed: true,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    renderPanel();
+    expect(await screen.findByText("Empfangen")).toBeInTheDocument();
+    expect(screen.getByText(/Anmeldung\.pdf · 2 KB/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Herunterladen" })).toHaveAttribute(
+      "href",
+      "/api/tenants/fc-a/communications/attachments/inbound-ready",
+    );
+    expect(
+      screen.getByText("Anhang konnte nicht verarbeitet werden"),
+    ).toBeInTheDocument();
+  });
+
+  it("uses the identical inbound attachment timeline for Waiting List", async () => {
+    vi.mocked(fetch).mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.includes("/communications/threads?")) {
+        return jsonResponse({ thread: { id: "thread-wait" } });
+      }
+      return jsonResponse({
+        recipient: baseRecipient,
+        messages: [
+          {
+            id: "m-wait-inbound",
+            direction: "INBOUND",
+            subject: "Re: Warteliste",
+            body: "Anbei.",
+            from: "anna@example.com",
+            to: null,
+            status: "RECEIVED",
+            senderDisplayName: null,
+            sentAt: null,
+            receivedAt: "2026-08-23T07:30:00.000Z",
+            createdAt: "2026-08-23T07:30:00.000Z",
+            deliveryError: null,
+            attachmentCount: 1,
+            attachments: [
+              {
+                id: "waiting-list-attachment",
+                filename: "Warteliste.pdf",
+                contentType: "application/pdf",
+                size: 1024,
+                downloadAvailable: true,
+              },
+            ],
+          },
+        ],
+      });
+    });
+
+    renderPanel({ targetType: "WAITING_LIST_ENTRY", targetId: "wait-a" });
+    expect(await screen.findByText(/Warteliste\.pdf · 1 KB/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Herunterladen" })).toHaveAttribute(
+      "href",
+      "/api/tenants/fc-a/communications/attachments/waiting-list-attachment",
+    );
+  });
+
   it("shows client-side size validation before starting an upload", async () => {
     const user = userEvent.setup();
     renderPanel();

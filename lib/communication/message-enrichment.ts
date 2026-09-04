@@ -12,6 +12,7 @@ export type PublicEmailThreadAttachment = {
   contentType: string | null;
   size: number | null;
   downloadAvailable: boolean;
+  processingFailed?: boolean;
 };
 
 export type PublicEmailThreadMessage = {
@@ -178,6 +179,9 @@ export async function toPublicEmailThreadMessages(
         contentType: attachment.contentType,
         size: attachment.size,
         downloadAvailable: false,
+        ...(attachment.processingStatus === "FAILED"
+          ? { processingFailed: true }
+          : {}),
       })),
     ];
     return {
