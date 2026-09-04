@@ -80,6 +80,101 @@ const SPIELBETRIEB_CHILD_KEYS = new Set(["matchcenter", "tournamentcenter", "ver
 const WOCHENPLANNER_KEY = "wochenplanner";
 const TRAININGCENTER_KEY = "trainingcenter";
 
+const WEBSITE_NEWS_CHILD_KEYS = new Set([
+  "website-news",
+  "website-publishing",
+  "website-overview",
+]);
+const WEBSITE_MEDIA_CHILD_KEYS = new Set(["website-media"]);
+const WEBSITE_CMS_CHILD_KEYS = new Set([
+  "website-pages",
+  "website-homepage",
+  "website-navigation",
+  "website-blocks",
+  "website-editorial",
+  "website-components",
+  "website-settings",
+]);
+
+function collectChildPermissionKeys(
+  children: NavItemChild[],
+  catalog: Map<string, PermissionCatalogRow>,
+): string[] {
+  const keys = new Set<string>();
+  for (const child of children) {
+    for (const key of filterGrantableKeys(child.permissionKeys, catalog)) {
+      keys.add(key);
+    }
+  }
+  return Array.from(keys);
+}
+
+function buildWebsiteUnits(
+  parentItem: NavItem,
+  children: NavItemChild[],
+  catalog: Map<string, PermissionCatalogRow>,
+): PermissionUnit[] {
+  const units: PermissionUnit[] = [];
+  const newsChildren = children.filter((child) => WEBSITE_NEWS_CHILD_KEYS.has(child.key));
+  const mediaChildren = children.filter((child) => WEBSITE_MEDIA_CHILD_KEYS.has(child.key));
+  const cmsChildren = children.filter((child) => WEBSITE_CMS_CHILD_KEYS.has(child.key));
+
+  const newsKeys = collectChildPermissionKeys(newsChildren, catalog).filter(
+    (key) => key === PERMISSIONS.NEWS_MANAGE,
+  );
+  const mediaKeys = collectChildPermissionKeys(mediaChildren, catalog).filter(
+    (key) => key === PERMISSIONS.WEBSITE_MANAGE,
+  );
+  const cmsKeys = collectChildPermissionKeys(cmsChildren, catalog).filter(
+    (key) => key === PERMISSIONS.WEBSITE_MANAGE,
+  );
+
+  const newsUnit = createUnit(
+    `${parentItem.key}-news`,
+    "News",
+    newsKeys.length > 0 ? newsKeys : collectChildPermissionKeys(newsChildren, catalog),
+    catalog,
+    {
+      description: "News und Beiträge veröffentlichen",
+      iconLabel: "News",
+      parentLabel: parentItem.label,
+    },
+  );
+  if (newsUnit) units.push(newsUnit);
+
+  const websiteCmsKeys = Array.from(new Set([...cmsKeys, ...mediaKeys]));
+  const websiteCmsUnit = createUnit(
+    `${parentItem.key}-cms`,
+    "Website / CMS",
+    websiteCmsKeys,
+    catalog,
+    {
+      description: "Seiten, Homepage, Navigation, Medien und Einstellungen",
+      iconLabel: "Seiten",
+      parentLabel: parentItem.label,
+    },
+  );
+  if (websiteCmsUnit) units.push(websiteCmsUnit);
+
+  const medienOnlyKeys = mediaKeys.filter((key) => !websiteCmsKeys.includes(key));
+  if (medienOnlyKeys.length > 0) {
+    const medienUnit = createUnit(
+      `${parentItem.key}-medien`,
+      "Medien",
+      medienOnlyKeys,
+      catalog,
+      {
+        description: "Medienbibliothek und Dateien",
+        iconLabel: "Medien",
+        parentLabel: parentItem.label,
+      },
+    );
+    if (medienUnit) units.push(medienUnit);
+  }
+
+  return units;
+}
+
 type UnitPresentation = {
   label: string;
   description?: string;
@@ -90,7 +185,7 @@ type UnitPresentation = {
 const UNIT_DESCRIPTION_BY_NAV_KEY: Record<string, string> = {
   teams: "Mannschaften und Kader",
   "provider-mapping": "Externe Anbieter und Team-Zuordnungen",
-  personen: "Personenstammdaten",
+  personen: "Personenstammdaten und Profile",
   competitions: "Ligen und Wettbewerbe",
   trainingcenter: "Trainingsplanung und Serien",
   wochenplanner: "Aggregierter Wochenüberblick",
@@ -102,18 +197,62 @@ const UNIT_DESCRIPTION_BY_NAV_KEY: Record<string, string> = {
   "admin-people-access": "Benutzer, Einladungen und Zugänge",
   "admin-tenants": "Mandantenverwaltung (Plattform)",
   "admin-integrations": "Externe Systemanbindungen",
+  "website-news": "News und Beiträge veröffentlichen",
+  "website-media": "Medienbibliothek und Dateien",
 };
+
+const FUNCTIONS_MANAGE_KEY = PERMISSIONS.FUNCTIONS_MANAGE;
 
 function presentationForNavChild(child: NavItemChild): UnitPresentation {
   const description = UNIT_DESCRIPTION_BY_NAV_KEY[child.key];
   if (child.key === "competitions") {
     return { label: "Wettbewerbe", description, iconLabel: "Wettkämpfe" };
   }
+  if (child.key === "personen") {
+    return { label: "Mitglieder", description, iconLabel: "Personen" };
+  }
   if (child.key === "communication-email-sender") {
     return {
       label: "Kommunikation",
       description: "E-Mail-Absender und Vereinskommunikation",
       iconLabel: "Kommunikation",
+    };
+  }
+  if (child.key === "website-news") {
+    return { label: "News", description, iconLabel: "News" };
+  }
+  if (child.key === "website-media") {
+    return { label: "Medien", description, iconLabel: "Medien" };
+  }
+  if (child.key === "admin-tenant-roles") {
+    return {
+      label: "Rollen & Berechtigungen",
+      description,
+      iconLabel: "Rollen & Berechtigungen",
+    };
+  }
+  if (child.key === "admin-seasons") {
+    return { label: "Saisons", description, iconLabel: "Saisons" };
+  }
+  if (child.key === "admin-facilities") {
+    return {
+      label: "Anlagen & Ressourcen",
+      description,
+      iconLabel: "Anlagen & Ressourcen",
+    };
+  }
+  if (child.key === "admin-people-access") {
+    return {
+      label: "Personen & Zugänge",
+      description,
+      iconLabel: "Personen & Zugänge",
+    };
+  }
+  if (child.key === "admin-branding") {
+    return {
+      label: "Administration",
+      description: "Club-Darstellung und Vereinseinstellungen",
+      iconLabel: "Darstellung",
     };
   }
   return {
@@ -128,32 +267,36 @@ function presentationForChildGroup(children: NavItemChild[]): UnitPresentation {
 
   if (keys.has("org-units") && keys.has("target-groups") && keys.has("vereine")) {
     return {
-      label: "Vereinsstruktur",
+      label: "Vereinsdaten",
       description: "Organisationseinheiten, Zielgruppen und Vereinsstruktur",
       iconLabel: "Organisationseinheiten",
     };
   }
 
-  if (
-    keys.has("website-overview") &&
-    keys.has("website-news") &&
-    keys.has("website-media") &&
-    keys.has("website-publishing")
-  ) {
+  if (keys.has("website-news") || keys.has("website-publishing")) {
     return {
-      label: "Inhalte & Veröffentlichungen",
-      description: "News, Medien und Veröffentlichungen",
+      label: "News",
+      description: "News und Beiträge veröffentlichen",
       iconLabel: "News",
     };
   }
 
+  if (keys.has("website-media")) {
+    return {
+      label: "Medien",
+      description: "Medienbibliothek und Dateien",
+      iconLabel: "Medien",
+    };
+  }
+
   if (
-    keys.has("website-pages") &&
-    keys.has("website-homepage") &&
-    keys.has("website-navigation")
+    keys.has("website-pages") ||
+    keys.has("website-homepage") ||
+    keys.has("website-navigation") ||
+    keys.has("website-overview")
   ) {
     return {
-      label: "Website & Seiten",
+      label: "Website / CMS",
       description: "Seiten, Homepage, Navigation und Einstellungen",
       iconLabel: "Seiten",
     };
@@ -443,11 +586,35 @@ function groupChildrenUnits(
     });
   }
 
+  if (parentItem.key === "website") {
+    units.push(...buildWebsiteUnits(parentItem, regularChildren, catalog));
+    return units;
+  }
+
   const signatureGroups = new Map<string, { children: NavItemChild[]; keys: string[] }>();
   for (const child of regularChildren) {
     if (child.key === TRAININGCENTER_KEY) continue;
+
     const keys = filterGrantableKeys(child.permissionKeys, catalog);
     if (keys.length === 0) continue;
+
+    if (parentItem.key === "administration") {
+      const presentation = presentationForNavChild(child);
+      const unit = createUnit(
+        `${parentItem.key}-${child.key}`,
+        presentation.label,
+        keys,
+        catalog,
+        {
+          description: presentation.description,
+          iconLabel: presentation.iconLabel,
+          parentLabel: parentItem.label,
+        },
+      );
+      if (unit) units.push(unit);
+      continue;
+    }
+
     const signature = [...keys].sort().join("|");
     const group = signatureGroups.get(signature) ?? { children: [], keys };
     group.children.push(child);
@@ -588,6 +755,28 @@ export function buildNavPermissionPresentation(
 
   for (const section of sections) {
     attachCatalogAdvancedPermissions(section.units, catalog, mappedKeys);
+  }
+
+  // Funktionen belongs under Organisation when grantable.
+  if (catalog.has(FUNCTIONS_MANAGE_KEY)) {
+    const organisation = sections.find((section) => section.label === "Organisation");
+    if (organisation) {
+      const functionsUnit = createUnit(
+        "organisation-functions",
+        "Funktionen",
+        [FUNCTIONS_MANAGE_KEY],
+        catalog,
+        {
+          description: "Vereinsfunktionen im Organigramm verwalten",
+          iconLabel: "Funktionen",
+          parentLabel: "Organisation",
+        },
+      );
+      if (functionsUnit) {
+        organisation.units.push(functionsUnit);
+        mappedKeys.add(FUNCTIONS_MANAGE_KEY);
+      }
+    }
   }
 
   const supplementalKeys = catalogRows

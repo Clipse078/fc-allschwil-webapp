@@ -170,16 +170,31 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
     expect(organisationToggle).toHaveAttribute("aria-expanded", "true");
     expect(websiteToggle).toHaveAttribute("aria-expanded", "false");
     expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.getByText("Vereinsstruktur")).toBeTruthy();
+    expect(screen.getByText("Vereinsdaten")).toBeTruthy();
   });
 
   it("shows concise product labels instead of long technical joins", () => {
     renderEditor();
 
-    expect(screen.getByText("Vereinsstruktur")).toBeTruthy();
+    expect(screen.getByText("Vereinsdaten")).toBeTruthy();
+    expect(screen.getByText("Mitglieder")).toBeTruthy();
     expect(
       screen.queryByText(/Organisationseinheiten · Zielgruppen · Vereine/),
     ).toBeNull();
+  });
+
+  it("renders section status labels and module count badges", () => {
+    renderEditor();
+
+    expect(screen.getAllByText(/Module/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Nicht aktiv|Teilweise aktiv|Aktiv/).length).toBeGreaterThan(0);
+  });
+
+  it("exposes bulk expand and clear controls", () => {
+    renderEditor();
+
+    expect(screen.getByRole("button", { name: "Alles einblenden" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Alle deaktivieren" })).toBeTruthy();
   });
 
   it("shows selected count on collapsed sections with active permissions", () => {
@@ -187,7 +202,7 @@ describe("NavAlignedPermissionEditor — ACCESS-ONBOARDING-03E", () => {
 
     const betriebToggle = screen.getByRole("button", { name: /Betrieb/i });
     expect(betriebToggle).toHaveAttribute("aria-expanded", "false");
-    expect(betriebToggle.textContent).toMatch(/2/);
+    expect(betriebToggle.textContent).toMatch(/Teilweise aktiv|Aktiv/);
   });
 
   it("renders advanced permissions behind Erweiterte Rechte disclosure", () => {

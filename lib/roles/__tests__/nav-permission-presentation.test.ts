@@ -77,7 +77,8 @@ describe("nav-permission-presentation", () => {
     );
 
     const organisation = presentation.sections.find((section) => section.label === "Organisation");
-    expect(organisation?.units.some((unit) => unit.label === "Vereinsstruktur")).toBe(true);
+    expect(organisation?.units.some((unit) => unit.label === "Vereinsdaten")).toBe(true);
+    expect(organisation?.units.some((unit) => unit.label === "Mitglieder")).toBe(true);
     expect(
       organisation?.units.some((unit) =>
         unit.label.includes("Organisationseinheiten · Zielgruppen"),
@@ -85,9 +86,8 @@ describe("nav-permission-presentation", () => {
     ).toBe(false);
 
     const website = presentation.sections.find((section) => section.label === "Website");
-    expect(website?.units.some((unit) => unit.label === "Inhalte & Veröffentlichungen")).toBe(
-      true,
-    );
+    expect(website?.units.some((unit) => unit.label === "News")).toBe(true);
+    expect(website?.units.some((unit) => unit.label === "Website / CMS")).toBe(true);
   });
 
   it("groups shared events permissions into a single Spielbetrieb unit", () => {
@@ -241,12 +241,12 @@ describe("nav-permission-presentation", () => {
 
   it("assigns icon labels and concise descriptions to permission units", () => {
     const presentation = buildNavPermissionPresentation(buildCatalog(TENANT_CATALOG_KEYS));
-    const vereinsstruktur = presentation.sections
+    const vereinsdaten = presentation.sections
       .find((section) => section.label === "Organisation")
-      ?.units.find((unit) => unit.label === "Vereinsstruktur");
+      ?.units.find((unit) => unit.label === "Vereinsdaten");
 
-    expect(vereinsstruktur?.iconLabel).toBe("Organisationseinheiten");
-    expect(vereinsstruktur?.description).toContain("Zielgruppen");
+    expect(vereinsdaten?.iconLabel).toBe("Organisationseinheiten");
+    expect(vereinsdaten?.description).toContain("Zielgruppen");
 
     const anmeldungen = presentation.sections
       .find((section) => section.label === "Betrieb")
@@ -255,11 +255,12 @@ describe("nav-permission-presentation", () => {
     expect(anmeldungen?.iconLabel).toBe("Anmeldungen");
   });
 
-  it("renames supplemental fallback to Weitere Zugriffsrechte", () => {
+  it("places Funktionen under Organisation when grantable", () => {
     const presentation = buildNavPermissionPresentation(
       buildCatalog([...TENANT_CATALOG_KEYS, PERMISSIONS.FUNCTIONS_MANAGE]),
     );
 
-    expect(presentation.supplementalUnit?.label).toBe("Weitere Zugriffsrechte");
+    const organisation = presentation.sections.find((section) => section.label === "Organisation");
+    expect(organisation?.units.some((unit) => unit.label === "Funktionen")).toBe(true);
   });
 });
