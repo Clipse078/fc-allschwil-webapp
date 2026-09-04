@@ -1,6 +1,6 @@
 /**
- * SCE-DESIGN-04C/04D — Premium animated sidebar nav iconography
- * Continuous semantic hover loops with rest beats; no whole-icon transforms.
+ * SCE-DESIGN-04C/04D/04E — Premium animated sidebar nav iconography
+ * Fast continuous semantic hover loops with short rest beats; no whole-icon transforms.
  */
 
 /* ── Base animated nav icon ─────────────────────────────────────────────── */
@@ -41,7 +41,17 @@
   opacity: 0;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  transition: opacity var(--sce-motion-duration-fast) var(--sce-motion-ease);
+  transition:
+    opacity var(--sce-nav-leave-settle) var(--sce-motion-ease-out),
+    stroke-dashoffset var(--sce-nav-leave-settle) var(--sce-motion-ease-out);
+}
+
+/* Pointer leave — deterministic settle back to idle within ~130ms */
+.sce-animated-nav-icon [class*="ani-"] {
+  transition:
+    transform var(--sce-nav-leave-settle) var(--sce-motion-ease-out),
+    opacity var(--sce-nav-leave-settle) var(--sce-motion-ease-out),
+    stroke-dashoffset var(--sce-nav-leave-settle) var(--sce-motion-ease-out);
 }
 
 /* Hover trigger — parent link drives animation with intent delay */
@@ -57,97 +67,114 @@
   stroke: color-mix(in srgb, var(--sce-nav-icon-copper) 45%, currentColor);
 }
 
-/* ── Loop keyframes (active segment + rest beat) ─────────────────────────── */
+/* ── Loop keyframes (active segment + short rest beat) ───────────────────── */
 
 @keyframes sce-nav-loop-settle-y {
-  0% { transform: translateY(-3px); opacity: 0.5; }
-  14% { transform: translateY(0); opacity: 1; }
-  32%, 100% { transform: translateY(0); opacity: 1; }
+  0% { transform: translateY(-2px); opacity: 0.55; }
+  10% { transform: translateY(0); opacity: 1; }
+  22% { transform: translateY(-1px); opacity: 0.88; }
+  32% { transform: translateY(0); opacity: 1; }
+  82%, 100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-settle-x {
   0% { transform: translateX(-2px); opacity: 0.6; }
-  14% { transform: translateX(0); opacity: 1; }
-  32%, 100% { transform: translateX(0); opacity: 1; }
+  10% { transform: translateX(0); opacity: 1; }
+  28% { transform: translateX(0); opacity: 1; }
+  80%, 100% { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-draw-stroke {
-  0% { stroke-dashoffset: 24; opacity: 0.4; }
-  16% { stroke-dashoffset: 0; opacity: 1; }
-  34%, 100% { stroke-dashoffset: 0; opacity: 1; }
+  0% { stroke-dashoffset: 20; opacity: 0.45; }
+  14% { stroke-dashoffset: 0; opacity: 1; }
+  26% { stroke-dashoffset: 0; opacity: 1; }
+  78%, 100% { stroke-dashoffset: 20; opacity: 0.45; }
 }
 
 @keyframes sce-nav-loop-copper-travel {
-  0%, 6% { stroke-dashoffset: 1; opacity: 0; }
-  12% { opacity: 1; }
-  28% { stroke-dashoffset: 0; opacity: 0.9; }
-  38%, 100% { stroke-dashoffset: 1; opacity: 0; }
+  0%, 3% { stroke-dashoffset: 1; opacity: 0.25; }
+  6% { opacity: 1; }
+  18% { stroke-dashoffset: 0; opacity: 1; }
+  24% { stroke-dashoffset: 0; opacity: 0.92; }
+  80%, 100% { stroke-dashoffset: 1; opacity: 0; }
 }
 
 @keyframes sce-nav-loop-ring-tighten {
-  0% { transform: scale(1.15); opacity: 0.5; }
-  16% { transform: scale(1); opacity: 1; }
-  34%, 100% { transform: scale(1); opacity: 1; }
+  0% { transform: scale(1.12); opacity: 0.55; }
+  12% { transform: scale(1); opacity: 1; }
+  28% { transform: scale(1); opacity: 1; }
+  82%, 100% { transform: scale(1); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-rotate-partial {
-  0%, 6% { transform: rotate(0deg); }
-  20% { transform: rotate(24deg); }
-  36%, 100% { transform: rotate(0deg); }
+  0%, 4% { transform: rotate(0deg); }
+  16% { transform: rotate(28deg); }
+  30% { transform: rotate(0deg); }
+  82%, 100% { transform: rotate(0deg); }
 }
 
 @keyframes sce-nav-loop-lift {
-  0%, 6% { transform: translateY(2px); }
-  18% { transform: translateY(-1px); }
-  34%, 100% { transform: translateY(0); }
+  0%, 4% { transform: translateY(2px); }
+  14% { transform: translateY(-2px); }
+  26% { transform: translateY(0); }
+  80%, 100% { transform: translateY(0); }
 }
 
 @keyframes sce-nav-loop-reveal {
-  0% { opacity: 0; transform: scale(0.85); }
-  16% { opacity: 1; transform: scale(1); }
-  34%, 100% { opacity: 1; transform: scale(1); }
+  0% { opacity: 0; transform: scale(0.88); }
+  12% { opacity: 1; transform: scale(1); }
+  26% { opacity: 1; transform: scale(1); }
+  80%, 100% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes sce-nav-loop-shift-queue {
-  0% { transform: translateY(-3px); opacity: 0.5; }
-  14% { transform: translateY(0); opacity: 1; }
-  32%, 100% { transform: translateY(0); opacity: 1; }
+  0% { transform: translateY(-2px); opacity: 0.55; }
+  10% { transform: translateY(0); opacity: 1; }
+  24% { transform: translateY(1px); opacity: 0.85; }
+  32% { transform: translateY(0); opacity: 1; }
+  82%, 100% { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-check-draw {
-  0% { stroke-dashoffset: 12; opacity: 0.3; }
-  16% { stroke-dashoffset: 0; opacity: 1; }
-  34%, 100% { stroke-dashoffset: 0; opacity: 1; }
+  0% { stroke-dashoffset: 12; opacity: 0.35; }
+  14% { stroke-dashoffset: 0; opacity: 1; }
+  28% { stroke-dashoffset: 0; opacity: 1; }
+  80%, 100% { stroke-dashoffset: 12; opacity: 0.35; }
 }
 
 @keyframes sce-nav-loop-line-slide {
-  0% { transform: translateX(-4px); opacity: 0.4; }
-  14% { transform: translateX(0); opacity: 1; }
-  32%, 100% { transform: translateX(0); opacity: 1; }
+  0% { transform: translateX(-3px); opacity: 0.45; }
+  10% { transform: translateX(0); opacity: 1; }
+  26% { transform: translateX(0); opacity: 1; }
+  80%, 100% { transform: translateX(0); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-pulse {
-  0%, 8% { transform: scale(1); opacity: 0.6; }
-  16% { transform: scale(1.3); opacity: 1; }
-  28%, 100% { transform: scale(1); opacity: 0.6; }
+  0%, 5% { transform: scale(1); opacity: 0.65; }
+  12% { transform: scale(1.25); opacity: 1; }
+  22% { transform: scale(1); opacity: 0.75; }
+  80%, 100% { transform: scale(1); opacity: 0.65; }
 }
 
 @keyframes sce-nav-loop-converge {
-  0% { transform: translate(var(--ani-tx, 0), var(--ani-ty, 0)); opacity: 0.5; }
-  16% { transform: translate(0, 0); opacity: 1; }
-  34%, 100% { transform: translate(0, 0); opacity: 1; }
+  0% { transform: translate(var(--ani-tx, 0), var(--ani-ty, 0)); opacity: 0.55; }
+  12% { transform: translate(0, 0); opacity: 1; }
+  28% { transform: translate(0, 0); opacity: 1; }
+  82%, 100% { transform: translate(0, 0); opacity: 1; }
 }
 
 @keyframes sce-nav-loop-open-flap {
-  0%, 6% { transform: rotateX(0deg); }
-  18% { transform: rotateX(-18deg); }
-  32%, 100% { transform: rotateX(0deg); }
+  0%, 4% { transform: rotateX(0deg); }
+  14% { transform: rotateX(-20deg); }
+  26% { transform: rotateX(0deg); }
+  80%, 100% { transform: rotateX(0deg); }
 }
 
 @keyframes sce-nav-loop-path-travel {
-  0%, 6% { stroke-dashoffset: 20; }
-  22% { stroke-dashoffset: 0; }
-  36%, 100% { stroke-dashoffset: 20; }
+  0%, 4% { stroke-dashoffset: 18; }
+  18% { stroke-dashoffset: 0; }
+  28% { stroke-dashoffset: 0; }
+  80%, 100% { stroke-dashoffset: 18; }
 }
 
 /* ── Hover loop application — pointer only, infinite while hovered ──────── */
@@ -155,7 +182,7 @@
 .sce-nav-item:hover .sce-animated-nav-icon [class*="ani-"],
 .sce-nav-child:hover .sce-animated-nav-icon [class*="ani-"] {
   animation-duration: var(--sce-nav-loop-duration);
-  animation-timing-function: var(--sce-motion-ease);
+  animation-timing-function: var(--sce-motion-ease-loop);
   animation-fill-mode: none;
   animation-delay: var(--sce-nav-hover-intent-delay);
   animation-iteration-count: infinite;
@@ -172,13 +199,13 @@
 .sce-nav-item:hover .ani-dash-tile-1,
 .sce-nav-child:hover .ani-dash-tile-1 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); }
 .sce-nav-item:hover .ani-dash-tile-2,
-.sce-nav-child:hover .ani-dash-tile-2 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 72ms); }
+.sce-nav-child:hover .ani-dash-tile-2 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 40ms); }
 .sce-nav-item:hover .ani-dash-tile-3,
-.sce-nav-child:hover .ani-dash-tile-3 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 96ms); }
+.sce-nav-child:hover .ani-dash-tile-3 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-dash-tile-4,
-.sce-nav-child:hover .ani-dash-tile-4 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-dash-tile-4 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 .sce-nav-item:hover .ani-dash-copper,
-.sce-nav-child:hover .ani-dash-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-dash-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 
 /* ── Organisation / group icons ─────────────────────────────────────────── */
 
@@ -190,7 +217,7 @@
 .sce-nav-item:hover .ani-org-link,
 .sce-nav-child:hover .ani-org-link { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 8; }
 .sce-nav-item:hover .ani-org-copper,
-.sce-nav-child:hover .ani-org-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); }
+.sce-nav-child:hover .ani-org-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); }
 
 /* Hierarchy */
 .sce-nav-item:hover .ani-hier-trunk,
@@ -198,7 +225,7 @@
 .sce-nav-item:hover .ani-hier-branch,
 .sce-nav-child:hover .ani-hier-branch { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 10; }
 .sce-nav-item:hover .ani-hier-branch-2,
-.sce-nav-child:hover .ani-hier-branch-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-hier-branch-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-hier-node,
 .sce-nav-child:hover .ani-hier-node { animation-name: sce-nav-loop-reveal; }
 
@@ -207,9 +234,9 @@
 .sce-nav-item:hover .ani-target-ring-outer,
 .sce-nav-child:hover .ani-target-ring-outer { animation-name: sce-nav-loop-ring-tighten; animation-duration: var(--sce-nav-loop-duration-long); }
 .sce-nav-item:hover .ani-target-ring-mid,
-.sce-nav-child:hover .ani-target-ring-mid { animation-name: sce-nav-loop-ring-tighten; animation-duration: var(--sce-nav-loop-duration); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
+.sce-nav-child:hover .ani-target-ring-mid { animation-name: sce-nav-loop-ring-tighten; animation-duration: var(--sce-nav-loop-duration); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 35ms); }
 .sce-nav-item:hover .ani-target-center,
-.sce-nav-child:hover .ani-target-center { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-target-center { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* Teams */
 .ani-team-node-1 { --ani-tx: -3px; }
@@ -223,7 +250,7 @@
 .sce-nav-item:hover .ani-map-line,
 .sce-nav-child:hover .ani-map-line { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 12; }
 .sce-nav-item:hover .ani-map-copper,
-.sce-nav-child:hover .ani-map-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-map-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-map-endpoint,
 .sce-nav-child:hover .ani-map-endpoint { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); }
 
@@ -235,7 +262,7 @@
 .sce-nav-item:hover .ani-person-head,
 .sce-nav-child:hover .ani-person-head { animation-name: sce-nav-loop-reveal; }
 .sce-nav-item:hover .ani-person-body,
-.sce-nav-child:hover .ani-person-body { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 20; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-person-body { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 20; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 
 /* Competition */
 .sce-nav-item:hover .ani-compete-left,
@@ -243,7 +270,7 @@
 .sce-nav-item:hover .ani-compete-right,
 .sce-nav-child:hover .ani-compete-right { animation-name: sce-nav-loop-settle-x; animation-direction: reverse; }
 .sce-nav-item:hover .ani-compete-clash,
-.sce-nav-child:hover .ani-compete-clash { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-compete-clash { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* ── Website / globe ─────────────────────────────────────────────────────── */
 
@@ -252,67 +279,67 @@
 .sce-nav-item:hover .ani-globe-lon,
 .sce-nav-child:hover .ani-globe-lon { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 24; }
 .sce-nav-item:hover .ani-globe-lon-2,
-.sce-nav-child:hover .ani-globe-lon-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-globe-lon-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 .sce-nav-item:hover .ani-globe-copper,
-.sce-nav-child:hover .ani-globe-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-globe-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* Grid panels */
 .sce-nav-item:hover .ani-grid-panel-1,
 .sce-nav-child:hover .ani-grid-panel-1 { animation-name: sce-nav-loop-settle-y; animation-duration: var(--sce-nav-loop-duration-short); }
 .sce-nav-item:hover .ani-grid-panel-2,
-.sce-nav-child:hover .ani-grid-panel-2 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
+.sce-nav-child:hover .ani-grid-panel-2 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 35ms); }
 .sce-nav-item:hover .ani-grid-panel-3,
-.sce-nav-child:hover .ani-grid-panel-3 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-grid-panel-3 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-grid-panel-4,
-.sce-nav-child:hover .ani-grid-panel-4 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-grid-panel-4 { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 
 /* News */
 .sce-nav-item:hover .ani-news-line,
 .sce-nav-child:hover .ani-news-line { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 10; }
 .sce-nav-item:hover .ani-news-line-2,
-.sce-nav-child:hover .ani-news-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-news-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 .sce-nav-item:hover .ani-news-line-3,
-.sce-nav-child:hover .ani-news-line-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-news-line-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 .sce-nav-item:hover .ani-news-pulse,
-.sce-nav-child:hover .ani-news-pulse { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 180ms); }
+.sce-nav-child:hover .ani-news-pulse { animation-name: sce-nav-loop-pulse; animation-duration: var(--sce-nav-loop-duration-short); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 95ms); }
 
 /* Pages */
 .sce-nav-item:hover .ani-page-layer,
 .sce-nav-child:hover .ani-page-layer { animation-name: sce-nav-loop-line-slide; }
 .sce-nav-item:hover .ani-page-layer-2,
-.sce-nav-child:hover .ani-page-layer-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-page-layer-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 
 /* Blocks */
 .sce-nav-item:hover .ani-block,
 .sce-nav-child:hover .ani-block { animation-name: sce-nav-loop-settle-y; }
 .sce-nav-item:hover .ani-block-2,
-.sce-nav-child:hover .ani-block-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 70ms); }
+.sce-nav-child:hover .ani-block-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 40ms); }
 .sce-nav-item:hover .ani-block-3,
-.sce-nav-child:hover .ani-block-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-block-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* Menu lines */
 .sce-nav-item:hover .ani-menu-line,
 .sce-nav-child:hover .ani-menu-line { animation-name: sce-nav-loop-line-slide; }
 .sce-nav-item:hover .ani-menu-line-2,
-.sce-nav-child:hover .ani-menu-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
+.sce-nav-child:hover .ani-menu-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 35ms); }
 .sce-nav-item:hover .ani-menu-line-3,
-.sce-nav-child:hover .ani-menu-line-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 110ms); }
+.sce-nav-child:hover .ani-menu-line-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
 
 /* Reveal blocks */
 .sce-nav-item:hover .ani-reveal-block,
 .sce-nav-child:hover .ani-reveal-block { animation-name: sce-nav-loop-reveal; }
 .sce-nav-item:hover .ani-reveal-block-2,
-.sce-nav-child:hover .ani-reveal-block-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 70ms); }
+.sce-nav-child:hover .ani-reveal-block-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 40ms); }
 .sce-nav-item:hover .ani-reveal-block-3,
-.sce-nav-child:hover .ani-reveal-block-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-reveal-block-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 .sce-nav-item:hover .ani-reveal-block-4,
-.sce-nav-child:hover .ani-reveal-block-4 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 170ms); }
+.sce-nav-child:hover .ani-reveal-block-4 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 90ms); }
 
 /* Media */
 .sce-nav-item:hover .ani-media-inner,
-.sce-nav-child:hover .ani-media-inner { animation-name: sce-nav-loop-reveal; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-media-inner { animation-name: sce-nav-loop-reveal; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-media-reveal,
-.sce-nav-child:hover .ani-media-reveal { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 16; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-media-reveal { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 16; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 
 /* Pen */
 .sce-nav-item:hover .ani-pen-stroke,
@@ -322,15 +349,15 @@
 .sce-nav-item:hover .ani-publish-arrow,
 .sce-nav-child:hover .ani-publish-arrow { animation-name: sce-nav-loop-settle-x; }
 .sce-nav-item:hover .ani-publish-arrowhead,
-.sce-nav-child:hover .ani-publish-arrowhead { animation-name: sce-nav-loop-line-slide; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-publish-arrowhead { animation-name: sce-nav-loop-line-slide; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 .sce-nav-item:hover .ani-publish-dest,
-.sce-nav-child:hover .ani-publish-dest { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 200ms); stroke: var(--sce-nav-icon-copper); }
+.sce-nav-child:hover .ani-publish-dest { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); stroke: var(--sce-nav-icon-copper); }
 .sce-nav-item:hover .ani-publish-copper,
-.sce-nav-child:hover .ani-publish-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-publish-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 
 /* Reuse loop */
 .sce-nav-item:hover .ani-reuse-loop,
-.sce-nav-child:hover .ani-reuse-loop { animation-name: sce-nav-loop-path-travel; stroke-dasharray: 16; animation-duration: var(--sce-nav-loop-duration-long); }
+.sce-nav-child:hover .ani-reuse-loop { animation-name: sce-nav-loop-path-travel; stroke-dasharray: 16; animation-duration: var(--sce-nav-loop-duration-copper); }
 
 /* Gear */
 .ani-gear-teeth { transform-origin: 12px 12px; }
@@ -342,7 +369,7 @@
 .sce-nav-item:hover .ani-cal-marker,
 .sce-nav-child:hover .ani-cal-marker { animation-name: sce-nav-loop-pulse; }
 .sce-nav-item:hover .ani-cal-copper,
-.sce-nav-child:hover .ani-cal-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-cal-copper { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-cal-pin,
 .sce-nav-child:hover .ani-cal-pin { animation-name: sce-nav-loop-settle-y; }
 
@@ -360,11 +387,11 @@
 .sce-nav-item:hover .ani-trophy-cup,
 .sce-nav-child:hover .ani-trophy-cup { animation-name: sce-nav-loop-lift; animation-duration: var(--sce-nav-loop-duration-long); }
 .sce-nav-item:hover .ani-trophy-highlight,
-.sce-nav-child:hover .ani-trophy-highlight { animation-name: sce-nav-loop-copper-travel; stroke: var(--sce-nav-icon-copper); stroke-dasharray: 8; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-trophy-highlight { animation-name: sce-nav-loop-copper-travel; stroke: var(--sce-nav-icon-copper); stroke-dasharray: 8; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* Event page */
 .sce-nav-item:hover .ani-event-marker,
-.sce-nav-child:hover .ani-event-marker { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 160ms); }
+.sce-nav-child:hover .ani-event-marker { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 85ms); }
 .sce-nav-item:hover .ani-event-line,
 .sce-nav-child:hover .ani-event-line { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 8; }
 
@@ -372,23 +399,23 @@
 .sce-nav-item:hover .ani-week-col,
 .sce-nav-child:hover .ani-week-col { animation-name: sce-nav-loop-reveal; }
 .sce-nav-item:hover .ani-week-col-2,
-.sce-nav-child:hover .ani-week-col-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
+.sce-nav-child:hover .ani-week-col-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 35ms); }
 .sce-nav-item:hover .ani-week-col-3,
-.sce-nav-child:hover .ani-week-col-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 110ms); }
+.sce-nav-child:hover .ani-week-col-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
 .sce-nav-item:hover .ani-week-col-4,
-.sce-nav-child:hover .ani-week-col-4 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 160ms); }
+.sce-nav-child:hover .ani-week-col-4 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 85ms); }
 
 /* Folder */
 .sce-nav-item:hover .ani-folder-tab,
 .sce-nav-child:hover .ani-folder-tab { animation-name: sce-nav-loop-open-flap; transform-origin: 11px 5px; }
 .sce-nav-item:hover .ani-folder-doc,
-.sce-nav-child:hover .ani-folder-doc { animation-name: sce-nav-loop-reveal; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-folder-doc { animation-name: sce-nav-loop-reveal; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 .sce-nav-item:hover .ani-folder-copper,
-.sce-nav-child:hover .ani-folder-copper { animation-name: sce-nav-loop-copper-travel; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-folder-copper { animation-name: sce-nav-loop-copper-travel; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 
 /* Inbox */
 .sce-nav-item:hover .ani-inbox-doc,
-.sce-nav-child:hover .ani-inbox-doc { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-inbox-doc { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 .sce-nav-item:hover .ani-inbox-flap,
 .sce-nav-child:hover .ani-inbox-flap { animation-name: sce-nav-loop-open-flap; transform-origin: 12px 6px; }
 
@@ -400,25 +427,25 @@
 .sce-nav-item:hover .ani-queue-item,
 .sce-nav-child:hover .ani-queue-item { animation-name: sce-nav-loop-shift-queue; }
 .sce-nav-item:hover .ani-queue-item-2,
-.sce-nav-child:hover .ani-queue-item-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 70ms); }
+.sce-nav-child:hover .ani-queue-item-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 40ms); }
 .sce-nav-item:hover .ani-queue-item-3,
-.sce-nav-child:hover .ani-queue-item-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 130ms); }
+.sce-nav-child:hover .ani-queue-item-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 70ms); }
 
 /* Archive */
 .sce-nav-item:hover .ani-archive-item,
-.sce-nav-child:hover .ani-archive-item { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-archive-item { animation-name: sce-nav-loop-settle-y; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 
 /* Envelope / communication */
 .sce-nav-item:hover .ani-envelope-flap,
 .sce-nav-child:hover .ani-envelope-flap { animation-name: sce-nav-loop-open-flap; transform-origin: 12px 7px; }
 .sce-nav-item:hover .ani-envelope-wave,
-.sce-nav-child:hover .ani-envelope-wave { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-long); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-envelope-wave { animation-name: sce-nav-loop-copper-travel; animation-duration: var(--sce-nav-loop-duration-copper); animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 /* Send */
 .sce-nav-item:hover .ani-send-arrow,
 .sce-nav-child:hover .ani-send-arrow { animation-name: sce-nav-loop-settle-x; }
 .sce-nav-item:hover .ani-send-copper,
-.sce-nav-child:hover .ani-send-copper { animation-name: sce-nav-loop-copper-travel; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 100ms); }
+.sce-nav-child:hover .ani-send-copper { animation-name: sce-nav-loop-copper-travel; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 55ms); }
 
 /* ── System / Führung ───────────────────────────────────────────────────── */
 
@@ -428,9 +455,9 @@
 .sce-nav-item:hover .ani-overview-tile,
 .sce-nav-child:hover .ani-overview-tile { animation-name: sce-nav-loop-settle-y; }
 .sce-nav-item:hover .ani-overview-tile-2,
-.sce-nav-child:hover .ani-overview-tile-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
+.sce-nav-child:hover .ani-overview-tile-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 35ms); }
 .sce-nav-item:hover .ani-overview-tile-3,
-.sce-nav-child:hover .ani-overview-tile-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 110ms); }
+.sce-nav-child:hover .ani-overview-tile-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 60ms); }
 
 .sce-nav-item:hover .ani-preview-play,
 .sce-nav-child:hover .ani-preview-play { animation-name: sce-nav-loop-reveal; }
@@ -438,12 +465,12 @@
 .sce-nav-item:hover .ani-scroll-line,
 .sce-nav-child:hover .ani-scroll-line { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 8; }
 .sce-nav-item:hover .ani-scroll-line-2,
-.sce-nav-child:hover .ani-scroll-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-scroll-line-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 
 .sce-nav-item:hover .ani-trend-point,
 .sce-nav-child:hover .ani-trend-point { animation-name: sce-nav-loop-pulse; }
 .sce-nav-item:hover .ani-trend-point-2,
-.sce-nav-child:hover .ani-trend-point-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-trend-point-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 .sce-nav-item:hover .ani-trend-line,
 .sce-nav-child:hover .ani-trend-line { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 16; }
 
@@ -462,9 +489,9 @@
 .sce-nav-item:hover .ani-palette-dot,
 .sce-nav-child:hover .ani-palette-dot { animation-name: sce-nav-loop-pulse; }
 .sce-nav-item:hover .ani-palette-dot-2,
-.sce-nav-child:hover .ani-palette-dot-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 70ms); }
+.sce-nav-child:hover .ani-palette-dot-2 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 40ms); }
 .sce-nav-item:hover .ani-palette-dot-3,
-.sce-nav-child:hover .ani-palette-dot-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 120ms); }
+.sce-nav-child:hover .ani-palette-dot-3 { animation-delay: calc(var(--sce-nav-hover-intent-delay) + 65ms); }
 
 .sce-nav-item:hover .ani-users-head,
 .sce-nav-child:hover .ani-users-head { animation-name: sce-nav-loop-converge; }
@@ -476,7 +503,7 @@
 .sce-nav-item:hover .ani-plug-connector,
 .sce-nav-child:hover .ani-plug-connector { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 8; }
 .sce-nav-item:hover .ani-plug-node,
-.sce-nav-child:hover .ani-plug-node { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 140ms); }
+.sce-nav-child:hover .ani-plug-node { animation-name: sce-nav-loop-pulse; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 75ms); }
 
 /* Goals */
 .sce-nav-item:hover .ani-goal-arrow,
@@ -498,7 +525,7 @@
 .sce-nav-item:hover .ani-tenant-lat,
 .sce-nav-child:hover .ani-tenant-lat { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 16; }
 .sce-nav-item:hover .ani-tenant-lon,
-.sce-nav-child:hover .ani-tenant-lon { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 20; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 80ms); }
+.sce-nav-child:hover .ani-tenant-lon { animation-name: sce-nav-loop-draw-stroke; stroke-dasharray: 20; animation-delay: calc(var(--sce-nav-hover-intent-delay) + 45ms); }
 
 /* Role */
 .sce-nav-item:hover .ani-role-mark,
