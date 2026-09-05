@@ -171,9 +171,7 @@ describe("POST /api/auth/stop-impersonation", () => {
     mocks.auth.mockResolvedValue({ user: impersonatedUser });
     mocks.userFindUnique.mockResolvedValue({ id: "actor-1", isActive: true });
 
-    const response = await stopImpersonation(
-      request("/api/auth/stop-impersonation"),
-    );
+    const response = await stopImpersonation();
 
     expect(response.status).toBe(200);
     expect(mocks.userFindUnique).toHaveBeenCalledWith(
@@ -190,9 +188,7 @@ describe("POST /api/auth/stop-impersonation", () => {
   });
 
   it("rejects stop without trusted impersonation state", async () => {
-    const response = await stopImpersonation(
-      request("/api/auth/stop-impersonation"),
-    );
+    const response = await stopImpersonation();
 
     expect(response.status).toBe(400);
     expect(mocks.stopImpersonationSession).not.toHaveBeenCalled();
@@ -202,9 +198,7 @@ describe("POST /api/auth/stop-impersonation", () => {
     mocks.auth.mockResolvedValue({ user: impersonatedUser });
     mocks.userFindUnique.mockResolvedValue({ id: "actor-1", isActive: false });
 
-    const response = await stopImpersonation(
-      request("/api/auth/stop-impersonation"),
-    );
+    const response = await stopImpersonation();
 
     expect(response.status).toBe(404);
     expect(mocks.stopImpersonationSession).not.toHaveBeenCalled();
@@ -215,9 +209,7 @@ describe("POST /api/auth/stop-impersonation", () => {
     mocks.userFindUnique.mockResolvedValue({ id: "actor-1", isActive: true });
     mocks.stopImpersonationSession.mockResolvedValue({ user: impersonatedUser });
 
-    const response = await stopImpersonation(
-      request("/api/auth/stop-impersonation"),
-    );
+    const response = await stopImpersonation();
 
     expect(response.status).toBe(409);
   });

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { auth, stopImpersonationSession } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
 
-export async function POST(_: NextRequest) {
+export async function POST() {
   const session = await auth();
 
   if (!session?.user || !session.user.isImpersonating || !session.user.actorUserId) {

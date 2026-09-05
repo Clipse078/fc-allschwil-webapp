@@ -279,36 +279,37 @@ export async function applyTrustedJwtState(
   return token;
 }
 
-export function applyTokenToSessionUser(
-  session: { user?: Record<string, unknown> },
+export function applyTokenToSessionUser<T extends { user?: unknown }>(
+  session: T,
   token: JWT,
-) {
-  if (!session.user) return session;
+): T {
+  if (!session.user || typeof session.user !== "object") return session;
+  const sessionUser = session.user as Record<string, unknown>;
 
-  session.user.id = String(token.id ?? "");
-  session.user.email = String(token.email ?? "");
-  session.user.firstName = String(token.firstName ?? "");
-  session.user.lastName = String(token.lastName ?? "");
-  session.user.roleKeys = Array.isArray(token.roleKeys) ? token.roleKeys.map(String) : [];
-  session.user.permissionKeys = Array.isArray(token.permissionKeys)
+  sessionUser.id = String(token.id ?? "");
+  sessionUser.email = String(token.email ?? "");
+  sessionUser.firstName = String(token.firstName ?? "");
+  sessionUser.lastName = String(token.lastName ?? "");
+  sessionUser.roleKeys = Array.isArray(token.roleKeys) ? token.roleKeys.map(String) : [];
+  sessionUser.permissionKeys = Array.isArray(token.permissionKeys)
     ? token.permissionKeys.map(String)
     : [];
-  session.user.isImpersonating = Boolean(token.isImpersonating);
-  session.user.actorUserId =
+  sessionUser.isImpersonating = Boolean(token.isImpersonating);
+  sessionUser.actorUserId =
     typeof token.sub === "string" ? token.sub : undefined;
-  session.user.actorEmail =
+  sessionUser.actorEmail =
     typeof token.actorEmail === "string" ? token.actorEmail : undefined;
-  session.user.actorName =
+  sessionUser.actorName =
     typeof token.actorName === "string" ? token.actorName : undefined;
-  session.user.effectiveUserId =
+  sessionUser.effectiveUserId =
     typeof token.effectiveUserId === "string"
       ? token.effectiveUserId
-      : session.user.id;
-  session.user.activeTenantId =
+      : sessionUser.id;
+  sessionUser.activeTenantId =
     typeof token.activeTenantId === "string" ? token.activeTenantId : null;
-  session.user.activeMembershipId =
+  sessionUser.activeMembershipId =
     typeof token.activeMembershipId === "string" ? token.activeMembershipId : null;
-  session.user.availableTenants = Array.isArray(token.availableTenants)
+  sessionUser.availableTenants = Array.isArray(token.availableTenants)
     ? token.availableTenants
     : [];
 
