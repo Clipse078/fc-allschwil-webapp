@@ -151,6 +151,10 @@ export async function deleteMediaBlob(url: string): Promise<void> {
   try {
     await del(url, { token });
   } catch (err) {
-    console.warn("[media] deleteMediaBlob: failed to delete", url, err);
+    console.warn("[blob-cleanup] operation failed", {
+      operation: "deleteMediaBlob",
+      errorCategory:
+        err instanceof Error && err.name ? err.name : "UnknownError",
+    });
   }
 }
