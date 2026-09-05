@@ -355,7 +355,17 @@ export async function applyTrustedJwtState(
   if (intent.kind === "start-impersonation") {
     if (token.isImpersonating) return token;
     const target = await loadLiveSessionUser(prisma, intent.targetUserId);
-    if (!target) return token;
+    if (
+      !target?.activeTenantId ||
+      !target.activeMembershipId ||
+      !(await isCurrentEffectiveUserEligible(
+        prisma,
+        target.id,
+        target.activeTenantId,
+      ))
+    ) {
+      return token;
+    }
     applyEffectiveUserState(token, target, true);
     return token;
   }
