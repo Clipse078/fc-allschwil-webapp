@@ -276,7 +276,11 @@ describe("resolveSessionPermissionKeys", () => {
       }),
       tenantMembershipFindUnique: vi
         .fn()
-        .mockResolvedValue({ isActive: true, tenant: { status: "ACTIVE" } }),
+        .mockResolvedValue({
+          isActive: true,
+          user: { isActive: true },
+          tenant: { status: "ACTIVE" },
+        }),
     });
 
     const keys = await resolveSessionPermissionKeys(prisma, "user-1", "tenant-1");
@@ -302,7 +306,11 @@ describe("resolveSessionPermissionKeys", () => {
       }),
       tenantMembershipFindUnique: vi
         .fn()
-        .mockResolvedValue({ isActive: true, tenant: { status: "ARCHIVED" } }),
+        .mockResolvedValue({
+          isActive: true,
+          user: { isActive: true },
+          tenant: { status: "ARCHIVED" },
+        }),
     });
 
     const keys = await resolveSessionPermissionKeys(prisma, "user-1", "tenant-1");
