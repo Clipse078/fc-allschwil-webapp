@@ -34,6 +34,7 @@ import {
   createPrismaMatchReconciliationDatabase,
   type MatchReconciliationResult,
 } from "../lib/sporting-data/match-reconciliation";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 export const EXECUTE_CONFIRMATION = "FIX-SFV-MATCH-LIFECYCLE";
 
@@ -163,6 +164,15 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<void
   if (execute && env === "PROD") {
     console.error("Refusing --execute against production DATABASE_URL.");
     process.exit(1);
+  }
+
+  if (execute) {
+    assertOperationalMutationAllowed({
+      operationId: "team-sfv-03-match-lifecycle-reconciliation",
+      databaseUrl: connectionString,
+      explicitIntent: true,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   const { prisma, pool } = createPrismaClient(connectionString);

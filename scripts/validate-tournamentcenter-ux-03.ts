@@ -24,6 +24,7 @@ import {
   listTournamentParticipants,
   removeTournamentParticipant,
 } from "@/lib/tournaments/participant-service";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const TENANT_ID = "cmomwboak0000tsf3zzivrs46"; // FC Allschwil
 const ZERO_TEAM_CLUB_ID = "manualcheck-club-zero"; // "AC Rossoneri (Manual Check)" — 0 ExternalTeam rows
@@ -44,6 +45,12 @@ function check(label: string, condition: boolean) {
 }
 
 async function main() {
+  assertOperationalMutationAllowed({
+    operationId: "validate-tournamentcenter-ux-03-fixtures",
+    databaseUrl: process.env.DATABASE_URL,
+    explicitIntent: true,
+  });
+
   console.log("=== PART 7 — complete canonical club list (same universe as /dashboard/vereine) ===");
   const database = createClubDirectoryQueryDatabase(prisma);
   const clubs = await listExternalClubs(database, { tenantId: TENANT_ID, limit: 200 });

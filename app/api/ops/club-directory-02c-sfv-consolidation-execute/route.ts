@@ -65,11 +65,9 @@
  *   see lib/env.ts#getRuntimeEnvironment), checked BEFORE authentication.
  *
  * AUTHENTICATION
- *   Same `CRON_SECRET` operator secret, same `Authorization: Bearer
- *   <CRON_SECRET>` contract as app/api/cron/sfv-sync/route.ts and the
- *   read-only CLUB-DIRECTORY-02C ops endpoint. Fails closed (401) if
- *   CRON_SECRET is not configured server-side. No new persistent secret is
- *   introduced.
+ *   Requires an authenticated SCE platform operator with the existing
+ *   platform-only `tenants.manage` permission. Routine `CRON_SECRET` is never
+ *   accepted.
  *
  * FIXED TENANT
  *   Operates ONLY on the hard-coded tenant key `fc-allschwil` — the request
@@ -144,6 +142,8 @@ import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
 import { persistConsolidationBackupSnapshot } from "@/lib/club-directory/ops-backup-storage";
 import { consolidateExternalClubsByProviderIdentity } from "@/lib/club-directory/consolidation-service";
 import { createClubConsolidationDatabase } from "@/lib/club-directory/prisma-consolidation-adapter";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -153,17 +153,6 @@ export const dynamic = "force-dynamic";
 const ALLOWED_TENANT_KEY = "fc-allschwil";
 
 const GENERIC_ERROR_MESSAGE = "Interner Serverfehler. Bitte erneut versuchen.";
-
-function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    // Fail closed: never allow an unauthenticated trigger of this endpoint.
-    return false;
-  }
-
-  const authHeader = request.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
-}
 
 type ExecuteRequestBody = {
   confirmation?: unknown;
@@ -324,9 +313,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── 2. Authentication — same operator secret as the SFV cron route ────────
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ── 2. Existing platform-operator permission boundary ─────────────────────
+  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   // ── 3. Body / confirmation / fingerprint — before ANY tenant/SFV/DB work ──

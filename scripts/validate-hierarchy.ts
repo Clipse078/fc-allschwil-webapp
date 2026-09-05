@@ -16,6 +16,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 // ── helpers mirrored from app/api/org-units/[id]/route.ts ─────────────────
 
@@ -96,7 +97,14 @@ function assert(
 // ── main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+  assertOperationalMutationAllowed({
+    operationId: "validate-hierarchy-fixtures",
+    databaseUrl: connectionString,
+    explicitIntent: true,
+  });
+
+  const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 

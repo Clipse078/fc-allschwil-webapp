@@ -32,6 +32,7 @@ loadEnvConfig(process.cwd());
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PermissionModule, PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 // ── Mode ───────────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,15 @@ if (!connectionString) {
     "[sync-workspace-permissions] ERROR: Neither DIRECT_DATABASE_URL nor DATABASE_URL is set."
   );
   process.exit(1);
+}
+
+if (!DRY_RUN) {
+  assertOperationalMutationAllowed({
+    operationId: "sync-workspace-permissions",
+    databaseUrl: connectionString,
+    explicitIntent: process.env.APPLY_PERMISSION_SYNC === "true",
+    allowedRemoteEnvironments: ["stage"],
+  });
 }
 
 // ── Client ─────────────────────────────────────────────────────────────────────

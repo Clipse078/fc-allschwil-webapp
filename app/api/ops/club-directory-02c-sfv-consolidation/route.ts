@@ -50,11 +50,9 @@
  *     imported, read, or accepted from this route in any form.
  *
  * AUTHENTICATION
- *   Reuses the existing `CRON_SECRET` operator secret (see
- *   app/api/cron/sfv-sync/route.ts) via the identical
- *   `Authorization: Bearer <CRON_SECRET>` contract — no new permanent
- *   secret is introduced. Fails closed (401) if CRON_SECRET is not
- *   configured server-side.
+ *   Requires an authenticated SCE platform operator with the existing
+ *   platform-only `tenants.manage` permission. Routine `CRON_SECRET`
+ *   scheduler authority is deliberately not accepted.
  *
  * ENVIRONMENT GUARD — STAGE ONLY
  *   Rejects with 403 on every environment except STAGE (`APP_ENV=stage`,
@@ -104,6 +102,8 @@ import {
   type TenantInventory,
 } from "@/scripts/club-directory-02c-sfv-consolidation";
 import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -119,17 +119,6 @@ type AllowedMode = (typeof ALLOWED_MODES)[number];
 
 function isAllowedMode(value: string | null): value is AllowedMode {
   return value !== null && (ALLOWED_MODES as readonly string[]).includes(value);
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    // Fail closed: never allow an unauthenticated trigger of this endpoint.
-    return false;
-  }
-
-  const authHeader = request.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
 }
 
 /** Strips this down to exactly the fields the task requires — no raw provider data. */
@@ -151,9 +140,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── 2. Authentication — same operator secret as the SFV cron route ────────
-  if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ── 2. Existing platform-operator permission boundary ─────────────────────
+  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   // ── 3. Tenant must be explicit and match the single allowed tenant ────────

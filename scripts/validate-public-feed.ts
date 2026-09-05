@@ -27,6 +27,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 // ── test utilities ──────────────────────────────────────────────────────────
 
@@ -54,7 +55,14 @@ function assert(id: number, name: string, condition: boolean, note: string) {
 // ── main ────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const connectionString = process.env.DATABASE_URL;
+  assertOperationalMutationAllowed({
+    operationId: "validate-public-feed-fixtures",
+    databaseUrl: connectionString,
+    explicitIntent: true,
+  });
+
+  const pool = new Pool({ connectionString });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 

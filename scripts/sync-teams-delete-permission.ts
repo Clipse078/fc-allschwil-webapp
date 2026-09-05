@@ -54,6 +54,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { reconcileTeamsDeletePermission } from "@/lib/permissions/teams-delete-permission-reconciliation";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 // ── Mode ───────────────────────────────────────────────────────────────────────
 
@@ -68,6 +69,15 @@ if (!connectionString) {
     "[sync-teams-delete-permission] ERROR: Neither DIRECT_DATABASE_URL nor DATABASE_URL is set."
   );
   process.exit(1);
+}
+
+if (!DRY_RUN) {
+  assertOperationalMutationAllowed({
+    operationId: "sync-teams-delete-permission",
+    databaseUrl: connectionString,
+    explicitIntent: process.env.APPLY_PERMISSION_SYNC === "true",
+    allowedRemoteEnvironments: ["stage"],
+  });
 }
 
 // ── Client ─────────────────────────────────────────────────────────────────────

@@ -61,6 +61,7 @@ import {
   applyRepairableEntries,
   type StaleMatchReconciliationReport,
 } from "../lib/integrations/sfv/sync/stale-match-reconciliation";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 export const EXECUTE_CONFIRMATION = "FIX-SFV-STALE-MATCHES";
 
@@ -222,6 +223,14 @@ async function main(): Promise<void> {
         "explicit instructions (TEAM-SFV-MAPPING-04 must not mutate STAGE). Use --dry-run instead.",
     );
     process.exit(1);
+  }
+
+  if (opts.execute) {
+    assertOperationalMutationAllowed({
+      operationId: "team-sfv-mapping-04-stale-match-reconciliation",
+      databaseUrl: connectionString,
+      explicitIntent: opts.confirm === EXECUTE_CONFIRMATION,
+    });
   }
 
   console.log(`[team-sfv-mapping-04] Database: ${maskUrl(connectionString)}`);

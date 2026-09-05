@@ -59,6 +59,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, RoleScope } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
 // ---------------------------------------------------------------------------
@@ -773,6 +774,15 @@ async function main(): Promise<void> {
         "This script must only run against STAGE or LOCAL environments.",
     );
     process.exit(1);
+  }
+
+  if (opts.execute) {
+    assertOperationalMutationAllowed({
+      operationId: "rperm-05c1-consolidate-club-admin-roles",
+      databaseUrl: connectionString,
+      explicitIntent: opts.confirm === EXECUTE_CONFIRMATION,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   console.log(`[rperm-05c1] Database: ${maskUrl(connectionString)}`);

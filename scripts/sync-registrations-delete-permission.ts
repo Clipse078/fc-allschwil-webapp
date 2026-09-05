@@ -27,10 +27,20 @@
 
 import { prisma } from "@/lib/db/prisma";
 import { reconcileRegistrationsDeletePermission } from "@/lib/permissions/registrations-delete-permission-reconciliation";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 async function main() {
   const apply = process.argv.includes("--apply");
   const dryRun = !apply;
+
+  if (apply) {
+    assertOperationalMutationAllowed({
+      operationId: "sync-registrations-delete-permission",
+      databaseUrl: process.env.DATABASE_URL,
+      explicitIntent: true,
+      allowedRemoteEnvironments: ["stage"],
+    });
+  }
 
   console.log(
     dryRun

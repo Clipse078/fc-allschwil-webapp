@@ -23,6 +23,11 @@ const mockResolveProviderClubIdIndex = vi.fn();
 const mockLoadTenantInventoryFromIndex = vi.fn();
 const mockBuildTenantPlan = vi.fn();
 const mockBuildBackupSnapshot = vi.fn();
+const mockRequireApiPermission = vi.fn();
+
+vi.mock("@/lib/permissions/require-api-permission", () => ({
+  requireApiPermission: mockRequireApiPermission,
+}));
 
 vi.mock("@/scripts/club-directory-02c-sfv-consolidation", () => ({
   resolveTenantContexts: mockResolveTenantContexts,
@@ -67,7 +72,7 @@ const ORIGINAL_ENV = { ...process.env };
 
 const ROUTE_PATH = "http://x/api/ops/club-directory-02c-sfv-consolidation-execute";
 const TENANT_KEY = "fc-allschwil";
-const CRON_SECRET = "test-cron-secret";
+const LEGACY_BEARER = "test-consolidation-operator-secret";
 const CONFIRMATION = "CONSOLIDATE-CLUB-DIRECTORY";
 
 const TENANT_CONTEXT = {
@@ -151,7 +156,7 @@ function makeRawRequest(rawBody: string, headers: Record<string, string> = {}): 
   });
 }
 
-function authHeaders(secret = CRON_SECRET): Record<string, string> {
+function authHeaders(secret = LEGACY_BEARER): Record<string, string> {
   return { authorization: `Bearer ${secret}` };
 }
 
@@ -160,8 +165,10 @@ function validBody(overrides: Record<string, unknown> = {}) {
 }
 
 function setStageEnvironment(): void {
+  process.env.NODE_ENV = "production";
   process.env.APP_ENV = "stage";
-  process.env.CRON_SECRET = CRON_SECRET;
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "production";
 }
 
 function setupHappyPathMocks(): void {
@@ -187,6 +194,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV };
   setStageEnvironment();
+  mockRequireApiPermission.mockResolvedValue({
+    ok: true,
+    status: 200,
+    error: null,
+    session: { user: { id: "platform-operator" } },
+  });
   setupHappyPathMocks();
 });
 
@@ -280,7 +293,7 @@ describe("POST — STAGE-only guard", () => {
   it("does not leak whether auth/confirmation would have succeeded when blocked by the STAGE guard", async () => {
     process.env.APP_ENV = "prod";
 
-    const response = await POST(makeRequest(validBody(), authHeaders(CRON_SECRET)));
+    const response = await POST(makeRequest(validBody(), authHeaders(LEGACY_BEARER)));
 
     expect(response.status).toBe(403);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
@@ -292,34 +305,59 @@ describe("POST — STAGE-only guard", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST — authentication", () => {
-  it("rejects with 401 when CRON_SECRET is not configured (fail closed)", async () => {
-    delete process.env.CRON_SECRET;
+  it("rejects an unauthenticated request with 401", async () => {
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      session: null,
+    });
 
-    const response = await POST(makeRequest(validBody(), authHeaders("anything")));
+    const response = await POST(makeRequest(validBody()));
+    expect(response.status).toBe(401);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+    expect(mockConsolidateExternalClubsByProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it("rejects an ordinary tenant Club Admin with 403", async () => {
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      session: { user: { id: "club-admin" } },
+    });
+
+    const response = await POST(makeRequest(validBody()));
+
+    expect(response.status).toBe(403);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+  });
+
+  it("does not accept the routine CRON_SECRET without an operator session", async () => {
+    process.env.CRON_SECRET = "routine-cron-secret";
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      session: null,
+    });
+
+    const response = await POST(
+      makeRequest(validBody(), authHeaders("routine-cron-secret")),
+    );
 
     expect(response.status).toBe(401);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
     expect(mockConsolidateExternalClubsByProviderIdentity).not.toHaveBeenCalled();
   });
 
-  it("rejects with 401 when no Authorization header is present", async () => {
+  it("requires the existing platform-only tenants.manage permission", async () => {
     const response = await POST(makeRequest(validBody()));
 
-    expect(response.status).toBe(401);
-    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
-  });
-
-  it("rejects with 401 when the bearer token is wrong", async () => {
-    const response = await POST(makeRequest(validBody(), authHeaders("wrong-secret")));
-
-    expect(response.status).toBe(401);
-    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
-  });
-
-  it("rejects a request with no 'Bearer ' prefix even if the raw value matches", async () => {
-    const response = await POST(makeRequest(validBody(), { authorization: CRON_SECRET }));
-
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(200);
+    expect(mockRequireApiPermission).toHaveBeenCalledWith(
+      "tenants.manage",
+    );
   });
 });
 
@@ -696,7 +734,7 @@ describe("POST — no credential leakage", () => {
     const response = await POST(makeRequest(validBody(), authHeaders()));
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(LEGACY_BEARER);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -714,7 +752,7 @@ describe("POST — no credential leakage", () => {
 
     for (const response of responses) {
       const json = JSON.stringify(await response.json());
-      expect(json).not.toContain(CRON_SECRET);
+      expect(json).not.toContain(LEGACY_BEARER);
       expect(json).not.toContain("super-secret-app-key");
       expect(json).not.toContain("super-secret-app-pass");
       expect(json).not.toContain("super-secret-blob-token");
@@ -746,7 +784,7 @@ describe("POST — no credential leakage", () => {
     expect(response.status).toBe(500);
     expect(json).not.toContain("supersecret");
     expect(json).not.toContain("postgresql://");
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(LEGACY_BEARER);
     expect(json).not.toContain("super-secret-blob-token");
   });
 });

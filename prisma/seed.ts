@@ -13,12 +13,20 @@ import {
 import { Pool } from "pg";
 import { PLATFORM_BRANDING } from "@/lib/tenant-runtime/branding";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set.");
 }
+
+assertOperationalMutationAllowed({
+  operationId: "database-seed",
+  databaseUrl: connectionString,
+  explicitIntent: true,
+  allowedRemoteEnvironments: ["stage"],
+});
 
 const pool = new Pool({
   connectionString,

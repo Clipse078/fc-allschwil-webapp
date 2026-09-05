@@ -3,6 +3,15 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    tenant: {
+      findFirst: vi.fn(),
+    },
+  },
+}));
+
 import {
   buildPublicCacheTag,
   buildPublicCacheTags,
@@ -99,6 +108,18 @@ describe("public-cache-notification", () => {
   it("skips notification when tenant is not configured", async () => {
     await notifyTenantPublicWebsiteCache({
       tenantSlug: "other-club",
+      domains: [PUBLIC_CACHE_DOMAINS.WEEKPLAN],
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("cannot emit an unsigned notification when HMAC config is missing", async () => {
+    delete process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG;
+    resetPublicCacheNotificationConfigForTests();
+
+    await notifyTenantPublicWebsiteCache({
+      tenantSlug: "fc-allschwil",
       domains: [PUBLIC_CACHE_DOMAINS.WEEKPLAN],
     });
 

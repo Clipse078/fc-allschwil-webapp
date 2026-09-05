@@ -31,6 +31,24 @@ function validateLocal(env: RuntimeEnvironment): string[] {
   return errors;
 }
 
+function validatePreview(env: RuntimeEnvironment): string[] {
+  const errors: string[] = [];
+
+  if (env.nodeEnv !== "production") {
+    errors.push("Preview deployments must run with NODE_ENV=production.");
+  }
+
+  return errors;
+}
+
+function validateUnknown(env: RuntimeEnvironment): string[] {
+  return env.isDeployed
+    ? [
+        "Deployed runtime has no valid environment classification. Privileged operations are disabled.",
+      ]
+    : ["APP_ENV is invalid."];
+}
+
 function validateStage(env: RuntimeEnvironment): string[] {
   const errors: string[] = [];
 
@@ -109,6 +127,10 @@ export function evaluateRuntimeConfiguration(): RuntimeCheckResult {
     errors = validateProd(env);
   } else if (env.isStage) {
     errors = validateStage(env);
+  } else if (env.isPreview) {
+    errors = validatePreview(env);
+  } else if (env.isUnknown) {
+    errors = validateUnknown(env);
   } else {
     errors = validateLocal(env);
   }

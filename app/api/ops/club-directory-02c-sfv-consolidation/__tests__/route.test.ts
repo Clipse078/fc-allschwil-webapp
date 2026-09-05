@@ -28,8 +28,12 @@ import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
 const mockResolveTenantContexts = vi.fn();
 const mockLoadTenantInventory = vi.fn();
 const mockBuildTenantPlan = vi.fn();
+const mockRequireApiPermission = vi.fn();
 
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/permissions/require-api-permission", () => ({
+  requireApiPermission: mockRequireApiPermission,
+}));
 
 vi.mock("@/scripts/club-directory-02c-sfv-consolidation", () => ({
   resolveTenantContexts: mockResolveTenantContexts,
@@ -44,7 +48,7 @@ const ORIGINAL_ENV = { ...process.env };
 
 const ROUTE_PATH = "http://x/api/ops/club-directory-02c-sfv-consolidation";
 const TENANT_KEY = "fc-allschwil";
-const CRON_SECRET = "test-cron-secret";
+const LEGACY_BEARER = "test-consolidation-operator-secret";
 
 const TENANT_CONTEXT = {
   tenantId: "tenant-fc-allschwil-id",
@@ -91,19 +95,27 @@ function makeRequest(
   return new NextRequest(url.toString(), { method: "GET", headers });
 }
 
-function authHeaders(secret = CRON_SECRET): Record<string, string> {
+function authHeaders(secret = LEGACY_BEARER): Record<string, string> {
   return { authorization: `Bearer ${secret}` };
 }
 
 function setStageEnvironment(): void {
+  process.env.NODE_ENV = "production";
   process.env.APP_ENV = "stage";
-  process.env.CRON_SECRET = CRON_SECRET;
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "production";
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   process.env = { ...ORIGINAL_ENV };
   setStageEnvironment();
+  mockRequireApiPermission.mockResolvedValue({
+    ok: true,
+    status: 200,
+    error: null,
+    session: { user: { id: "platform-operator" } },
+  });
   mockResolveTenantContexts.mockResolvedValue([TENANT_CONTEXT]);
   mockLoadTenantInventory.mockResolvedValue(INVENTORY);
   mockBuildTenantPlan.mockResolvedValue(PLAN);
@@ -198,7 +210,7 @@ describe("GET — STAGE-only guard", () => {
 
     // Even a correct secret must not bypass the STAGE guard.
     const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders(CRON_SECRET)),
+      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders(LEGACY_BEARER)),
     );
 
     expect(response.status).toBe(403);
@@ -219,47 +231,62 @@ describe("GET — STAGE-only guard", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET — authentication", () => {
-  it("rejects with 401 when CRON_SECRET is not configured (fail closed)", async () => {
-    delete process.env.CRON_SECRET;
+  it("rejects an unauthenticated request with 401", async () => {
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      session: null,
+    });
 
-    const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders("anything")),
-    );
-
+    const response = await GET(makeRequest({ tenant: TENANT_KEY, mode: "inventory" }));
     expect(response.status).toBe(401);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
   });
 
-  it("rejects with 401 when no Authorization header is present", async () => {
+  it("rejects an ordinary tenant Club Admin with 403", async () => {
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: "Forbidden",
+      session: { user: { id: "club-admin" } },
+    });
+
     const response = await GET(makeRequest({ tenant: TENANT_KEY, mode: "inventory" }));
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(403);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
   });
 
-  it("rejects with 401 when the bearer token is wrong", async () => {
+  it("does not accept the routine CRON_SECRET without an operator session", async () => {
+    process.env.CRON_SECRET = "routine-cron-secret";
+    mockRequireApiPermission.mockResolvedValue({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      session: null,
+    });
+
     const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders("wrong-secret")),
+      makeRequest(
+        { tenant: TENANT_KEY, mode: "inventory" },
+        authHeaders("routine-cron-secret"),
+      ),
     );
 
     expect(response.status).toBe(401);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
   });
 
-  it("rejects a request with no 'Bearer ' prefix even if the raw value matches", async () => {
+  it("requires the existing platform-only tenants.manage permission", async () => {
     const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, { authorization: CRON_SECRET }),
-    );
-
-    expect(response.status).toBe(401);
-  });
-
-  it("accepts the correct Authorization: Bearer <CRON_SECRET> header", async () => {
-    const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders()),
+      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }),
     );
 
     expect(response.status).toBe(200);
+    expect(mockRequireApiPermission).toHaveBeenCalledWith(
+      "tenants.manage",
+    );
   });
 });
 
@@ -511,7 +538,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
     );
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(LEGACY_BEARER);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -526,7 +553,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
     );
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(LEGACY_BEARER);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -542,7 +569,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
 
     for (const response of responses) {
       const json = JSON.stringify(await response.json());
-      expect(json).not.toContain(CRON_SECRET);
+      expect(json).not.toContain(LEGACY_BEARER);
       expect(json).not.toContain("super-secret-app-key");
       expect(json).not.toContain("super-secret-app-pass");
     }

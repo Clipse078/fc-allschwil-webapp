@@ -36,6 +36,7 @@
 import "dotenv/config";
 import { Client } from "pg";
 import bcrypt from "bcryptjs";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const TARGET_EMAIL = "admin@fcallschwil.ch";
 const BCRYPT_COST = 12;
@@ -53,6 +54,13 @@ async function main(): Promise<void> {
     console.error("ERROR: STAGE_NEW_PASSWORD is not set.");
     process.exit(1);
   }
+
+  assertOperationalMutationAllowed({
+    operationId: "stage-auth-password-reset-approved",
+    databaseUrl: dbUrl,
+    explicitIntent: true,
+    allowedRemoteEnvironments: ["stage"],
+  });
 
   let userFound = false;
   let passwordUpdated = false;
