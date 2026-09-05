@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { writeAuditRecord } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 import { hashPassword } from "@/lib/auth/password";
 import {
   acquirePlatformSuperAdminMutationLock,

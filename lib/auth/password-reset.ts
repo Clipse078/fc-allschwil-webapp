@@ -25,7 +25,7 @@
 import crypto from "crypto";
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword } from "@/lib/auth/password";
-import { writeAuditRecord } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 import {
   acquirePlatformSuperAdminMutationLock,
   platformSuperAdminAssignmentWhere,

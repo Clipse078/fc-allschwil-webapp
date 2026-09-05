@@ -2,7 +2,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { writeAuditRecord } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 
 type RouteContext = {
   params: Promise<{

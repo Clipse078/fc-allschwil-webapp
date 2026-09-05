@@ -21,7 +21,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { writeAuditRecord } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 import {
   ArchivedRoleError,
   InvalidPermissionScopeError,
