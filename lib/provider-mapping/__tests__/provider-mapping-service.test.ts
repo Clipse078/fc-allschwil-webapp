@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    teamSeason: { findFirst: vi.fn(), findUniqueOrThrow: vi.fn() },
+    teamSeason: { findFirst: vi.fn(), findFirstOrThrow: vi.fn() },
     competition: { findFirst: vi.fn() },
     teamExternalMapping: {
       count: vi.fn(),
@@ -174,30 +174,23 @@ describe("B. Duplicate prevention", () => {
 
 describe("C. Tenant isolation", () => {
   it("rejects when TeamSeason belongs to a different tenant", async () => {
-    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
-      ...mockTeamSeason,
-      team: { name: "FC Test", tenantId: TENANT_B },
-    } as never);
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null as never);
     const result = await createProviderMapping(baseInput);
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("TEAM_SEASON_TENANT_MISMATCH");
+      expect(result.code).toBe("TEAM_SEASON_NOT_FOUND");
     }
   });
 
   it("rejects when Competition belongs to a different tenant", async () => {
-    vi.mocked(prisma.competition.findFirst).mockResolvedValue({
-      id: COMPETITION_ID,
-      tenantId: TENANT_B,
-      isArchived: false,
-    } as never);
+    vi.mocked(prisma.competition.findFirst).mockResolvedValue(null as never);
     const result = await createProviderMapping({
       ...baseInput,
       competitionId: COMPETITION_ID,
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("COMPETITION_TENANT_MISMATCH");
+      expect(result.code).toBe("COMPETITION_NOT_FOUND");
     }
   });
 });
@@ -356,7 +349,7 @@ describe("H. replaceProviderMapping — atomic transaction", () => {
           upsert: vi.fn().mockResolvedValue(mockMappingRow),
         },
         teamSeason: {
-          findUniqueOrThrow: vi.fn().mockResolvedValue({ teamId: TEAM_ID }),
+          findFirstOrThrow: vi.fn().mockResolvedValue({ teamId: TEAM_ID }),
         },
       };
       return cb(txClient);
