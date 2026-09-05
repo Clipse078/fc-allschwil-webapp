@@ -41,5 +41,8 @@ describe("GET /api/public/[tenant]/website/weekplan error disclosure", () => {
       "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut.",
     );
     expect(JSON.stringify(body)).not.toMatch(/Prisma|P1001|db\.internal|5432/);
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toMatch(
+      /Prisma|P1001|db\.internal|5432/,
+    );
   });
 });

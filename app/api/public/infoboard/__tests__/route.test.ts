@@ -56,6 +56,9 @@ describe("GET /api/public/infoboard error disclosure", () => {
     expect(JSON.stringify(body)).not.toMatch(
       /db\.internal|5432|password|Connection refused/,
     );
+    expect(JSON.stringify(vi.mocked(console.error).mock.calls)).not.toMatch(
+      /db\.internal|5432|password|Connection refused/,
+    );
   });
 
   it("preserves the intentional tenant-safe not-found response", async () => {

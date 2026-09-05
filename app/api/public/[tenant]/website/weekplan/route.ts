@@ -195,7 +195,9 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       { headers: { "Cache-Control": WEEKPLAN_CACHE_CONTROL } },
     );
   } catch (error) {
-    console.error("[public/[tenant]/website/weekplan] GET failed:", error);
+    console.error("[public/[tenant]/website/weekplan] GET failed:", {
+      kind: error instanceof Error ? "error" : "non-error",
+    });
     return NextResponse.json(
       {
         error:

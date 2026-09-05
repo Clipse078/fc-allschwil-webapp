@@ -58,7 +58,9 @@ export async function GET(request: NextRequest) {
       events,
     });
   } catch (error) {
-    console.error("Public Infoboard feed failed:", error);
+    console.error("Public Infoboard feed failed:", {
+      kind: error instanceof Error ? "error" : "non-error",
+    });
 
     return NextResponse.json(
       {

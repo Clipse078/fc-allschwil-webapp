@@ -84,7 +84,9 @@ export async function GET(request: NextRequest) {
       days,
     });
   } catch (error) {
-    console.error("Public Wochenplan feed failed:", error);
+    console.error("Public Wochenplan feed failed:", {
+      kind: error instanceof Error ? "error" : "non-error",
+    });
 
     return NextResponse.json(
       {
