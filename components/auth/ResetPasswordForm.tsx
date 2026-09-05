@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState, useEffect, type FormEvent } from "react";
+import { useState, useEffect, useRef, type FormEvent } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/cn";
 
@@ -34,7 +34,8 @@ function ScePlatformWordmark({ size = 42 }: { size?: number }) {
 
 export default function ResetPasswordForm() {
   const searchParams = useSearchParams();
-  const token = searchParams.get("token") ?? "";
+  const tokenRef = useRef(searchParams.get("token") ?? "");
+  const token = tokenRef.current;
 
   const [validation, setValidation] = useState<TokenValidation | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -51,6 +52,14 @@ export default function ResetPasswordForm() {
       setValidation({ valid: false });
       return;
     }
+
+    // Keep the token only in this component's memory, then remove the
+    // token-bearing query and any fragment from the visible URL/history.
+    window.history.replaceState(
+      window.history.state,
+      "",
+      window.location.pathname,
+    );
 
     fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`)
       .then((r) => r.json())

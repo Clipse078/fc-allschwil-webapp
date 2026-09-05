@@ -23,12 +23,18 @@ function cspRequest(body: BodyInit, headers: HeadersInit = {}) {
   });
 }
 
+function loggedReport(): Record<string, unknown> {
+  const serialized = vi.mocked(console.warn).mock.calls[0]?.[1];
+  return JSON.parse(String(serialized)) as Record<string, unknown>;
+}
+
 describe("CSP report endpoint", () => {
   beforeEach(() => {
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -52,6 +58,105 @@ describe("CSP report endpoint", () => {
     expect(response.headers.get("Cache-Control")).toBe("no-store");
     expect(console.warn).toHaveBeenCalledTimes(1);
     expect(databaseModuleFactory).not.toHaveBeenCalled();
+  });
+
+  it("strips document-uri query strings", async () => {
+    await POST(
+      cspRequest(
+        JSON.stringify({
+          "csp-report": {
+            "effective-directive": "script-src",
+            "document-uri":
+              "https://sce.example/reset-password?token=reset-secret",
+          },
+        }),
+      ),
+    );
+
+    expect(loggedReport()["document-uri"]).toBe(
+      "https://sce.example/reset-password",
+    );
+    expect(JSON.stringify(loggedReport())).not.toContain("reset-secret");
+  });
+
+  it("strips document-uri fragments", async () => {
+    await POST(
+      cspRequest(
+        JSON.stringify({
+          "csp-report": {
+            "effective-directive": "style-src",
+            "document-uri":
+              "https://sce.example/reset-password#token=fragment-secret",
+          },
+        }),
+      ),
+    );
+
+    expect(loggedReport()["document-uri"]).toBe(
+      "https://sce.example/reset-password",
+    );
+    expect(JSON.stringify(loggedReport())).not.toContain("fragment-secret");
+  });
+
+  it("never logs reset or invitation bearer tokens", async () => {
+    const tokens = ["reset-token-value", "invitation-token-value"];
+
+    for (const token of tokens) {
+      await POST(
+        cspRequest(
+          JSON.stringify({
+            "csp-report": {
+              "effective-directive": "script-src",
+              "document-uri": `https://sce.example/reset-password?token=${token}`,
+            },
+          }),
+        ),
+      );
+    }
+
+    const output = JSON.stringify(vi.mocked(console.warn).mock.calls);
+    expect(output).not.toContain("reset-token-value");
+    expect(output).not.toContain("invitation-token-value");
+  });
+
+  it("sanitizes every allowlisted URL-bearing CSP field", async () => {
+    await POST(
+      cspRequest(
+        JSON.stringify({
+          "csp-report": {
+            "effective-directive": "script-src",
+            "document-uri": "https://user:pass@sce.example/page?doc=secret#doc",
+            "blocked-uri": "https://cdn.example/script.js?blocked=secret#blocked",
+            "source-file": "https://sce.example/app.js?source=secret#source",
+          },
+        }),
+      ),
+    );
+
+    expect(loggedReport()).toMatchObject({
+      "document-uri": "https://sce.example/page",
+      "blocked-uri": "https://cdn.example/script.js",
+      "source-file": "https://sce.example/app.js",
+    });
+    const output = JSON.stringify(loggedReport());
+    expect(output).not.toMatch(/user|pass|secret|#doc|#blocked|#source/);
+  });
+
+  it("replaces malformed URLs without logging their raw token-bearing input", async () => {
+    await POST(
+      cspRequest(
+        JSON.stringify({
+          "csp-report": {
+            "effective-directive": "script-src",
+            "document-uri":
+              "https://[malformed.example/reset-password?token=raw-secret",
+          },
+        }),
+      ),
+    );
+
+    expect(loggedReport()["document-uri"]).toBe("[invalid-url]");
+    expect(JSON.stringify(loggedReport())).not.toContain("raw-secret");
   });
 
   it("rejects malformed and non-CSP JSON without logging", async () => {
@@ -117,5 +222,26 @@ describe("CSP report endpoint", () => {
     expect(serializedLog).not.toContain("\r");
     expect(serializedLog).not.toContain("arbitrary");
     expect(serializedLog).not.toContain("must-not-be-logged");
+  });
+
+  it("retains the process-local limit of 20 logs per minute", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2100-01-01T00:00:00.000Z"));
+
+    for (let index = 0; index < 21; index += 1) {
+      const response = await POST(
+        cspRequest(
+          JSON.stringify({
+            "csp-report": {
+              "effective-directive": "script-src",
+              "document-uri": `https://sce.example/page/${index}`,
+            },
+          }),
+        ),
+      );
+      expect(response.status).toBe(204);
+    }
+
+    expect(console.warn).toHaveBeenCalledTimes(20);
   });
 });

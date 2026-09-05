@@ -63,9 +63,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Infoboard Feed konnte nicht geladen werden.",
+          "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut.",
       },
       { status: 500 }
     );
