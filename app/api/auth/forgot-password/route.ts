@@ -28,6 +28,7 @@ import {
   resolveSecurityLinkBaseUrl,
   SecurityLinkConfigurationError,
 } from "@/lib/server/security-link-url";
+import { platformSuperAdminAssignmentWhere } from "@/lib/security/platform-superadmin";
 
 const OPAQUE_SUCCESS = {
   message:
@@ -69,10 +70,21 @@ export async function POST(req: NextRequest) {
   try {
     const user = await prisma.user.findUnique({
       where: { email },
-      select: { id: true, email: true, isActive: true },
+      select: {
+        id: true,
+        email: true,
+        isActive: true,
+        userRoles: {
+          where: platformSuperAdminAssignmentWhere,
+          select: { id: true },
+          take: 1,
+        },
+      },
     });
 
-    if (user && user.isActive) {
+    // Public recovery is intentionally unavailable to platform Superadmins.
+    // Preserve the same opaque response and do not issue or send a token.
+    if (user && user.isActive && user.userRoles.length === 0) {
       userId = user.id;
       userEmail = user.email;
     }

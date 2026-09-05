@@ -19,7 +19,10 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { consumePasswordResetToken, validatePasswordResetToken } from "@/lib/auth/password-reset";
+import {
+  consumePasswordResetToken,
+  validatePasswordResetToken,
+} from "@/lib/auth/password-reset";
 import { activateInvitationMembership } from "@/lib/users/mutations";
 
 const MIN_PASSWORD_LENGTH = 12;
@@ -59,16 +62,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Pre-validate to capture invitation context before consumption.
-  // consumePasswordResetToken re-validates internally, so this is safe.
-  const preValidated = await validatePasswordResetToken(prisma, token).catch(() => null);
-  const isInvitationToken = preValidated?.isInvitation ?? false;
-  const pendingUserId = preValidated?.userId;
-  const invitationTenantId = preValidated?.invitationTenantId ?? null;
-
-  let success = false;
+  let consumed: Awaited<ReturnType<typeof consumePasswordResetToken>> = null;
   try {
-    success = await consumePasswordResetToken(prisma, token, newPassword);
+    consumed = await consumePasswordResetToken(prisma, token, newPassword);
   } catch (err) {
     console.error(
       "[reset-password] consumePasswordResetToken error",
@@ -80,7 +76,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!success) {
+  if (!consumed) {
     return NextResponse.json(
       { error: "Ungültiger oder abgelaufener Link. Bitte fordere einen neuen an." },
       { status: 400 },
@@ -90,8 +86,11 @@ export async function POST(req: NextRequest) {
   // Invitation acceptance: activate exactly the membership for the invitation's
   // tenant now that the user has set their password.
   // Non-fatal — password is already saved; activation failure can be retried.
-  if (isInvitationToken && pendingUserId && invitationTenantId) {
-    await activateInvitationMembership(pendingUserId, invitationTenantId).catch((err) => {
+  if (consumed.isInvitation && consumed.invitationTenantId) {
+    await activateInvitationMembership(
+      consumed.userId,
+      consumed.invitationTenantId,
+    ).catch((err) => {
       console.error("[reset-password] Failed to activate invitation membership:", err);
     });
   }

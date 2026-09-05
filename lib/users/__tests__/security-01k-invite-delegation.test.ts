@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   assertTenantDelegationAllowed: vi.fn(),
   personFindUnique: vi.fn(),
   membershipFindUnique: vi.fn(),
+  userRoleFindFirst: vi.fn(),
   userRoleFindMany: vi.fn(),
 }));
 
@@ -15,7 +16,10 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     person: { findUnique: mocks.personFindUnique },
     tenantMembership: { findUnique: mocks.membershipFindUnique },
-    userRole: { findMany: mocks.userRoleFindMany },
+    userRole: {
+      findFirst: mocks.userRoleFindFirst,
+      findMany: mocks.userRoleFindMany,
+    },
   },
 }));
 vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
@@ -30,7 +34,10 @@ import {
 } from "@/lib/users/mutations";
 
 describe("SECURITY-GO-LIVE-01K-A invite delegation", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.userRoleFindFirst.mockResolvedValue(null);
+  });
 
   it("rejects attached roles at the canonical subset boundary before onboarding writes", async () => {
     mocks.assertTenantDelegationAllowed.mockRejectedValueOnce(

@@ -22,7 +22,7 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
+  requirePlatformApiPermission: vi.fn(),
   userFindUnique: vi.fn(),
   roleFindMany: vi.fn(),
   userRoleFindMany: vi.fn(),
@@ -31,11 +31,13 @@ const mocks = vi.hoisted(() => ({
   userRoleCreate: vi.fn(),
   transaction: vi.fn(),
   auditLogCreate: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
+  requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
+vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
@@ -86,18 +88,22 @@ function platformRole(overrides: Partial<{ id: string; key: string; isSystem: bo
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireApiPermission.mockResolvedValue({
+  mocks.requirePlatformApiPermission.mockResolvedValue({
     ok: true,
     status: 200,
     error: null,
     session: { user: { id: "admin-1", activeTenantId: null } },
   });
-  mocks.userFindUnique.mockResolvedValue({ id: "user-1" });
+  mocks.userFindUnique.mockResolvedValue({ id: "user-1", isActive: true });
   mocks.userRoleFindMany.mockResolvedValue([]);
   mocks.userRoleCount.mockResolvedValue(1);
   mocks.transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
     callback({
+      $queryRawUnsafe: mocks.queryRaw,
+      user: { findUnique: mocks.userFindUnique },
       userRole: {
+        findMany: mocks.userRoleFindMany,
+        count: mocks.userRoleCount,
         deleteMany: mocks.userRoleDeleteMany,
         create: mocks.userRoleCreate,
       },
@@ -161,7 +167,7 @@ describe("PUT /api/users/[userId]/roles — platform assignment succeeds", () =>
     const response = await PUT(request, context);
 
     expect(response.status).toBe(200);
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
     expect(mocks.userRoleCreate).not.toHaveBeenCalled();
     expect(mocks.userRoleDeleteMany).not.toHaveBeenCalled();
   });
@@ -220,7 +226,13 @@ describe("PUT /api/users/[userId]/roles — tenant data is never touched", () =>
 
     // The only UserRole query issued is scoped to PLATFORM roles.
     expect(mocks.userRoleFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: "user-1", role: { scope: "PLATFORM" } } }),
+      expect.objectContaining({
+        where: {
+          userId: "user-1",
+          tenantId: null,
+          role: { scope: "PLATFORM", tenantId: null },
+        },
+      }),
     );
   });
 
@@ -270,7 +282,7 @@ describe("PUT /api/users/[userId]/roles — last platform admin safeguard", () =
     expect(response.status).toBe(409);
     const body = await response.json();
     expect(body.code).toBe("LAST_REQUIRED_ADMIN");
-    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
   });
 
   it("allows removal when another holder of the isSystem role exists", async () => {

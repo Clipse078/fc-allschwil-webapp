@@ -12,7 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
+  requirePlatformApiPermission: vi.fn(),
   role: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -21,8 +21,8 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
+  requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -33,10 +33,11 @@ import { GET as listRoles } from "@/app/api/roles/route";
 import { PATCH as patchRole } from "@/app/api/roles/[id]/route";
 
 function mockAuthorized() {
-  mocks.requireApiPermission.mockResolvedValue({
+  mocks.requirePlatformApiPermission.mockResolvedValue({
     ok: true,
     status: 200,
     error: null,
+    actorUserId: "platform-admin",
     session: { user: { id: "platform-admin", activeTenantId: null } },
   });
 }

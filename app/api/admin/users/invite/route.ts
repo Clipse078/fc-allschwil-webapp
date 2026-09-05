@@ -283,6 +283,11 @@ function _invitationErrorResponse(error: InvitationDomainError): NextResponse {
         { error: "Dieser Benutzer ist bereits aktives Mitglied dieses Clubs." },
         { status: 409 },
       );
+    case "PLATFORM_ACCOUNT_PROTECTED":
+      return NextResponse.json(
+        { error: "Plattformkonten können nicht über die Mandantenverwaltung eingeladen werden." },
+        { status: 403 },
+      );
     default:
       return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
   }

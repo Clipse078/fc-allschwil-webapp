@@ -24,7 +24,13 @@
  *   • Content review/approval/workspace creator fields — Nulled (SetNull)
  */
 
+import type { PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
+import {
+  acquirePlatformSuperAdminMutationLock,
+  platformSuperAdminAssignmentWhere,
+  usablePlatformSuperAdminWhere,
+} from "@/lib/security/platform-superadmin";
 
 export type UserDeletionImpact = {
   /** All tenant memberships across all tenants — will be deleted */
@@ -58,22 +64,19 @@ export type UserDeletionResult = {
   impact: UserDeletionImpact;
 };
 
-const SUPER_ADMIN_ROLE_KEY = "super_admin";
+type DeletionClient = Pick<PrismaClient, "user" | "userRole">;
 
-/**
- * Returns the deletion impact for a global User account, or a blocker
- * if deletion is not permitted (e.g., last super_admin).
- * Never mutates.
- */
-export async function getUserDeletionImpact(
+async function getUserDeletionImpactWithClient(
+  client: DeletionClient,
   userId: string,
 ): Promise<UserDeletionImpactResult | null> {
-  const user = await prisma.user.findUnique({
+  const user = await client.user.findUnique({
     where: { id: userId },
     select: {
       email: true,
       firstName: true,
       lastName: true,
+      isActive: true,
       _count: {
         select: {
           userRoles: true,
@@ -84,36 +87,28 @@ export async function getUserDeletionImpact(
         select: { id: true, firstName: true, lastName: true },
       },
       userRoles: {
-        select: {
-          role: { select: { key: true, scope: true } },
-        },
+        where: platformSuperAdminAssignmentWhere,
+        select: { id: true },
       },
     },
   });
 
   if (!user) return null;
 
-  const isPlatformSuperAdmin = user.userRoles.some(
-    (ur) => ur.role.key === SUPER_ADMIN_ROLE_KEY && ur.role.scope === "PLATFORM",
-  );
-
-  // Safety: block if this is the last remaining super_admin.
-  if (isPlatformSuperAdmin) {
-    const superAdminCount = await prisma.userRole.count({
-      where: {
-        role: { key: SUPER_ADMIN_ROLE_KEY, scope: "PLATFORM", isArchived: false },
-        tenantId: null,
-      },
+  const isPlatformSuperAdmin = user.userRoles.length > 0;
+  if (isPlatformSuperAdmin && user.isActive) {
+    const usableSuperAdminCount = await client.userRole.count({
+      where: usablePlatformSuperAdminWhere,
     });
 
-    if (superAdminCount <= 1) {
+    if (usableSuperAdminCount <= 1) {
       return {
         blocked: true,
         blocker: {
           reason: "LAST_SUPER_ADMIN",
           message:
             "Dieser Benutzer ist der einzige aktive SCE Super Admin. " +
-            "Weise zunächst einem anderen Benutzer die Super-Admin-Rolle zu, bevor du diesen Account löschst.",
+            "Weise zunächst einem anderen aktiven Benutzer die Super-Admin-Rolle zu, bevor du diesen Account löschst.",
         },
       };
     }
@@ -137,6 +132,17 @@ export async function getUserDeletionImpact(
 }
 
 /**
+ * Returns the deletion impact for a global User account, or a blocker
+ * if deletion is not permitted (e.g., last super_admin).
+ * Never mutates.
+ */
+export async function getUserDeletionImpact(
+  userId: string,
+): Promise<UserDeletionImpactResult | null> {
+  return getUserDeletionImpactWithClient(prisma, userId);
+}
+
+/**
  * Permanently deletes a global User account.
  *
  * All cascade/SetNull behavior is handled automatically by Prisma schema
@@ -148,18 +154,20 @@ export async function getUserDeletionImpact(
 export async function deleteUserPermanently(
   userId: string,
 ): Promise<UserDeletionResult | UserDeletionBlocker | null> {
-  const impactResult = await getUserDeletionImpact(userId);
-  if (impactResult === null) return null;
-  if (impactResult.blocked) return impactResult.blocker;
+  return prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
+    const impactResult = await getUserDeletionImpactWithClient(tx, userId);
+    if (impactResult === null) return null;
+    if (impactResult.blocked) return impactResult.blocker;
 
-  const { impact } = impactResult;
+    const { impact } = impactResult;
+    await tx.user.delete({ where: { id: userId } });
 
-  await prisma.user.delete({ where: { id: userId } });
-
-  return {
-    userId,
-    email: impact.email,
-    displayName: impact.displayName,
-    impact,
-  };
+    return {
+      userId,
+      email: impact.email,
+      displayName: impact.displayName,
+      impact,
+    };
+  });
 }

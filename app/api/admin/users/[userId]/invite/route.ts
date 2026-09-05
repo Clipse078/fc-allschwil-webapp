@@ -118,6 +118,12 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
           { status: 404 },
         );
       }
+      if (error.code === "PLATFORM_ACCOUNT_PROTECTED") {
+        return NextResponse.json(
+          { error: "Plattformkonten können nicht über die Mandantenverwaltung eingeladen werden." },
+          { status: 403 },
+        );
+      }
     }
     console.error("[resend-invite] Unexpected error:", error);
     return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
@@ -162,6 +168,12 @@ export async function DELETE(_req: NextRequest, { params }: RouteContext) {
         return NextResponse.json(
           { error: "Keine aktive Einladung vorhanden." },
           { status: 400 },
+        );
+      }
+      if (error.code === "PLATFORM_ACCOUNT_PROTECTED") {
+        return NextResponse.json(
+          { error: "Plattformkonten können nicht über die Mandantenverwaltung geändert werden." },
+          { status: 403 },
         );
       }
     }

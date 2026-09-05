@@ -126,6 +126,12 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
           { status: 400 },
         );
       }
+      if (error.code === "PLATFORM_ACCOUNT_PROTECTED") {
+        return NextResponse.json(
+          { error: "Plattformkonten können nicht über die Mandantenverwaltung geändert werden." },
+          { status: 403 },
+        );
+      }
     }
     return NextResponse.json(
       { error: "Interner Serverfehler." },
@@ -183,6 +189,12 @@ export async function DELETE(_request: NextRequest, context: RouteContext) {
               "Der letzte Club Admin kann nicht entfernt werden. Weise zuerst einem anderen Benutzer die Club-Admin-Rolle zu.",
           },
           { status: 400 },
+        );
+      }
+      if (error.code === "PLATFORM_ACCOUNT_PROTECTED") {
+        return NextResponse.json(
+          { error: "Plattformkonten können nicht über die Mandantenverwaltung geändert werden." },
+          { status: 403 },
         );
       }
     }

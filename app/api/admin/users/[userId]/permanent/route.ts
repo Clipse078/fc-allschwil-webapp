@@ -17,10 +17,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { auth } from "@/auth";
-import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { logAction } from "@/lib/audit/log-action";
 import {
   getUserDeletionImpact,
@@ -30,27 +28,15 @@ import {
 type Params = { params: Promise<{ userId: string }> };
 
 export async function DELETE(request: NextRequest, { params }: Params) {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await requirePlatformApiPermission(PERMISSIONS.USERS_DELETE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   const { userId } = await params;
 
-  // Platform permission check: users.delete is scope=PLATFORM.
-  // No tenantId supplied → resolver checks platform permissions only.
-  const resolver = createEffectivePermissionResolver(prisma);
-  const authorized = await resolver.hasPermission({
-    userId: session.user.id,
-    permission: PERMISSIONS.USERS_DELETE,
-  });
-
-  if (!authorized) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
   // Prevent self-deletion.
-  if (userId === session.user.id) {
+  if (userId === access.actorUserId) {
     return NextResponse.json(
       { error: "Du kannst deinen eigenen Account nicht endgültig löschen." },
       { status: 400 },
@@ -93,7 +79,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   await logAction({
-    actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
+    actorUserId: access.actorUserId,
     moduleKey: "users",
     entityType: "User",
     entityId: userId,

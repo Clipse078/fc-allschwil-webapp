@@ -47,28 +47,51 @@ type MockPasswordResetToken = {
   expiresAt: Date;
   usedAt: Date | null;
   createdAt: Date;
-  user: { id: string; email: string; isActive: boolean };
+  isInvitation: boolean;
+  invitationTenantId: string | null;
+  user: {
+    id: string;
+    email: string;
+    isActive: boolean;
+    lastLoginAt: Date | null;
+    userRoles: { id: string }[];
+  };
 };
 
 function makeMockPrisma(overrides: {
   passwordResetTokenFindUnique?: ReturnType<typeof vi.fn>;
   passwordResetTokenDeleteMany?: ReturnType<typeof vi.fn>;
   passwordResetTokenCreate?: ReturnType<typeof vi.fn>;
-  passwordResetTokenUpdate?: ReturnType<typeof vi.fn>;
+  passwordResetTokenUpdateMany?: ReturnType<typeof vi.fn>;
   userUpdate?: ReturnType<typeof vi.fn>;
   $transaction?: ReturnType<typeof vi.fn>;
 } = {}): PrismaClient {
+  const passwordResetToken = {
+    findUnique: overrides.passwordResetTokenFindUnique ?? vi.fn(() => null),
+    deleteMany: overrides.passwordResetTokenDeleteMany ?? vi.fn(() => ({ count: 0 })),
+    create: overrides.passwordResetTokenCreate ?? vi.fn(() => ({})),
+    updateMany:
+      overrides.passwordResetTokenUpdateMany ??
+      vi.fn(() => ({ count: 1 })),
+  };
+  const user = {
+    update: overrides.userUpdate ?? vi.fn((args: unknown) => (args as { data: unknown }).data),
+  };
+  const transaction =
+    overrides.$transaction ??
+    vi.fn(async (callback: (tx: unknown) => unknown) =>
+      callback({
+        passwordResetToken,
+        user,
+        $queryRawUnsafe: vi.fn(() => []),
+      }),
+    );
   return {
     passwordResetToken: {
-      findUnique: overrides.passwordResetTokenFindUnique ?? vi.fn(() => null),
-      deleteMany: overrides.passwordResetTokenDeleteMany ?? vi.fn(() => ({ count: 0 })),
-      create: overrides.passwordResetTokenCreate ?? vi.fn(() => ({})),
-      update: overrides.passwordResetTokenUpdate ?? vi.fn(() => ({})),
+      ...passwordResetToken,
     },
-    user: {
-      update: overrides.userUpdate ?? vi.fn((args: unknown) => (args as { data: unknown }).data),
-    },
-    $transaction: overrides.$transaction ?? vi.fn(async (ops: unknown[]) => await Promise.all(ops)),
+    user,
+    $transaction: transaction,
   } as unknown as PrismaClient;
 }
 
@@ -83,7 +106,15 @@ function makeValidToken(overrides: Partial<MockPasswordResetToken> = {}): MockPa
     expiresAt: FUTURE,
     usedAt: null,
     createdAt: new Date(),
-    user: { id: "user-1", email: "alice@example.com", isActive: true },
+    isInvitation: false,
+    invitationTenantId: null,
+    user: {
+      id: "user-1",
+      email: "alice@example.com",
+      isActive: true,
+      lastLoginAt: null,
+      userRoles: [],
+    },
     ...overrides,
   };
 }
@@ -190,7 +221,13 @@ describe("validatePasswordResetToken", () => {
   it("PR-14: token belonging to user-2 cannot be used to get user-1 context", async () => {
     const record = makeValidToken({
       userId: "user-2",
-      user: { id: "user-2", email: "bob@example.com", isActive: true },
+      user: {
+        id: "user-2",
+        email: "bob@example.com",
+        isActive: true,
+        lastLoginAt: null,
+        userRoles: [],
+      },
     });
     const prisma = makeMockPrisma({ passwordResetTokenFindUnique: vi.fn(() => record) });
 
@@ -204,14 +241,14 @@ describe("consumePasswordResetToken", () => {
   it("PR-11: returns false for invalid token", async () => {
     const prisma = makeMockPrisma({ passwordResetTokenFindUnique: vi.fn(() => null) });
     const result = await consumePasswordResetToken(prisma, "bad", "NewPassword123!");
-    expect(result).toBe(false);
+    expect(result).toBeNull();
   });
 
   it("PR-11: returns false for expired token", async () => {
     const record = makeValidToken({ expiresAt: PAST });
     const prisma = makeMockPrisma({ passwordResetTokenFindUnique: vi.fn(() => record) });
     const result = await consumePasswordResetToken(prisma, "raw", "NewPassword123!");
-    expect(result).toBe(false);
+    expect(result).toBeNull();
   });
 
   it("PR-08 + PR-09: updates passwordHash with bcrypt-verified hash and sets passwordChangedAt", async () => {
@@ -226,13 +263,12 @@ describe("consumePasswordResetToken", () => {
 
     const prisma = makeMockPrisma({
       passwordResetTokenFindUnique: vi.fn(() => record),
-      $transaction: vi.fn(async (ops: unknown[]) => await Promise.all(ops)),
       userUpdate: userUpdateFn,
     });
 
     const newPassword = "SecurePass12345!";
     const result = await consumePasswordResetToken(prisma, "raw", newPassword);
-    expect(result).toBe(true);
+    expect(result).toMatchObject({ userId: "user-1" });
     expect(updatedData.passwordHash).toBeDefined();
 
     // PR-09: bcrypt must verify the new password against the stored hash.
@@ -257,7 +293,6 @@ describe("consumePasswordResetToken", () => {
 
     const prisma = makeMockPrisma({
       passwordResetTokenFindUnique: vi.fn(() => record),
-      $transaction: vi.fn(async (ops: unknown[]) => await Promise.all(ops)),
       userUpdate: userUpdateFn,
     });
 
@@ -274,18 +309,83 @@ describe("consumePasswordResetToken", () => {
     const tokenUpdateFn = vi.fn((args: unknown) => {
       const { data } = args as { data: { usedAt?: Date } };
       tokenUpdateData = data;
-      return {};
+      return { count: 1 };
     });
 
     const prisma = makeMockPrisma({
       passwordResetTokenFindUnique: vi.fn(() => record),
-      $transaction: vi.fn(async (ops: unknown[]) => await Promise.all(ops)),
-      passwordResetTokenUpdate: tokenUpdateFn,
+      passwordResetTokenUpdateMany: tokenUpdateFn,
       userUpdate: vi.fn(() => ({})),
     });
 
     await consumePasswordResetToken(prisma, "raw", "SecurePass12345!");
     expect(tokenUpdateData.usedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects password recovery for a current platform Superadmin", async () => {
+    const record = makeValidToken({
+      user: {
+        id: "platform-admin",
+        email: "platform@example.com",
+        isActive: true,
+        lastLoginAt: new Date(),
+        userRoles: [{ id: "platform-superadmin-assignment" }],
+      },
+    });
+    const userUpdate = vi.fn();
+    const prisma = makeMockPrisma({
+      passwordResetTokenFindUnique: vi.fn(() => record),
+      userUpdate,
+    });
+
+    await expect(
+      consumePasswordResetToken(prisma, "raw", "SecurePass12345!"),
+    ).resolves.toBeNull();
+    expect(userUpdate).not.toHaveBeenCalled();
+  });
+
+  it("allows exactly one of two concurrent consumers to claim a valid token", async () => {
+    let usedAt: Date | null = null;
+    let queue = Promise.resolve();
+    const userUpdate = vi.fn();
+    const currentRecord = () => makeValidToken({ usedAt });
+    const tx = {
+      $queryRawUnsafe: vi.fn(() => []),
+      passwordResetToken: {
+        findUnique: vi.fn(() => currentRecord()),
+        updateMany: vi.fn(({ data }) => {
+          if (usedAt !== null) return { count: 0 };
+          usedAt = data.usedAt;
+          return { count: 1 };
+        }),
+        deleteMany: vi.fn(() => ({ count: 0 })),
+      },
+      user: { update: userUpdate },
+    };
+    const prisma = {
+      passwordResetToken: {
+        findUnique: vi.fn(() => currentRecord()),
+      },
+      $transaction: vi.fn(
+        <T>(callback: (client: typeof tx) => Promise<T>): Promise<T> => {
+          const run = queue.then(() => callback(tx));
+          queue = run.then(
+            () => undefined,
+            () => undefined,
+          );
+          return run;
+        },
+      ),
+    } as unknown as PrismaClient;
+
+    const results = await Promise.all([
+      consumePasswordResetToken(prisma, "same-token", "SecurePass12345!"),
+      consumePasswordResetToken(prisma, "same-token", "AnotherSecure123!"),
+    ]);
+
+    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter((result) => result === null)).toHaveLength(1);
+    expect(userUpdate).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -8,13 +8,15 @@ import { hashPassword } from "@/lib/auth/password";
 import { setTenantUserRoles } from "@/lib/roles/mutations";
 import { assignScopedRoleToUser } from "@/lib/roles/scoped-mutations";
 import { assertTenantDelegationAllowed } from "@/lib/roles/delegation";
+import { isPlatformSuperAdmin } from "@/lib/security/platform-superadmin";
 
 // ── Error types ───────────────────────────────────────────────────────────────
 
 export type MembershipToggleErrorCode =
   | "MEMBERSHIP_NOT_FOUND"
   | "SELF_DEACTIVATION"
-  | "LAST_CLUB_ADMIN";
+  | "LAST_CLUB_ADMIN"
+  | "PLATFORM_ACCOUNT_PROTECTED";
 
 export class MembershipDomainError extends Error {
   constructor(public readonly code: MembershipToggleErrorCode) {
@@ -31,7 +33,8 @@ export type InvitationErrorCode =
   | "EMAIL_TAKEN_BY_OTHER_USER"
   | "ALREADY_HAS_ACTIVE_MEMBERSHIP"
   | "USER_NOT_FOUND"
-  | "NO_ACTIVE_INVITATION";
+  | "NO_ACTIVE_INVITATION"
+  | "PLATFORM_ACCOUNT_PROTECTED";
 
 export class InvitationDomainError extends Error {
   constructor(public readonly code: InvitationErrorCode, message?: string) {
@@ -84,6 +87,9 @@ export async function setTenantMembershipActive(
   });
   if (!existing) {
     throw new MembershipDomainError("MEMBERSHIP_NOT_FOUND");
+  }
+  if (await isPlatformSuperAdmin(prisma, userId)) {
+    throw new MembershipDomainError("PLATFORM_ACCOUNT_PROTECTED");
   }
 
   // Safety 2: last Club Admin guard (deactivation only)
@@ -147,7 +153,8 @@ export async function setTenantMembershipActive(
 export type RemoveMembershipErrorCode =
   | "MEMBERSHIP_NOT_FOUND"
   | "SELF_REMOVAL"
-  | "LAST_CLUB_ADMIN";
+  | "LAST_CLUB_ADMIN"
+  | "PLATFORM_ACCOUNT_PROTECTED";
 
 export class RemoveMembershipDomainError extends Error {
   constructor(public readonly code: RemoveMembershipErrorCode) {
@@ -198,6 +205,9 @@ export async function removeTenantMembership(
   });
   if (!existing) {
     throw new RemoveMembershipDomainError("MEMBERSHIP_NOT_FOUND");
+  }
+  if (await isPlatformSuperAdmin(prisma, userId)) {
+    throw new RemoveMembershipDomainError("PLATFORM_ACCOUNT_PROTECTED");
   }
 
   // Safety 2: last Club Admin guard
@@ -379,6 +389,9 @@ export async function invitePersonToTenant(
       // userId set but user deleted — clear the stale link and proceed.
       await prisma.person.update({ where: { id: personId }, data: { userId: null } });
     } else {
+      if (await isPlatformSuperAdmin(prisma, existingUser.id)) {
+        throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+      }
       // Already linked; check membership state and resend invitation.
       const result = await _ensureMembershipAndResendInvitation(
         tenantId,
@@ -406,6 +419,9 @@ export async function invitePersonToTenant(
       },
     });
     if (emailConflict) {
+      if (await isPlatformSuperAdmin(prisma, emailConflict.id)) {
+        throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+      }
       // Hard conflict: same-tenant Person → different User. Never silently relink.
       if (
         emailConflict.person &&
@@ -530,6 +546,9 @@ export async function createPersonAndInvite(
   });
 
   if (existingUser) {
+    if (await isPlatformSuperAdmin(prisma, existingUser.id)) {
+      throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+    }
     // Hard conflict: existing User is already linked to a different Person in
     // THIS tenant. Two Persons in the same tenant cannot share a User.
     if (existingUser.person && existingUser.person.tenantId === tenantId) {
@@ -645,6 +664,9 @@ export async function resendTenantInvitation(
     select: { isActive: true },
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
+  if (await isPlatformSuperAdmin(prisma, userId)) {
+    throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+  }
 
   const currentRoleIds = await prisma.userRole.findMany({
     where: {
@@ -699,6 +721,9 @@ export async function revokeTenantInvitation(
     select: { isActive: true },
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
+  if (await isPlatformSuperAdmin(prisma, userId)) {
+    throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+  }
 
   // Delete only the invitation token for this specific tenant — never touch
   // tokens issued for other tenants or normal password-reset tokens.
@@ -783,6 +808,9 @@ async function _ensureMembershipAndResendInvitation(
   actorUserId: string,
   sendInvitation = true,
 ): Promise<InvitePersonResult> {
+  if (await isPlatformSuperAdmin(prisma, userId)) {
+    throw new InvitationDomainError("PLATFORM_ACCOUNT_PROTECTED");
+  }
   // Check if membership exists.
   const existing = await prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },

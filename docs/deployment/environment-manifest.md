@@ -98,9 +98,10 @@ in every deployed runtime scope.
 | `ALLOW_DEMO_SEED` | Explicit demo-seed intent | No | Forbidden | Forbidden | Conditional | Local seed only | Seed guard denies execution | Must not persist |
 | `ALLOW_PASSWORD_CHANGE` | Explicit recovery password-change intent | No | Forbidden | Forbidden | Conditional | One approved recovery operation only | Recovery script denies execution | Must not persist |
 | `BOOTSTRAP_ADMIN_PASSWORD` | Temporary admin bootstrap credential | Yes | Forbidden | Forbidden | Conditional | One bootstrap operation only | Bootstrap cannot set a password | Remove immediately after use |
-| `ADMIN_PASSWORD_HASH` | Precomputed break-glass password hash | Yes | Forbidden | Forbidden | Conditional | One recovery operation only | Recovery script refuses to run | Hashes are credential material; never print metadata |
 | `STAGE_LOGIN_PASSWORD` | Temporary STAGE login verification credential | Yes | Forbidden | Forbidden | Conditional | Break-glass verification only | Verification is unavailable | Never persist or log |
-| `STAGE_NEW_PASSWORD` | Temporary approved STAGE replacement password | Yes | Forbidden | Forbidden | Conditional | One approved reset only | Reset script refuses to run | Never persist or log |
+| `TARGET_SUPERADMIN_EMAIL` | Operator-selected existing platform Superadmin | Yes | Forbidden as a persistent runtime variable | Forbidden | Conditional | Break-glass reset or verification only | Tool refuses to run | Never hardcode or persist |
+| `BREAK_GLASS_NEW_PASSWORD` | Exceptional platform Superadmin replacement password | Yes | Forbidden as a persistent runtime variable | Forbidden | Conditional | One approved reset only | Reset tool refuses to run | Never persist or log |
+| `BREAK_GLASS_CONFIRM` | Exact exceptional-reset confirmation phrase | No | Forbidden as a persistent runtime variable | Forbidden | Conditional | One approved reset only | Reset tool refuses to run | Must equal `RESET_EXISTING_ACTIVE_PLATFORM_SUPERADMIN` |
 | `SCE_SUPER_ADMIN_BOOTSTRAP_PASSWORD` | Temporary platform-admin bootstrap credential | Yes | Forbidden | Forbidden | Conditional | One approved bootstrap only | Bootstrap refuses the relevant write | Never persist |
 | `FCA_CLUB_ADMIN_BOOTSTRAP_PASSWORD` | Temporary legacy FCA club-admin bootstrap credential | Yes | Forbidden | Forbidden | Conditional | One approved bootstrap only | Bootstrap refuses the relevant write | FCA-specific and temporary; not a Tenant #2 pattern |
 
