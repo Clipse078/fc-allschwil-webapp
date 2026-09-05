@@ -23,6 +23,7 @@ vi.mock("@/lib/db/prisma", () => ({
     orgUnit: { findMany: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn() },
     teamSeason: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(),
       create: vi.fn(),
     },
     teamSeasonOrgUnit: { createMany: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn(), update: vi.fn() },

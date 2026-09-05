@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/permissions/require-api-any-permission", () => ({
   requireApiAnyPermission: mocks.requireApiAnyPermission,
 }));
+vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     event: { findMany: mocks.eventFindMany },
