@@ -10,7 +10,6 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PrismaClient } from "@prisma/client";
 
 // Mock the prisma module before importing the service
 vi.mock("@/lib/db/prisma", () => ({

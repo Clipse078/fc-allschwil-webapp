@@ -117,12 +117,20 @@ function makeUserRoleRow(opts: {
  * Tenant.status alongside TenantMembership.isActive).
  */
 function activeMembership(tenantStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" = "ACTIVE") {
-  return { isActive: true, tenant: { status: tenantStatus } };
+  return {
+    isActive: true,
+    tenant: { status: tenantStatus },
+    user: { isActive: true },
+  };
 }
 
 /** Inactive tenant membership fixture. */
 function inactiveMembership(tenantStatus: "ACTIVE" | "INACTIVE" | "ARCHIVED" = "ACTIVE") {
-  return { isActive: false, tenant: { status: tenantStatus } };
+  return {
+    isActive: false,
+    tenant: { status: tenantStatus },
+    user: { isActive: true },
+  };
 }
 
 // ---------------------------------------------------------------------------

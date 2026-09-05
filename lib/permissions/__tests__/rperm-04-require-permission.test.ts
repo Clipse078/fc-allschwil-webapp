@@ -34,11 +34,18 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`REDIRECT:${path}`);
   }),
   getEffectivePermissions: vi.fn(),
+  userFindUnique: vi.fn(),
+  membershipFindFirst: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    user: { findUnique: mocks.userFindUnique },
+    tenantMembership: { findFirst: mocks.membershipFindFirst },
+  },
+}));
 vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
   createEffectivePermissionResolver: () => ({
     getEffectivePermissions: mocks.getEffectivePermissions,
@@ -56,6 +63,8 @@ function sessionWithTenant(userId: string, activeTenantId: string | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.userFindUnique.mockResolvedValue({ isActive: true });
+  mocks.membershipFindFirst.mockResolvedValue({ id: "membership-1" });
   mocks.redirect.mockImplementation((path: string) => {
     throw new Error(`REDIRECT:${path}`);
   });
