@@ -15,6 +15,7 @@ type SecurityHeaderEnvironment = {
 };
 
 const ONE_YEAR_IN_SECONDS = 31_536_000;
+export const CSP_REPORT_ENDPOINT = "/api/security/csp-report";
 
 function isProductionNodeEnvironment(
   environment: SecurityHeaderEnvironment,
@@ -63,6 +64,7 @@ export function buildContentSecurityPolicy(
     `connect-src 'self'${isDevelopment ? " ws: wss:" : ""}`,
     "frame-src 'self'",
     "manifest-src 'self'",
+    `report-uri ${CSP_REPORT_ENDPOINT}`,
   ];
 
   if (isDeployedHttps) {
@@ -77,8 +79,12 @@ export function buildSecurityHeaderRules(
 ): SecurityHeaderRule[] {
   const headers: SecurityHeader[] = [
     {
-      key: "Content-Security-Policy",
+      key: "Content-Security-Policy-Report-Only",
       value: buildContentSecurityPolicy(environment),
+    },
+    {
+      key: "X-Frame-Options",
+      value: "SAMEORIGIN",
     },
     {
       key: "X-Content-Type-Options",

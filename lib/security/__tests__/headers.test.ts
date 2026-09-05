@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   buildContentSecurityPolicy,
   buildSecurityHeaderRules,
+  CSP_REPORT_ENDPOINT,
   isDeployedHttpsEnvironment,
 } from "@/lib/security/headers";
+import { nextConfig } from "@/next.config";
 
 function globalHeaders(environment: {
   NODE_ENV?: string;
@@ -36,13 +38,16 @@ describe("browser security headers", () => {
       "same-origin-allow-popups",
     );
     expect(headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    expect(headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+    expect(headers.has("Content-Security-Policy")).toBe(false);
 
-    const csp = headers.get("Content-Security-Policy");
+    const csp = headers.get("Content-Security-Policy-Report-Only");
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("frame-ancestors 'self'");
     expect(csp).toContain("frame-src 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("upgrade-insecure-requests");
+    expect(csp).toContain(`report-uri ${CSP_REPORT_ENDPOINT}`);
   });
 
   it("does not include dangerous broad production script allowances", () => {
@@ -79,7 +84,7 @@ describe("browser security headers", () => {
       NODE_ENV: "development",
       APP_ENV: "local",
     });
-    const csp = headers.get("Content-Security-Policy");
+    const csp = headers.get("Content-Security-Policy-Report-Only");
 
     expect(headers.has("Strict-Transport-Security")).toBe(false);
     expect(csp).toContain("'unsafe-eval'");
@@ -118,6 +123,30 @@ describe("browser security headers", () => {
         value: "cross-origin",
       },
     ]);
+  });
+
+  it("keeps the complete restrictive global control set", () => {
+    const headers = globalHeaders({
+      NODE_ENV: "production",
+      APP_ENV: "prod",
+    });
+
+    expect(headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(headers.get("Referrer-Policy")).toBe(
+      "strict-origin-when-cross-origin",
+    );
+    expect(headers.get("Permissions-Policy")).toBe(
+      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), browsing-topics=()",
+    );
+    expect(headers.get("Cross-Origin-Opener-Policy")).toBe(
+      "same-origin-allow-popups",
+    );
+    expect(headers.get("Cross-Origin-Resource-Policy")).toBe("same-origin");
+    expect(headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
+  });
+
+  it("keeps the Next.js powered-by header disabled", () => {
+    expect(nextConfig.poweredByHeader).toBe(false);
   });
 
   it("is host-agnostic for every tenant", () => {

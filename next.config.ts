@@ -4,7 +4,7 @@ import { buildSecurityHeaderRules } from "./lib/security/headers";
 
 const withNextIntl = createNextIntlPlugin();
 
-const nextConfig: NextConfig = {
+export const nextConfig: NextConfig = {
   poweredByHeader: false,
   typescript: {
     tsconfigPath: "tsconfig.build.json",
