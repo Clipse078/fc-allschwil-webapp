@@ -195,13 +195,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       { headers: { "Cache-Control": WEEKPLAN_CACHE_CONTROL } },
     );
   } catch (error) {
-    console.error("[public/[tenant]/website/weekplan] GET failed:", error);
+    console.error("[public/[tenant]/website/weekplan] GET failed:", {
+      kind: error instanceof Error ? "error" : "non-error",
+    });
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Wochenplan Feed konnte nicht geladen werden.",
+          "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut.",
       },
       { status: 500 },
     );

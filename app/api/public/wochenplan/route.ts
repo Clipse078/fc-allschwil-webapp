@@ -84,14 +84,14 @@ export async function GET(request: NextRequest) {
       days,
     });
   } catch (error) {
-    console.error("Public Wochenplan feed failed:", error);
+    console.error("Public Wochenplan feed failed:", {
+      kind: error instanceof Error ? "error" : "non-error",
+    });
 
     return NextResponse.json(
       {
         error:
-          error instanceof Error
-            ? "Technischer Fehler: " + error.message
-            : "Wochenplan Feed konnte nicht geladen werden.",
+          "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut.",
       },
       { status: 500 }
     );

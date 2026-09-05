@@ -11,6 +11,8 @@ import {
   evaluateRuntimeConfiguration,
 } from "@/lib/server/runtime";
 import { getDeploymentMetadata } from "@/lib/server/deployment";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +28,14 @@ function getDatabaseHost(): string {
 }
 
 export async function GET(): Promise<NextResponse> {
+  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.error },
+      { status: access.status },
+    );
+  }
+
   const runtime = evaluateRuntimeConfiguration();
   const deployment = getDeploymentMetadata();
 
