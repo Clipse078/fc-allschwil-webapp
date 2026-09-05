@@ -80,15 +80,30 @@ describe("persistConsolidationBackupSnapshot", () => {
 
   it("returns ok:false without throwing when the upload fails", async () => {
     process.env.OPS_BACKUP_READ_WRITE_TOKEN = "test-ops-backup-token";
-    mockPut.mockRejectedValue(new Error("network failure with sensitive detail"));
+    const sensitiveDetail =
+      "https://signed.example/backup?token=provider-secret";
+    mockPut.mockRejectedValue(
+      new Error(`network failure at ${sensitiveDetail}`),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
 
     const result = await persistConsolidationBackupSnapshot({ some: "data" }, "backups/a.json");
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.status).toBe(500);
-      expect(result.error).not.toContain("sensitive detail");
+      expect(result.error).not.toContain(sensitiveDetail);
     }
+    expect(JSON.stringify(consoleError.mock.calls)).not.toContain(
+      sensitiveDetail,
+    );
+    expect(consoleError).toHaveBeenCalledWith(
+      "[ops-backup-storage] backup persistence failed",
+      { operation: "put", errorCategory: "Error" },
+    );
+    consoleError.mockRestore();
   });
 
   it("never includes the blob token in the returned result", async () => {
