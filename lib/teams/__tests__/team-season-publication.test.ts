@@ -60,7 +60,11 @@ describe("updateTeamSeasonPublication", () => {
 
     expect(result.ok).toBe(true);
     expect(update).toHaveBeenCalledWith({
-      where: { id: "season-a" },
+      where: {
+        id: "season-a",
+        teamId: "team-a",
+        team: { tenantId: "tenant-a" },
+      },
       data: { showNextMatch: false },
       select: {
         showNextMatch: true,
@@ -104,7 +108,11 @@ describe("updateTeamSeasonPublication", () => {
 
     expect(result.ok).toBe(true);
     expect(update).toHaveBeenCalledWith({
-      where: { id: "season-a" },
+      where: {
+        id: "season-a",
+        teamId: "team-a",
+        team: { tenantId: "tenant-a" },
+      },
       data: {
         showNextMatch: false,
         showNextTournament: true,
@@ -137,7 +145,11 @@ describe("updateTeamSeasonPublication", () => {
     });
 
     expect(update).toHaveBeenCalledTimes(1);
-    expect(update.mock.calls[0]?.[0].where).toEqual({ id: "season-a" });
+    expect(update.mock.calls[0]?.[0].where).toEqual({
+      id: "season-a",
+      teamId: "team-a",
+      team: { tenantId: "tenant-a" },
+    });
   });
 
   it("allows different seasons of the same Team to persist different values", async () => {
@@ -158,8 +170,8 @@ describe("updateTeamSeasonPublication", () => {
     });
 
     expect(update.mock.calls.map(([args]) => args.where)).toEqual([
-      { id: "season-a" },
-      { id: "season-b" },
+      { id: "season-a", teamId: "team-a", team: { tenantId: "tenant-a" } },
+      { id: "season-b", teamId: "team-a", team: { tenantId: "tenant-a" } },
     ]);
     expect(update.mock.calls.map(([args]) => args.data)).toEqual([
       { showNextMatch: false },

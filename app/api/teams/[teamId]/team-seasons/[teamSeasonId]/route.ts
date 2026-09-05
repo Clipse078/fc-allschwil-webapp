@@ -67,7 +67,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     }
 
     const updated = await prisma.teamSeason.update({
-      where: { id: teamSeasonId },
+      where: { id: teamSeasonId, teamId, team: { tenantId } },
       data: {
         displayName,
         shortName,

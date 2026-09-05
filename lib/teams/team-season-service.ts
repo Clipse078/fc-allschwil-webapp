@@ -776,7 +776,11 @@ export async function updateTeamSeasonPublication(
 
   try {
     const publication = await prisma.teamSeason.update({
-      where: { id: input.teamSeasonId },
+      where: {
+        id: input.teamSeasonId,
+        teamId: input.teamId,
+        team: { tenantId: input.tenantId },
+      },
       data,
       select: {
         showNextMatch: true,

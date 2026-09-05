@@ -214,7 +214,7 @@ export async function updateClubEvent(
     data.teamPageVisible = Boolean(input.teamPageVisible);
 
   return prisma.event.update({
-    where: { id: eventId },
+    where: { id: eventId, tenantId, type: "OTHER" },
     data,
     select: CLUB_EVENT_SELECT,
   });
@@ -238,7 +238,7 @@ export async function archiveClubEvent(
   }
 
   return prisma.event.update({
-    where: { id: eventId },
+    where: { id: eventId, tenantId, type: "OTHER" },
     data: { status: "ARCHIVED" },
     select: CLUB_EVENT_SELECT,
   });
@@ -262,7 +262,7 @@ export async function restoreClubEvent(
   }
 
   return prisma.event.update({
-    where: { id: eventId },
+    where: { id: eventId, tenantId, type: "OTHER" },
     data: { status: "SCHEDULED" },
     select: CLUB_EVENT_SELECT,
   });
@@ -285,5 +285,7 @@ export async function deleteClubEvent(
     throw new ClubEventNotFoundError();
   }
 
-  await prisma.event.delete({ where: { id: eventId } });
+  await prisma.event.delete({
+    where: { id: eventId, tenantId, type: "OTHER" },
+  });
 }

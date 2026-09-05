@@ -195,7 +195,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   }
 
   const updated = await prisma.event.update({
-    where: { id: eventId },
+    where: { id: eventId, tenantId },
     data: {
       pitchCode: pitchResult.value,
       homeDressingRoomCode: homeResult.value,

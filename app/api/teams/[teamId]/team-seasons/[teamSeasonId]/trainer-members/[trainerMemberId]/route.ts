@@ -58,7 +58,11 @@ export async function DELETE(_: Request, context: Context) {
     }
 
     await prisma.trainerTeamMember.delete({
-      where: { id: trainerMemberId },
+      where: {
+        id: trainerMemberId,
+        teamSeason: { teamId, team: { tenantId } },
+        person: { tenantId },
+      },
     });
 
     await logAction({

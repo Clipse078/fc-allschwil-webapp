@@ -82,7 +82,13 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
   const actorUserId =
     access.session?.user?.effectiveUserId ?? access.session?.user?.id ?? null;
 
-  await prisma.trainerTeamMember.delete({ where: { id: trainerMemberId } });
+  await prisma.trainerTeamMember.delete({
+    where: {
+      id: trainerMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
+  });
 
   const personName =
     person.displayName ?? `${person.firstName} ${person.lastName}`;
