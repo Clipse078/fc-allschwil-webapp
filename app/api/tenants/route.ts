@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenants } from "@/lib/tenants/queries";
+import { auditTenantCreated } from "@/lib/tenants/platform-ops/lifecycle";
 
 export async function GET() {
   const access = await requireApiAnyPermission([
@@ -17,7 +18,7 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.TENANTS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const body = await req.json().catch(() => ({}));
@@ -45,9 +46,16 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const tenant = await prisma.tenant.create({
-      data: { key, name, status: "ACTIVE" },
-      select: { id: true, key: true, name: true, status: true },
+    const tenant = await prisma.$transaction(async (tx) => {
+      const created = await tx.tenant.create({
+        data: { key, name, status: "ACTIVE" },
+        select: { id: true, key: true, name: true, status: true },
+      });
+      await auditTenantCreated(tx, {
+        actorUserId: access.actorUserId!,
+        tenant: created,
+      });
+      return created;
     });
     return NextResponse.json({ tenant }, { status: 201 });
   } catch (e) {
