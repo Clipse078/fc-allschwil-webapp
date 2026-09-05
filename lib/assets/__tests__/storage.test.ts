@@ -13,7 +13,13 @@ vi.mock("file-type", () => ({
   fileTypeFromBuffer: (...args: unknown[]) => fileTypeFromBufferMock(...args),
 }));
 
-import { uploadExternalClubLogo, uploadExternalTeamLogo, uploadTenantLogo } from "../storage";
+import {
+  deleteAnlageplanBackground,
+  deleteOrphanedLogo,
+  uploadExternalClubLogo,
+  uploadExternalTeamLogo,
+  uploadTenantLogo,
+} from "../storage";
 
 const PNG_BUFFER = new Uint8Array([1, 2, 3, 4]);
 
@@ -31,6 +37,7 @@ describe("CLUB-DIRECTORY-01 crest upload — shares uploadTenantLogo's validatio
 
   afterEach(() => {
     process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+    vi.restoreAllMocks();
   });
 
   it("uploadExternalClubLogo stores the crest at the club-scoped key", async () => {
@@ -84,5 +91,26 @@ describe("CLUB-DIRECTORY-01 crest upload — shares uploadTenantLogo's validatio
       expect.anything(),
       expect.objectContaining({ access: "public", contentType: "image/png" }),
     );
+  });
+
+  it("does not expose Blob URLs or provider error details in cleanup logs", async () => {
+    const oldUrl =
+      "https://store.public.blob.vercel-storage.com/tenant/private-object.png";
+    const newUrl =
+      "https://store.public.blob.vercel-storage.com/tenant/new-object.png";
+    const providerSecret = "provider-secret-bearing-error";
+    delMock.mockRejectedValue(
+      new Error(`${providerSecret}: failed deleting ${oldUrl}`),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await deleteAnlageplanBackground(oldUrl);
+    await deleteOrphanedLogo(oldUrl, newUrl);
+
+    expect(warn).toHaveBeenCalledTimes(2);
+    const serializedLogs = JSON.stringify(warn.mock.calls);
+    expect(serializedLogs).not.toContain(oldUrl);
+    expect(serializedLogs).not.toContain(providerSecret);
+    expect(serializedLogs).toContain("Error");
   });
 });

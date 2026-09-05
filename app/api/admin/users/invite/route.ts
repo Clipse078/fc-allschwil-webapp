@@ -43,6 +43,11 @@ import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
 import { INVITATION_EXPIRY_HOURS } from "@/lib/users/mutations";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildPasswordResetLink,
+  resolveSecurityLinkBaseUrl,
+  SecurityLinkConfigurationError,
+} from "@/lib/server/security-link-url";
 
 export async function POST(request: NextRequest) {
   const access = await requireApiPermission(PERMISSIONS.USERS_INVITE);
@@ -112,6 +117,10 @@ export async function POST(request: NextRequest) {
   };
 
   try {
+    if (sendInvitation) {
+      resolveSecurityLinkBaseUrl();
+    }
+
     let userId: string;
     let recipientEmail: string;
     let recipientFirstName: string;
@@ -174,9 +183,17 @@ export async function POST(request: NextRequest) {
     if (error instanceof InvitationDomainError) {
       return _invitationErrorResponse(error);
     }
-    if (error instanceof MailConfigurationError) {
+    if (
+      error instanceof MailConfigurationError ||
+      error instanceof SecurityLinkConfigurationError
+    ) {
       // Email config issue — log server-side; return a friendly error.
-      console.error("[invite] MailConfigurationError:", error.message);
+      console.error(
+        "[invite] invitation configuration error",
+        error instanceof SecurityLinkConfigurationError
+          ? error.code
+          : "MAIL_CONFIGURATION",
+      );
       return NextResponse.json(
         { error: "E-Mail-Dienst nicht konfiguriert. Bitte Administrator kontaktieren." },
         { status: 500 },
@@ -196,8 +213,8 @@ async function _sendInvitationEmail(
   rawToken: string | undefined,
 ) {
   if (!rawToken) return;
-  const appBaseUrl = (process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
-  const inviteUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
+  const appBaseUrl = resolveSecurityLinkBaseUrl().toString().replace(/\/$/, "");
+  const inviteUrl = buildPasswordResetLink(rawToken);
 
   // Get tenant name for the email.
   const tenant = await prisma.tenant.findUnique({

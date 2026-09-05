@@ -57,6 +57,10 @@ import {
 
 const VERCEL_BLOB_HOSTNAME_RE = /\.public\.blob\.vercel-storage\.com$/;
 
+function getSafeErrorCategory(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : "UnknownError";
+}
+
 /**
  * Returns true when `url` is a Vercel Blob CDN URL.
  * Used to decide whether a previous logoUrl should be deleted after re-upload.
@@ -292,7 +296,10 @@ export async function deleteAnlageplanBackground(
   try {
     await del(url, { token });
   } catch (err) {
-    console.warn("[storage] deleteAnlageplanBackground: failed to delete blob", url, err);
+    console.warn("[blob-cleanup] operation failed", {
+      operation: "deleteAnlageplanBackground",
+      errorCategory: getSafeErrorCategory(err),
+    });
   }
 }
 
@@ -326,6 +333,9 @@ export async function deleteOrphanedLogo(
   } catch (err) {
     // Non-fatal: orphan cleanup is best-effort.
     // The new blob is already uploaded and the DB already updated.
-    console.warn("[storage] deleteOrphanedLogo: failed to delete old blob", oldUrl, err);
+    console.warn("[blob-cleanup] operation failed", {
+      operation: "deleteOrphanedLogo",
+      errorCategory: getSafeErrorCategory(err),
+    });
   }
 }

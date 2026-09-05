@@ -21,7 +21,7 @@
  *   - Updates ONLY admin@fcallschwil.ch
  *   - Updates ONLY passwordHash (no other fields touched)
  *   - Verifies the row exists and is active before writing
- *   - Prints a confirmation row after writing (email, hash prefix, lastLoginAt)
+ *   - Prints a confirmation row after writing (email, status)
  *   - Changes NO other user records
  *
  * After use, delete or archive this script — it is a one-time recovery tool.
@@ -72,8 +72,7 @@ const hash: string = rawHash;
 if (!/^\$2[ab]\$\d{2}\$.{53}$/.test(hash)) {
   console.error(
     "[restore-admin-hash] ERROR: ADMIN_PASSWORD_HASH does not look like a valid " +
-    "bcrypt hash. Expected format: $2b$12$<53 chars> (length 60).\n" +
-    "Provided prefix: " + hash.substring(0, 7) + "..., length: " + hash.length
+    "bcrypt hash."
   );
   process.exit(1);
 }
@@ -111,7 +110,7 @@ async function main() {
   console.log(`  isActive  : ${existing.isActive}`);
   console.log(`  tenantId  : ${existing.tenantId ?? "(null — run bootstrap to fix)"}`);
   console.log(`  lastLoginAt: ${existing.lastLoginAt?.toISOString() ?? "never"}`);
-  console.log(`\n[restore-admin-hash] Applying new hash (prefix: ${hash.substring(0, 7)})…`);
+  console.log("\n[restore-admin-hash] Applying approved password hash…");
 
   // Update ONLY passwordHash — no other fields.
   await prisma.user.update({
@@ -132,7 +131,6 @@ async function main() {
 
   console.log(`\n[restore-admin-hash] SUCCESS`);
   console.log(`  email      : ${after.email}`);
-  console.log(`  hash prefix: ${after.passwordHash.substring(0, 7)}`);
   console.log(`  isActive   : ${after.isActive}`);
   console.log(`\nLogin with ${ADMIN_EMAIL} using the password that produced this hash.`);
   console.log("Change the password via the admin UI after first successful login.\n");

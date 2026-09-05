@@ -468,7 +468,9 @@ export async function deletePersonDocument(
   await workspaceStorageProvider.delete(storageKey).catch((err: unknown) => {
     console.warn("[person-document-service] blob deletion failed after DB delete", {
       documentId: input.documentId,
-      error: String(err),
+      operation: "delete",
+      errorCategory:
+        err instanceof Error && err.name ? err.name : "UnknownError",
     });
   });
 }

@@ -20,9 +20,7 @@
  *   PR-17  rate-limit blocks requests exceeding the limit
  *   PR-18  missing RESEND_API_KEY throws MailConfigurationError (no silent fallback)
  *   PR-19  missing EMAIL_FROM throws MailConfigurationError
- *   PR-20  missing APP_BASE_URL causes internal error (opaque external response)
  *   PR-21  sendMail never logs raw token or reset URL
- *   PR-22  localhost URL rejected by requireAppBaseUrl
  *   PR-23  password-reset email contains branding, expiry, CTA, ignore notice
  */
 
@@ -50,15 +48,6 @@ type MockPasswordResetToken = {
   usedAt: Date | null;
   createdAt: Date;
   user: { id: string; email: string; isActive: boolean };
-};
-
-type MockUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  isActive: boolean;
-  passwordHash: string;
-  passwordChangedAt: Date | null;
 };
 
 function makeMockPrisma(overrides: {
@@ -385,94 +374,6 @@ describe("sendMail — mail configuration enforcement", () => {
       // Error message must not expose env var values.
       expect((err as Error).message).not.toContain("re_");
     }
-  });
-});
-
-/**
- * Mirrors requireAppBaseUrl() from app/api/auth/forgot-password/route.ts.
- * Tested inline since Next.js route modules require a full server runtime context.
- * Keep in sync with the route implementation.
- */
-function requireAppBaseUrl(): string {
-  const url =
-    process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
-    process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
-
-  if (!url) {
-    throw new Error(
-      "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
-    );
-  }
-
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?($|\/)/.test(url)) {
-    throw new Error(
-      "APP_BASE_URL resolves to localhost. Password reset emails require a publicly routable URL.",
-    );
-  }
-
-  return url;
-}
-
-describe("forgot-password route — canonical base URL requirement", () => {
-  const savedEnv: Record<string, string | undefined> = {};
-
-  beforeEach(() => {
-    savedEnv.APP_BASE_URL = process.env.APP_BASE_URL;
-    savedEnv.NEXTAUTH_URL = process.env.NEXTAUTH_URL;
-    delete process.env.APP_BASE_URL;
-    delete process.env.NEXTAUTH_URL;
-  });
-
-  afterEach(() => {
-    if (savedEnv.APP_BASE_URL !== undefined) {
-      process.env.APP_BASE_URL = savedEnv.APP_BASE_URL;
-    } else {
-      delete process.env.APP_BASE_URL;
-    }
-    if (savedEnv.NEXTAUTH_URL !== undefined) {
-      process.env.NEXTAUTH_URL = savedEnv.NEXTAUTH_URL;
-    } else {
-      delete process.env.NEXTAUTH_URL;
-    }
-  });
-
-  it("PR-20: throws when both APP_BASE_URL and NEXTAUTH_URL are absent", () => {
-    expect(() => requireAppBaseUrl()).toThrow(/APP_BASE_URL.*not configured/);
-  });
-
-  it("PR-20: returns APP_BASE_URL when set to a routable URL", () => {
-    process.env.APP_BASE_URL = "https://stage.sportclubevo.app";
-    expect(requireAppBaseUrl()).toBe("https://stage.sportclubevo.app");
-  });
-
-  it("PR-20: falls back to NEXTAUTH_URL when APP_BASE_URL is absent", () => {
-    process.env.NEXTAUTH_URL = "https://fcallschwil.sportclubevo.com";
-    expect(requireAppBaseUrl()).toBe("https://fcallschwil.sportclubevo.com");
-  });
-
-  it("PR-20: strips trailing slash from APP_BASE_URL", () => {
-    process.env.APP_BASE_URL = "https://stage.sportclubevo.app/";
-    expect(requireAppBaseUrl()).toBe("https://stage.sportclubevo.app");
-  });
-
-  it("PR-22: throws when APP_BASE_URL is localhost (http)", () => {
-    process.env.APP_BASE_URL = "http://localhost:3000";
-    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
-  });
-
-  it("PR-22: throws when APP_BASE_URL is localhost (https)", () => {
-    process.env.APP_BASE_URL = "https://localhost";
-    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
-  });
-
-  it("PR-22: throws when APP_BASE_URL is 127.0.0.1", () => {
-    process.env.APP_BASE_URL = "http://127.0.0.1:3000";
-    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
-  });
-
-  it("PR-22: throws when NEXTAUTH_URL falls back to localhost", () => {
-    process.env.NEXTAUTH_URL = "http://localhost:3000";
-    expect(() => requireAppBaseUrl()).toThrow(/localhost/);
   });
 });
 

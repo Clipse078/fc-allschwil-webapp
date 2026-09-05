@@ -23,6 +23,11 @@ import { createPasswordResetToken, TOKEN_EXPIRY_MS } from "@/lib/auth/password-r
 import { checkRateLimit } from "@/lib/auth/rate-limit";
 import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildPasswordResetEmail } from "@/lib/email/templates/password-reset";
+import {
+  buildPasswordResetLink,
+  resolveSecurityLinkBaseUrl,
+  SecurityLinkConfigurationError,
+} from "@/lib/server/security-link-url";
 
 const OPAQUE_SUCCESS = {
   message:
@@ -35,37 +40,6 @@ function getClientIp(req: NextRequest): string {
     req.headers.get("x-real-ip") ??
     "unknown"
   );
-}
-
-/**
- * Returns the canonical application base URL from environment configuration.
- * Prefers APP_BASE_URL, falls back to NEXTAUTH_URL.
- *
- * Throws if:
- *   - Neither APP_BASE_URL nor NEXTAUTH_URL is configured.
- *   - The resolved URL points to localhost or 127.0.0.1 (not a routable
- *     production URL; reset links sent to that address are unusable).
- *
- * The caller must catch and log the error; the external response stays opaque.
- */
-function requireAppBaseUrl(): string {
-  const url =
-    process.env.APP_BASE_URL?.trim().replace(/\/$/, "") ||
-    process.env.NEXTAUTH_URL?.trim().replace(/\/$/, "");
-
-  if (!url) {
-    throw new Error(
-      "APP_BASE_URL (or NEXTAUTH_URL) is not configured. Cannot construct password reset URL.",
-    );
-  }
-
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?($|\/)/.test(url)) {
-    throw new Error(
-      "APP_BASE_URL resolves to localhost. Password reset emails require a publicly routable URL.",
-    );
-  }
-
-  return url;
 }
 
 export async function POST(req: NextRequest) {
@@ -115,9 +89,9 @@ export async function POST(req: NextRequest) {
   // reset URLs, or account existence to the caller.
   if (userId && userEmail) {
     try {
+      const appBaseUrl = resolveSecurityLinkBaseUrl().toString().replace(/\/$/, "");
       const rawToken = await createPasswordResetToken(prisma, userId);
-      const appBaseUrl = requireAppBaseUrl();
-      const resetUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
+      const resetUrl = buildPasswordResetLink(rawToken);
       const expiryMinutes = Math.round(TOKEN_EXPIRY_MS / 60000);
 
       const { subject, html, text } = buildPasswordResetEmail({
@@ -130,9 +104,15 @@ export async function POST(req: NextRequest) {
       await sendMail({ to: userEmail, subject, html, text });
     } catch (err) {
       const isConfigError = err instanceof MailConfigurationError;
+      const isLinkConfigError = err instanceof SecurityLinkConfigurationError;
       const emailPrefix = (userEmail ?? "").slice(0, 3) + "***";
 
-      if (isConfigError) {
+      if (isLinkConfigError) {
+        console.error(
+          "[forgot-password] invalid security link configuration",
+          err.code,
+        );
+      } else if (isConfigError) {
         // Operational/configuration failure — visible in logs, not to caller.
         console.error("[forgot-password] mail configuration error:", (err as Error).message);
       } else {

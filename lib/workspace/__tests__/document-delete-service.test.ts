@@ -161,17 +161,26 @@ describe("deleteWorkspaceDocumentPermanently", () => {
   });
 
   it("8 — storage failure does not throw (best-effort cleanup; DB delete already committed)", async () => {
+    const storageUrl = "https://blob.example/private/url1";
+    const providerSecret = "provider-secret-bearing-error";
     mocks.workspaceDocumentFindUnique.mockResolvedValueOnce(
       makeDocumentWithVersions([
-        { id: "v1", storageKey: "workspace/key1", storageUrl: "https://blob.example/url1" },
+        { id: "v1", storageKey: "workspace/key1", storageUrl },
       ]),
     );
-    mocks.storageDelete.mockRejectedValueOnce(new Error("Blob unreachable"));
+    mocks.storageDelete.mockRejectedValueOnce(
+      new Error(`${providerSecret}: Blob unreachable at ${storageUrl}`),
+    );
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     // Should resolve without throwing
     await expect(
       deleteWorkspaceDocumentPermanently(TENANT_A, DOC_ID),
     ).resolves.toBeDefined();
+    const serializedLogs = JSON.stringify(warn.mock.calls);
+    expect(serializedLogs).not.toContain(storageUrl);
+    expect(serializedLogs).not.toContain(providerSecret);
+    expect(serializedLogs).toContain(DOC_ID);
   });
 
   it("9 — throws INVALID_INPUT for blank tenantId", async () => {

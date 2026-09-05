@@ -19,15 +19,26 @@ const mockCreatePersonAndInvite = vi.fn();
 const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaTenantFindUnique = vi.fn();
 const mockSendMail = vi.fn();
+const mockBuildInvitationEmail = vi.fn(() => ({
+  subject: "Test",
+  html: "<p>Test</p>",
+  text: "Test",
+}));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/permissions/require-api-permission", () => ({
   requireApiPermission: mockRequireApiPermission,
 }));
 
-vi.mock("@/lib/users/mutations", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/users/mutations")>("@/lib/users/mutations");
+vi.mock("@/lib/users/mutations", () => {
+  class InvitationDomainError extends Error {
+    constructor(public readonly code: string) {
+      super(code);
+    }
+  }
   return {
-    ...actual,
+    InvitationDomainError,
+    INVITATION_EXPIRY_HOURS: 48,
     invitePersonToTenant: mockInvitePersonToTenant,
     createPersonAndInvite: mockCreatePersonAndInvite,
   };
@@ -46,11 +57,7 @@ vi.mock("@/lib/email/mailer", () => ({
 }));
 
 vi.mock("@/lib/email/templates/invitation", () => ({
-  buildInvitationEmail: vi.fn(() => ({
-    subject: "Test",
-    html: "<p>Test</p>",
-    text: "Test",
-  })),
+  buildInvitationEmail: mockBuildInvitationEmail,
 }));
 
 const { POST } = await import("../route");
@@ -60,6 +67,8 @@ const { POST } = await import("../route");
 const TENANT_ID = "tenant-001";
 const ACTOR_ID = "actor-001";
 const USER_ID = "user-new-001";
+const originalAppBaseUrl = process.env.APP_BASE_URL;
+const originalNextAuthUrl = process.env.NEXTAUTH_URL;
 
 const AUTH_OK = {
   ok: true as const,
@@ -97,6 +106,8 @@ function makeRequest(body: unknown) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.APP_BASE_URL = "https://canonical.example.test";
+  delete process.env.NEXTAUTH_URL;
   mockRequireApiPermission.mockResolvedValue(AUTH_OK);
   mockInvitePersonToTenant.mockResolvedValue({ userId: USER_ID, rawToken: "abc123def456" + "a".repeat(52) });
   mockCreatePersonAndInvite.mockResolvedValue({ userId: USER_ID, personId: "person-001", rawToken: "abc123def456" + "a".repeat(52) });
@@ -106,6 +117,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalAppBaseUrl === undefined) delete process.env.APP_BASE_URL;
+  else process.env.APP_BASE_URL = originalAppBaseUrl;
+  if (originalNextAuthUrl === undefined) delete process.env.NEXTAUTH_URL;
+  else process.env.NEXTAUTH_URL = originalNextAuthUrl;
   vi.restoreAllMocks();
 });
 
@@ -153,6 +168,41 @@ describe("POST /api/admin/users/invite — invite existing person", () => {
       roleIds: undefined,
       scopedRoles: undefined,
     });
+  });
+
+  it("PERSON-2a. builds the invitation link from the canonical base", async () => {
+    const rawToken = "invite+a/b?c=d%e";
+    mockInvitePersonToTenant.mockResolvedValue({ userId: USER_ID, rawToken });
+
+    await POST(
+      new Request("http://hostile.example/api/admin/users/invite", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Host: "hostile.example",
+          "X-Forwarded-Host": "hostile.example",
+        },
+        body: JSON.stringify({ personId: "person-001" }),
+      }) as never,
+    );
+
+    const input = (mockBuildInvitationEmail.mock.calls as unknown[][])[0]?.[0] as {
+      inviteUrl: string;
+    };
+    const inviteUrl = new URL(input.inviteUrl);
+    expect(inviteUrl.origin).toBe("https://canonical.example.test");
+    expect(inviteUrl.pathname).toBe("/reset-password");
+    expect(inviteUrl.searchParams.get("token")).toBe(rawToken);
+  });
+
+  it("PERSON-2b. fails before mutation or provider invocation for invalid URL config", async () => {
+    process.env.APP_BASE_URL = "https://canonical.example.test/unexpected";
+
+    const res = await POST(makeRequest({ personId: "person-001" }) as never);
+
+    expect(res.status).toBe(500);
+    expect(mockInvitePersonToTenant).not.toHaveBeenCalled();
+    expect(mockSendMail).not.toHaveBeenCalled();
   });
 
   it("PERSON-3. returns 404 on PERSON_NOT_FOUND", async () => {

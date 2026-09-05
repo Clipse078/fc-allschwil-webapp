@@ -379,7 +379,9 @@ export async function deleteTeamDocument(
   await storage.delete(storageKey).catch((err: unknown) => {
     console.warn("[team-document-service] blob deletion failed after DB delete", {
       documentId: input.documentId,
-      error: String(err),
+      operation: "delete",
+      errorCategory:
+        err instanceof Error && err.name ? err.name : "UnknownError",
     });
   });
 }
