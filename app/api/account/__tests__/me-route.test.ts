@@ -34,7 +34,7 @@ const SESSION_USER = {
 
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
-  unstable_update: vi.fn(),
+  refreshEffectiveUserSession: vi.fn(),
   userFindUnique: vi.fn(),
   personFindFirst: vi.fn(),
   personUpdate: vi.fn(),
@@ -46,7 +46,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/auth", () => ({
   auth: mocks.auth,
-  unstable_update: mocks.unstable_update,
+  refreshEffectiveUserSession: mocks.refreshEffectiveUserSession,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -186,7 +186,7 @@ describe("PATCH /api/account/me", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.logAction.mockResolvedValue(undefined);
-    mocks.unstable_update.mockResolvedValue(undefined);
+    mocks.refreshEffectiveUserSession.mockResolvedValue(undefined);
     mocks.transaction.mockImplementation(async (ops: unknown[]) => {
       for (const op of ops) await op;
     });
@@ -274,7 +274,7 @@ describe("PATCH /api/account/me", () => {
     expect(body.error).toMatch(/50 Zeichen/);
   });
 
-  it("calls unstable_update to refresh session after save", async () => {
+  it("refreshes presentation from trusted server state after save", async () => {
     mocks.auth.mockResolvedValue({ user: SESSION_USER });
     mocks.personFindFirst.mockResolvedValue(null);
     mocks.userUpdate.mockResolvedValue({});
@@ -282,11 +282,7 @@ describe("PATCH /api/account/me", () => {
     const req = makeRequest({ firstName: "Bob", lastName: "Smith" });
     await PATCH(req);
 
-    expect(mocks.unstable_update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        user: expect.objectContaining({ firstName: "Bob", lastName: "Smith" }),
-      }),
-    );
+    expect(mocks.refreshEffectiveUserSession).toHaveBeenCalledWith("user-001");
   });
 
   it("does not allow email change (read-only field)", async () => {

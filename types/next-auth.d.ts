@@ -66,6 +66,7 @@ declare module "next-auth/jwt" {
     actorEmail?: string;
     actorName?: string;
     effectiveUserId?: string;
+    authorizationContextVersion?: number;
     /** RPERM-04: see Session.user.activeTenantId. */
     activeTenantId?: string | null;
     activeMembershipId?: string | null;
