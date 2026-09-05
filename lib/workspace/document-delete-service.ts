@@ -177,7 +177,7 @@ export async function deleteWorkspaceDocumentPermanently(
   }
 
   const storageReferences = document.versions.map(
-    (v) => v.storageUrl ?? v.storageKey,
+    (version) => version.storageKey,
   );
 
   const versionCount = document.versions.length;

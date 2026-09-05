@@ -67,6 +67,38 @@ function makeUploadFailure(
 }
 
 const WORKSPACE_STORAGE_PREFIX = "workspace";
+const PRIVATE_STORAGE_PREFIXES = [
+  "workspace/",
+  "team-docs/",
+  "communication/",
+] as const;
+
+export function isAllowedWorkspaceStorageReference(
+  value: string,
+): boolean {
+  const normalized = value.trim();
+  if (
+    !normalized ||
+    normalized.includes("\\") ||
+    normalized.includes("://")
+  ) {
+    return false;
+  }
+
+  const segments = normalized.split("/");
+  if (
+    segments.some(
+      (segment) =>
+        !segment || segment === "." || segment === "..",
+    )
+  ) {
+    return false;
+  }
+
+  return PRIVATE_STORAGE_PREFIXES.some((prefix) =>
+    normalized.startsWith(prefix),
+  );
+}
 
 function normalizeStorageSegment(
   value: string,
@@ -160,7 +192,10 @@ export class VercelBlobWorkspaceStorage
     sizeBytes: number;
   }> {
     const storageKey = input.storageKey.trim();
-    if (!storageKey || input.buffer.byteLength === 0) {
+    if (
+      !isAllowedWorkspaceStorageReference(storageKey) ||
+      input.buffer.byteLength === 0
+    ) {
       throw new Error("A storage key and non-empty buffer are required.");
     }
 
@@ -401,7 +436,7 @@ export class VercelBlobWorkspaceStorage
 
     const storageReference = input.storageReference.trim();
 
-    if (!storageReference) {
+    if (!isAllowedWorkspaceStorageReference(storageReference)) {
       return {
         ok: false,
         status: 400,
@@ -498,7 +533,7 @@ export class VercelBlobWorkspaceStorage
 
     const normalizedReference = storageReference.trim();
 
-    if (!normalizedReference) {
+    if (!isAllowedWorkspaceStorageReference(normalizedReference)) {
       return;
     }
 

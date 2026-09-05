@@ -23,9 +23,11 @@ import { prisma } from "@/lib/db/prisma";
 import { workspaceStorageProvider } from "@/lib/workspace/upload-storage";
 import {
   validateWorkspaceUploadFile,
-  sanitizeWorkspaceFilename,
-  isAllowedWorkspaceMimeType,
 } from "@/lib/workspace/upload-types";
+import {
+  TeamDocumentValidationError,
+  validateTeamDocumentUpload,
+} from "@/lib/teams/team-document-validation";
 import { logAction } from "@/lib/audit/log-action";
 
 // ── Storage key scheme ─────────────────────────────────────────────────────
@@ -263,12 +265,25 @@ export async function createPersonDocument(
     throw new PersonDocumentServiceError("INVALID_INPUT", "Titel darf maximal 200 Zeichen lang sein.");
   }
 
-  if (!isAllowedWorkspaceMimeType(input.mimeType)) {
-    throw new PersonDocumentServiceError("INVALID_INPUT", `Nicht erlaubter Dateityp: ${input.mimeType}.`);
+  let validatedFile;
+  try {
+    validatedFile = await validateTeamDocumentUpload({
+      filename: input.filename,
+      declaredContentType: input.mimeType,
+      buffer: input.fileBuffer,
+    });
+  } catch (error) {
+    if (error instanceof TeamDocumentValidationError) {
+      throw new PersonDocumentServiceError(
+        "INVALID_INPUT",
+        error.message,
+      );
+    }
+    throw error;
   }
 
   const documentId = randomUUID();
-  const sanitizedFilename = sanitizeWorkspaceFilename(input.filename);
+  const sanitizedFilename = validatedFile.sanitizedFilename;
 
   // Upload to private blob store
   const uploadResult = await workspaceStorageProvider.upload({
@@ -276,7 +291,7 @@ export async function createPersonDocument(
     documentId,
     versionNumber: 1,
     filename: sanitizedFilename,
-    mimeType: input.mimeType as Parameters<typeof workspaceStorageProvider.upload>[0]["mimeType"],
+    mimeType: validatedFile.contentType,
     buffer: input.fileBuffer,
   });
 
@@ -300,7 +315,7 @@ export async function createPersonDocument(
         storageKey: uploadResult.storageKey,
         storageUrl: uploadResult.storageUrl ?? null,
         originalFilename: sanitizedFilename,
-        mimeType: input.mimeType,
+        mimeType: validatedFile.contentType,
         sizeBytes: uploadResult.sizeBytes,
         issueDate: input.issueDate ?? null,
         expiryDate: input.expiryDate ?? null,

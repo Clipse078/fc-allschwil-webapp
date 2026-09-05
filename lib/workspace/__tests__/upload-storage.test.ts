@@ -791,19 +791,10 @@ describe("Workspace upload storage", () => {
     delete process.env.BLOB_READ_WRITE_TOKEN;
   });
 
-  it("handles cleanup failures without throwing", async () => {
+  it("rejects URL-based cleanup references without calling Blob", async () => {
     setWorkspaceBlobEnv();
     const storageReference =
       "https://store.public.blob.vercel-storage.com/private/object.pdf";
-    const providerSecret = "provider-secret-bearing-error";
-
-    blobMocks.del.mockRejectedValue(
-      new Error(`${providerSecret}: failed deleting ${storageReference}`),
-    );
-
-    const consoleWarning = vi
-      .spyOn(console, "warn")
-      .mockImplementation(() => undefined);
 
     const storage = new VercelBlobWorkspaceStorage();
 
@@ -811,13 +802,28 @@ describe("Workspace upload storage", () => {
       storage.delete(storageReference),
     ).resolves.toBeUndefined();
 
-    expect(consoleWarning).toHaveBeenCalled();
-    const serializedLogs = JSON.stringify(consoleWarning.mock.calls);
-    expect(serializedLogs).not.toContain(storageReference);
-    expect(serializedLogs).not.toContain(providerSecret);
-    expect(serializedLogs).toContain("Error");
+    expect(blobMocks.del).not.toHaveBeenCalled();
+  });
 
-    consoleWarning.mockRestore();
+  it.each([
+    "../workspace/tenant-a/document.pdf",
+    "workspace/tenant-a/../tenant-b/document.pdf",
+    "ops-backups/private.json",
+    "https://example.test/workspace/tenant-a/document.pdf",
+  ])("rejects unauthorized storage pathname %s", async (storageReference) => {
+    setWorkspaceBlobEnv();
+    const storage = new VercelBlobWorkspaceStorage();
+
+    const result = await storage.download({
+      storageReference,
+      filename: "document.pdf",
+      mimeType: "application/pdf",
+    });
+
+    expect(result).toMatchObject({ ok: false, status: 400 });
+    expect(blobMocks.get).not.toHaveBeenCalled();
+    await storage.delete(storageReference);
+    expect(blobMocks.del).not.toHaveBeenCalled();
   });
 });
 

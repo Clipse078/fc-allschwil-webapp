@@ -34,8 +34,13 @@ import {
   listWorkspaceDocuments,
   WorkspaceDocumentServiceError,
 } from "@/lib/workspace/document-service";
+import type { WorkspaceDocumentDto } from "@/lib/workspace/document-dto";
 import { workspaceStorageProvider } from "@/lib/workspace/upload-storage";
 import { validateWorkspaceUploadFile } from "@/lib/workspace/upload-types";
+import {
+  TeamDocumentValidationError,
+  validateTeamDocumentUpload,
+} from "@/lib/teams/team-document-validation";
 
 function getOptionalFormText(
   formData: FormData,
@@ -65,6 +70,39 @@ function mapDocumentServiceError(
     case "DUPLICATE_DOCUMENT_NAME":
       return 409;
   }
+}
+
+function toClientWorkspaceDocument(
+  document: WorkspaceDocumentDto,
+) {
+  return {
+    id: document.id,
+    folderId: document.folderId,
+    name: document.name,
+    status: document.status,
+    currentVersionId: document.currentVersionId,
+    createdByUserId: document.createdByUserId,
+    updatedByUserId: document.updatedByUserId,
+    archivedAt: document.archivedAt,
+    createdAt: document.createdAt,
+    updatedAt: document.updatedAt,
+    currentVersion: document.currentVersion
+      ? {
+          id: document.currentVersion.id,
+          documentId: document.currentVersion.documentId,
+          versionNumber: document.currentVersion.versionNumber,
+          status: document.currentVersion.status,
+          filename: document.currentVersion.filename,
+          mimeType: document.currentVersion.mimeType,
+          sizeBytes: document.currentVersion.sizeBytes,
+          checksum: document.currentVersion.checksum,
+          changeNote: document.currentVersion.changeNote,
+          createdByUserId:
+            document.currentVersion.createdByUserId,
+          createdAt: document.currentVersion.createdAt,
+        }
+      : null,
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -267,6 +305,22 @@ export async function POST(request: NextRequest) {
   const arrayBuffer = await fileEntry.arrayBuffer();
   const buffer = new Uint8Array(arrayBuffer);
 
+  try {
+    await validateTeamDocumentUpload({
+      filename: fileEntry.name,
+      declaredContentType: fileEntry.type,
+      buffer,
+    });
+  } catch (error) {
+    if (error instanceof TeamDocumentValidationError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: 400 },
+      );
+    }
+    throw error;
+  }
+
   const uploadResult = await workspaceStorageProvider.upload({
     tenantKey: tenant.key,
     documentId,
@@ -307,7 +361,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(
       {
-        document,
+        document: toClientWorkspaceDocument(document),
       },
       {
         status: 201,
@@ -315,8 +369,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     await workspaceStorageProvider.delete(
-      uploadResult.storageUrl ??
-        uploadResult.storageKey,
+      uploadResult.storageKey,
     );
 
     if (error instanceof WorkspaceDocumentServiceError) {
