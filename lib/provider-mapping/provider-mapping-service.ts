@@ -221,7 +221,7 @@ export async function createProviderMapping(
 
   // 1. Validate TeamSeason
   const teamSeason = await prisma.teamSeason.findFirst({
-    where: { id: teamSeasonId },
+    where: { id: teamSeasonId, team: { tenantId } },
     select: {
       id: true,
       status: true,
@@ -238,14 +238,6 @@ export async function createProviderMapping(
     };
   }
 
-  if (teamSeason.team.tenantId && teamSeason.team.tenantId !== tenantId) {
-    return {
-      ok: false,
-      code: "TEAM_SEASON_TENANT_MISMATCH",
-      message: "Die TeamSeason gehört nicht zum Mandanten.",
-    };
-  }
-
   if (teamSeason.status === "ARCHIVED") {
     return {
       ok: false,
@@ -257,7 +249,7 @@ export async function createProviderMapping(
   // 2. Validate Competition (when provided)
   if (input.competitionId) {
     const competition = await prisma.competition.findFirst({
-      where: { id: input.competitionId },
+      where: { id: input.competitionId, tenantId },
       select: { id: true, tenantId: true, isArchived: true },
     });
 
@@ -266,14 +258,6 @@ export async function createProviderMapping(
         ok: false,
         code: "COMPETITION_NOT_FOUND",
         message: "Wettbewerb nicht gefunden.",
-      };
-    }
-
-    if (competition.tenantId !== tenantId) {
-      return {
-        ok: false,
-        code: "COMPETITION_TENANT_MISMATCH",
-        message: "Der Wettbewerb gehört nicht zum Mandanten.",
       };
     }
 
@@ -517,7 +501,15 @@ export async function replaceProviderMapping(
         },
         create: {
           tenantId,
-          teamId: (await tx.teamSeason.findUniqueOrThrow({ where: { id: input.teamSeasonId }, select: { teamId: true } })).teamId,
+          teamId: (
+            await tx.teamSeason.findFirstOrThrow({
+              where: {
+                id: input.teamSeasonId,
+                team: { tenantId },
+              },
+              select: { teamId: true },
+            })
+          ).teamId,
           provider: input.provider,
           externalTeamId: input.externalTeamId,
           externalSeasonId: input.externalSeasonId,
@@ -661,16 +653,13 @@ export async function validateProviderMapping(
 
   // 2. TeamSeason
   const teamSeason = await prisma.teamSeason.findFirst({
-    where: { id: input.teamSeasonId },
+    where: { id: input.teamSeasonId, team: { tenantId: input.tenantId } },
     select: { status: true, team: { select: { tenantId: true } } },
   });
 
   if (!teamSeason) {
     errors.push("TeamSeason nicht gefunden.");
   } else {
-    if (teamSeason.team.tenantId && teamSeason.team.tenantId !== input.tenantId) {
-      errors.push("Die TeamSeason gehört nicht zum Mandanten.");
-    }
     if (teamSeason.status === "ARCHIVED") {
       errors.push("Archivierte TeamSeason-Einträge können nicht verknüpft werden.");
     }
@@ -679,16 +668,13 @@ export async function validateProviderMapping(
   // 3. Competition (optional)
   if (input.competitionId) {
     const competition = await prisma.competition.findFirst({
-      where: { id: input.competitionId },
+      where: { id: input.competitionId, tenantId: input.tenantId },
       select: { tenantId: true, isArchived: true },
     });
 
     if (!competition) {
       errors.push("Wettbewerb nicht gefunden.");
     } else {
-      if (competition.tenantId !== input.tenantId) {
-        errors.push("Der Wettbewerb gehört nicht zum Mandanten.");
-      }
       if (competition.isArchived) {
         errors.push("Archivierter Wettbewerb kann nicht als Kontext verwendet werden.");
       }

@@ -30,9 +30,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  teamSeasonFindUnique: vi.fn(),
+  teamSeasonFindFirst: vi.fn(),
   competitionFindFirst: vi.fn(),
-  competitionFindUnique: vi.fn(),
   teamSeasonCompetitionUpdateMany: vi.fn(),
   teamSeasonCompetitionFindUnique: vi.fn(),
   teamSeasonCompetitionUpdate: vi.fn(),
@@ -44,11 +43,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     teamSeason: {
-      findUnique: (...args: unknown[]) => mocks.teamSeasonFindUnique(...args),
+      findFirst: (...args: unknown[]) => mocks.teamSeasonFindFirst(...args),
     },
     competition: {
       findFirst: (...args: unknown[]) => mocks.competitionFindFirst(...args),
-      findUnique: (...args: unknown[]) => mocks.competitionFindUnique(...args),
     },
     teamSeasonCompetition: {
       updateMany: (...args: unknown[]) => mocks.teamSeasonCompetitionUpdateMany(...args),
@@ -85,7 +83,7 @@ function makeTx() {
 beforeEach(() => {
   vi.clearAllMocks();
 
-  mocks.teamSeasonFindUnique.mockResolvedValue({
+  mocks.teamSeasonFindFirst.mockResolvedValue({
     id: TEAM_SEASON_ID,
     teamId: TEAM_ID,
     participationType: "COMPETITION",
@@ -171,7 +169,7 @@ describe("setTeamSeasonCompetition", () => {
   });
 
   it("4 — rejects a competition assignment when the TeamSeason is not a COMPETITION participation type", async () => {
-    mocks.teamSeasonFindUnique.mockResolvedValueOnce({
+    mocks.teamSeasonFindFirst.mockResolvedValueOnce({
       id: TEAM_SEASON_ID,
       teamId: TEAM_ID,
       participationType: "TRAINING",
@@ -195,7 +193,6 @@ describe("setTeamSeasonCompetition", () => {
 
   it("5 — rejects a competition belonging to another tenant", async () => {
     mocks.competitionFindFirst.mockResolvedValueOnce(null);
-    mocks.competitionFindUnique.mockResolvedValueOnce({ id: COMPETITION_ID });
 
     const result = await setTeamSeasonCompetition({
       tenantId: TENANT_A,
@@ -206,8 +203,8 @@ describe("setTeamSeasonCompetition", () => {
 
     expect(result).toEqual({
       ok: false,
-      code: "COMPETITION_TENANT_MISMATCH",
-      message: expect.stringContaining("Mandanten"),
+      code: "COMPETITION_NOT_FOUND",
+      message: expect.stringContaining("nicht gefunden"),
     });
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
@@ -236,7 +233,7 @@ describe("setTeamSeasonCompetition", () => {
   });
 
   it("7 — returns TEAM_SEASON_NOT_FOUND for an unknown TeamSeason (never leaks existence)", async () => {
-    mocks.teamSeasonFindUnique.mockResolvedValueOnce(null);
+    mocks.teamSeasonFindFirst.mockResolvedValueOnce(null);
 
     const result = await setTeamSeasonCompetition({
       tenantId: TENANT_B,
@@ -253,12 +250,7 @@ describe("setTeamSeasonCompetition", () => {
   });
 
   it("8 — returns TEAM_SEASON_NOT_FOUND when the TeamSeason belongs to a different Team", async () => {
-    mocks.teamSeasonFindUnique.mockResolvedValueOnce({
-      id: TEAM_SEASON_ID,
-      teamId: "different-team",
-      participationType: "COMPETITION",
-      team: { tenantId: TENANT_A },
-    });
+    mocks.teamSeasonFindFirst.mockResolvedValueOnce(null);
 
     const result = await setTeamSeasonCompetition({
       tenantId: TENANT_A,

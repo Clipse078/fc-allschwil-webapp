@@ -20,6 +20,11 @@ export async function POST(request: NextRequest, context: Context) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   try {
     const { teamId, teamSeasonId } = await context.params;
     const body = await request.json();
@@ -77,8 +82,8 @@ export async function POST(request: NextRequest, context: Context) {
       );
     }
 
-    const teamSeason = await prisma.teamSeason.findUnique({
-      where: { id: teamSeasonId },
+    const teamSeason = await prisma.teamSeason.findFirst({
+      where: { id: teamSeasonId, teamId, team: { tenantId } },
       include: {
         team: {
           select: {
@@ -99,15 +104,15 @@ export async function POST(request: NextRequest, context: Context) {
       },
     });
 
-    if (!teamSeason || teamSeason.teamId !== teamId) {
+    if (!teamSeason) {
       return NextResponse.json(
         { error: "Team-Saison nicht gefunden." },
         { status: 404 }
       );
     }
 
-    const person = await prisma.person.findUnique({
-      where: { id: personId },
+    const person = await prisma.person.findFirst({
+      where: { id: personId, tenantId },
       select: {
         id: true,
         firstName: true,

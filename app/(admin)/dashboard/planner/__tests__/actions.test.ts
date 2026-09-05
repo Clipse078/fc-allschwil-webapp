@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   }),
   revalidatePath: vi.fn(),
   seasonFindUnique: vi.fn(),
-  teamFindUnique: vi.fn(),
+  teamFindFirst: vi.fn(),
   teamSeasonFindMany: vi.fn(),
   eventCreate: vi.fn(),
   eventFindFirst: vi.fn(),
@@ -20,7 +20,7 @@ vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     season: { findUnique: mocks.seasonFindUnique },
-    team: { findUnique: mocks.teamFindUnique },
+    team: { findFirst: mocks.teamFindFirst },
     teamSeason: { findMany: mocks.teamSeasonFindMany },
     event: {
       create: mocks.eventCreate,
@@ -70,7 +70,7 @@ describe("planner tournament TeamSeason consistency", () => {
       id: "season-a",
       key: "2026-27",
     });
-    mocks.teamFindUnique.mockResolvedValue({ id: "team-a" });
+    mocks.teamFindFirst.mockResolvedValue({ id: "team-a" });
     mocks.teamSeasonFindMany.mockResolvedValue([{ id: "team-season-a" }]);
     mocks.eventFindFirst.mockResolvedValue({ id: "event-a" });
     mocks.eventCreate.mockResolvedValue({ id: "event-a" });
@@ -98,7 +98,7 @@ describe("planner tournament TeamSeason consistency", () => {
       id: "season-new",
       key: "2026-27",
     });
-    mocks.teamFindUnique.mockResolvedValue({ id: "team-new" });
+    mocks.teamFindFirst.mockResolvedValue({ id: "team-new" });
     mocks.teamSeasonFindMany.mockResolvedValue([{ id: "team-season-new" }]);
 
     await expect(
@@ -121,7 +121,7 @@ describe("planner tournament TeamSeason consistency", () => {
       }),
     );
     expect(mocks.eventUpdate).toHaveBeenCalledWith({
-      where: { id: "event-a" },
+      where: { id: "event-a", tenantId: "tenant-a" },
       data: expect.objectContaining({
         teamId: "team-new",
         seasonId: "season-new",
@@ -137,7 +137,7 @@ describe("planner tournament TeamSeason consistency", () => {
 
     expect(mocks.teamSeasonFindMany).not.toHaveBeenCalled();
     expect(mocks.eventUpdate).toHaveBeenCalledWith({
-      where: { id: "event-a" },
+      where: { id: "event-a", tenantId: "tenant-a" },
       data: expect.objectContaining({ teamSeasonId: null, type: "OTHER" }),
     });
   });

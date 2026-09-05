@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     teamSeason: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
     },
   },
@@ -12,7 +12,7 @@ vi.mock("@/lib/db/prisma", () => ({
 import { prisma } from "@/lib/db/prisma";
 import { updateTeamSeasonPublication } from "../team-season-service";
 
-const findUnique = vi.mocked(prisma.teamSeason.findUnique);
+const findFirst = vi.mocked(prisma.teamSeason.findFirst);
 const update = vi.mocked(prisma.teamSeason.update);
 
 function teamSeason(
@@ -39,7 +39,7 @@ function teamSeason(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  findUnique.mockResolvedValue(teamSeason() as never);
+  findFirst.mockResolvedValue(teamSeason() as never);
   update.mockResolvedValue({
     showNextMatch: false,
     showNextTournament: false,
@@ -147,7 +147,7 @@ describe("updateTeamSeasonPublication", () => {
       teamSeasonId: "season-a",
       showNextMatch: false,
     });
-    findUnique.mockResolvedValueOnce(
+    findFirst.mockResolvedValueOnce(
       teamSeason({ showNextMatch: false }) as never,
     );
     await updateTeamSeasonPublication({
@@ -168,9 +168,7 @@ describe("updateTeamSeasonPublication", () => {
   });
 
   it("rejects a TeamSeason belonging to another tenant", async () => {
-    findUnique.mockResolvedValueOnce(
-      teamSeason({ tenantId: "tenant-b" }) as never,
-    );
+    findFirst.mockResolvedValueOnce(null);
 
     const result = await updateTeamSeasonPublication({
       tenantId: "tenant-a",
@@ -181,13 +179,13 @@ describe("updateTeamSeasonPublication", () => {
 
     expect(result).toMatchObject({
       ok: false,
-      code: "TEAM_SEASON_TENANT_MISMATCH",
+      code: "TEAM_SEASON_NOT_FOUND",
     });
     expect(update).not.toHaveBeenCalled();
   });
 
   it("rejects a mismatched teamId/teamSeasonId pair", async () => {
-    findUnique.mockResolvedValueOnce(teamSeason({ teamId: "team-b" }) as never);
+    findFirst.mockResolvedValueOnce(null);
 
     const result = await updateTeamSeasonPublication({
       tenantId: "tenant-a",
@@ -225,7 +223,7 @@ describe("updateTeamSeasonPublication", () => {
   });
 
   it("persists squadWebsiteVisible false → true independently", async () => {
-    findUnique.mockResolvedValueOnce(
+    findFirst.mockResolvedValueOnce(
       teamSeason({ squadWebsiteVisible: false }) as never,
     );
     update.mockResolvedValueOnce({
@@ -268,7 +266,7 @@ describe("updateTeamSeasonPublication", () => {
   });
 
   it("persists trainerTeamWebsiteVisible false → true independently", async () => {
-    findUnique.mockResolvedValueOnce(
+    findFirst.mockResolvedValueOnce(
       teamSeason({ trainerTeamWebsiteVisible: false }) as never,
     );
     update.mockResolvedValueOnce({
@@ -313,7 +311,7 @@ describe("updateTeamSeasonPublication", () => {
   });
 
   it("persists trainingWebsiteVisible false → true independently", async () => {
-    findUnique.mockResolvedValueOnce(
+    findFirst.mockResolvedValueOnce(
       teamSeason({ trainingWebsiteVisible: false }) as never,
     );
     update.mockResolvedValueOnce({

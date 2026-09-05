@@ -65,10 +65,11 @@ export type TeamSeasonDeletionResult = {
  * Never mutates.
  */
 export async function getTeamSeasonDeletionImpact(
+  tenantId: string,
   teamSeasonId: string,
 ): Promise<TeamSeasonDeletionImpact | null> {
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: teamSeasonId },
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: { id: teamSeasonId, team: { tenantId } },
     select: {
       displayName: true,
       season: { select: { name: true } },
@@ -141,9 +142,10 @@ export async function getTeamSeasonDeletionImpact(
  * Returns null when the TeamSeason does not exist (idempotent-safe).
  */
 export async function deleteTeamSeasonPermanently(
+  tenantId: string,
   teamSeasonId: string,
 ): Promise<TeamSeasonDeletionResult | null> {
-  const impact = await getTeamSeasonDeletionImpact(teamSeasonId);
+  const impact = await getTeamSeasonDeletionImpact(tenantId, teamSeasonId);
   if (impact === null) return null;
 
   // Collect session IDs before deleting (must be done outside transaction).
@@ -176,7 +178,9 @@ export async function deleteTeamSeasonPermanently(
     //   TeamSeasonOrgUnit, PlayerSquadMember, TrainerTeamMember,
     //   TeamSeasonCompetition, TrainingSeries → TrainingSession,
     //   TrainingSession (direct). SetNull: TeamExternalMapping.teamSeasonId.
-    await tx.teamSeason.delete({ where: { id: teamSeasonId } });
+    await tx.teamSeason.delete({
+      where: { id: teamSeasonId, team: { tenantId } },
+    });
   });
 
   return {

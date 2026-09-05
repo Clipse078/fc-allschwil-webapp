@@ -239,16 +239,29 @@ function toPublicEventItem(event: PublicEventQueryRow): PublicEventItem {
 export async function getPublicEvents(input: GetPublicEventsInput): Promise<PublicEventItem[]> {
   const limit = normalizeLimit(input.limit, input.maxLimit ?? DEFAULT_MAX_LIMIT);
 
+  // Public publication is always tenant-bound. A missing tenant context must
+  // fail closed instead of silently widening the query to every tenant.
+  if (!input.tenantId) {
+    return [];
+  }
+
   const where: Record<string, unknown> = {
     ...buildSurfaceWhere(input.surface),
+    tenantId: input.tenantId,
+    // A malformed historical cross-tenant Event → Team relation must not
+    // expose the related Team through a tenant-owned Event.
+    AND: [
+      {
+        OR: [
+          { teamId: null },
+          { team: { tenantId: input.tenantId } },
+        ],
+      },
+    ],
     status: {
       in: ["SCHEDULED", "LIVE", "COMPLETED", "POSTPONED"],
     },
   };
-
-  if (input.tenantId) {
-    where.tenantId = input.tenantId;
-  }
 
   if (input.eventTypes && input.eventTypes.length > 0) {
     where.type = { in: input.eventTypes };
@@ -263,6 +276,7 @@ export async function getPublicEvents(input: GetPublicEventsInput): Promise<Publ
   if (input.teamSlug) {
     where.team = {
       slug: input.teamSlug,
+      tenantId: input.tenantId,
     };
   }
 

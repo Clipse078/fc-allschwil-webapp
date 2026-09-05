@@ -12,11 +12,11 @@
  *   1. events.delete → permanent delete allowed within own tenant.
  *   2. events.manage without events.delete → 403 for permanent delete.
  *   3. Unauthorized (no session) → 401 for permanent delete.
- *   4. Cross-tenant permanent delete → 403 (resolver denies).
+ *   4. Cross-tenant permanent delete → 404 before permission resolution.
  *   5. Archive (no ?permanent) still uses events.manage → allowed.
  *   6. Archive (no ?permanent) without events.manage → denied.
  *   7. Event not found → 404 for permanent delete (before resolver called).
- *   8. Club Admin: allowed within own tenant; uses event's DB tenantId, not session.activeTenantId.
+ *   8. Club Admin: active tenant scopes both lookup and permission resolution.
  */
 
 import { NextRequest } from "next/server";
@@ -83,7 +83,6 @@ import { DELETE } from "../route";
 
 const EVENT_ID = "event-01";
 const TENANT_A = "tenant-a";
-const TENANT_B = "tenant-b";
 
 function makeContext() {
   return { params: Promise.resolve({ eventId: EVENT_ID }) };
@@ -107,13 +106,13 @@ beforeEach(() => {
   mocks.deleteClubEvent.mockResolvedValue(undefined);
   mocks.archiveClubEvent.mockResolvedValue({ id: EVENT_ID, status: "ARCHIVED" });
   // Default: event exists in tenant-a
-  mocks.eventFindFirst.mockResolvedValue({ id: EVENT_ID, tenantId: TENANT_A });
+  mocks.eventFindFirst.mockResolvedValue({ id: EVENT_ID });
 });
 
 describe("DELETE /api/events/[eventId] — CLUB-EVENTS-01-C1 permanent delete auth", () => {
   it("1 — events.delete → permanent delete allowed within own tenant", async () => {
     mocks.auth.mockResolvedValueOnce(makeSession("club-admin-1", TENANT_A));
-    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID, tenantId: TENANT_A });
+    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID });
     mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
 
     const response = await DELETE(new NextRequest(permanentUrl()), makeContext());
@@ -131,7 +130,7 @@ describe("DELETE /api/events/[eventId] — CLUB-EVENTS-01-C1 permanent delete au
 
   it("2 — events.manage without events.delete → 403 for permanent delete", async () => {
     mocks.auth.mockResolvedValueOnce(makeSession("manage-only-user"));
-    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID, tenantId: TENANT_A });
+    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID });
     mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(false);
 
     const response = await DELETE(new NextRequest(permanentUrl()), makeContext());
@@ -153,19 +152,14 @@ describe("DELETE /api/events/[eventId] — CLUB-EVENTS-01-C1 permanent delete au
     expect(mocks.deleteClubEvent).not.toHaveBeenCalled();
   });
 
-  it("4 — cross-tenant: resolver denies → 403", async () => {
+  it("4 — cross-tenant event is hidden as not found", async () => {
     mocks.auth.mockResolvedValueOnce(makeSession("club-admin-a", TENANT_A));
-    // Event belongs to TENANT_B
-    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID, tenantId: TENANT_B });
-    mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(false);
+    mocks.eventFindFirst.mockResolvedValueOnce(null);
 
     const response = await DELETE(new NextRequest(permanentUrl()), makeContext());
 
-    expect(response.status).toBe(403);
-    // Resolver is called with the event's own tenantId, not session.activeTenantId
-    expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: TENANT_B }),
-    );
+    expect(response.status).toBe(404);
+    expect(mocks.hasTenantDeletionAuthority).not.toHaveBeenCalled();
     expect(mocks.deleteClubEvent).not.toHaveBeenCalled();
   });
 
@@ -214,20 +208,21 @@ describe("DELETE /api/events/[eventId] — CLUB-EVENTS-01-C1 permanent delete au
     expect(mocks.deleteClubEvent).not.toHaveBeenCalled();
   });
 
-  it("8 — Club Admin: event's DB tenantId used, not session.activeTenantId", async () => {
-    // Session says activeTenantId=TENANT_A but the event belongs to TENANT_B —
-    // the permanent delete path must use the DB-resolved tenantId (TENANT_B)
-    // for the resolver call, never the session's activeTenantId.
-    mocks.auth.mockResolvedValueOnce(makeSession("sce-super-admin", TENANT_A));
-    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID, tenantId: TENANT_B });
+  it("8 — active tenant scopes lookup and Club Admin authority", async () => {
+    mocks.auth.mockResolvedValueOnce(makeSession("club-admin-a", TENANT_A));
+    mocks.eventFindFirst.mockResolvedValueOnce({ id: EVENT_ID });
     mocks.hasTenantDeletionAuthority.mockResolvedValueOnce(true);
 
     const response = await DELETE(new NextRequest(permanentUrl()), makeContext());
 
     expect(response.status).toBe(200);
+    expect(mocks.eventFindFirst).toHaveBeenCalledWith({
+      where: { id: EVENT_ID, type: "OTHER", tenantId: TENANT_A },
+      select: { id: true },
+    });
     expect(mocks.hasTenantDeletionAuthority).toHaveBeenCalledWith(
-      expect.objectContaining({ tenantId: TENANT_B }),
+      expect.objectContaining({ tenantId: TENANT_A }),
     );
-    expect(mocks.deleteClubEvent).toHaveBeenCalledWith(TENANT_B, EVENT_ID);
+    expect(mocks.deleteClubEvent).toHaveBeenCalledWith(TENANT_A, EVENT_ID);
   });
 });

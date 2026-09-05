@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/db/prisma";
 
-export async function getTeamSeasonSquadData(teamSeasonId: string) {
+export async function getTeamSeasonSquadData(tenantId: string, teamSeasonId: string) {
   return prisma.playerSquadMember.findMany({
     where: {
       teamSeasonId,
+      teamSeason: { team: { tenantId } },
+      person: { tenantId },
     },
     orderBy: [
       { sortOrder: "asc" },
@@ -36,10 +38,11 @@ export async function getTeamSeasonSquadData(teamSeasonId: string) {
   });
 }
 
-export async function getTeamSquadOverviewData(teamId: string) {
+export async function getTeamSquadOverviewData(tenantId: string, teamId: string) {
   const teamSeasons = await prisma.teamSeason.findMany({
     where: {
       teamId,
+      team: { tenantId },
     },
     orderBy: {
       season: {

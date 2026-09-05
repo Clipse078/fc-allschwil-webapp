@@ -19,6 +19,11 @@ export async function POST(request: NextRequest, context: Context) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   try {
     const { teamId } = await context.params;
     const body = await request.json();
@@ -54,8 +59,8 @@ export async function POST(request: NextRequest, context: Context) {
       );
     }
 
-    const team = await prisma.team.findUnique({
-      where: { id: teamId },
+    const team = await prisma.team.findFirst({
+      where: { id: teamId, tenantId },
       select: {
         id: true,
         name: true,

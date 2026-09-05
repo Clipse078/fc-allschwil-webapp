@@ -315,6 +315,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
             },
           },
           playerSquadMembers: {
+            where: { person: { tenantId } },
             orderBy: [
               { sortOrder: "asc" },
               { shirtNumber: "asc" },
@@ -345,6 +346,7 @@ export async function getTeamDetailData(tenantId: string, teamId: string) {
             },
           },
           trainerTeamMembers: {
+            where: { person: { tenantId } },
             orderBy: [
               { sortOrder: "asc" },
               { person: { lastName: "asc" } },

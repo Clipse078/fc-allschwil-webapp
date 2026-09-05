@@ -2,23 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getInfoboardFeed } from "@/lib/events/public-event-feed";
 import { getDefaultTenant } from "@/lib/tenants/queries";
 
-// TODO(tenant-isolation): Public InfoBoard feed is currently not tenant-scoped.
-//
-// For the current single-tenant FC Allschwil deployment this is intentional —
-// all infoboard-visible events belong to the same tenant and the kiosk is
-// operated on-site.
-//
-// Before multi-tenant public websites go live, this route must resolve a
-// tenant from the request context (subdomain / custom domain / path prefix)
-// and scope the DB query accordingly:
-//
-//   const tenant = await resolveTenantFromRequest(request); // host header / path
-//   const events = await getInfoboardFeed({ ...params, tenantId: tenant.id });
-//
-// Without this change, a multi-tenant deployment would show a cross-tenant
-// event mix on every public InfoBoard screen — a data-visibility violation.
-// Tracked: Admin → Facilities & Resources MVP will introduce the domain/tenant
-// configuration table that this resolver will depend on.
+// Legacy tenant resolution remains the default-tenant fallback. The resolved
+// tenant id is nevertheless mandatory for every feed query: failure to resolve
+// the default tenant must never degrade into an unscoped public event query.
 
 function parseLimit(value: string | null) {
   if (!value) {
@@ -47,6 +33,9 @@ export async function GET(request: NextRequest) {
     // Resolve the default tenant so facility/resource labels use tenant-configured names.
     // TODO(tenant-isolation/website): replace with resolveTenantFromRequest(request).
     const tenant = await getDefaultTenant();
+    if (!tenant) {
+      return NextResponse.json({ error: "Tenant not found." }, { status: 404 });
+    }
 
     const events = await getInfoboardFeed({
       seasonKey,
@@ -54,7 +43,7 @@ export async function GET(request: NextRequest) {
       dateFrom,
       dateTo,
       limit,
-      tenantId: tenant?.id ?? null,
+      tenantId: tenant.id,
     });
 
     return NextResponse.json({

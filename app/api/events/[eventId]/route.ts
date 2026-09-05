@@ -268,28 +268,31 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Resolve the event and its tenantId strictly from DB — never from the
-    // client or from session.activeTenantId. Scoped to type=OTHER so this
-    // path can never permanently delete a Match/Tournament/Training.
+    const activeTenantId = session.user.activeTenantId;
+    if (!activeTenantId) {
+      return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+    }
+
+    // Scope the lookup to the active tenant and type=OTHER so a foreign id is
+    // indistinguishable from a missing id and can never select the tenant in
+    // which authorization should be evaluated.
     const eventRow = await prisma.event.findFirst({
-      where: { id: eventId, type: "OTHER" },
-      select: { id: true, tenantId: true },
+      where: { id: eventId, type: "OTHER", tenantId: activeTenantId },
+      select: { id: true },
     });
 
-    if (!eventRow || !eventRow.tenantId) {
+    if (!eventRow) {
       return NextResponse.json(
         { error: "Veranstaltung nicht gefunden." },
         { status: 404 },
       );
     }
 
-    const eventTenantId = eventRow.tenantId;
-
     const resolver = createEffectivePermissionResolver(prisma);
     const authorized = await resolver.hasTenantDeletionAuthority({
       userId: session.user.id,
       permission: PERMISSIONS.EVENTS_DELETE,
-      tenantId: eventTenantId,
+      tenantId: activeTenantId,
     });
 
     if (!authorized) {
@@ -300,14 +303,14 @@ export async function DELETE(
       session.user.effectiveUserId ?? session.user.id ?? null;
 
     try {
-      await deleteClubEvent(eventTenantId, eventId);
+      await deleteClubEvent(activeTenantId, eventId);
       await logAction({
         actorUserId,
         moduleKey: "veranstaltungen",
         entityType: "Event",
         entityId: eventId,
         action: "DELETE_PERMANENT",
-        afterJson: { tenantId: eventTenantId },
+        afterJson: { tenantId: activeTenantId },
       });
       return NextResponse.json({ deleted: true });
     } catch (err) {

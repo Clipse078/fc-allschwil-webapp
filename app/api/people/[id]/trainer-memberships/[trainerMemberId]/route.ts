@@ -51,7 +51,11 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
 
   // Verify trainer membership belongs to this person
   const trainerMember = await prisma.trainerTeamMember.findFirst({
-    where: { id: trainerMemberId, personId },
+    where: {
+      id: trainerMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
     select: {
       id: true,
       personId: true,

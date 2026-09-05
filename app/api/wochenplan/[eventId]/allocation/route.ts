@@ -91,12 +91,15 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const actorTenantId = access.session?.user?.activeTenantId ?? null;
+  if (!actorTenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
 
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId: actorTenantId },
     select: {
       id: true,
       tenantId: true,
@@ -107,14 +110,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   });
   if (!event) return NextResponse.json({ error: "Event nicht gefunden." }, { status: 404 });
 
-  // Tenant isolation: if the event has a tenantId, it must match the actor's tenant.
-  if (event.tenantId && actorTenantId && event.tenantId !== actorTenantId) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-
-  // Tenant identity for resource validation comes from the trusted Event row
-  // (falling back to the actor's session tenant) — never from client input.
-  const tenantId = event.tenantId ?? actorTenantId;
+  const tenantId = actorTenantId;
 
   // Only codes that actually change value need to resolve to an active
   // resource — an unchanged code may remain even if it is now archived (see

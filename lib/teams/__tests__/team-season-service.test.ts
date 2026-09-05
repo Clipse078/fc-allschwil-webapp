@@ -364,6 +364,10 @@ describe("createCanonicalTeamSeason", () => {
 // ---------------------------------------------------------------------------
 
 describe("validateMappingTeamSeasonConsistency", () => {
+  beforeEach(() => {
+    vi.mocked(prisma.teamSeason.findFirst).mockReset();
+  });
+
   it("returns null (valid, unresolved) when teamSeasonId is null", async () => {
     const result = await validateMappingTeamSeasonConsistency({
       tenantId: TENANT_A,
@@ -383,7 +387,7 @@ describe("validateMappingTeamSeasonConsistency", () => {
   });
 
   it("returns error string when TeamSeason does not exist", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue(null as never);
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null as never);
 
     const result = await validateMappingTeamSeasonConsistency({
       tenantId: TENANT_A,
@@ -396,10 +400,7 @@ describe("validateMappingTeamSeasonConsistency", () => {
   });
 
   it("returns error string when TeamSeason belongs to a different team", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
-      teamId: "different-team-id",
-      team: { tenantId: TENANT_A },
-    } as never);
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null as never);
 
     const result = await validateMappingTeamSeasonConsistency({
       tenantId: TENANT_A,
@@ -408,11 +409,11 @@ describe("validateMappingTeamSeasonConsistency", () => {
     });
 
     expect(typeof result).toBe("string");
-    expect(result).toContain("nicht zu diesem Team");
+    expect(result).toContain("nicht gefunden");
   });
 
   it("returns undefined (valid) when TeamSeason belongs to the same team and tenant", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
       teamId: TEAM_ID,
       team: { tenantId: TENANT_A },
     } as never);
@@ -427,10 +428,7 @@ describe("validateMappingTeamSeasonConsistency", () => {
   });
 
   it("returns error when TeamSeason's team belongs to different tenant", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
-      teamId: TEAM_ID,
-      team: { tenantId: TENANT_B }, // wrong tenant!
-    } as never);
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null as never);
 
     const result = await validateMappingTeamSeasonConsistency({
       tenantId: TENANT_A,
@@ -439,7 +437,7 @@ describe("validateMappingTeamSeasonConsistency", () => {
     });
 
     expect(typeof result).toBe("string");
-    expect(result).toContain("Mandanten");
+    expect(result).toContain("nicht gefunden");
   });
 });
 
@@ -548,7 +546,7 @@ describe("setTeamSeasonOrgUnit", () => {
     vi.clearAllMocks();
 
     // Default: TeamSeason found, belongs to tenant
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
       id: TEAM_SEASON_ID_2,
       teamId: TEAM_ID,
       team: { tenantId: TENANT_A },
@@ -610,7 +608,7 @@ describe("setTeamSeasonOrgUnit", () => {
   });
 
   it("TEAM-SEASON-ORGUNIT-01: returns TEAM_SEASON_NOT_FOUND when TeamSeason does not exist", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null);
 
     const result = await setTeamSeasonOrgUnit({
       tenantId: TENANT_A,
@@ -625,12 +623,8 @@ describe("setTeamSeasonOrgUnit", () => {
     }
   });
 
-  it("TEAM-SEASON-ORGUNIT-01: returns TEAM_SEASON_TENANT_MISMATCH when TeamSeason belongs to a different tenant", async () => {
-    vi.mocked(prisma.teamSeason.findUnique).mockResolvedValue({
-      id: TEAM_SEASON_ID_2,
-      teamId: TEAM_ID,
-      team: { tenantId: TENANT_B },
-    } as never);
+  it("TEAM-SEASON-ORGUNIT-01: hides a TeamSeason belonging to a different tenant", async () => {
+    vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue(null);
 
     const result = await setTeamSeasonOrgUnit({
       tenantId: TENANT_A,
@@ -641,13 +635,12 @@ describe("setTeamSeasonOrgUnit", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("TEAM_SEASON_TENANT_MISMATCH");
+      expect(result.code).toBe("TEAM_SEASON_NOT_FOUND");
     }
   });
 
   it("TEAM-SEASON-ORGUNIT-01: returns ORG_UNIT_NOT_FOUND when OrgUnit does not exist", async () => {
     vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue(null);
-    vi.mocked(prisma.orgUnit.findUnique).mockResolvedValue(null);
 
     const result = await setTeamSeasonOrgUnit({
       tenantId: TENANT_A,
@@ -662,11 +655,8 @@ describe("setTeamSeasonOrgUnit", () => {
     }
   });
 
-  it("TEAM-SEASON-ORGUNIT-01: returns ORG_UNIT_TENANT_MISMATCH when OrgUnit belongs to different tenant", async () => {
+  it("TEAM-SEASON-ORGUNIT-01: hides an OrgUnit belonging to different tenant", async () => {
     vi.mocked(prisma.orgUnit.findFirst).mockResolvedValue(null);
-    vi.mocked(prisma.orgUnit.findUnique).mockResolvedValue({
-      id: ORG_UNIT_ID_1,
-    } as never);
 
     const result = await setTeamSeasonOrgUnit({
       tenantId: TENANT_A,
@@ -677,7 +667,7 @@ describe("setTeamSeasonOrgUnit", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.code).toBe("ORG_UNIT_TENANT_MISMATCH");
+      expect(result.code).toBe("ORG_UNIT_NOT_FOUND");
     }
   });
 

@@ -16,11 +16,21 @@ export async function DELETE(_: Request, context: Context) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   try {
     const { teamId, teamSeasonId, trainerMemberId } = await context.params;
 
-    const existing = await prisma.trainerTeamMember.findUnique({
-      where: { id: trainerMemberId },
+    const existing = await prisma.trainerTeamMember.findFirst({
+      where: {
+        id: trainerMemberId,
+        teamSeasonId,
+        teamSeason: { teamId, team: { tenantId } },
+        person: { tenantId },
+      },
       select: {
         id: true,
         teamSeasonId: true,
@@ -40,7 +50,7 @@ export async function DELETE(_: Request, context: Context) {
       },
     });
 
-    if (!existing || existing.teamSeasonId !== teamSeasonId) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Trainerteam-Eintrag nicht gefunden." },
         { status: 404 }
