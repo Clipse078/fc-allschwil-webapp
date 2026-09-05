@@ -43,6 +43,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, RoleScope, PermissionScope } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 import { hashPassword } from "@/lib/auth/password";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 
@@ -1615,6 +1616,15 @@ async function main(): Promise<void> {
       "This script must only run against STAGE or LOCAL environments."
     );
     process.exit(1);
+  }
+
+  if (opts.execute) {
+    assertOperationalMutationAllowed({
+      operationId: "rperm-03b-bootstrap-admin-separation",
+      databaseUrl: connectionString,
+      explicitIntent: opts.confirm === EXECUTE_CONFIRMATION,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   console.log(`[rperm-03b] Database: ${maskUrl(connectionString)}`);

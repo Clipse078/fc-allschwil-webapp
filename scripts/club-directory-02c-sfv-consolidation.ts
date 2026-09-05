@@ -73,6 +73,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 import fs from "fs";
 import path from "path";
 import { pathToFileURL } from "url";
@@ -535,6 +536,15 @@ async function main(): Promise<void> {
   if (opts.execute && env === "PROD") {
     console.error("[club-directory-02c] BLOCKED: DATABASE_URL appears to point to PRODUCTION.");
     process.exit(1);
+  }
+
+  if (opts.execute) {
+    assertOperationalMutationAllowed({
+      operationId: "club-directory-02c-consolidation",
+      databaseUrl: connectionString,
+      explicitIntent: opts.confirm === EXECUTE_CONFIRMATION,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   console.log(`[club-directory-02c] Database: ${maskUrl(connectionString)}`);

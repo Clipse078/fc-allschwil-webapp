@@ -54,6 +54,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient, RoleScope } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 import fs from "fs";
 import path from "path";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
@@ -1127,6 +1128,15 @@ async function main(): Promise<void> {
         "This script must only run against STAGE or LOCAL environments."
     );
     process.exit(1);
+  }
+
+  if (opts.execute) {
+    assertOperationalMutationAllowed({
+      operationId: "stage-cleanup-01-fca-canonical-data",
+      databaseUrl: connectionString,
+      explicitIntent: opts.confirm === EXECUTE_CONFIRMATION,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   console.log(`[stage-cleanup-01] Database: ${maskUrl(connectionString)}`);
