@@ -3,9 +3,9 @@
 import { EventSource, EventStatus, EventType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireApiTenantPermissionContext } from "@/lib/permissions/require-api-tenant-context";
 import { TournamentValidationError } from "@/lib/tournaments/errors";
 import { resolveTournamentTeamSeasonId } from "@/lib/tournaments/team-season-resolution";
 
@@ -52,22 +52,15 @@ function buildPlannerRedirect(args: {
 }
 
 async function requirePlannerManagePermission() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const permissionKeys = session.user.permissionKeys ?? [];
-  const canManage =
-    permissionKeys.includes(PERMISSIONS.WOCHENPLAN_MANAGE) ||
-    permissionKeys.includes(PERMISSIONS.EVENTS_MANAGE);
-
-  if (!canManage) {
+  const access = await requireApiTenantPermissionContext([
+    PERMISSIONS.WOCHENPLAN_MANAGE,
+    PERMISSIONS.EVENTS_MANAGE,
+  ]);
+  if (!access.ok) {
+    if (access.status === 401) redirect("/login");
     redirect(buildPlannerRedirect({ status: "forbidden" }));
   }
-
-  return session;
+  return access.context;
 }
 
 async function validatePlannerForm(
@@ -206,8 +199,8 @@ async function resolvePlannerTournamentTeamSeasonId(args: {
 }
 
 export async function createPlannerEntryAction(formData: FormData) {
-  const session = await requirePlannerManagePermission();
-  const tenantId = session?.user?.activeTenantId ?? null;
+  const context = await requirePlannerManagePermission();
+  const tenantId = context.tenantId;
   if (!tenantId) {
     redirect(buildPlannerRedirect({ status: "create-tenant-required" }));
   }
@@ -259,8 +252,8 @@ export async function createPlannerEntryAction(formData: FormData) {
 }
 
 export async function updatePlannerEntryAction(formData: FormData) {
-  const session = await requirePlannerManagePermission();
-  const tenantId = session?.user?.activeTenantId ?? null;
+  const context = await requirePlannerManagePermission();
+  const tenantId = context.tenantId;
   if (!tenantId) {
     redirect(buildPlannerRedirect({ status: "update-tenant-required" }));
   }
@@ -328,8 +321,8 @@ export async function updatePlannerEntryAction(formData: FormData) {
 }
 
 export async function deletePlannerEntryAction(formData: FormData) {
-  const session = await requirePlannerManagePermission();
-  const tenantId = session?.user?.activeTenantId ?? null;
+  const context = await requirePlannerManagePermission();
+  const tenantId = context.tenantId;
 
   const eventId = toNullableString(formData.get("eventId"));
   const seasonKey = toNullableString(formData.get("seasonKey"));

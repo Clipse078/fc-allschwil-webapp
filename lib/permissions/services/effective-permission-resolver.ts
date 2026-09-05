@@ -329,10 +329,18 @@ async function resolveTenantPermissions(
   // nothing about the tenant's own status — both must hold.
   const membership = await prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId, userId } },
-    select: { isActive: true, tenant: { select: { status: true } } },
+    select: {
+      isActive: true,
+      tenant: { select: { status: true } },
+      user: { select: { isActive: true } },
+    },
   });
 
-  if (!membership?.isActive || membership.tenant.status !== "ACTIVE") {
+  if (
+    !membership?.isActive ||
+    !membership.user.isActive ||
+    membership.tenant.status !== "ACTIVE"
+  ) {
     return new Set<string>();
   }
 

@@ -27,6 +27,8 @@ export type ActorContext = {
   roleKeys: string[];
   /** Permission keys from session — may be used for module-level gates. */
   permissionKeys: string[];
+  /** Server-resolved active tenant. Strategic data access fails closed without it. */
+  tenantId?: string;
   /**
    * OrgUnit IDs the actor is an active, non-expired member of.
    * Populated by loadOrgUnitIds(userId) when org-unit visibility is needed.
@@ -54,11 +56,13 @@ export function buildActorContext(
   user: SessionUser,
   orgUnitIds: string[] = [],
   targetGroupIds: string[] = [],
+  tenantId?: string,
 ): ActorContext {
   return {
     userId: user.id,
     roleKeys: user.roleKeys ?? [],
     permissionKeys: user.permissionKeys ?? [],
+    tenantId,
     orgUnitIds,
     targetGroupIds,
   };

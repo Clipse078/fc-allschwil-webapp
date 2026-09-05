@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  auth: vi.fn(),
+  requireApiTenantPermissionContext: vi.fn(),
   redirect: vi.fn((path: string) => {
     throw new Error(`REDIRECT:${path}`);
   }),
@@ -14,7 +14,10 @@ const mocks = vi.hoisted(() => ({
   eventUpdate: vi.fn(),
 }));
 
-vi.mock("@/auth", () => ({ auth: mocks.auth }));
+vi.mock("@/lib/permissions/require-api-tenant-context", () => ({
+  requireApiTenantPermissionContext:
+    mocks.requireApiTenantPermissionContext,
+}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: mocks.revalidatePath }));
 vi.mock("@/lib/db/prisma", () => ({
@@ -59,11 +62,13 @@ function plannerForm(
 describe("planner tournament TeamSeason consistency", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.auth.mockResolvedValue({
-      user: {
-        id: "user-a",
-        activeTenantId: "tenant-a",
+    mocks.requireApiTenantPermissionContext.mockResolvedValue({
+      ok: true,
+      context: {
+        tenantId: "tenant-a",
+        actorUserId: "user-a",
         permissionKeys: ["events.manage"],
+        roleKeys: [],
       },
     });
     mocks.seasonFindUnique.mockResolvedValue({

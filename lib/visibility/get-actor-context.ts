@@ -33,6 +33,8 @@
 
 import { buildActorContext } from "./actor-context";
 import { loadOrgUnitIds, loadTargetGroupIds } from "@/lib/org/queries";
+import { prisma } from "@/lib/db/prisma";
+import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 
 type SessionUser = {
   id: string;
@@ -52,6 +54,53 @@ type SessionUser = {
 export async function getActorContext(user: SessionUser, tenantId?: string) {
   let orgUnitIds: string[] = [];
   let targetGroupIds: string[] = [];
+  let roleKeys = user.roleKeys ?? [];
+  let permissionKeys = user.permissionKeys ?? [];
+
+  if (tenantId) {
+    try {
+      const membership = await prisma.tenantMembership.findFirst({
+        where: {
+          tenantId,
+          userId: user.id,
+          isActive: true,
+          user: { isActive: true },
+          tenant: { status: "ACTIVE" },
+        },
+        select: { id: true },
+      });
+      if (!membership) {
+        return buildActorContext(
+          { id: user.id, roleKeys: [], permissionKeys: [] },
+          [],
+          [],
+        );
+      }
+
+      const [effective, assignments] = await Promise.all([
+        createEffectivePermissionResolver(prisma).getEffectivePermissions({
+          userId: user.id,
+          tenantId,
+        }),
+        prisma.userRole.findMany({
+          where: {
+            userId: user.id,
+            tenantId,
+            role: { scope: "TENANT", tenantId, isArchived: false },
+          },
+          select: { role: { select: { key: true } } },
+        }),
+      ]);
+      permissionKeys = [...effective.platform, ...effective.tenant];
+      roleKeys = assignments.map((assignment) => assignment.role.key);
+    } catch {
+      return buildActorContext(
+        { id: user.id, roleKeys: [], permissionKeys: [] },
+        [],
+        [],
+      );
+    }
+  }
 
   try {
     [orgUnitIds, targetGroupIds] = await Promise.all([
@@ -63,5 +112,10 @@ export async function getActorContext(user: SessionUser, tenantId?: string) {
     // [] is the documented safe default — no false-positive visibility grants.
   }
 
-  return buildActorContext(user, orgUnitIds, targetGroupIds);
+  return buildActorContext(
+    { id: user.id, roleKeys, permissionKeys },
+    orgUnitIds,
+    targetGroupIds,
+    tenantId,
+  );
 }
