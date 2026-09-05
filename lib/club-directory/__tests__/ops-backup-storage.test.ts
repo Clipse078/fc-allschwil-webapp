@@ -53,6 +53,19 @@ describe("persistConsolidationBackupSnapshot", () => {
     expect(mockPut).not.toHaveBeenCalled();
   });
 
+  it("rejects a copied ops-backup token in Acceptance without explicit enablement", async () => {
+    process.env.OPS_BACKUP_READ_WRITE_TOKEN = "test-ops-backup-token";
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    const result = await persistConsolidationBackupSnapshot(
+      { some: "data" },
+      "backups/a.json",
+    );
+
+    expect(result).toMatchObject({ ok: false, status: 503 });
+    expect(mockPut).not.toHaveBeenCalled();
+  });
+
   it("uploads the snapshot as a private JSON blob at the given key, using the dedicated OPS_BACKUP token", async () => {
     process.env.OPS_BACKUP_READ_WRITE_TOKEN = "test-ops-backup-token";
     mockPut.mockResolvedValue({ url: "https://blob.example/backups/a.json", pathname: "backups/a.json" });

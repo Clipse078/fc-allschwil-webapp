@@ -13,6 +13,7 @@
 
 import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/db/prisma";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 import {
   buildPublicCacheTags,
   isPublicCacheDomain,
@@ -37,7 +38,14 @@ type RevalidationConfig = Record<string, TenantRevalidationEndpoint>;
 
 function parseRevalidationConfig(): RevalidationConfig {
   const raw = process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG?.trim();
-  if (!raw) return {};
+  if (
+    !raw ||
+    !isExternalSideEffectConfigured("website-revalidation", [
+      "PUBLIC_WEBSITE_REVALIDATION_CONFIG",
+    ])
+  ) {
+    return {};
+  }
 
   try {
     const parsed = JSON.parse(raw) as Record<string, { url?: string; secret?: string }>;

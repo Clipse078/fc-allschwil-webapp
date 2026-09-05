@@ -31,6 +31,8 @@ function clearSfvEnv() {
   delete process.env["SFV_APPLICATION_KEY"];
   delete process.env["SFV_APPLICATION_PASS"];
   delete process.env["SFV_CLUB_ID"];
+  delete process.env["VERCEL_TARGET_ENV"];
+  delete process.env["ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS"];
 }
 
 beforeEach(() => {
@@ -258,6 +260,18 @@ describe("getSfvConfig", () => {
     expect(config.applicationKey).toBe("test-application-key");
     expect(config.applicationPass).toBe("test-application-pass");
     expect(config.clubId).toBe("999999");
+  });
+
+  it("does not enable SFV in Acceptance from copied credentials alone", () => {
+    setEnv();
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    expect(getSfvConfigStatus()).toMatchObject({
+      allPresent: true,
+      providerEnabled: false,
+      allValid: false,
+    });
+    expect(() => getSfvConfig()).toThrow(SfvConfigurationError);
   });
 
   it("error messages do not contain actual credential values", () => {

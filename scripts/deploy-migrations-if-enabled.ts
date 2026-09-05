@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
+import { shouldApplyDatabaseMigrations } from "@/lib/server/database-migration-policy";
 
-const enabled = process.env.APPLY_DATABASE_MIGRATIONS === "true";
+const enabled = shouldApplyDatabaseMigrations();
 
 if (!enabled) {
   console.log(

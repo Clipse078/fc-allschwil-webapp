@@ -49,6 +49,40 @@ function validateUnknown(env: RuntimeEnvironment): string[] {
     : ["APP_ENV is invalid."];
 }
 
+function validateAcceptance(env: RuntimeEnvironment): string[] {
+  const errors: string[] = [];
+
+  if (env.nodeEnv !== "production") {
+    errors.push("Acceptance must run with NODE_ENV=production.");
+  }
+
+  if (!env.appBaseUrl) {
+    errors.push("Acceptance requires APP_BASE_URL.");
+  }
+
+  if (!env.nextAuthUrl) {
+    errors.push("Acceptance requires NEXTAUTH_URL.");
+  }
+
+  if (!env.hasDatabaseUrl) {
+    errors.push("Acceptance requires DATABASE_URL.");
+  }
+
+  if (!env.hasNextAuthSecret) {
+    errors.push("Acceptance requires NEXTAUTH_SECRET.");
+  }
+
+  if (env.appBaseUrl && env.appBaseUrl.includes("localhost")) {
+    errors.push("Acceptance APP_BASE_URL must not point to localhost.");
+  }
+
+  if (env.nextAuthUrl && env.nextAuthUrl.includes("localhost")) {
+    errors.push("Acceptance NEXTAUTH_URL must not point to localhost.");
+  }
+
+  return errors;
+}
+
 function validateStage(env: RuntimeEnvironment): string[] {
   const errors: string[] = [];
 
@@ -127,6 +161,8 @@ export function evaluateRuntimeConfiguration(): RuntimeCheckResult {
     errors = validateProd(env);
   } else if (env.isStage) {
     errors = validateStage(env);
+  } else if (env.isAcceptance) {
+    errors = validateAcceptance(env);
   } else if (env.isPreview) {
     errors = validatePreview(env);
   } else if (env.isUnknown) {

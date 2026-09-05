@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACCEPTANCE_ROBOTS_POLICY,
   buildContentSecurityPolicy,
   buildSecurityHeaderRules,
   CSP_REPORT_ENDPOINT,
@@ -11,6 +12,8 @@ function globalHeaders(environment: {
   NODE_ENV?: string;
   APP_ENV?: string;
   VERCEL?: string;
+  VERCEL_ENV?: string;
+  VERCEL_TARGET_ENV?: string;
 }) {
   const globalRule = buildSecurityHeaderRules(environment)[0];
   return new Map(
@@ -147,6 +150,32 @@ describe("browser security headers", () => {
 
   it("keeps the Next.js powered-by header disabled", () => {
     expect(nextConfig.poweredByHeader).toBe(false);
+  });
+
+  it("emits the noindex policy only for the Acceptance target", () => {
+    const acceptanceHeaders = globalHeaders({
+      NODE_ENV: "production",
+      APP_ENV: "stage",
+      VERCEL: "1",
+      VERCEL_TARGET_ENV: "acceptance",
+    });
+    const stageHeaders = globalHeaders({
+      NODE_ENV: "production",
+      APP_ENV: "stage",
+      VERCEL: "1",
+    });
+    const previewHeaders = globalHeaders({
+      NODE_ENV: "production",
+      APP_ENV: "stage",
+      VERCEL: "1",
+      VERCEL_ENV: "preview",
+    });
+
+    expect(acceptanceHeaders.get("X-Robots-Tag")).toBe(
+      ACCEPTANCE_ROBOTS_POLICY,
+    );
+    expect(stageHeaders.has("X-Robots-Tag")).toBe(false);
+    expect(previewHeaders.has("X-Robots-Tag")).toBe(false);
   });
 
   it("is host-agnostic for every tenant", () => {

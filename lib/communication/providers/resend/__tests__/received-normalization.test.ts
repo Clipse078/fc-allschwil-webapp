@@ -48,6 +48,8 @@ beforeEach(() => {
   mocks.resendConstructorArgs.length = 0;
   process.env.RESEND_API_KEY = "re_testkey";
   delete process.env.RESEND_RECEIVING_API_KEY;
+  delete process.env.VERCEL_TARGET_ENV;
+  delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
 });
 
 describe("normalizeResendEmailReceivedEvent (COMM-02B)", () => {
@@ -142,6 +144,18 @@ describe("normalizeResendEmailReceivedEvent (COMM-02B)", () => {
       name: "ResendInboundEmailFetchError",
       emailId: "56761188-7520-42d8-8898-ff6fc54ce618",
     });
+    expect(mocks.receivingGet).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch inbound email in Acceptance from copied credentials alone", async () => {
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    await expect(
+      normalizeResendEmailReceivedEvent({
+        event: makeEvent(),
+        providerEventId: null,
+      }),
+    ).rejects.toBeInstanceOf(ResendInboundEmailFetchError);
     expect(mocks.receivingGet).not.toHaveBeenCalled();
   });
 });

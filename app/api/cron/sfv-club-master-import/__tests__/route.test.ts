@@ -86,6 +86,18 @@ describe("GET /api/cron/sfv-club-master-import — authorization", () => {
     expect(response.status).toBe(200);
     expect(mockRunAutomaticSfvClubMasterImport).toHaveBeenCalledOnce();
   });
+
+  it("rejects copied cron credentials in Acceptance without explicit enablement", async () => {
+    process.env.CRON_SECRET = "test-cron-secret";
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    const response = await GET(
+      makeRequest({ authorization: "Bearer test-cron-secret" }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockRunAutomaticSfvClubMasterImport).not.toHaveBeenCalled();
+  });
 });
 
 describe("GET /api/cron/sfv-club-master-import — response", () => {

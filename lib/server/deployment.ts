@@ -1,7 +1,14 @@
 ﻿import { getPublicEnvironmentLabel, getRuntimeEnvironment } from "@/lib/env";
 
 export type DeploymentMetadata = {
-  environment: "LOCAL" | "TEST" | "PREVIEW" | "STAGE" | "PROD" | "UNKNOWN";
+  environment:
+    | "LOCAL"
+    | "TEST"
+    | "PREVIEW"
+    | "ACCEPTANCE"
+    | "STAGE"
+    | "PROD"
+    | "UNKNOWN";
   vercelEnv: string | null;
   commitSha: string | null;
   deploymentId: string | null;

@@ -16,6 +16,7 @@
 
 import { put, del } from "@vercel/blob";
 import { fileTypeFromBuffer } from "file-type";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 import {
   isAllowedMediaMime,
   mimeToExt,
@@ -67,7 +68,12 @@ export async function uploadMediaAsset(
   declaredMime: string,
 ): Promise<MediaUploadResult> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("public-blob", [
+      "BLOB_READ_WRITE_TOKEN",
+    ])
+  ) {
     return {
       ok: false,
       status: 503,
@@ -147,7 +153,14 @@ export function isVercelBlobUrl(url: string | null | undefined): boolean {
 export async function deleteMediaBlob(url: string): Promise<void> {
   if (!isVercelBlobUrl(url)) return;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) return;
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("public-blob", [
+      "BLOB_READ_WRITE_TOKEN",
+    ])
+  ) {
+    return;
+  }
   try {
     await del(url, { token });
   } catch (err) {

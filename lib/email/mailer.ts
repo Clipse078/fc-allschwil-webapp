@@ -34,6 +34,7 @@
  */
 
 import { Resend } from "resend";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 
 export const RESEND_MAX_ENCODED_MESSAGE_BYTES = 40 * 1024 * 1024;
 
@@ -112,7 +113,13 @@ export async function getSenderDomainAuthorization(
 ): Promise<SenderDomainAuthorization> {
   const apiKey = process.env.RESEND_API_KEY?.trim();
   const domain = extractEmailDomain(emailAddress.trim());
-  if (!apiKey || !domain) return "UNKNOWN";
+  if (
+    !apiKey ||
+    !domain ||
+    !isExternalSideEffectConfigured("resend", ["RESEND_API_KEY"])
+  ) {
+    return "UNKNOWN";
+  }
 
   try {
     const resend = new Resend(apiKey);
@@ -156,7 +163,13 @@ export async function sendMail(message: MailMessage): Promise<MailDeliveryResult
   }
 
   const apiKey = process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
+  if (
+    !apiKey ||
+    !isExternalSideEffectConfigured("resend", [
+      "RESEND_API_KEY",
+      "EMAIL_FROM",
+    ])
+  ) {
     throw new MailConfigurationError(
       "RESEND_API_KEY is not configured. Email delivery is unavailable.",
     );
