@@ -26,6 +26,7 @@ const prisma = {
 
 const actorToken: JWT = {
   sub: "actor-1",
+  authenticatedAt: 1_700_000_000_000,
   id: "actor-1",
   email: "actor@example.com",
   firstName: "Alice",
@@ -54,6 +55,7 @@ function liveUser(id: string, overrides: Record<string, unknown> = {}) {
     firstName: id === "actor-1" ? "Alice" : "Terry",
     lastName: id === "actor-1" ? "Actor" : "Target",
     isActive: true,
+    passwordChangedAt: null,
     userRoles: [{ role: { key: "member" } }],
     ...overrides,
   };
@@ -112,7 +114,7 @@ describe("generic client session update trust boundary", () => {
     );
 
     expect(token).toEqual(before);
-    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
   });
 
   it("ignores a combined cross-tenant admin impersonation payload", async () => {
@@ -146,7 +148,7 @@ describe("generic client session update trust boundary", () => {
     );
 
     expect(token).toEqual(before);
-    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
   });
 
   it("rebuilds pre-boundary tokens from the immutable JWT subject", async () => {
@@ -247,9 +249,11 @@ describe("trusted login, session, and refresh behavior", () => {
   });
 
   it("refreshes presentation and authorization fields from live server state", async () => {
-    mocks.userFindUnique.mockResolvedValueOnce(
-      liveUser("actor-1", { firstName: "Updated", lastName: "Name" }),
-    );
+    mocks.userFindUnique
+      .mockResolvedValueOnce(liveUser("actor-1"))
+      .mockResolvedValueOnce(
+        liveUser("actor-1", { firstName: "Updated", lastName: "Name" }),
+      );
     const token = cloneToken();
     const capability = issueTrustedSessionUpdateIntent({
       kind: "refresh-effective-user",
@@ -272,6 +276,130 @@ describe("trusted login, session, and refresh behavior", () => {
       activeTenantId: "tenant-actor-1",
       permissionKeys: ["permission:actor-1"],
     });
+  });
+});
+
+describe("password-change session revocation", () => {
+  it("keeps a session authenticated after passwordChangedAt valid", async () => {
+    mocks.userFindUnique.mockResolvedValueOnce(
+      liveUser("actor-1", { passwordChangedAt: new Date(1_699_999_999_999) }),
+    );
+
+    await expect(
+      applyTrustedJwtState({ token: cloneToken() }, prisma),
+    ).resolves.toMatchObject({ sub: "actor-1" });
+  });
+
+  it("rejects a session authenticated before passwordChangedAt", async () => {
+    mocks.userFindUnique.mockResolvedValueOnce(
+      liveUser("actor-1", { passwordChangedAt: new Date(1_700_000_000_001) }),
+    );
+
+    await expect(
+      applyTrustedJwtState({ token: cloneToken() }, prisma),
+    ).resolves.toBeNull();
+  });
+
+  it("keeps a valid session when passwordChangedAt is null", async () => {
+    await expect(
+      applyTrustedJwtState({ token: cloneToken() }, prisma),
+    ).resolves.toMatchObject({ authenticatedAt: 1_700_000_000_000 });
+  });
+
+  it("does not let a client update refresh the original authentication time", async () => {
+    mocks.userFindUnique.mockResolvedValueOnce(
+      liveUser("actor-1", { passwordChangedAt: new Date(1_700_000_000_001) }),
+    );
+    const token = cloneToken();
+
+    const result = await applyTrustedJwtState(
+      {
+        token,
+        trigger: "update",
+        session: {
+          authenticatedAt: Date.now(),
+          user: { authenticatedAt: Date.now() },
+        },
+      },
+      prisma,
+    );
+
+    expect(result).toBeNull();
+    expect(token.authenticatedAt).toBe(1_700_000_000_000);
+  });
+
+  it.each(["start-impersonation", "stop-impersonation"] as const)(
+    "rejects revoked actors before trusted %s updates",
+    async (kind) => {
+      mocks.userFindUnique.mockResolvedValueOnce(
+        liveUser("actor-1", { passwordChangedAt: new Date(1_700_000_000_001) }),
+      );
+      const token = cloneToken({
+        ...actorToken,
+        ...(kind === "stop-impersonation"
+          ? {
+              id: "target-1",
+              effectiveUserId: "target-1",
+              isImpersonating: true,
+            }
+          : {}),
+      });
+      const capability = issueTrustedSessionUpdateIntent(
+        kind === "start-impersonation"
+          ? {
+              kind,
+              actorUserId: "actor-1",
+              targetUserId: "target-1",
+            }
+          : { kind, actorUserId: "actor-1" },
+      );
+
+      await expect(
+        applyTrustedJwtState(
+          {
+            token,
+            trigger: "update",
+            session: trustedUpdatePayload(capability),
+          },
+          prisma,
+        ),
+      ).resolves.toBeNull();
+      expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("promotes a signed legacy iat without exposing it in the browser session", async () => {
+    const token = cloneToken({
+      ...actorToken,
+      authenticatedAt: undefined,
+      iat: 1_700_000_000,
+    });
+
+    const result = await applyTrustedJwtState({ token }, prisma);
+
+    expect(result).toMatchObject({ authenticatedAt: 1_700_000_000_000 });
+    expect(applyTokenToSessionUser({ user: {} }, token).user).not.toHaveProperty(
+      "authenticatedAt",
+    );
+  });
+
+  it.each([
+    ["missing", { ...actorToken, authenticatedAt: undefined, iat: undefined }],
+    ["malformed", { ...actorToken, authenticatedAt: "now" }],
+  ])("fails closed for %s authentication time", async (_label, value) => {
+    await expect(
+      applyTrustedJwtState({ token: cloneToken(value as JWT) }, prisma),
+    ).resolves.toBeNull();
+  });
+
+  it.each([
+    ["deleted", null],
+    ["inactive", liveUser("actor-1", { isActive: false })],
+  ])("fails closed when the canonical actor is %s", async (_label, actor) => {
+    mocks.userFindUnique.mockResolvedValueOnce(actor);
+    await expect(
+      applyTrustedJwtState({ token: cloneToken() }, prisma),
+    ).resolves.toBeNull();
   });
 });
 
@@ -325,7 +453,7 @@ describe("trusted impersonation lifecycle", () => {
     );
 
     expect(token).toEqual(before);
-    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
   });
 
   it("consumes a trusted capability exactly once", async () => {
@@ -356,11 +484,13 @@ describe("trusted impersonation lifecycle", () => {
 
     expect(firstToken.effectiveUserId).toBe("target-1");
     expect(replayToken).toEqual(actorToken);
-    expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
+    expect(mocks.userFindUnique).toHaveBeenCalledTimes(3);
   });
 
   it("fails closed when the target user is inactive", async () => {
-    mocks.userFindUnique.mockResolvedValueOnce(liveUser("target-1", { isActive: false }));
+    mocks.userFindUnique
+      .mockResolvedValueOnce(liveUser("actor-1"))
+      .mockResolvedValueOnce(liveUser("target-1", { isActive: false }));
     const token = cloneToken();
     const before = cloneToken(token);
     const capability = issueTrustedSessionUpdateIntent({

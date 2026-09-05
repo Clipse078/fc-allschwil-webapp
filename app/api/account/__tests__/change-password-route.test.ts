@@ -90,6 +90,24 @@ describe("POST /api/account/change-password", () => {
     expect(body.error).toMatch(/authentifiziert/i);
   });
 
+  it("rejects password changes while impersonating", async () => {
+    mocks.auth.mockResolvedValue({
+      user: { ...SESSION_USER, isImpersonating: true },
+    });
+
+    const res = await POST(
+      makeRequest({
+        currentPassword: "correctcurrentpw",
+        newPassword: "newpassword123",
+        confirmPassword: "newpassword123",
+      }),
+    );
+
+    expect(res.status).toBe(403);
+    expect(mocks.userFindUnique).not.toHaveBeenCalled();
+    expect(mocks.userUpdate).not.toHaveBeenCalled();
+  });
+
   it("returns 400 when currentPassword is missing", async () => {
     mocks.auth.mockResolvedValue({ user: SESSION_USER });
     const res = await POST(makeRequest({ currentPassword: "", newPassword: "newpassword123", confirmPassword: "newpassword123" }));

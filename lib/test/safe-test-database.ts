@@ -68,7 +68,12 @@ export function normalizeDatabaseUrl(url: string): string {
 
 export function isLocalTestDatabaseHost(hostname: string): boolean {
   const host = hostname.toLowerCase();
-  return host === "localhost" || host === "127.0.0.1" || host === "::1";
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host === "[::1]"
+  );
 }
 
 export function getTestDatabaseUrl(): string | null {
@@ -166,28 +171,48 @@ export function assertSafeTestDatabase(url?: string): string {
   const candidate = url?.trim() || getTestDatabaseUrl();
   if (!candidate) {
     throw new UnsafeTestDatabaseError(
-      "TEST_DATABASE_URL is not configured. Database-mutating integration tests require an explicitly isolated test database.",
+      "Refusing DB-mutating test: explicit local TEST_DATABASE_URL required.",
     );
   }
 
-  const stageUrl = process.env.STAGE_DB_URL?.trim();
-  if (stageUrl && normalizeDatabaseUrl(stageUrl) === normalizeDatabaseUrl(candidate)) {
+  let target: ParsedDatabaseTarget;
+  try {
+    target = parseDatabaseTarget(candidate);
+  } catch {
     throw new UnsafeTestDatabaseError(
-      `TEST_DATABASE_URL must not equal STAGE_DB_URL. Target: ${maskDatabaseUrl(candidate)}`,
+      `Refusing DB-mutating test: TEST_DATABASE_URL is malformed. Target: ${maskDatabaseUrl(candidate)}`,
     );
   }
 
-  const shared = isKnownSharedOrRuntimeDatabase(candidate);
+  if (!target.hostname || target.database === "(default)") {
+    throw new UnsafeTestDatabaseError(
+      `Refusing DB-mutating test: TEST_DATABASE_URL is malformed. Target: ${maskDatabaseUrl(candidate)}`,
+    );
+  }
+
+  if (target.protocol !== "postgresql:" && target.protocol !== "postgres:") {
+    throw new UnsafeTestDatabaseError(
+      `Refusing DB-mutating test: TEST_DATABASE_URL must use PostgreSQL. Target: ${maskDatabaseUrl(candidate)}`,
+    );
+  }
+
+  let shared: ReturnType<typeof isKnownSharedOrRuntimeDatabase>;
+  try {
+    shared = isKnownSharedOrRuntimeDatabase(candidate);
+  } catch {
+    throw new UnsafeTestDatabaseError(
+      `Refusing DB-mutating test: TEST_DATABASE_URL is malformed. Target: ${maskDatabaseUrl(candidate)}`,
+    );
+  }
   if (shared.unsafe) {
     throw new UnsafeTestDatabaseError(
-      `Refusing database-mutating tests against unsafe target (${shared.reason}). Target: ${maskDatabaseUrl(candidate)}`,
+      `Refusing DB-mutating test: unsafe target (${shared.reason}). Target: ${maskDatabaseUrl(candidate)}`,
     );
   }
 
-  const target = parseDatabaseTarget(candidate);
   if (!isLocalTestDatabaseHost(target.hostname)) {
     throw new UnsafeTestDatabaseError(
-      `TEST_DATABASE_URL must point to a local isolated test database (localhost/127.0.0.1/::1). Target: ${maskDatabaseUrl(candidate)}`,
+      `Refusing DB-mutating test: TEST_DATABASE_URL must be local (localhost/127.0.0.1/::1). Target: ${maskDatabaseUrl(candidate)}`,
     );
   }
 
@@ -213,4 +238,15 @@ export function applyConfiguredTestDatabaseUrlToProcessEnv(): void {
   const safeUrl = assertSafeTestDatabase(url);
   process.env.DATABASE_URL = safeUrl;
   process.env.DIRECT_URL = safeUrl;
+}
+
+/**
+ * Mandatory boundary used by the application Prisma singleton under Vitest.
+ * It never falls back to ambient DATABASE_URL.
+ */
+export function requireSafeTestDatabaseUrlForPrisma(): string {
+  const safeUrl = assertSafeTestDatabase();
+  process.env.DATABASE_URL = safeUrl;
+  process.env.DIRECT_URL = safeUrl;
+  return safeUrl;
 }

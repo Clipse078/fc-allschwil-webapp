@@ -11,7 +11,8 @@
  *   - Rejects when newPassword === currentPassword (bcrypt compare)
  *   - Updates ONLY User.passwordHash and User.passwordChangedAt
  *   - Does not touch Person, TenantMembership, roles, or other users
- *   - Does not invalidate existing sessions in this slice (same as reset flow)
+ *   - Sets passwordChangedAt so JWT sessions authenticated earlier are revoked
+ *   - Rejects password changes while impersonating
  *
  * Auth: any authenticated session — users only ever touch their own record.
  */
@@ -28,6 +29,12 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
+  }
+  if (session.user.isImpersonating) {
+    return NextResponse.json(
+      { error: "Passwortänderungen sind während einer Impersonation nicht erlaubt." },
+      { status: 403 },
+    );
   }
 
   let body: unknown;

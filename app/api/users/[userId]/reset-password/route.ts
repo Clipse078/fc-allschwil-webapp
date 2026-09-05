@@ -30,11 +30,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const passwordHash = await hashPassword(password);
+    const passwordChangedAt = new Date();
 
     await prisma.user.update({
       where: { id: userId },
       data: {
         passwordHash,
+        passwordChangedAt,
       },
     });
 

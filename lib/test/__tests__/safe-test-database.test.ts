@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   UnsafeTestDatabaseError,
+  applyConfiguredTestDatabaseUrlToProcessEnv,
   assertSafeTestDatabase,
   canRunDbMutatingIntegrationTests,
   isKnownSharedOrRuntimeDatabase,
@@ -18,7 +19,9 @@ describe("safe-test-database guard", () => {
   it("1. rejects missing TEST_DATABASE_URL", () => {
     delete process.env.TEST_DATABASE_URL;
     expect(() => assertSafeTestDatabase()).toThrow(UnsafeTestDatabaseError);
-    expect(() => assertSafeTestDatabase()).toThrow(/TEST_DATABASE_URL is not configured/);
+    expect(() => assertSafeTestDatabase()).toThrow(
+      /explicit local TEST_DATABASE_URL required/,
+    );
     expect(canRunDbMutatingIntegrationTests()).toBe(false);
   });
 
@@ -28,7 +31,7 @@ describe("safe-test-database guard", () => {
     process.env.TEST_DATABASE_URL = process.env.STAGE_DB_URL;
 
     expect(() => assertSafeTestDatabase()).toThrow(UnsafeTestDatabaseError);
-    expect(() => assertSafeTestDatabase()).toThrow(/must not equal STAGE_DB_URL/);
+    expect(() => assertSafeTestDatabase()).toThrow(/shared STAGE target/);
   });
 
   it("3. rejects known FC Allschwil STAGE Neon host/database", () => {
@@ -88,9 +91,69 @@ describe("safe-test-database guard", () => {
   });
 
   it("does not treat NODE_ENV=test alone as sufficient", () => {
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "test";
     delete process.env.TEST_DATABASE_URL;
 
     expect(canRunDbMutatingIntegrationTests()).toBe(false);
+  });
+
+  it("rejects ambient DATABASE_URL without explicit TEST_DATABASE_URL", () => {
+    process.env.DATABASE_URL =
+      "postgresql://stage:secret@stage-db.example.com:5432/application";
+    delete process.env.TEST_DATABASE_URL;
+
+    expect(() => assertSafeTestDatabase()).toThrow(
+      /explicit local TEST_DATABASE_URL required/,
+    );
+    expect(() => applyConfiguredTestDatabaseUrlToProcessEnv()).not.toThrow();
+    expect(process.env.DATABASE_URL).toContain("stage-db.example.com");
+  });
+
+  it.each([
+    [
+      "arbitrary remote PostgreSQL",
+      "postgresql://app:secret@db.example.com:5432/application_test",
+    ],
+    [
+      "Neon",
+      "postgresql://app:secret@ep-example.eu-central-1.aws.neon.tech/db",
+    ],
+    [
+      "Vercel Preview runtime",
+      "postgresql://app:secret@preview-db.vercel.example:5432/app",
+    ],
+    [
+      "STAGE URL shape",
+      "postgresql://app:secret@postgres.stage.internal:5432/app",
+    ],
+    [
+      "production marker",
+      "postgresql://app:secret@postgres.internal:5432/app_production",
+    ],
+  ])("rejects %s targets", (_label, url) => {
+    process.env.TEST_DATABASE_URL = url;
+    expect(() => assertSafeTestDatabase()).toThrow(UnsafeTestDatabaseError);
+  });
+
+  it.each(["not-a-url", "://missing-protocol", "postgresql://"])(
+    "rejects malformed URL %s",
+    (url) => {
+      process.env.TEST_DATABASE_URL = url;
+      expect(() => assertSafeTestDatabase()).toThrow(/malformed/);
+    },
+  );
+
+  it("rejects non-PostgreSQL local targets", () => {
+    process.env.TEST_DATABASE_URL = "mysql://root:secret@localhost/test";
+    expect(() => assertSafeTestDatabase()).toThrow(/must use PostgreSQL/);
+  });
+
+  it.each([
+    "postgresql://postgres:postgres@localhost:5432/application_test",
+    "postgresql://postgres:postgres@127.0.0.1:5432/application_test",
+    "postgresql://postgres:postgres@[::1]:5432/application_test",
+  ])("accepts explicit local PostgreSQL target %s", (url) => {
+    process.env.TEST_DATABASE_URL = url;
+    expect(assertSafeTestDatabase()).toBe(url);
   });
 });

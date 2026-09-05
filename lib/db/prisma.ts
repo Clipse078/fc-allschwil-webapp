@@ -1,13 +1,19 @@
 ﻿import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { requireSafeTestDatabaseUrlForPrisma } from "@/lib/test/safe-test-database";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
   prismaPool?: Pool;
 };
 
-const connectionString = process.env.DATABASE_URL;
+// Vitest must never inherit a runtime DATABASE_URL. Any test that obtains the
+// real application singleton must first prove an explicit local test target.
+const connectionString =
+  process.env.NODE_ENV === "test"
+    ? requireSafeTestDatabaseUrlForPrisma()
+    : process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set.");

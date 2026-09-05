@@ -29,38 +29,20 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { createSafeTestPrismaClient } from "@/lib/test/safe-test-prisma";
 
 import { createClubDirectoryMutationDatabase } from "../prisma-mutation-adapter";
 import { discoverExternalTeamFromProvider } from "../discovery-service";
 
-const TEST_DATABASE_URL = process.env.CLUB_DIRECTORY_02C_TEST_DATABASE_URL;
-
-function isSafeLocalTestUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-const canRun = Boolean(TEST_DATABASE_URL) && isSafeLocalTestUrl(TEST_DATABASE_URL ?? "");
-
 const PROVIDER = "SFV";
 
 function createIndependentClient(): { prisma: PrismaClient; pool: Pool } {
-  const pool = new Pool({ connectionString: TEST_DATABASE_URL });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
-  return { prisma, pool };
+  return createSafeTestPrismaClient();
 }
 
-describe.skipIf(!canRun)(
+describe(
   "CLUB-DIRECTORY-02C discoverExternalTeamFromProvider — club identity (real disposable Postgres)",
   () => {
     let adminPrisma: PrismaClient;
@@ -73,8 +55,6 @@ describe.skipIf(!canRun)(
     const TENANT_B_KEY = `club-directory-02c-identity-b-${RUN_ID}`;
 
     beforeAll(async () => {
-      if (!TEST_DATABASE_URL) return;
-
       const { prisma, pool } = createIndependentClient();
       adminPrisma = prisma;
       adminPool = pool;
@@ -88,7 +68,7 @@ describe.skipIf(!canRun)(
     });
 
     afterAll(async () => {
-      if (!TEST_DATABASE_URL) return;
+      if (!adminPrisma || !adminPool) return;
 
       for (const id of [tenantId, tenantBId]) {
         await adminPrisma.externalTeamProviderMapping.deleteMany({ where: { tenantId: id } });
