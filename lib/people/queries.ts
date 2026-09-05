@@ -151,10 +151,7 @@ export async function getPersons() {
 
 // ── Detail ─────────────────────────────────────────────────────────────────
 
-export async function getPersonById(id: string) {
-  return prisma.person.findUnique({
-    where: { id },
-    select: {
+const PERSON_DETAIL_SELECT = {
       id: true,
       firstName: true,
       lastName: true,
@@ -192,7 +189,22 @@ export async function getPersonById(id: string) {
       user: {
         select: { id: true, email: true, isActive: true },
       },
-    },
+} as const;
+
+export async function getPersonById(id: string) {
+  return prisma.person.findUnique({
+    where: { id },
+    select: PERSON_DETAIL_SELECT,
+  });
+}
+
+export async function getPersonByIdForTenant(
+  id: string,
+  tenantId: string,
+) {
+  return prisma.person.findFirst({
+    where: { id, tenantId },
+    select: PERSON_DETAIL_SELECT,
   });
 }
 

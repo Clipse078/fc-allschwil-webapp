@@ -16,7 +16,7 @@ import { Pencil, ArrowLeft, Mail, Phone, Calendar } from "lucide-react";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import {
-  getPersonById,
+  getPersonByIdForTenant,
   getPersonAssignments,
   getOrgUnitsForTenant,
   getTeamsForTenant,
@@ -63,17 +63,11 @@ function calculateAge(dateOfBirth: Date): number {
 
 export default async function PersonDetailPage({ params }: PageProps) {
   const session = await requirePermission(PERMISSIONS.PEOPLE_VIEW);
-
-  const { id } = await params;
-  const person = await getPersonById(id);
-  if (!person) notFound();
-
   const tenantId = await requireActiveTenantId();
 
-  // Tenant isolation
-  if (person.tenantId !== tenantId) {
-    notFound();
-  }
+  const { id } = await params;
+  const person = await getPersonByIdForTenant(id, tenantId);
+  if (!person) notFound();
 
   const [assignments, orgUnits, teams, activeSeason, squadMemberships, trainerMemberships, personMemberships] =
     await Promise.all([
