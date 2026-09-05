@@ -17,7 +17,9 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: { auditLog: { findMany: mocks.auditLogFindMany } },
 }));
 
-import { GET } from "@/app/api/audit-logs/route";
+import * as auditLogRoute from "@/app/api/audit-logs/route";
+
+const { GET } = auditLogRoute;
 
 function request(query = "") {
   return new NextRequest(`http://localhost/api/audit-logs${query}`);
@@ -90,5 +92,12 @@ describe("GET /api/audit-logs tenant isolation", () => {
 
     expect(response.status).toBe(403);
     expect(mocks.auditLogFindMany).not.toHaveBeenCalled();
+  });
+
+  it("exposes no audit mutation or deletion route", () => {
+    expect(auditLogRoute).not.toHaveProperty("POST");
+    expect(auditLogRoute).not.toHaveProperty("PUT");
+    expect(auditLogRoute).not.toHaveProperty("PATCH");
+    expect(auditLogRoute).not.toHaveProperty("DELETE");
   });
 });
