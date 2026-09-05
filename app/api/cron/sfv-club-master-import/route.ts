@@ -44,12 +44,16 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { runAutomaticSfvClubMasterImport } from "@/lib/integrations/sfv/sync/auto-club-master-import";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 
 export const dynamic = "force-dynamic";
 
 function isAuthorized(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
+  if (
+    !secret ||
+    !isExternalSideEffectConfigured("cron", ["CRON_SECRET"])
+  ) {
     // Fail closed: never allow an unauthenticated trigger of this endpoint.
     return false;
   }

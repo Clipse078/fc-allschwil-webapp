@@ -19,6 +19,7 @@
  */
 
 import { SfvConfigurationError } from "./errors";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 
 export type SfvConfig = {
   tokenUrl: string;
@@ -34,6 +35,7 @@ export type SfvConfigStatus = {
   hasClubId: boolean;
   tokenUrlUsesHttps: boolean;
   clubIdFormatValid: boolean;
+  providerEnabled: boolean;
   allPresent: boolean;
   allValid: boolean;
 };
@@ -76,7 +78,14 @@ export function getSfvConfigStatus(): SfvConfigStatus {
   const clubIdFormatValid = hasClubId ? validateClubId(rawClubId!) : false;
 
   const allPresent = hasTokenUrl && hasApplicationKey && hasApplicationPass && hasClubId;
-  const allValid = allPresent && tokenUrlUsesHttps && clubIdFormatValid;
+  const providerEnabled = isExternalSideEffectConfigured("sfv", [
+    "SFV_TOKEN_URL",
+    "SFV_APPLICATION_KEY",
+    "SFV_APPLICATION_PASS",
+    "SFV_CLUB_ID",
+  ]);
+  const allValid =
+    allPresent && tokenUrlUsesHttps && clubIdFormatValid && providerEnabled;
 
   return {
     hasTokenUrl,
@@ -85,6 +94,7 @@ export function getSfvConfigStatus(): SfvConfigStatus {
     hasClubId,
     tokenUrlUsesHttps,
     clubIdFormatValid,
+    providerEnabled,
     allPresent,
     allValid,
   };
@@ -98,6 +108,13 @@ export function getSfvConfigStatus(): SfvConfigStatus {
  */
 export function getSfvConfig(): SfvConfig {
   const status = getSfvConfigStatus();
+
+  if (!status.providerEnabled && status.allPresent) {
+    throw new SfvConfigurationError(
+      "CONFIGURATION_MISSING",
+      "SFV integration is not enabled for this environment.",
+    );
+  }
 
   if (!status.hasTokenUrl) {
     throw new SfvConfigurationError("CONFIGURATION_MISSING", "SFV_TOKEN_URL is not configured.");

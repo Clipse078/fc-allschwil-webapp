@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { getRuntimeEnvironment } from "../env";
+import {
+  getPublicEnvironmentLabel,
+  getRuntimeEnvironment,
+} from "../env";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,6 +29,39 @@ describe("runtime environment classification", () => {
     expect(runtime.isPreview).toBe(true);
     expect(runtime.isLocal).toBe(false);
     expect(runtime.isStage).toBe(false);
+  });
+
+  it("classifies the named Vercel target as Acceptance even when VERCEL_ENV is Preview", () => {
+    const runtime = getRuntimeEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "stage",
+      VERCEL: "1",
+      VERCEL_ENV: "preview",
+      VERCEL_TARGET_ENV: "acceptance",
+    });
+
+    expect(runtime.appEnv).toBe("acceptance");
+    expect(runtime.isAcceptance).toBe(true);
+    expect(runtime.isPreview).toBe(false);
+    expect(runtime.isStage).toBe(false);
+    expect(runtime.isProd).toBe(false);
+    expect(runtime.isDeployed).toBe(true);
+    expect(getPublicEnvironmentLabel(runtime.appEnv)).toBe("ACCEPTANCE");
+  });
+
+  it("keeps ordinary Preview classified as Preview without the Acceptance target", () => {
+    const runtime = getRuntimeEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "prod",
+      APP_BASE_URL: "https://acceptance.sportclubevo.com",
+      VERCEL: "1",
+      VERCEL_ENV: "preview",
+    });
+
+    expect(runtime.appEnv).toBe("preview");
+    expect(runtime.isPreview).toBe(true);
+    expect(runtime.isAcceptance).toBe(false);
+    expect(runtime.isProd).toBe(false);
   });
 
   it("fails closed when APP_ENV is missing in a deployed runtime", () => {
@@ -63,6 +99,19 @@ describe("runtime environment classification", () => {
 
     expect(runtime.appEnv).toBe("stage");
     expect(runtime.isStage).toBe(true);
+  });
+
+  it("preserves explicit PROD classification on Vercel production", () => {
+    const runtime = getRuntimeEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "prod",
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+    });
+
+    expect(runtime.appEnv).toBe("prod");
+    expect(runtime.isProd).toBe(true);
+    expect(runtime.isAcceptance).toBe(false);
   });
 
   it("does not turn deployed APP_ENV=local into local privileges", () => {

@@ -2,6 +2,7 @@
   | "local"
   | "test"
   | "preview"
+  | "acceptance"
   | "stage"
   | "prod"
   | "unknown";
@@ -10,6 +11,7 @@ export type RuntimeEnvironment = {
   nodeEnv: string;
   appEnv: AppEnv;
   vercelEnv: string | null;
+  vercelTargetEnv: string | null;
   appBaseUrl: string | null;
   nextAuthUrl: string | null;
   hasDatabaseUrl: boolean;
@@ -18,6 +20,7 @@ export type RuntimeEnvironment = {
   isDeployed: boolean;
   isTest: boolean;
   isPreview: boolean;
+  isAcceptance: boolean;
   isLocal: boolean;
   isStage: boolean;
   isProd: boolean;
@@ -29,6 +32,7 @@ const APP_ENV_VALUES = new Set<AppEnv>([
   "local",
   "test",
   "preview",
+  "acceptance",
   "stage",
   "prod",
 ]);
@@ -70,18 +74,35 @@ function parseConfiguredAppEnv(rawValue: string | undefined): AppEnv | null {
   return "unknown";
 }
 
+export function isAcceptanceEnvironment(
+  env: Pick<NodeJS.ProcessEnv, "VERCEL_TARGET_ENV"> = process.env,
+): boolean {
+  return (
+    readOptionalString(env.VERCEL_TARGET_ENV)?.toLowerCase() === "acceptance"
+  );
+}
+
 function classifyAppEnv(env: NodeJS.ProcessEnv): {
   appEnv: AppEnv;
   isDeployed: boolean;
 } {
   const configured = parseConfiguredAppEnv(env.APP_ENV);
   const vercelEnv = readOptionalString(env.VERCEL_ENV)?.toLowerCase() ?? null;
+  const vercelTargetEnv =
+    readOptionalString(env.VERCEL_TARGET_ENV)?.toLowerCase() ?? null;
   const isVercel = Boolean(readOptionalString(env.VERCEL));
   const hasVercelMetadata =
     vercelEnv === "production" ||
     vercelEnv === "preview" ||
-    vercelEnv === "development";
+    vercelEnv === "development" ||
+    vercelTargetEnv !== null;
   const isDeployed = isVercel || hasVercelMetadata;
+
+  // A named Vercel Custom Environment currently reports VERCEL_ENV=preview.
+  // VERCEL_TARGET_ENV is therefore the authoritative Acceptance discriminator.
+  if (isAcceptanceEnvironment(env)) {
+    return { appEnv: "acceptance", isDeployed: true };
+  }
 
   // Vercel Preview is authoritative deployment metadata. It must never inherit
   // STAGE/local privileges from APP_ENV or from credentials currently in scope.
@@ -144,6 +165,7 @@ export function getRuntimeEnvironment(
   const nodeEnv = readRequiredString(processEnv.NODE_ENV, "NODE_ENV");
   const { appEnv, isDeployed } = classifyAppEnv(processEnv);
   const vercelEnv = readOptionalString(processEnv.VERCEL_ENV);
+  const vercelTargetEnv = readOptionalString(processEnv.VERCEL_TARGET_ENV);
   const appBaseUrl = normalizeUrl(
     readOptionalString(processEnv.APP_BASE_URL),
     "APP_BASE_URL",
@@ -157,6 +179,7 @@ export function getRuntimeEnvironment(
     nodeEnv,
     appEnv,
     vercelEnv,
+    vercelTargetEnv,
     appBaseUrl,
     nextAuthUrl,
     hasDatabaseUrl: Boolean(readOptionalString(processEnv.DATABASE_URL)),
@@ -165,6 +188,7 @@ export function getRuntimeEnvironment(
     isDeployed,
     isTest: appEnv === "test",
     isPreview: appEnv === "preview",
+    isAcceptance: appEnv === "acceptance",
     isLocal: appEnv === "local",
     isStage: appEnv === "stage",
     isProd: appEnv === "prod",
@@ -175,13 +199,24 @@ export function getRuntimeEnvironment(
 
 export function getPublicEnvironmentLabel(
   appEnv: AppEnv,
-): "LOCAL" | "TEST" | "PREVIEW" | "STAGE" | "PROD" | "UNKNOWN" {
+):
+  | "LOCAL"
+  | "TEST"
+  | "PREVIEW"
+  | "ACCEPTANCE"
+  | "STAGE"
+  | "PROD"
+  | "UNKNOWN" {
   if (appEnv === "test") {
     return "TEST";
   }
 
   if (appEnv === "preview") {
     return "PREVIEW";
+  }
+
+  if (appEnv === "acceptance") {
+    return "ACCEPTANCE";
   }
 
   if (appEnv === "stage") {

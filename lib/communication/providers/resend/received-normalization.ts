@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { Resend } from "resend";
 import type { NormalizedInboundEmail } from "@/lib/communication/inbound-email-types";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 
 const attachmentSchema = z
   .object({
@@ -104,10 +105,14 @@ export async function normalizeResendEmailReceivedEvent(args: {
     return null;
   }
 
-  const apiKey =
-    process.env.RESEND_RECEIVING_API_KEY?.trim() ||
-    process.env.RESEND_API_KEY?.trim();
-  if (!apiKey) {
+  const apiKeyVariable = process.env.RESEND_RECEIVING_API_KEY?.trim()
+    ? "RESEND_RECEIVING_API_KEY"
+    : "RESEND_API_KEY";
+  const apiKey = process.env[apiKeyVariable]?.trim();
+  if (
+    !apiKey ||
+    !isExternalSideEffectConfigured("inbound-email", [apiKeyVariable])
+  ) {
     throw new ResendInboundEmailFetchError({
       message:
         "Resend receiving.get failed: RESEND_API_KEY (or RESEND_RECEIVING_API_KEY) is not configured.",

@@ -45,6 +45,7 @@
  */
 
 import { put } from "@vercel/blob";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 
 function getSafeErrorCategory(error: unknown): string {
   return error instanceof Error && error.name
@@ -73,7 +74,12 @@ export async function persistConsolidationBackupSnapshot(
 ): Promise<PersistBackupSnapshotResult> {
   const token = process.env.OPS_BACKUP_READ_WRITE_TOKEN?.trim();
 
-  if (!token) {
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("ops-backup", [
+      "OPS_BACKUP_READ_WRITE_TOKEN",
+    ])
+  ) {
     return {
       ok: false,
       status: 503,

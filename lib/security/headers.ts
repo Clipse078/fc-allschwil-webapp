@@ -1,3 +1,5 @@
+import { isAcceptanceEnvironment } from "@/lib/env";
+
 export type SecurityHeader = {
   key: string;
   value: string;
@@ -12,10 +14,13 @@ type SecurityHeaderEnvironment = {
   NODE_ENV?: string;
   APP_ENV?: string;
   VERCEL?: string;
+  VERCEL_ENV?: string;
+  VERCEL_TARGET_ENV?: string;
 };
 
 const ONE_YEAR_IN_SECONDS = 31_536_000;
 export const CSP_REPORT_ENDPOINT = "/api/security/csp-report";
+export const ACCEPTANCE_ROBOTS_POLICY = "noindex, nofollow, noarchive";
 
 function isProductionNodeEnvironment(
   environment: SecurityHeaderEnvironment,
@@ -113,6 +118,13 @@ export function buildSecurityHeaderRules(
     headers.push({
       key: "Strict-Transport-Security",
       value: `max-age=${ONE_YEAR_IN_SECONDS}`,
+    });
+  }
+
+  if (isAcceptanceEnvironment(environment)) {
+    headers.push({
+      key: "X-Robots-Tag",
+      value: ACCEPTANCE_ROBOTS_POLICY,
     });
   }
 

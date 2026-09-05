@@ -12,11 +12,15 @@ describe("getWorkspaceBlobConfig", () => {
   beforeEach(() => {
     delete process.env[TOKEN_VAR];
     delete process.env[STORE_VAR];
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
   });
 
   afterEach(() => {
     delete process.env[TOKEN_VAR];
     delete process.env[STORE_VAR];
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
   });
 
   it("returns the config when both variables are present", () => {
@@ -48,6 +52,16 @@ describe("getWorkspaceBlobConfig", () => {
   });
 
   it("throws WorkspaceBlobConfigError when both variables are missing", () => {
+    expect(() => getWorkspaceBlobConfig()).toThrow(
+      WorkspaceBlobConfigError,
+    );
+  });
+
+  it("rejects copied Workspace Blob credentials in Acceptance", () => {
+    process.env[TOKEN_VAR] = "ws-token-value";
+    process.env[STORE_VAR] = "ws-store-value";
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
     expect(() => getWorkspaceBlobConfig()).toThrow(
       WorkspaceBlobConfigError,
     );

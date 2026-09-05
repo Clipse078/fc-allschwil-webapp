@@ -1,3 +1,5 @@
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
+
 /**
  * Dedicated configuration for the private Workspace Blob store.
  *
@@ -49,6 +51,17 @@ export function getWorkspaceBlobConfig(): WorkspaceBlobConfig {
 
   if (!storeId) {
     throw new WorkspaceBlobConfigError("WORKSPACE_BLOB_STORE_ID");
+  }
+
+  if (
+    !isExternalSideEffectConfigured("workspace-blob", [
+      "WORKSPACE_BLOB_READ_WRITE_TOKEN",
+      "WORKSPACE_BLOB_STORE_ID",
+    ])
+  ) {
+    throw new WorkspaceBlobConfigError(
+      "ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS",
+    );
   }
 
   return { token, storeId };

@@ -37,6 +37,8 @@ describe("CLUB-DIRECTORY-01 crest upload — shares uploadTenantLogo's validatio
 
   afterEach(() => {
     process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
     vi.restoreAllMocks();
   });
 
@@ -81,6 +83,21 @@ describe("CLUB-DIRECTORY-01 crest upload — shares uploadTenantLogo's validatio
     expect(result).toEqual(
       expect.objectContaining({ ok: false, status: 503 }),
     );
+  });
+
+  it("returns 503 in Acceptance when a copied Blob token is not explicitly enabled", async () => {
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    const result = await uploadTenantLogo(
+      "tenant-a",
+      PNG_BUFFER,
+      "image/png",
+    );
+
+    expect(result).toEqual(
+      expect.objectContaining({ ok: false, status: 503 }),
+    );
+    expect(putMock).not.toHaveBeenCalled();
   });
 
   it("uploadTenantLogo (pre-existing behaviour) is unaffected by the shared refactor", async () => {

@@ -54,6 +54,8 @@ describe("public-cache-notification", () => {
 
   afterEach(() => {
     process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG = originalConfig;
+    delete process.env.VERCEL_TARGET_ENV;
+    delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
     resetPublicCacheNotificationConfigForTests();
     vi.unstubAllGlobals();
     fetchMock.mockReset();
@@ -116,6 +118,18 @@ describe("public-cache-notification", () => {
 
   it("cannot emit an unsigned notification when HMAC config is missing", async () => {
     delete process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG;
+    resetPublicCacheNotificationConfigForTests();
+
+    await notifyTenantPublicWebsiteCache({
+      tenantSlug: "fc-allschwil",
+      domains: [PUBLIC_CACHE_DOMAINS.WEEKPLAN],
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not revalidate from Acceptance when copied config is not explicitly enabled", async () => {
+    process.env.VERCEL_TARGET_ENV = "acceptance";
     resetPublicCacheNotificationConfigForTests();
 
     await notifyTenantPublicWebsiteCache({

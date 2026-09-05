@@ -41,6 +41,7 @@
 
 import { put, del } from "@vercel/blob";
 import { fileTypeFromBuffer } from "file-type";
+import { isExternalSideEffectConfigured } from "@/lib/server/external-side-effect-policy";
 import {
   isAllowedLogoUploadMimeType,
   mimeToLogoExtension,
@@ -105,7 +106,12 @@ async function uploadLogoObject(
 ): Promise<UploadLogoResult> {
   // ── Token check (no throw — caller surfaces as 503) ───────────────────────
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) {
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("public-blob", [
+      "BLOB_READ_WRITE_TOKEN",
+    ])
+  ) {
     return {
       ok: false,
       status: 503,
@@ -292,7 +298,14 @@ export async function deleteAnlageplanBackground(
 ): Promise<void> {
   if (!url || !isVercelBlobUrl(url)) return;
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) return;
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("public-blob", [
+      "BLOB_READ_WRITE_TOKEN",
+    ])
+  ) {
+    return;
+  }
   try {
     await del(url, { token });
   } catch (err) {
@@ -326,7 +339,14 @@ export async function deleteOrphanedLogo(
   if (!oldUrl || !isVercelBlobUrl(oldUrl) || oldUrl === newUrl) return;
 
   const token = process.env.BLOB_READ_WRITE_TOKEN;
-  if (!token) return;
+  if (
+    !token ||
+    !isExternalSideEffectConfigured("public-blob", [
+      "BLOB_READ_WRITE_TOKEN",
+    ])
+  ) {
+    return;
+  }
 
   try {
     await del(oldUrl, { token });

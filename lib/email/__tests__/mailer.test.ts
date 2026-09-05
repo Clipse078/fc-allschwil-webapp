@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   domainsList: vi.fn(),
@@ -14,6 +14,7 @@ vi.mock("resend", () => ({
 
 import {
   getSenderDomainAuthorization,
+  MailConfigurationError,
   MailAttachmentPreflightError,
   sendMail,
 } from "@/lib/email/mailer";
@@ -38,6 +39,11 @@ beforeEach(() => {
     },
     error: null,
   });
+});
+
+afterEach(() => {
+  delete process.env.VERCEL_TARGET_ENV;
+  delete process.env.ACCEPTANCE_ENABLED_EXTERNAL_PROVIDERS;
 });
 
 describe("Resend sender authorization", () => {
@@ -139,6 +145,19 @@ describe("Resend sender authorization", () => {
         ],
       }),
     ).rejects.toBeInstanceOf(MailAttachmentPreflightError);
+    expect(mocks.emailsSend).not.toHaveBeenCalled();
+  });
+
+  it("does not send from Acceptance when copied credentials are not explicitly enabled", async () => {
+    process.env.VERCEL_TARGET_ENV = "acceptance";
+
+    await expect(
+      sendMail({
+        to: "recipient@example.com",
+        subject: "Blocked",
+        html: "<p>Blocked</p>",
+      }),
+    ).rejects.toBeInstanceOf(MailConfigurationError);
     expect(mocks.emailsSend).not.toHaveBeenCalled();
   });
 });
