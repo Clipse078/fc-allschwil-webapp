@@ -6,8 +6,7 @@
  * Design principles:
  *   • Impact preview never mutates.
  *   • Initiative has no child sub-entities (no cascade relations in schema).
- *   • No tenantId on Initiative — authorization is caller-resolved via
- *     hasTenantDeletionAuthority() using the actor's active tenant.
+ *   • Canonical tenant ownership is checked before impact reads and deletion.
  *   • A single prisma.initiative.delete() is sufficient.
  */
 

@@ -7,8 +7,7 @@
  *   • Impact preview never mutates — counts cascade children only.
  *   • All sub-entities (agendaItems, decisions, actions, participants)
  *     cascade automatically on Meeting delete (onDelete: Cascade in schema).
- *   • No tenantId on Meeting — authorization is caller-resolved via
- *     hasTenantDeletionAuthority() using the actor's active tenant.
+ *   • Canonical tenant ownership is checked before impact reads and deletion.
  *   • A single prisma.meeting.delete() is sufficient; no pre-cleanup needed.
  */
 

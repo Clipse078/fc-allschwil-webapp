@@ -38,7 +38,17 @@ export async function assertTenantDelegationAllowed(
   );
   const requestedRoleIds = Array.from(new Set(request.roleIds ?? []));
 
-  const [permissions, roles, effective] = await Promise.all([
+  const [membership, permissions, roles, effective] = await Promise.all([
+    db.tenantMembership.findFirst({
+      where: {
+        tenantId: request.tenantId,
+        userId: request.actorUserId,
+        isActive: true,
+        user: { isActive: true },
+        tenant: { status: "ACTIVE" },
+      },
+      select: { id: true },
+    }),
     requestedPermissionKeys.length
       ? db.permission.findMany({
           where: {
@@ -80,6 +90,7 @@ export async function assertTenantDelegationAllowed(
   ]);
 
   if (
+    !membership ||
     permissions.length !== requestedPermissionKeys.length ||
     roles.length !== requestedRoleIds.length
   ) {

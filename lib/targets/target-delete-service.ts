@@ -6,7 +6,7 @@
  * Design principles:
  *   • Impact preview never mutates.
  *   • TargetMetric (and TargetDataPoint via metric cascade) cascade on Target delete.
- *   • No tenantId on Target — authorization uses the actor's active tenant.
+ *   • Canonical tenant ownership is checked before impact reads and deletion.
  *   • A single prisma.target.delete() is sufficient; cascades handle children.
  */
 

@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   effectiveTenantPermissions: [] as string[],
   permissionFindMany: vi.fn(),
   roleFindMany: vi.fn(),
+  membershipFindFirst: vi.fn(),
   getEffectivePermissions: vi.fn(),
 }));
 
@@ -27,6 +28,7 @@ import {
 const db = {
   permission: { findMany: mocks.permissionFindMany },
   role: { findMany: mocks.roleFindMany },
+  tenantMembership: { findFirst: mocks.membershipFindFirst },
 } as unknown as PrismaClient;
 
 beforeEach(() => {
@@ -43,6 +45,7 @@ beforeEach(() => {
         .map((key) => ({ key })),
   );
   mocks.roleFindMany.mockResolvedValue([]);
+  mocks.membershipFindFirst.mockResolvedValue({ id: "membership-a" });
 });
 
 describe("SECURITY-GO-LIVE-01K-A delegation boundary", () => {
@@ -94,6 +97,21 @@ describe("SECURITY-GO-LIVE-01K-A delegation boundary", () => {
           tenantId: "tenant-a",
           actorUserId: "actor-a",
           roleIds: ["tenant-b-role"],
+        },
+        db,
+      ),
+    ).rejects.toBeInstanceOf(DelegationForbiddenError);
+  });
+
+  it("rejects delegation when the actor no longer has an active tenant membership", async () => {
+    mocks.membershipFindFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      assertTenantDelegationAllowed(
+        {
+          tenantId: "tenant-a",
+          actorUserId: "actor-a",
+          roleIds: [],
         },
         db,
       ),
