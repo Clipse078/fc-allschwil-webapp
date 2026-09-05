@@ -650,7 +650,12 @@ Demo FC Aktive`,
 
   for (const meetingData of meetingsData) {
     await prisma.meeting.upsert({
-      where: { slug: meetingData.slug },
+      where: {
+        tenantId_slug: {
+          tenantId: fcAllschwilTenant.id,
+          slug: meetingData.slug,
+        },
+      },
       update: {
         title: meetingData.title,
         description: meetingData.description,
@@ -660,6 +665,7 @@ Demo FC Aktive`,
         status: meetingData.status,
       },
       create: {
+        tenantId: fcAllschwilTenant.id,
         slug: meetingData.slug,
         title: meetingData.title,
         description: meetingData.description,
@@ -702,7 +708,12 @@ Demo FC Aktive`,
 
   for (const initiativeData of initiativesData) {
     await prisma.initiative.upsert({
-      where: { slug: initiativeData.slug },
+      where: {
+        tenantId_slug: {
+          tenantId: fcAllschwilTenant.id,
+          slug: initiativeData.slug,
+        },
+      },
       update: {
         title: initiativeData.title,
         summary: initiativeData.summary,
@@ -711,6 +722,7 @@ Demo FC Aktive`,
         progress: initiativeData.progress,
       },
       create: {
+        tenantId: fcAllschwilTenant.id,
         slug: initiativeData.slug,
         title: initiativeData.title,
         summary: initiativeData.summary,
