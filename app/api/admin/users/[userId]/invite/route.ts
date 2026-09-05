@@ -34,6 +34,11 @@ import {
 import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildPasswordResetLink,
+  resolveSecurityLinkBaseUrl,
+  SecurityLinkConfigurationError,
+} from "@/lib/server/security-link-url";
 
 type RouteContext = { params: Promise<{ userId: string }> };
 
@@ -61,6 +66,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
   }
 
   try {
+    resolveSecurityLinkBaseUrl();
     const rawToken = await resendTenantInvitation(tenantId, userId, actorUserId);
 
     // Send the invitation email.
@@ -72,7 +78,12 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
       try {
         await _sendInvitationEmail(tenantId, user.email, user.firstName, rawToken);
       } catch (emailError) {
-        if (emailError instanceof MailConfigurationError) {
+        if (emailError instanceof SecurityLinkConfigurationError) {
+          console.error(
+            "[resend-invite] invalid security link configuration",
+            emailError.code,
+          );
+        } else if (emailError instanceof MailConfigurationError) {
           console.error("[resend-invite] MailConfigurationError:", emailError.message);
         } else {
           console.error("[resend-invite] Email send error:", emailError);
@@ -83,6 +94,16 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof SecurityLinkConfigurationError) {
+      console.error(
+        "[resend-invite] invalid security link configuration",
+        error.code,
+      );
+      return NextResponse.json(
+        { error: "E-Mail-Dienst nicht konfiguriert. Bitte Administrator kontaktieren." },
+        { status: 500 },
+      );
+    }
     if (error instanceof InvitationDomainError) {
       if (error.code === "USER_NOT_FOUND") {
         return NextResponse.json(
@@ -150,8 +171,8 @@ async function _sendInvitationEmail(
   firstName: string,
   rawToken: string,
 ) {
-  const appBaseUrl = (process.env.APP_BASE_URL ?? "").replace(/\/$/, "");
-  const inviteUrl = `${appBaseUrl}/reset-password?token=${rawToken}`;
+  const appBaseUrl = resolveSecurityLinkBaseUrl().toString().replace(/\/$/, "");
+  const inviteUrl = buildPasswordResetLink(rawToken);
 
   const tenant = await prisma.tenant.findUnique({
     where: { id: tenantId },

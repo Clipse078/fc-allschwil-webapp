@@ -16,7 +16,13 @@ const mockRevokeTenantInvitation = vi.fn();
 const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaTenantFindUnique = vi.fn();
 const mockSendMail = vi.fn();
+const mockBuildInvitationEmail = vi.fn((_input: unknown) => ({
+  subject: "Test",
+  html: "<p>Test</p>",
+  text: "Test",
+}));
 
+vi.mock("server-only", () => ({}));
 vi.mock("@/lib/permissions/require-api-permission", () => ({
   requireApiPermission: mockRequireApiPermission,
 }));
@@ -43,11 +49,7 @@ vi.mock("@/lib/email/mailer", () => ({
 }));
 
 vi.mock("@/lib/email/templates/invitation", () => ({
-  buildInvitationEmail: vi.fn(() => ({
-    subject: "Test",
-    html: "<p>Test</p>",
-    text: "Test",
-  })),
+  buildInvitationEmail: mockBuildInvitationEmail,
 }));
 
 const { POST, DELETE } = await import("../route");
@@ -57,6 +59,8 @@ const { POST, DELETE } = await import("../route");
 const TENANT_ID = "tenant-001";
 const USER_ID = "user-001";
 const ACTOR_ID = "actor-001";
+const originalAppBaseUrl = process.env.APP_BASE_URL;
+const originalNextAuthUrl = process.env.NEXTAUTH_URL;
 
 const AUTH_OK = {
   ok: true as const,
@@ -96,6 +100,8 @@ function makeParams(userId = USER_ID) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  process.env.APP_BASE_URL = "https://canonical.example.test";
+  delete process.env.NEXTAUTH_URL;
   mockRequireApiPermission.mockResolvedValue(AUTH_OK);
   mockResendTenantInvitation.mockResolvedValue("raw-token-abc");
   mockRevokeTenantInvitation.mockResolvedValue(undefined);
@@ -108,6 +114,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  if (originalAppBaseUrl === undefined) delete process.env.APP_BASE_URL;
+  else process.env.APP_BASE_URL = originalAppBaseUrl;
+  if (originalNextAuthUrl === undefined) delete process.env.NEXTAUTH_URL;
+  else process.env.NEXTAUTH_URL = originalNextAuthUrl;
   vi.restoreAllMocks();
 });
 
@@ -150,6 +160,30 @@ describe("POST /invite — success", () => {
       USER_ID,
       ACTOR_ID,
     );
+  });
+
+  it("RESEND-3. builds a canonical, once-encoded invitation link", async () => {
+    const rawToken = "invite+a/b?c=d%e";
+    mockResendTenantInvitation.mockResolvedValue(rawToken);
+
+    await POST(makeRequest() as never, makeParams());
+
+    const input = mockBuildInvitationEmail.mock.calls[0]?.[0] as {
+      inviteUrl: string;
+    };
+    const inviteUrl = new URL(input.inviteUrl);
+    expect(inviteUrl.origin).toBe("https://canonical.example.test");
+    expect(inviteUrl.searchParams.get("token")).toBe(rawToken);
+  });
+
+  it("RESEND-4. does not mutate or call the provider for invalid URL config", async () => {
+    process.env.APP_BASE_URL = "https://canonical.example.test/unexpected";
+
+    const res = await POST(makeRequest() as never, makeParams());
+
+    expect(res.status).toBe(500);
+    expect(mockResendTenantInvitation).not.toHaveBeenCalled();
+    expect(mockSendMail).not.toHaveBeenCalled();
   });
 });
 
