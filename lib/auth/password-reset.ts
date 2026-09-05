@@ -25,6 +25,7 @@
 import crypto from "crypto";
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword } from "@/lib/auth/password";
+import { writeAuditRecord } from "@/lib/audit/log-action";
 import {
   acquirePlatformSuperAdminMutationLock,
   platformSuperAdminAssignmentWhere,
@@ -226,6 +227,20 @@ export async function consumePasswordResetToken(
       where: {
         userId: current.user.id,
         id: { not: current.id },
+      },
+    });
+    await writeAuditRecord(tx, {
+      tenantId: current.invitationTenantId ?? null,
+      actorUserId: null,
+      moduleKey: "security",
+      entityType: "User",
+      entityId: current.user.id,
+      action: current.isInvitation
+        ? "INVITATION_PASSWORD_SET"
+        : "PASSWORD_RESET_COMPLETED",
+      metadataJson: {
+        authenticationMethod: "single_use_recovery_link",
+        priorSessionsInvalidated: true,
       },
     });
 

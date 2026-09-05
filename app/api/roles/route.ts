@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { writeAuditRecord } from "@/lib/audit/log-action";
 
 export async function GET() {
   const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
@@ -80,25 +81,37 @@ export async function POST(request: NextRequest) {
     // RPERM-05: scope is always forced to PLATFORM here — this endpoint
     // never accepts a scope/tenantId from the request body. Tenant custom
     // roles are created exclusively through POST /api/tenant/roles.
-    const role = await prisma.role.create({
-      data: {
-        key,
-        name,
-        description,
-        canAccessVereinsleitung,
-        canAttendVereinsleitungMeetings,
-        scope: "PLATFORM",
-        isSystem: false,
-      },
-      select: {
-        id: true,
-        key: true,
-        name: true,
-        description: true,
-        canAccessVereinsleitung: true,
-        canAttendVereinsleitungMeetings: true,
-        updatedAt: true,
-      },
+    const role = await prisma.$transaction(async (tx) => {
+      const created = await tx.role.create({
+        data: {
+          key,
+          name,
+          description,
+          canAccessVereinsleitung,
+          canAttendVereinsleitungMeetings,
+          scope: "PLATFORM",
+          isSystem: false,
+        },
+        select: {
+          id: true,
+          key: true,
+          name: true,
+          description: true,
+          canAccessVereinsleitung: true,
+          canAttendVereinsleitungMeetings: true,
+          updatedAt: true,
+        },
+      });
+      await writeAuditRecord(tx, {
+        tenantId: null,
+        actorUserId: access.actorUserId,
+        moduleKey: "roles",
+        entityType: "Role",
+        entityId: created.id,
+        action: "PLATFORM_ROLE_CREATE",
+        afterJson: { key: created.key },
+      });
+      return created;
     });
 
     return NextResponse.json({ role }, { status: 201 });

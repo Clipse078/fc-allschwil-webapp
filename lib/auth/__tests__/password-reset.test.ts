@@ -64,6 +64,7 @@ function makeMockPrisma(overrides: {
   passwordResetTokenCreate?: ReturnType<typeof vi.fn>;
   passwordResetTokenUpdateMany?: ReturnType<typeof vi.fn>;
   userUpdate?: ReturnType<typeof vi.fn>;
+  auditLogCreate?: ReturnType<typeof vi.fn>;
   $transaction?: ReturnType<typeof vi.fn>;
 } = {}): PrismaClient {
   const passwordResetToken = {
@@ -77,12 +78,16 @@ function makeMockPrisma(overrides: {
   const user = {
     update: overrides.userUpdate ?? vi.fn((args: unknown) => (args as { data: unknown }).data),
   };
+  const auditLog = {
+    create: overrides.auditLogCreate ?? vi.fn(() => ({})),
+  };
   const transaction =
     overrides.$transaction ??
     vi.fn(async (callback: (tx: unknown) => unknown) =>
       callback({
         passwordResetToken,
         user,
+        auditLog,
         $queryRawUnsafe: vi.fn(() => []),
       }),
     );
@@ -91,6 +96,7 @@ function makeMockPrisma(overrides: {
       ...passwordResetToken,
     },
     user,
+    auditLog,
     $transaction: transaction,
   } as unknown as PrismaClient;
 }
@@ -322,6 +328,39 @@ describe("consumePasswordResetToken", () => {
     expect(tokenUpdateData.usedAt).toBeInstanceOf(Date);
   });
 
+  it("records password reset completion atomically without password or token material", async () => {
+    const record = makeValidToken();
+    const auditLogCreate = vi.fn(() => ({}));
+    const prisma = makeMockPrisma({
+      passwordResetTokenFindUnique: vi.fn(() => record),
+      auditLogCreate,
+    });
+
+    await consumePasswordResetToken(
+      prisma,
+      "raw-reset-token-must-not-be-logged",
+      "SecurePass12345!",
+    );
+
+    expect(auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: null,
+        actorUserId: null,
+        entityId: "user-1",
+        action: "PASSWORD_RESET_COMPLETED",
+        metadataJson: {
+          authenticationMethod: "single_use_recovery_link",
+          priorSessionsInvalidated: true,
+          outcome: "SUCCESS",
+        },
+      }),
+    });
+    const payload = JSON.stringify(auditLogCreate.mock.calls[0]);
+    expect(payload).not.toContain("raw-reset-token-must-not-be-logged");
+    expect(payload).not.toContain("SecurePass12345!");
+    expect(payload).not.toContain("passwordHash");
+  });
+
   it("rejects password recovery for a current platform Superadmin", async () => {
     const record = makeValidToken({
       user: {
@@ -361,6 +400,7 @@ describe("consumePasswordResetToken", () => {
         deleteMany: vi.fn(() => ({ count: 0 })),
       },
       user: { update: userUpdate },
+      auditLog: { create: vi.fn(() => ({})) },
     };
     const prisma = {
       passwordResetToken: {

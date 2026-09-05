@@ -14,6 +14,7 @@ describe("platform Superadmin break-glass tooling", () => {
     );
     expect(source).toContain("assertOperationalMutationAllowed");
     expect(source).toContain("SCE_OPERATION_AUTHORIZATION");
+    expect(source).toContain("BREAK_GLASS_OPERATOR_ID");
   });
 
   it("contains no hardcoded privileged account email or credential", () => {
@@ -34,6 +35,7 @@ describe("platform Superadmin break-glass tooling", () => {
     expect(source).toContain("passwordChangedAt");
     expect(source).toContain("BREAK_GLASS_PASSWORD_RESET");
     expect(source).toContain("auditLog.create");
+    expect(source).toContain("operatorId");
   });
 
   it("removes obsolete account-specific password mutation scripts", () => {

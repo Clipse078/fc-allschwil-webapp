@@ -1,16 +1,53 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const platformScope =
+    request.nextUrl.searchParams.get("scope") === "platform";
+
+  if (platformScope) {
+    const platformAccess = await requirePlatformApiPermission(
+      PERMISSIONS.USERS_MANAGE,
+    );
+    if (!platformAccess.ok) {
+      return NextResponse.json(
+        { error: platformAccess.error },
+        { status: platformAccess.status },
+      );
+    }
+
+    return listAuditLogs(null);
+  }
+
   const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    const platformAccess = await requirePlatformApiPermission(
+      PERMISSIONS.USERS_MANAGE,
+    );
+    if (!platformAccess.ok) {
+      return NextResponse.json(
+        { error: platformAccess.error },
+        { status: platformAccess.status },
+      );
+    }
+    return listAuditLogs(null);
+  }
+
+  return listAuditLogs(tenantId);
+}
+
+async function listAuditLogs(tenantId: string | null) {
   const logs = await prisma.auditLog.findMany({
+    where: { tenantId },
     orderBy: {
       createdAt: "desc",
     },

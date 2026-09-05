@@ -6,6 +6,7 @@ import {
   PlatformAccountDomainError,
   updatePlatformAccount,
 } from "@/lib/users/platform-account-service";
+import { auditRejectedPrivilegedAction } from "@/lib/audit/security-events";
 
 type RouteContext = {
   params: Promise<{
@@ -84,6 +85,15 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     });
   } catch (error) {
     if (error instanceof PlatformAccountDomainError) {
+      const { userId } = await context.params;
+      await auditRejectedPrivilegedAction({
+        actorUserId: access.actorUserId,
+        tenantId: null,
+        action: "PLATFORM_ACCOUNT_UPDATE_REJECTED",
+        entityType: "User",
+        entityId: userId,
+        reasonCode: error.code,
+      });
       const status =
         error.code === "USER_NOT_FOUND"
           ? 404

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   requirePlatformApiPermission: vi.fn(),
   updatePlatformAccount: vi.fn(),
+  auditRejectedPrivilegedAction: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
@@ -23,6 +24,9 @@ vi.mock("@/lib/users/platform-account-service", () => {
   };
 });
 vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/audit/security-events", () => ({
+  auditRejectedPrivilegedAction: mocks.auditRejectedPrivilegedAction,
+}));
 
 import { PATCH } from "@/app/api/users/[userId]/route";
 
@@ -94,5 +98,13 @@ describe("platform account update route", () => {
     const response = await PATCH(request() as never, context);
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: "EMAIL_TAKEN" });
+    expect(mocks.auditRejectedPrivilegedAction).toHaveBeenCalledWith({
+      actorUserId: "platform-actor",
+      tenantId: null,
+      action: "PLATFORM_ACCOUNT_UPDATE_REJECTED",
+      entityType: "User",
+      entityId: "platform-admin",
+      reasonCode: "EMAIL_TAKEN",
+    });
   });
 });

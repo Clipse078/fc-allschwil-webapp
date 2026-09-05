@@ -137,6 +137,7 @@ export async function setTenantMembershipActive(
   });
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "TenantMembership",
@@ -255,6 +256,7 @@ export async function removeTenantMembership(
   });
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "TenantMembership",
@@ -494,6 +496,7 @@ export async function invitePersonToTenant(
   }
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "User",
@@ -576,6 +579,7 @@ export async function createPersonAndInvite(
     await applyOnboardRoleAssignments(tenantId, existingUser.id, actorUserId, options);
 
     await logAction({
+      tenantId,
       actorUserId,
       moduleKey: "users",
       entityType: "User",
@@ -629,6 +633,7 @@ export async function createPersonAndInvite(
   await applyOnboardRoleAssignments(tenantId, newUser.id, actorUserId, options);
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "User",
@@ -685,6 +690,7 @@ export async function resendTenantInvitation(
   const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "User",
@@ -734,6 +740,7 @@ export async function revokeTenantInvitation(
   if (deleted.count === 0) throw new InvitationDomainError("NO_ACTIVE_INVITATION");
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "User",
@@ -838,6 +845,7 @@ async function _ensureMembershipAndResendInvitation(
     // Has a pending invitation — resend it.
     const rawToken = await _createInvitationToken(userId, tenantId);
     await logAction({
+      tenantId,
       actorUserId,
       moduleKey: "users",
       entityType: "User",
@@ -864,6 +872,7 @@ async function _ensureMembershipAndResendInvitation(
   const rawToken = await _createInvitationToken(userId, tenantId);
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: "users",
     entityType: "User",

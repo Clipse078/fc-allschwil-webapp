@@ -343,6 +343,7 @@ export async function createPersonDocument(
     });
 
     await logAction({
+      tenantId: input.tenantId,
       actorUserId: input.actorUserId,
       moduleKey: "persons",
       entityType: "PersonDocument",
@@ -351,8 +352,6 @@ export async function createPersonDocument(
       afterJson: {
         personId: input.personId,
         category: input.category,
-        title,
-        originalFilename: sanitizedFilename,
         mimeType: input.mimeType,
         sizeBytes: uploadResult.sizeBytes,
         hasIssueDate: !!input.issueDate,
@@ -431,6 +430,7 @@ export async function updatePersonDocument(
   });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: "persons",
     entityType: "PersonDocument",
@@ -439,7 +439,6 @@ export async function updatePersonDocument(
     afterJson: {
       personId: input.personId,
       category: doc.category,
-      title: doc.title,
       hasIssueDate: !!doc.issueDate,
       hasExpiryDate: !!doc.expiryDate,
     },
@@ -466,6 +465,7 @@ export async function deletePersonDocument(
   await prisma.personDocument.delete({ where: { id: input.documentId } });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: "persons",
     entityType: "PersonDocument",
@@ -474,8 +474,6 @@ export async function deletePersonDocument(
     beforeJson: {
       personId: input.personId,
       category: doc.category,
-      title: doc.title,
-      originalFilename: doc.originalFilename,
     },
   });
 

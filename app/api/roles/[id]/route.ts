@@ -2,6 +2,7 @@
 import { prisma } from "@/lib/db/prisma";
 import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { writeAuditRecord } from "@/lib/audit/log-action";
 
 type RouteContext = {
   params: Promise<{
@@ -42,30 +43,58 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     // role.
     const existingRole = await prisma.role.findFirst({
       where: { id, scope: "PLATFORM" },
-      select: { id: true },
+      select: {
+        id: true,
+        name: true,
+        canAccessVereinsleitung: true,
+        canAttendVereinsleitungMeetings: true,
+      },
     });
 
     if (!existingRole) {
       return NextResponse.json({ error: "Rolle nicht gefunden." }, { status: 404 });
     }
 
-    const role = await prisma.role.update({
-      where: { id },
-      data: {
-        name,
-        description,
-        canAccessVereinsleitung,
-        canAttendVereinsleitungMeetings,
-      },
-      select: {
-        id: true,
-        key: true,
-        name: true,
-        description: true,
-        canAccessVereinsleitung: true,
-        canAttendVereinsleitungMeetings: true,
-        updatedAt: true,
-      },
+    const role = await prisma.$transaction(async (tx) => {
+      const updated = await tx.role.update({
+        where: { id },
+        data: {
+          name,
+          description,
+          canAccessVereinsleitung,
+          canAttendVereinsleitungMeetings,
+        },
+        select: {
+          id: true,
+          key: true,
+          name: true,
+          description: true,
+          canAccessVereinsleitung: true,
+          canAttendVereinsleitungMeetings: true,
+          updatedAt: true,
+        },
+      });
+      await writeAuditRecord(tx, {
+        tenantId: null,
+        actorUserId: access.actorUserId,
+        moduleKey: "roles",
+        entityType: "Role",
+        entityId: updated.id,
+        action: "PLATFORM_ROLE_UPDATE",
+        beforeJson: {
+          name: existingRole.name,
+          canAccessVereinsleitung: existingRole.canAccessVereinsleitung,
+          canAttendVereinsleitungMeetings:
+            existingRole.canAttendVereinsleitungMeetings,
+        },
+        afterJson: {
+          name: updated.name,
+          canAccessVereinsleitung: updated.canAccessVereinsleitung,
+          canAttendVereinsleitungMeetings:
+            updated.canAttendVereinsleitungMeetings,
+        },
+      });
+      return updated;
     });
 
     return NextResponse.json({ role });

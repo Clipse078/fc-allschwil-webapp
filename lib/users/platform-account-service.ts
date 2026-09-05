@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
-import { logAction } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/log-action";
 import { hashPassword } from "@/lib/auth/password";
 import {
   acquirePlatformSuperAdminMutationLock,
@@ -59,15 +59,6 @@ export async function updatePlatformAccount(input: UpdatePlatformAccountInput) {
     );
   }
 
-  let before:
-    | {
-        firstName: string;
-        lastName: string;
-        email: string;
-        isActive: boolean;
-      }
-    | undefined;
-
   try {
     const updated = await prisma.$transaction(async (tx) => {
       await acquirePlatformSuperAdminMutationLock(tx);
@@ -109,16 +100,10 @@ export async function updatePlatformAccount(input: UpdatePlatformAccountInput) {
         }
       }
 
-      before = {
-        firstName: user.firstName,
-        lastName: user.lastName,
-        email: user.email,
-        isActive: user.isActive,
-      };
       const securitySensitiveChange =
         user.email !== email || (user.isActive && !input.isActive);
 
-      return tx.user.update({
+      const updated = await tx.user.update({
         where: { id: user.id },
         data: {
           firstName,
@@ -137,21 +122,25 @@ export async function updatePlatformAccount(input: UpdatePlatformAccountInput) {
           isActive: true,
         },
       });
-    });
 
-    await logAction({
-      actorUserId: input.actorUserId,
-      moduleKey: "users",
-      entityType: "User",
-      entityId: updated.id,
-      action: "PLATFORM_ACCOUNT_UPDATE",
-      beforeJson: before,
-      afterJson: {
-        firstName: updated.firstName,
-        lastName: updated.lastName,
-        email: updated.email,
-        isActive: updated.isActive,
-      },
+      await writeAuditRecord(tx, {
+        tenantId: null,
+        actorUserId: input.actorUserId,
+        moduleKey: "users",
+        entityType: "User",
+        entityId: updated.id,
+        action: "PLATFORM_ACCOUNT_UPDATE",
+        beforeJson: {
+          isActive: user.isActive,
+          emailChanged: user.email !== updated.email,
+        },
+        afterJson: {
+          isActive: updated.isActive,
+          emailChanged: user.email !== updated.email,
+        },
+      });
+
+      return updated;
     });
 
     return updated;
@@ -174,34 +163,39 @@ export async function resetPlatformAccountPassword(input: {
   password: string;
   actorUserId: string;
 }): Promise<void> {
-  const user = await prisma.user.findUnique({
-    where: { id: input.userId },
-    select: { id: true, isActive: true },
-  });
-  if (!user) {
-    throw new PlatformAccountDomainError(
-      "USER_NOT_FOUND",
-      "Benutzer nicht gefunden.",
-    );
-  }
-  if (!user.isActive) {
-    throw new PlatformAccountDomainError(
-      "INACTIVE_USER",
-      "Das Passwort eines deaktivierten Kontos kann nicht geändert werden.",
-    );
-  }
-
   const passwordHash = await hashPassword(input.password);
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { passwordHash, passwordChangedAt: new Date() },
-  });
+  await prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
+    const user = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, isActive: true },
+    });
+    if (!user) {
+      throw new PlatformAccountDomainError(
+        "USER_NOT_FOUND",
+        "Benutzer nicht gefunden.",
+      );
+    }
+    if (!user.isActive) {
+      throw new PlatformAccountDomainError(
+        "INACTIVE_USER",
+        "Das Passwort eines deaktivierten Kontos kann nicht geändert werden.",
+      );
+    }
 
-  await logAction({
-    actorUserId: input.actorUserId,
-    moduleKey: "users",
-    entityType: "User",
-    entityId: user.id,
-    action: "PLATFORM_PASSWORD_RESET",
+    const changedAt = new Date();
+    await tx.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordChangedAt: changedAt },
+    });
+    await writeAuditRecord(tx, {
+      tenantId: null,
+      actorUserId: input.actorUserId,
+      moduleKey: "users",
+      entityType: "User",
+      entityId: user.id,
+      action: "PLATFORM_PASSWORD_RESET",
+      metadataJson: { sessionsRevokedAt: changedAt },
+    });
   });
 }

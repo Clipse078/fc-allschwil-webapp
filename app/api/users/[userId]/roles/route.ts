@@ -31,6 +31,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { setPlatformUserRoles } from "@/lib/roles/platform-mutations";
 import { toRoleApiErrorResponse } from "@/lib/roles/errors";
+import { auditRejectedPrivilegedAction } from "@/lib/audit/security-events";
 
 type RouteContext = {
   params: Promise<{
@@ -88,7 +89,7 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const result = await setPlatformUserRoles({
       userId,
       roleIds,
-      actorUserId: access.session?.user?.id,
+      actorUserId: access.actorUserId,
     });
 
     return NextResponse.json({
@@ -97,6 +98,19 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     });
   } catch (error) {
     const { status, body: errorBody } = toRoleApiErrorResponse(error);
+    if (status >= 400 && status < 500) {
+      await auditRejectedPrivilegedAction({
+        actorUserId: access.actorUserId,
+        tenantId: null,
+        action: "PLATFORM_ROLE_ASSIGNMENT_REJECTED",
+        entityType: "User",
+        entityId: userId,
+        reasonCode:
+          "code" in errorBody && typeof errorBody.code === "string"
+            ? errorBody.code
+            : "REJECTED",
+      });
+    }
     return NextResponse.json(errorBody, { status });
   }
 }

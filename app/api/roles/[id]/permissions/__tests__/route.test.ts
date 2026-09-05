@@ -20,6 +20,8 @@ const mocks = vi.hoisted(() => ({
     createMany: vi.fn(),
   },
   permission: { findMany: vi.fn() },
+  auditLogCreate: vi.fn(),
+  auditRejectedPrivilegedAction: vi.fn(),
   transaction: vi.fn(),
   queryRaw: vi.fn(),
 }));
@@ -27,13 +29,15 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
   requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
-vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
-
+vi.mock("@/lib/audit/security-events", () => ({
+  auditRejectedPrivilegedAction: mocks.auditRejectedPrivilegedAction,
+}));
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     role: mocks.role,
     rolePermission: mocks.rolePermission,
     permission: mocks.permission,
+    auditLog: { create: mocks.auditLogCreate },
     $transaction: mocks.transaction,
   },
 }));
@@ -45,6 +49,7 @@ function mockAuthorized() {
     ok: true,
     status: 200,
     error: null,
+    actorUserId: "platform-admin",
     session: { user: { id: "platform-admin", activeTenantId: null } },
   });
 }
@@ -67,6 +72,7 @@ beforeEach(() => {
       callback({
         $queryRawUnsafe: mocks.queryRaw,
         rolePermission: mocks.rolePermission,
+        auditLog: { create: mocks.auditLogCreate },
       }),
   );
 });
@@ -85,6 +91,14 @@ describe("PUT /api/roles/[id]/permissions — RPERM-05-C1 scope validation", () 
     const body = await res.json();
     expect(body.permissionKeys).toEqual(["users.view"]);
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "platform-admin",
+        tenantId: null,
+        entityId: "role-1",
+        action: "PLATFORM_PERMISSIONS_CHANGE",
+      }),
+    });
   });
 
   it("PLATFORM + TENANT → denied atomically; transaction is never attempted", async () => {
@@ -102,6 +116,14 @@ describe("PUT /api/roles/[id]/permissions — RPERM-05-C1 scope validation", () 
     expect(body.code).toBe("INVALID_PERMISSION_SCOPE");
     expect(body.error).toContain("workspace.manage");
     expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.auditRejectedPrivilegedAction).toHaveBeenCalledWith({
+      actorUserId: "platform-admin",
+      tenantId: null,
+      action: "PLATFORM_PERMISSION_CHANGE_REJECTED",
+      entityType: "Role",
+      entityId: "role-1",
+      reasonCode: "INVALID_PERMISSION_SCOPE",
+    });
   });
 
   it("a submitted tenant-only mixed-scope list rejects the entire request, not just the invalid key", async () => {

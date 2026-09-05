@@ -124,7 +124,7 @@ describe("RPERM-05-C1 — setPlatformRolePermissions (mutation)", () => {
     const perm = await ensurePlatformPermission("rperm05c1-platform-allowed-perm");
     const role = await createPlatformRole("rperm05c1-platform-allowed-role");
 
-    const result = await setPlatformRolePermissions({ roleId: role.id, permissionKeys: [perm.key] });
+    const result = await setPlatformRolePermissions({ roleId: role.id, permissionKeys: [perm.key], actorUserId: null });
     expect(result.permissionKeys).toEqual([perm.key]);
 
     const persisted = await prisma.rolePermission.findMany({
@@ -143,7 +143,7 @@ describe("RPERM-05-C1 — setPlatformRolePermissions (mutation)", () => {
     await prisma.rolePermission.create({ data: { roleId: role.id, permissionId: platformPerm.id } });
 
     await expect(
-      setPlatformRolePermissions({ roleId: role.id, permissionKeys: [platformPerm.key, tenantPerm.key] }),
+      setPlatformRolePermissions({ roleId: role.id, permissionKeys: [platformPerm.key, tenantPerm.key], actorUserId: null }),
     ).rejects.toBeInstanceOf(InvalidPermissionScopeError);
 
     // Atomicity: the pre-existing valid PLATFORM permission set is untouched
@@ -161,7 +161,7 @@ describe("RPERM-05-C1 — setPlatformRolePermissions (mutation)", () => {
     const role = await createPlatformRole("rperm05c1-mixed2-scope-role");
 
     await expect(
-      setPlatformRolePermissions({ roleId: role.id, permissionKeys: [platformPerm.key, tenantPerm.key] }),
+      setPlatformRolePermissions({ roleId: role.id, permissionKeys: [platformPerm.key, tenantPerm.key], actorUserId: null }),
     ).rejects.toBeInstanceOf(InvalidPermissionScopeError);
 
     const rolePermissionRow = await prisma.rolePermission.findFirst({
@@ -177,7 +177,7 @@ describe("RPERM-05-C1 — setPlatformRolePermissions (mutation)", () => {
     const tenantRole = await createTenantRole("rperm05c1-mutation-scope-tenant-role", tenant.id);
 
     await expect(
-      setPlatformRolePermissions({ roleId: tenantRole.id, permissionKeys: [] }),
+      setPlatformRolePermissions({ roleId: tenantRole.id, permissionKeys: [], actorUserId: null }),
     ).rejects.toBeInstanceOf(RoleNotFoundError);
 
     await prisma.role.delete({ where: { id: tenantRole.id } });
@@ -191,6 +191,7 @@ describe("RPERM-05-C1 — setPlatformRolePermissions (mutation)", () => {
     const result = await setPlatformRolePermissions({
       roleId: role.id,
       permissionKeys: ["rperm05c1-does-not-exist"],
+      actorUserId: null,
     });
     expect(result.permissionKeys).toEqual([]);
   });
