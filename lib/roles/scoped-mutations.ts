@@ -29,6 +29,7 @@ import {
   RoleValidationError,
 } from "@/lib/roles/errors";
 import { getTenantClubAdminRoleKey, CLUB_ADMIN_TEMPLATE_KEY } from "@/lib/roles/tenant-role-keys";
+import { assertTenantDelegationAllowed } from "@/lib/roles/delegation";
 import type { OrgUnitScopeMode } from "@prisma/client";
 
 const AUDIT_MODULE_KEY = "roles";
@@ -275,6 +276,11 @@ export async function assignScopedRoleToUser(
     throw new ArchivedRoleError("Archivierte Rollen können nicht als Zuständigkeit zugewiesen werden.");
   }
   await assertNotClubAdminRole(role, tenantId);
+  await assertTenantDelegationAllowed({
+    tenantId,
+    actorUserId,
+    roleIds: [role.id],
+  });
 
   // 2. Validate OrgUnit: exists and belongs to tenantId.
   const orgUnit = await assertOrgUnitBelongsToTenant(tenantId, orgUnitId);

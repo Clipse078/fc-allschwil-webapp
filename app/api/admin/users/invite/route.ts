@@ -43,6 +43,7 @@ import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
 import { INVITATION_EXPIRY_HOURS } from "@/lib/users/mutations";
 import { prisma } from "@/lib/db/prisma";
+import { RoleDomainError } from "@/lib/roles/errors";
 import {
   buildPasswordResetLink,
   resolveSecurityLinkBaseUrl,
@@ -180,6 +181,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, userId, invitationSent: sendInvitation && Boolean(userId) });
   } catch (error) {
+    if (error instanceof RoleDomainError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     if (error instanceof InvitationDomainError) {
       return _invitationErrorResponse(error);
     }

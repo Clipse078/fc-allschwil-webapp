@@ -18,6 +18,7 @@ export type RoleDomainErrorCode =
   | "INACTIVE_MEMBERSHIP"
   | "ARCHIVED_ROLE"
   | "INVALID_PERMISSION_SCOPE"
+  | "DELEGATION_FORBIDDEN"
   | "USER_NOT_FOUND"
   | "VALIDATION_ERROR";
 
@@ -92,6 +93,14 @@ export class ArchivedRoleError extends RoleDomainError {
 export class InvalidPermissionScopeError extends RoleDomainError {
   constructor(message = "Eine oder mehrere Berechtigungen sind für diesen Rollen-Scope ungültig.") {
     super("INVALID_PERMISSION_SCOPE", message, 400);
+  }
+}
+
+export class DelegationForbiddenError extends RoleDomainError {
+  constructor(
+    message = "Sie dürfen nur Berechtigungen und Rollen delegieren, die Sie selbst aktuell besitzen.",
+  ) {
+    super("DELEGATION_FORBIDDEN", message, 403);
   }
 }
 

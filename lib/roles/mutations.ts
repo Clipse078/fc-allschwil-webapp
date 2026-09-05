@@ -34,6 +34,7 @@ import {
 } from "@/lib/roles/errors";
 import { findLockedPermissionRemovals, isProtectedRole } from "@/lib/roles/protected";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
+import { assertTenantDelegationAllowed } from "@/lib/roles/delegation";
 
 const AUDIT_MODULE_KEY = "roles";
 
@@ -153,6 +154,11 @@ export async function createTenantRole(
   const description = input.description?.trim() || null;
 
   await assertUniqueTenantRoleName(input.tenantId, name);
+  await assertTenantDelegationAllowed({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    permissionKeys: input.permissionKeys,
+  });
   const permissions = await resolveTenantPermissions(input.permissionKeys);
 
   const key = `custom_${input.tenantId.slice(0, 8)}_${Date.now().toString(36)}_${Math.random()
@@ -310,6 +316,12 @@ export async function setTenantRolePermissions(
     throw new ArchivedRoleError("Archivierte Rollen können nicht bearbeitet werden.");
   }
 
+  await assertTenantDelegationAllowed({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    permissionKeys: input.permissionKeys,
+  });
+
   const currentPermissions = await prisma.rolePermission.findMany({
     where: { roleId: role.id },
     select: { permission: { select: { key: true } } },
@@ -370,6 +382,12 @@ export async function assignTenantRoleToUser(
   if (role.isArchived) {
     throw new ArchivedRoleError("Archivierte Rollen können nicht zugewiesen werden.");
   }
+
+  await assertTenantDelegationAllowed({
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    roleIds: [role.id],
+  });
 
   const membership = await prisma.tenantMembership.findUnique({
     where: { tenantId_userId: { tenantId: input.tenantId, userId: input.userId } },
@@ -529,6 +547,12 @@ export async function setTenantUserRoles(
   //    tenant, and not archived. Cross-tenant or PLATFORM IDs yield the same
   //    error as "not found" — no existence leakage.
   const deduped = Array.from(new Set(roleIds));
+
+  await assertTenantDelegationAllowed({
+    tenantId,
+    actorUserId,
+    roleIds: deduped,
+  });
 
   const validRoles =
     deduped.length > 0
