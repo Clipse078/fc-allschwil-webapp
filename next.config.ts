@@ -1,9 +1,11 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { buildSecurityHeaderRules } from "./lib/security/headers";
 
 const withNextIntl = createNextIntlPlugin();
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   typescript: {
     tsconfigPath: "tsconfig.build.json",
   },
@@ -15,6 +17,9 @@ const nextConfig: NextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async headers() {
+    return buildSecurityHeaderRules(process.env);
   },
 };
 
