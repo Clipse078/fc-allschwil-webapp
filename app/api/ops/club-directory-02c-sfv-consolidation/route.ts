@@ -50,9 +50,9 @@
  *     imported, read, or accepted from this route in any form.
  *
  * AUTHENTICATION
- *   Requires the dedicated, temporary
- *   `FCA_CONSOLIDATION_OPERATOR_SECRET` bearer capability. Routine
- *   `CRON_SECRET` scheduler authority is deliberately not accepted.
+ *   Requires an authenticated SCE platform operator with the existing
+ *   platform-only `tenants.manage` permission. Routine `CRON_SECRET`
+ *   scheduler authority is deliberately not accepted.
  *
  * ENVIRONMENT GUARD — STAGE ONLY
  *   Rejects with 403 on every environment except STAGE (`APP_ENV=stage`,
@@ -102,7 +102,8 @@ import {
   type TenantInventory,
 } from "@/scripts/club-directory-02c-sfv-consolidation";
 import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
-import { hasFcaConsolidationCapability } from "@/lib/server/operator-capability";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -139,9 +140,10 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── 2. Dedicated temporary operator capability ────────────────────────────
-  if (!hasFcaConsolidationCapability(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ── 2. Existing platform-operator permission boundary ─────────────────────
+  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   // ── 3. Tenant must be explicit and match the single allowed tenant ────────

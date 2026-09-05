@@ -65,9 +65,9 @@
  *   see lib/env.ts#getRuntimeEnvironment), checked BEFORE authentication.
  *
  * AUTHENTICATION
- *   Requires the dedicated, temporary
- *   `FCA_CONSOLIDATION_OPERATOR_SECRET` bearer capability shared only with
- *   the read-only inventory route. Routine `CRON_SECRET` is never accepted.
+ *   Requires an authenticated SCE platform operator with the existing
+ *   platform-only `tenants.manage` permission. Routine `CRON_SECRET` is never
+ *   accepted.
  *
  * FIXED TENANT
  *   Operates ONLY on the hard-coded tenant key `fc-allschwil` — the request
@@ -142,7 +142,8 @@ import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
 import { persistConsolidationBackupSnapshot } from "@/lib/club-directory/ops-backup-storage";
 import { consolidateExternalClubsByProviderIdentity } from "@/lib/club-directory/consolidation-service";
 import { createClubConsolidationDatabase } from "@/lib/club-directory/prisma-consolidation-adapter";
-import { hasFcaConsolidationCapability } from "@/lib/server/operator-capability";
+import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -312,9 +313,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── 2. Dedicated temporary operator capability ────────────────────────────
-  if (!hasFcaConsolidationCapability(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // ── 2. Existing platform-operator permission boundary ─────────────────────
+  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
   // ── 3. Body / confirmation / fingerprint — before ANY tenant/SFV/DB work ──
