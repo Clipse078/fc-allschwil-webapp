@@ -39,10 +39,8 @@
  *      no errors, and a subsequent rerun stays idempotent.
  *
  * SAFETY:
- *   - This suite ONLY runs when `CLUB_DIRECTORY_02C_TEST_DATABASE_URL` is
- *     set. When unset, the entire suite is skipped — never touches any
- *     real database.
- *   - The URL must resolve to a local host (localhost/127.0.0.1/::1).
+ *   - This suite requires an explicit local `TEST_DATABASE_URL`. Missing or
+ *     unsafe configuration fails before a Pool is constructed.
  *   - All rows are created under randomly-generated, per-run tenant/season
  *     keys so repeated runs never collide, and everything is deleted in
  *     `afterAll`.
@@ -52,44 +50,26 @@
  *   sudo -u postgres psql -c "CREATE DATABASE club_directory_02c_test;"
  *   sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
  *   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02c_test npx prisma db push --accept-data-loss
- *   CLUB_DIRECTORY_02C_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02c_test npx vitest run lib/club-directory/__tests__/consolidation-service.integration.test.ts
+ *   TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02c_test npx vitest run lib/club-directory/__tests__/consolidation-service.integration.test.ts
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { createSafeTestPrismaClient } from "@/lib/test/safe-test-prisma";
 
 import { consolidateExternalClubsByProviderIdentity } from "../consolidation-service";
 import { createClubConsolidationDatabase } from "../prisma-consolidation-adapter";
 import { getMatchcenterMatchDetail, type MatchcenterQueryDatabase } from "../../matchcenter/query-service";
 
-const TEST_DATABASE_URL = process.env.CLUB_DIRECTORY_02C_TEST_DATABASE_URL;
-
-function isSafeLocalTestUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1" || parsed.hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-const canRun = Boolean(TEST_DATABASE_URL) && isSafeLocalTestUrl(TEST_DATABASE_URL ?? "");
-
 const PROVIDER = "SFV";
 
 /** A fully independent PrismaClient + Pool, for simulating two overlapping processes. */
 function createIndependentClient(): { prisma: PrismaClient; pool: Pool } {
-  const pool = new Pool({ connectionString: TEST_DATABASE_URL });
-  const adapter = new PrismaPg(pool);
-  const prisma = new PrismaClient({ adapter });
-  return { prisma, pool };
+  return createSafeTestPrismaClient();
 }
 
-describe.skipIf(!canRun)(
+describe(
   "CLUB-DIRECTORY-02C consolidation service (real disposable Postgres)",
   () => {
     let prisma: PrismaClient;
@@ -105,11 +85,7 @@ describe.skipIf(!canRun)(
     let seasonId: string;
 
     beforeAll(async () => {
-      if (!TEST_DATABASE_URL) return;
-
-      pool = new Pool({ connectionString: TEST_DATABASE_URL });
-      const adapter = new PrismaPg(pool);
-      prisma = new PrismaClient({ adapter });
+      ({ prisma, pool } = createSafeTestPrismaClient());
 
       const [tenantA, tenantB] = await Promise.all([
         prisma.tenant.create({ data: { key: TENANT_A_KEY, name: "CLUB-DIRECTORY-02C Tenant A" } }),
@@ -131,7 +107,7 @@ describe.skipIf(!canRun)(
     });
 
     afterAll(async () => {
-      if (!TEST_DATABASE_URL) return;
+      if (!prisma || !pool) return;
 
       for (const tenantId of [tenantAId, tenantBId]) {
         await prisma.matchExternalMapping.deleteMany({ where: { tenantId } });

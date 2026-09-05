@@ -67,6 +67,11 @@ declare module "next-auth/jwt" {
     actorName?: string;
     effectiveUserId?: string;
     authorizationContextVersion?: number;
+    /**
+     * Original credential authentication time in epoch milliseconds.
+     * Server-issued and intentionally omitted from the browser Session.
+     */
+    authenticatedAt?: number;
     /** RPERM-04: see Session.user.activeTenantId. */
     activeTenantId?: string | null;
     activeMembershipId?: string | null;

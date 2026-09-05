@@ -1,7 +1,7 @@
 /**
  * RPERM-02 — Seed and Backfill Integration Tests
  *
- * Requires a live PostgreSQL database (DATABASE_URL env var).
+ * Requires a disposable local PostgreSQL database (TEST_DATABASE_URL env var).
  * Run after `prisma db push` and `tsx prisma/seed.ts`.
  * DATABASE_URL is loaded from .env via dotenv/config.
  *
@@ -17,25 +17,16 @@
  *   DB-RPERM02-8.  New permission keys are present in the database
  */
 
-import "dotenv/config";
-
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PermissionScope, PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
-
-const connectionString = process.env.DATABASE_URL;
+import { createSafeTestPrismaClient } from "@/lib/test/safe-test-prisma";
 
 let prisma: PrismaClient;
 let pool: Pool;
 
 beforeAll(() => {
-  if (!connectionString) {
-    throw new Error("DATABASE_URL is not set — cannot run DB integration tests.");
-  }
-  pool = new Pool({ connectionString });
-  const adapter = new PrismaPg(pool);
-  prisma = new PrismaClient({ adapter });
+  ({ prisma, pool } = createSafeTestPrismaClient());
 });
 
 afterAll(async () => {

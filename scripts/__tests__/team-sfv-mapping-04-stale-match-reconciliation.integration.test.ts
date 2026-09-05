@@ -9,13 +9,8 @@
  * and idempotency.
  *
  * SAFETY:
- *   - This suite ONLY runs when `SFV_MAPPING_04_TEST_DATABASE_URL` is set.
- *     When unset (the default in any environment without a disposable local
- *     Postgres instance, including STAGE/CI runners that don't provision
- *     one), the entire suite is skipped — never touches any real database.
- *   - The URL must never be STAGE_DB_URL / STAGE_DIRECT_URL / DATABASE_URL.
- *     A defensive check refuses to run against anything that looks like a
- *     non-local host.
+ *   - This suite requires an explicit local `TEST_DATABASE_URL`. Missing or
+ *     unsafe configuration fails before a Pool is constructed.
  *   - All rows are created under a randomly-generated, per-run tenant key so
  *     repeated runs never collide, and everything is deleted in `afterAll`.
  *
@@ -24,7 +19,7 @@
  *   sudo -u postgres psql -c "CREATE DATABASE sfv_mapping04_test;"
  *   sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
  *   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/sfv_mapping04_test npx prisma db push --accept-data-loss
- *   SFV_MAPPING_04_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/sfv_mapping04_test npx vitest run scripts/__tests__/team-sfv-mapping-04-stale-match-reconciliation.integration.test.ts
+ *   TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/sfv_mapping04_test npx vitest run scripts/__tests__/team-sfv-mapping-04-stale-match-reconciliation.integration.test.ts
  *
  * TEST COVERAGE MAP:
  *   1.  Stale HOME reference is repaired when exactly one active
@@ -50,33 +45,16 @@
  */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { createSafeTestPrismaClient } from "@/lib/test/safe-test-prisma";
 
 import {
   planStaleMatchReconciliation,
   executeStaleMatchReconciliation,
 } from "../../lib/integrations/sfv/sync/stale-match-reconciliation";
 
-const TEST_DATABASE_URL = process.env.SFV_MAPPING_04_TEST_DATABASE_URL;
-
-function isSafeLocalTestUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "localhost" ||
-      parsed.hostname === "127.0.0.1" ||
-      parsed.hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-const canRun = Boolean(TEST_DATABASE_URL) && isSafeLocalTestUrl(TEST_DATABASE_URL ?? "");
-
-describe.skipIf(!canRun)(
+describe(
   "TEAM-SFV-MAPPING-04 stale-match reconciliation (real disposable Postgres)",
   () => {
     let prisma: PrismaClient;
@@ -146,11 +124,7 @@ describe.skipIf(!canRun)(
     }
 
     beforeAll(async () => {
-      if (!TEST_DATABASE_URL) return;
-
-      pool = new Pool({ connectionString: TEST_DATABASE_URL });
-      const adapter = new PrismaPg(pool);
-      prisma = new PrismaClient({ adapter });
+      ({ prisma, pool } = createSafeTestPrismaClient());
 
       const tenantA = await prisma.tenant.create({
         data: { key: TENANT_A_KEY, name: "SFV Mapping 04 Test Tenant A" },
@@ -293,7 +267,7 @@ describe.skipIf(!canRun)(
     });
 
     afterAll(async () => {
-      if (!TEST_DATABASE_URL) return;
+      if (!prisma || !pool) return;
 
       await prisma.matchExternalMapping.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });
       await prisma.event.deleteMany({ where: { tenantId: { in: [tenantAId, tenantBId] } } });

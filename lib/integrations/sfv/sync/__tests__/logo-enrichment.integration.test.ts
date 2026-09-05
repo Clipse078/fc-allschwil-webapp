@@ -54,13 +54,8 @@
  * fully-mocked wiring-shape proof).
  *
  * SAFETY:
- *   - This suite ONLY runs when `CLUB_DIRECTORY_02B_TEST_DATABASE_URL` is
- *     set. When unset (the default in any environment without a disposable
- *     local Postgres instance, including STAGE/CI runners that don't
- *     provision one), the entire suite is skipped — never touches any real
- *     database.
- *   - The URL must resolve to a local host (localhost/127.0.0.1/::1) — a
- *     defensive check refuses to run against anything else.
+ *   - This suite requires an explicit local `TEST_DATABASE_URL`. Missing or
+ *     unsafe configuration fails before a Pool is constructed.
  *   - All rows are created under randomly-generated, per-run tenant keys so
  *     repeated runs never collide, and everything is deleted in `afterAll`.
  *
@@ -69,13 +64,13 @@
  *   sudo -u postgres psql -c "CREATE DATABASE club_directory_02b_test;"
  *   sudo -u postgres psql -c "ALTER USER postgres PASSWORD 'postgres';"
  *   DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02b_test npx prisma db push --accept-data-loss
- *   CLUB_DIRECTORY_02B_TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02b_test npx vitest run lib/integrations/sfv/sync/__tests__/logo-enrichment.integration.test.ts
+ *   TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/club_directory_02b_test npx vitest run lib/integrations/sfv/sync/__tests__/logo-enrichment.integration.test.ts
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { createSafeTestPrismaClient } from "@/lib/test/safe-test-prisma";
 
 const mockFetchTeamPicture = vi.fn();
 vi.mock("../../client", () => ({
@@ -88,23 +83,6 @@ const { discoverExternalTeamFromProvider } = await import("../../../../club-dire
 const { linkExternalTeamProvider } = await import("../../../../club-directory/mutation-service");
 const { findExternalTeamByProviderIdentity } = await import("../../../../club-directory/query-service");
 const { resolveProviderLogoDataUri } = await import("../team-logo");
-
-const TEST_DATABASE_URL = process.env.CLUB_DIRECTORY_02B_TEST_DATABASE_URL;
-
-function isSafeLocalTestUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    return (
-      parsed.hostname === "localhost" ||
-      parsed.hostname === "127.0.0.1" ||
-      parsed.hostname === "::1"
-    );
-  } catch {
-    return false;
-  }
-}
-
-const canRun = Boolean(TEST_DATABASE_URL) && isSafeLocalTestUrl(TEST_DATABASE_URL ?? "");
 
 const GIF_BASE64 = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 const PROVIDER = "SFV";
@@ -157,7 +135,7 @@ function picturePayload(base64: string) {
   };
 }
 
-describe.skipIf(!canRun)(
+describe(
   "CLUB-DIRECTORY-02B SFV logo discovery & enrichment (real disposable Postgres)",
   () => {
     let prisma: PrismaClient;
@@ -170,11 +148,7 @@ describe.skipIf(!canRun)(
     let tenantBId: string;
 
     beforeAll(async () => {
-      if (!TEST_DATABASE_URL) return;
-
-      pool = new Pool({ connectionString: TEST_DATABASE_URL });
-      const adapter = new PrismaPg(pool);
-      prisma = new PrismaClient({ adapter });
+      ({ prisma, pool } = createSafeTestPrismaClient());
 
       const [tenantA, tenantB] = await Promise.all([
         prisma.tenant.create({ data: { key: TENANT_A_KEY, name: "CLUB-DIRECTORY-02B Tenant A" } }),
@@ -185,7 +159,7 @@ describe.skipIf(!canRun)(
     });
 
     afterAll(async () => {
-      if (!TEST_DATABASE_URL) return;
+      if (!prisma || !pool) return;
 
       for (const tenantId of [tenantAId, tenantBId]) {
         await prisma.externalTeamProviderMapping.deleteMany({ where: { tenantId } });

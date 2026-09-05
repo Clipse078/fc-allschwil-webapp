@@ -38,6 +38,54 @@ const INTENT_TTL_MS = 30_000;
 const AUTHORIZATION_CONTEXT_VERSION = 1;
 const pendingIntents = new Map<string, PendingIntent>();
 
+type ActorSecurityState = {
+  isActive: boolean;
+  passwordChangedAt: Date | null;
+};
+
+/**
+ * Resolve the original authentication time without trusting update payloads.
+ *
+ * New sessions receive `authenticatedAt` at credential sign-in. For a legacy
+ * encrypted Auth.js token, its signed `iat` is accepted once and promoted to
+ * `authenticatedAt`. Auth.js rewrites `iat` during normal refresh, so it must
+ * never replace an already-present dedicated timestamp.
+ */
+export function resolveOriginalAuthenticationTime(token: JWT): number | null {
+  if (token.authenticatedAt !== undefined) {
+    return typeof token.authenticatedAt === "number" &&
+      Number.isSafeInteger(token.authenticatedAt) &&
+      token.authenticatedAt > 0
+      ? token.authenticatedAt
+      : null;
+  }
+
+  return typeof token.iat === "number" &&
+    Number.isSafeInteger(token.iat) &&
+    token.iat > 0
+    ? token.iat * 1000
+    : null;
+}
+
+export function isActorSessionCurrent(
+  actor: ActorSecurityState | null,
+  authenticatedAt: number | null,
+): boolean {
+  if (!actor?.isActive || authenticatedAt === null) return false;
+  if (!actor.passwordChangedAt) return true;
+  return authenticatedAt >= actor.passwordChangedAt.getTime();
+}
+
+async function loadActorSecurityState(
+  prisma: PrismaClient,
+  actorUserId: string,
+): Promise<ActorSecurityState | null> {
+  return prisma.user.findUnique({
+    where: { id: actorUserId },
+    select: { isActive: true, passwordChangedAt: true },
+  });
+}
+
 function removeExpiredIntents(now = Date.now()) {
   for (const [capability, pending] of pendingIntents) {
     if (pending.expiresAt <= now) pendingIntents.delete(capability);
@@ -184,14 +232,17 @@ type JwtUpdateInput = {
 export async function applyTrustedJwtState(
   { token, user, trigger, session }: JwtUpdateInput,
   prisma: PrismaClient,
-): Promise<JWT> {
+): Promise<JWT | null> {
   if (user) {
     const loginUser = normalizeLoginUser(user as Partial<SessionUserShape>);
     const canonicalActorUserId =
       typeof token.sub === "string" && token.sub ? token.sub : loginUser.id;
 
+    if (!canonicalActorUserId) return null;
+
     token.sub = canonicalActorUserId;
     token.actorUserId = canonicalActorUserId;
+    token.authenticatedAt = Date.now();
     token.actorEmail = loginUser.email;
     token.actorName =
       `${loginUser.firstName} ${loginUser.lastName}`.trim() || loginUser.email;
@@ -203,14 +254,28 @@ export async function applyTrustedJwtState(
   const canonicalActorUserId =
     typeof token.sub === "string" && token.sub ? token.sub : null;
 
+  if (!canonicalActorUserId) return null;
+
   // The signed JWT subject is the canonical actor. Never accept actor identity
   // from update data, and repair the redundant display field on every callback.
-  if (canonicalActorUserId) token.actorUserId = canonicalActorUserId;
+  token.actorUserId = canonicalActorUserId;
+
+  const authenticatedAt = resolveOriginalAuthenticationTime(token);
+  const actorSecurityState = await loadActorSecurityState(
+    prisma,
+    canonicalActorUserId,
+  );
+  if (!isActorSessionCurrent(actorSecurityState, authenticatedAt)) return null;
+
+  // Migration compatibility for encrypted tokens issued before this field
+  // existed. This is derived only from the signed token, never update data.
+  if (token.authenticatedAt === undefined) {
+    token.authenticatedAt = authenticatedAt;
+  }
 
   // Tokens issued before this trust boundary existed may contain client-forged
   // authorization fields. Rebuild them as the canonical actor before use.
   if (
-    canonicalActorUserId &&
     token.authorizationContextVersion !== AUTHORIZATION_CONTEXT_VERSION
   ) {
     const actor = await loadLiveSessionUser(prisma, canonicalActorUserId);
