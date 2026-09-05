@@ -75,7 +75,9 @@ function parseConfiguredAppEnv(rawValue: string | undefined): AppEnv | null {
 }
 
 export function isAcceptanceEnvironment(
-  env: Pick<NodeJS.ProcessEnv, "VERCEL_TARGET_ENV"> = process.env,
+  env:
+    | NodeJS.ProcessEnv
+    | { VERCEL_TARGET_ENV?: string } = process.env,
 ): boolean {
   return (
     readOptionalString(env.VERCEL_TARGET_ENV)?.toLowerCase() === "acceptance"

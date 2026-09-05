@@ -4,7 +4,7 @@ import {
   isExternalSideEffectConfigured,
 } from "../external-side-effect-policy";
 
-const ACCEPTANCE_ENV = {
+const ACCEPTANCE_ENV: NodeJS.ProcessEnv = {
   NODE_ENV: "production",
   VERCEL: "1",
   VERCEL_ENV: "preview",

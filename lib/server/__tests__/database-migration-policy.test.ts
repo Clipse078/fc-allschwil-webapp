@@ -17,16 +17,19 @@ describe("database migration deployment policy", () => {
   it("requires APPLY_DATABASE_MIGRATIONS to be exactly true", () => {
     expect(
       shouldApplyDatabaseMigrations({
+        NODE_ENV: "test",
         APPLY_DATABASE_MIGRATIONS: "true",
       }),
     ).toBe(true);
     expect(
       shouldApplyDatabaseMigrations({
+        NODE_ENV: "test",
         APPLY_DATABASE_MIGRATIONS: "TRUE",
       }),
     ).toBe(false);
     expect(
       shouldApplyDatabaseMigrations({
+        NODE_ENV: "test",
         APPLY_DATABASE_MIGRATIONS: " true ",
       }),
     ).toBe(false);
