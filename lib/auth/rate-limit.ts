@@ -17,10 +17,10 @@
  *   - Introducing a shared store (Redis/Upstash) solely for this endpoint
  *     is disproportionate without existing infrastructure.
  *
- * Follow-up required for production-grade distributed abuse protection:
- *   Move to a durable shared rate-limit store (e.g. Upstash Redis via
- *   @upstash/ratelimit) once Vercel Redis infrastructure is in place.
- *   Track as a USER-ADMIN security follow-up slice.
+ * Primary distributed protection is Vercel WAF rate limiting — see
+ * docs/security/vercel-auth-rate-limits.md and lib/security/abuse-policy.ts.
+ *
+ * This module remains a defense-in-depth fallback within a single instance.
  */
 
 type Bucket = {

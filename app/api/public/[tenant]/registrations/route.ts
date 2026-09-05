@@ -38,33 +38,11 @@ import {
   validatePublicPayload,
   createPublicRegistration,
 } from "@/lib/registrations/public-submission";
+import { getClientIp } from "@/lib/security/client-ip";
+import { checkApplicationRateLimit } from "@/lib/security/abuse-policy";
+import { createRateLimitResponse } from "@/lib/security/rate-limit-response";
 
 type RouteParams = { params: Promise<{ tenant: string }> };
-
-// ---------------------------------------------------------------------------
-// Simple in-memory rate limiter
-// ---------------------------------------------------------------------------
-
-const IP_RATE_MAP = new Map<string, { count: number; windowStart: number }>();
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
-const RATE_LIMIT_MAX = 5; // max 5 submissions per IP per minute
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = IP_RATE_MAP.get(ip);
-
-  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    IP_RATE_MAP.set(ip, { count: 1, windowStart: now });
-    return true; // allowed
-  }
-
-  if (entry.count >= RATE_LIMIT_MAX) {
-    return false; // blocked
-  }
-
-  entry.count += 1;
-  return true; // allowed
-}
 
 // ---------------------------------------------------------------------------
 // Idempotency cache (in-memory, good enough for single-instance / Edge)
@@ -111,23 +89,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     if (guard) return guard;
 
     // ── 2. Rate limiting ─────────────────────────────────────────────────
-    const ip =
-      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      request.headers.get("x-real-ip") ??
-      "unknown";
-
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.",
-        },
-        {
-          status: 429,
-          headers: { "Retry-After": "60" },
-        },
-      );
+    const ip = getClientIp(request);
+    const rateCheck = checkApplicationRateLimit("publicRegistration", ip);
+    if (!rateCheck.allowed) {
+      return createRateLimitResponse(rateCheck.retryAfterMs, {
+        ok: false,
+        error:
+          "Zu viele Anfragen. Bitte warte einen Moment und versuche es erneut.",
+      });
     }
 
     // ── 3. Parse body ────────────────────────────────────────────────────

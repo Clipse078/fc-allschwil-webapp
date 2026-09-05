@@ -431,6 +431,19 @@ describe("resendTenantInvitation", () => {
       }),
     );
   });
+
+  it("RESEND-4. enforces 60-second resend cooldown per tenant and user", async () => {
+    mockMembershipFindUnique.mockResolvedValue({ isActive: true } as Awaited<ReturnType<typeof prisma.tenantMembership.findUnique>>);
+    mockTokenFindFirst.mockResolvedValue({
+      createdAt: new Date(),
+    } as Awaited<ReturnType<typeof prisma.passwordResetToken.findFirst>>);
+
+    await expect(
+      resendTenantInvitation(TENANT_ID, USER_ID, ACTOR_ID),
+    ).rejects.toMatchObject({ code: "INVITATION_RESEND_COOLDOWN" });
+
+    expect(mockTokenCreate).not.toHaveBeenCalled();
+  });
 });
 
 // ═════════════════════════════════════════════════════════════════════════════

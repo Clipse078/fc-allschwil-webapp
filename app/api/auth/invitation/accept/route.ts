@@ -14,6 +14,7 @@
  *   200  — { success: true }
  *   400  — missing/invalid/expired/already-used token, or token belongs to
  *           a new (not-yet-activated) user (must use the password-setup path)
+ *   429  — rate limited
  *   500  — unexpected internal error
  */
 
@@ -21,8 +22,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { validatePasswordResetToken, hashResetToken } from "@/lib/auth/password-reset";
 import { activateInvitationMembership } from "@/lib/users/mutations";
+import { getClientIp } from "@/lib/security/client-ip";
+import {
+  AUTH_SECURITY_MESSAGES,
+  checkApplicationRateLimit,
+} from "@/lib/security/abuse-policy";
+import { createRateLimitResponse } from "@/lib/security/rate-limit-response";
+
+function invalidInvitationResponse() {
+  return NextResponse.json(
+    { error: AUTH_SECURITY_MESSAGES.invalidInvitationLink },
+    { status: 400 },
+  );
+}
 
 export async function POST(req: NextRequest) {
+  const rateCheck = checkApplicationRateLimit("invitationAccept", getClientIp(req));
+  if (!rateCheck.allowed) {
+    return createRateLimitResponse(rateCheck.retryAfterMs);
+  }
+
   let token: string;
   try {
     const body = await req.json();
@@ -32,30 +51,18 @@ export async function POST(req: NextRequest) {
   }
 
   if (!token) {
-    return NextResponse.json({ error: "Token fehlt." }, { status: 400 });
+    return invalidInvitationResponse();
   }
 
   const validated = await validatePasswordResetToken(prisma, token).catch(() => null);
-  if (!validated) {
-    return NextResponse.json(
-      { error: "Einladungslink ist ungültig, abgelaufen oder bereits verwendet." },
-      { status: 400 },
-    );
-  }
-
-  if (!validated.isInvitation) {
-    return NextResponse.json(
-      { error: "Dieser Link ist kein Einladungslink." },
-      { status: 400 },
-    );
+  if (!validated || !validated.isInvitation) {
+    return invalidInvitationResponse();
   }
 
   if (!validated.isExistingUser) {
-    // New users must go through the password-setup path.
-    return NextResponse.json(
-      { error: "Bitte richte dein Passwort über den Einladungslink ein." },
-      { status: 400 },
-    );
+    // New users must go through the password-setup path — same outward error
+    // shape as invalid tokens to avoid useful enumeration.
+    return invalidInvitationResponse();
   }
 
   // Mark the token as used (consume without changing the password).
@@ -68,8 +75,8 @@ export async function POST(req: NextRequest) {
         data: { usedAt: now },
       }),
     ]);
-  } catch (err) {
-    console.error("[invitation/accept]", err);
+  } catch {
+    console.error("[invitation/accept] token consumption failed");
     return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
   }
 
@@ -77,8 +84,8 @@ export async function POST(req: NextRequest) {
   // Non-fatal — token is already consumed; activation failure can be retried.
   if (validated.invitationTenantId) {
     await activateInvitationMembership(validated.userId, validated.invitationTenantId).catch(
-      (err) => {
-        console.error("[invitation/accept] Failed to activate invitation membership:", err);
+      () => {
+        console.error("[invitation/accept] membership activation failed");
       },
     );
   }

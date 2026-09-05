@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import { logAction } from "@/lib/audit/log-action";
 import { hashResetToken } from "@/lib/auth/password-reset";
+import { INVITATION_RESEND_COOLDOWN_MS } from "@/lib/security/abuse-policy";
 import { hashPassword } from "@/lib/auth/password";
 import { setTenantUserRoles } from "@/lib/roles/mutations";
 import { assignScopedRoleToUser } from "@/lib/roles/scoped-mutations";
@@ -30,7 +31,8 @@ export type InvitationErrorCode =
   | "EMAIL_TAKEN_BY_OTHER_USER"
   | "ALREADY_HAS_ACTIVE_MEMBERSHIP"
   | "USER_NOT_FOUND"
-  | "NO_ACTIVE_INVITATION";
+  | "NO_ACTIVE_INVITATION"
+  | "INVITATION_RESEND_COOLDOWN";
 
 export class InvitationDomainError extends Error {
   constructor(public readonly code: InvitationErrorCode, message?: string) {
@@ -627,6 +629,19 @@ export async function resendTenantInvitation(
     select: { isActive: true },
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
+
+  const recentInvitation = await prisma.passwordResetToken.findFirst({
+    where: { userId, isInvitation: true, invitationTenantId: tenantId },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+
+  if (
+    recentInvitation &&
+    Date.now() - recentInvitation.createdAt.getTime() < INVITATION_RESEND_COOLDOWN_MS
+  ) {
+    throw new InvitationDomainError("INVITATION_RESEND_COOLDOWN");
+  }
 
   const rawToken = await _createInvitationToken(userId, tenantId);
 

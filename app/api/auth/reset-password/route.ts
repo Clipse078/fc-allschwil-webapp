@@ -21,10 +21,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { consumePasswordResetToken, validatePasswordResetToken } from "@/lib/auth/password-reset";
 import { activateInvitationMembership } from "@/lib/users/mutations";
+import { getClientIp } from "@/lib/security/client-ip";
+import {
+  AUTH_SECURITY_MESSAGES,
+  checkApplicationRateLimit,
+} from "@/lib/security/abuse-policy";
+import { createRateLimitResponse } from "@/lib/security/rate-limit-response";
 
 const MIN_PASSWORD_LENGTH = 12;
 
 export async function POST(req: NextRequest) {
+  const rateCheck = checkApplicationRateLimit("resetPassword", getClientIp(req));
+  if (!rateCheck.allowed) {
+    return createRateLimitResponse(rateCheck.retryAfterMs);
+  }
+
   let token: string;
   let newPassword: string;
   let confirmPassword: string;
@@ -40,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   if (!token) {
     return NextResponse.json(
-      { error: "Ungültiger oder abgelaufener Link. Bitte fordere einen neuen an." },
+      { error: AUTH_SECURITY_MESSAGES.invalidOrExpiredToken },
       { status: 400 },
     );
   }
@@ -82,7 +93,7 @@ export async function POST(req: NextRequest) {
 
   if (!success) {
     return NextResponse.json(
-      { error: "Ungültiger oder abgelaufener Link. Bitte fordere einen neuen an." },
+      { error: AUTH_SECURITY_MESSAGES.invalidOrExpiredToken },
       { status: 400 },
     );
   }
