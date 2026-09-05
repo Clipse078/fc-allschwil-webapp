@@ -12,7 +12,12 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantFromSession } from "@/lib/tenants/queries";
 import { validateMediaUploadFile } from "@/lib/media/types";
 import { uploadMediaAsset } from "@/lib/media/upload";
-import { listMediaAssets, countMediaAssets, createMediaAsset } from "@/lib/media/queries";
+import {
+  listMediaAssets,
+  countMediaAssets,
+  createMediaAsset,
+  validateMediaReferencesForTenant,
+} from "@/lib/media/queries";
 
 const MEDIA_PERMISSIONS = [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE];
 
@@ -104,6 +109,17 @@ export async function POST(request: NextRequest) {
   const copyright   = getString("copyright");
   const photographer = getString("photographer");
   const folderId    = getString("folderId");
+
+  if (
+    !(await validateMediaReferencesForTenant(tenant.id, {
+      folderId,
+    }))
+  ) {
+    return NextResponse.json(
+      { error: "Medienordner nicht gefunden." },
+      { status: 404 },
+    );
+  }
 
   const assetId = crypto.randomUUID().replace(/-/g, "");
   const arrayBuffer = await fileEntry.arrayBuffer();

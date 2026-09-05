@@ -65,6 +65,68 @@ const mediaDetailSelect = {
   storageKey: true,
 } as const;
 
+export async function validateMediaReferencesForTenant(
+  tenantId: string,
+  input: {
+    folderId?: string | null;
+    tagIds?: string[];
+  },
+): Promise<boolean> {
+  if (input.folderId) {
+    const folder = await prisma.mediaFolder.findFirst({
+      where: {
+        id: input.folderId,
+        tenantId,
+        archivedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!folder) return false;
+  }
+
+  if (input.tagIds) {
+    const uniqueTagIds = Array.from(new Set(input.tagIds));
+    const ownedTagCount = await prisma.mediaTag.count({
+      where: {
+        id: { in: uniqueTagIds },
+        tenantId,
+      },
+    });
+    if (ownedTagCount !== uniqueTagIds.length) return false;
+  }
+
+  return true;
+}
+
+async function isMediaFolderDescendantOf(
+  tenantId: string,
+  candidateFolderId: string,
+  rootFolderId: string,
+): Promise<boolean> {
+  let currentId: string | null = candidateFolderId;
+  const visited = new Set<string>();
+
+  while (currentId) {
+    if (currentId === rootFolderId) return true;
+    if (visited.has(currentId)) return true;
+    visited.add(currentId);
+
+    const folder: { parentId: string | null } | null =
+      await prisma.mediaFolder.findFirst({
+        where: {
+          id: currentId,
+          tenantId,
+          archivedAt: null,
+        },
+        select: { parentId: true },
+      });
+    if (!folder) return false;
+    currentId = folder.parentId;
+  }
+
+  return false;
+}
+
 // Shape the raw Prisma result into the public type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function shapeAsset(row: any): MediaAssetListItem {
@@ -192,6 +254,14 @@ export type CreateMediaAssetInput = {
 export async function createMediaAsset(
   input: CreateMediaAssetInput,
 ): Promise<MediaAssetDetail> {
+  if (
+    !(await validateMediaReferencesForTenant(input.tenantId, {
+      folderId: input.folderId,
+    }))
+  ) {
+    throw new Error("Media folder does not belong to the tenant.");
+  }
+
   const row = await prisma.mediaAsset.create({
     data: {
       id: input.id,
@@ -240,6 +310,15 @@ export async function updateMediaAsset(
     select: { id: true },
   });
   if (!existing) return null;
+
+  if (
+    !(await validateMediaReferencesForTenant(tenantId, {
+      folderId: input.folderId,
+      tagIds: input.tagIds,
+    }))
+  ) {
+    return null;
+  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = {};
@@ -466,6 +545,14 @@ export type CreateFolderInput = {
 };
 
 export async function createMediaFolder(input: CreateFolderInput): Promise<MediaFolderItem> {
+  if (
+    !(await validateMediaReferencesForTenant(input.tenantId, {
+      folderId: input.parentId,
+    }))
+  ) {
+    throw new Error("Parent media folder does not belong to the tenant.");
+  }
+
   const id = `mf${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
   const row = await prisma.mediaFolder.create({
     data: {
@@ -488,6 +575,24 @@ export async function updateMediaFolder(
     where: { id, tenantId, archivedAt: null },
   });
   if (!existing) return null;
+  if (data.parentId === id) return null;
+  if (
+    !(await validateMediaReferencesForTenant(tenantId, {
+      folderId: data.parentId,
+    }))
+  ) {
+    return null;
+  }
+  if (
+    data.parentId &&
+    (await isMediaFolderDescendantOf(
+      tenantId,
+      data.parentId,
+      id,
+    ))
+  ) {
+    return null;
+  }
   const row = await prisma.mediaFolder.update({
     where: { id },
     data,
