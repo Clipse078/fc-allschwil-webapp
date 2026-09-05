@@ -38,9 +38,10 @@ export type MeetingDeletionResult = {
  */
 export async function getMeetingDeletionImpact(
   meetingId: string,
+  tenantId: string,
 ): Promise<MeetingDeletionImpact | null> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: meetingId },
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, tenantId },
     select: {
       _count: {
         select: {
@@ -73,9 +74,10 @@ export async function getMeetingDeletionImpact(
  */
 export async function deleteMeetingPermanently(
   meetingId: string,
+  tenantId: string,
 ): Promise<MeetingDeletionResult | null> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: meetingId },
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, tenantId },
     select: {
       title: true,
       _count: {
@@ -98,7 +100,7 @@ export async function deleteMeetingPermanently(
     participants: meeting._count.participants,
   };
 
-  await prisma.meeting.delete({ where: { id: meetingId } });
+  await prisma.meeting.delete({ where: { id: meetingId, tenantId } });
 
   return { meetingId, title: meeting.title, impact };
 }

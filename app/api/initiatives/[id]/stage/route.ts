@@ -80,7 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const needsStamp = requiresReviewerStamp(toStage);
 
     const updated = await prisma.initiative.update({
-      where: { id },
+      where: { id, tenantId: actor.tenantId },
       data: {
         reviewStage: toStage,
         reviewedByUserId: needsStamp ? actor.userId : undefined,

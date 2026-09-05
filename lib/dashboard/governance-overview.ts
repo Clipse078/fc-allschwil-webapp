@@ -42,11 +42,16 @@ export type PendingApprovalItem = {
 export async function getPendingApprovals(
   actor: ActorContext,
 ): Promise<PendingApprovalItem[]> {
+  if (!actor.tenantId) return [];
   const visWhere = buildVisibilityWhere(actor);
 
   const [meetings, initiatives, targets, templates] = await Promise.all([
     prisma.meeting.findMany({
-      where: { ...visWhere, reviewStage: "SUBMITTED" },
+      where: {
+        tenantId: actor.tenantId,
+        ...visWhere,
+        reviewStage: "SUBMITTED",
+      },
       select: {
         id: true,
         slug: true,
@@ -63,7 +68,11 @@ export async function getPendingApprovals(
       orderBy: { updatedAt: "asc" },
     }),
     prisma.initiative.findMany({
-      where: { ...visWhere, reviewStage: "SUBMITTED" },
+      where: {
+        tenantId: actor.tenantId,
+        ...visWhere,
+        reviewStage: "SUBMITTED",
+      },
       select: {
         id: true,
         slug: true,
@@ -80,7 +89,11 @@ export async function getPendingApprovals(
       orderBy: { updatedAt: "asc" },
     }),
     prisma.target.findMany({
-      where: { ...visWhere, reviewStage: "SUBMITTED" },
+      where: {
+        tenantId: actor.tenantId,
+        ...visWhere,
+        reviewStage: "SUBMITTED",
+      },
       select: {
         id: true,
         title: true,
@@ -191,11 +204,13 @@ const STALE_DAYS = 30;
 export async function getStaleTargets(
   actor: ActorContext,
 ): Promise<StaleTargetItem[]> {
+  if (!actor.tenantId) return [];
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - STALE_DAYS);
 
   const rows = await prisma.target.findMany({
     where: {
+      tenantId: actor.tenantId,
       ...buildVisibilityWhere(actor),
       status: "ACTIVE",
       updatedAt: { lt: cutoff },
@@ -315,12 +330,14 @@ export type OverdueActionItem = {
 export async function getOverdueActions(
   actor: ActorContext,
 ): Promise<OverdueActionItem[]> {
+  if (!actor.tenantId) return [];
   const now = new Date();
 
   const rows = await prisma.meetingAction.findMany({
     where: {
       status: "OPEN",
       dueDate: { lt: now },
+      meeting: { tenantId: actor.tenantId },
     },
     select: {
       id: true,

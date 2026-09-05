@@ -185,8 +185,9 @@ export async function requireMeetingAccess(opts: {
   id: string;
   access: AccessMode;
 }): Promise<GuardResult<MeetingGuardEntity>> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: opts.id },
+  if (!opts.actor.tenantId) return notFound("Meeting nicht gefunden.");
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: opts.id, tenantId: opts.actor.tenantId },
     select: MEETING_GUARD_SELECT,
   });
 
@@ -227,8 +228,9 @@ export async function requireInitiativeAccess(opts: {
   id: string;
   access: AccessMode;
 }): Promise<GuardResult<InitiativeGuardEntity>> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: opts.id },
+  if (!opts.actor.tenantId) return notFound("Initiative nicht gefunden.");
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: opts.id, tenantId: opts.actor.tenantId },
     select: INITIATIVE_GUARD_SELECT,
   });
 
@@ -271,8 +273,9 @@ export async function requireTargetAccess(opts: {
   id: string;
   access: AccessMode;
 }): Promise<GuardResult<TargetGuardEntity>> {
-  const target = await prisma.target.findUnique({
-    where: { id: opts.id },
+  if (!opts.actor.tenantId) return notFound("Ziel nicht gefunden.");
+  const target = await prisma.target.findFirst({
+    where: { id: opts.id, tenantId: opts.actor.tenantId },
     select: TARGET_GUARD_SELECT,
   });
 

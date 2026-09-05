@@ -38,8 +38,14 @@ const LINK_OPTION_VISIBILITY_SELECT = {
  * disclosure of restricted/private records.
  */
 export async function getMeetingLinkOptions(actor: ActorContext): Promise<EntityRef[]> {
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["meetings.view", "meetings.manage"].includes(key),
+    )
+  ) return [];
   const rows = await prisma.meeting.findMany({
-    where: buildVisibilityWhere(actor),
+    where: { tenantId: actor.tenantId, ...buildVisibilityWhere(actor) },
     orderBy: { meetingDate: "desc" },
     select: { slug: true, title: true, ...LINK_OPTION_VISIBILITY_SELECT },
   });
@@ -54,8 +60,14 @@ export async function getMeetingLinkOptions(actor: ActorContext): Promise<Entity
  * Visible initiatives for the link editor — respects VisibilityScope.
  */
 export async function getInitiativeLinkOptions(actor: ActorContext): Promise<EntityRef[]> {
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["initiatives.view", "initiatives.manage"].includes(key),
+    )
+  ) return [];
   const rows = await prisma.initiative.findMany({
-    where: buildVisibilityWhere(actor),
+    where: { tenantId: actor.tenantId, ...buildVisibilityWhere(actor) },
     orderBy: { title: "asc" },
     select: { slug: true, title: true, ...LINK_OPTION_VISIBILITY_SELECT },
   });

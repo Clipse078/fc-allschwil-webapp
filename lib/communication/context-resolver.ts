@@ -47,9 +47,9 @@ function formatSwissTime(date: Date | null | undefined): string {
   }).format(new Date(date));
 }
 
-async function resolveMeetingContext(entityId: string): Promise<ContextMap> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: entityId },
+async function resolveMeetingContext(entityId: string, tenantId: string): Promise<ContextMap> {
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: entityId, tenantId },
     select: { title: true, meetingDate: true, location: true, description: true, attendeeCount: true },
   });
   if (!meeting) return {};
@@ -62,9 +62,9 @@ async function resolveMeetingContext(entityId: string): Promise<ContextMap> {
   };
 }
 
-async function resolveTargetContext(entityId: string): Promise<ContextMap> {
-  const target = await prisma.target.findUnique({
-    where: { id: entityId },
+async function resolveTargetContext(entityId: string, tenantId: string): Promise<ContextMap> {
+  const target = await prisma.target.findFirst({
+    where: { id: entityId, tenantId },
     select: { title: true, description: true, category: true, periodLabel: true, period: true },
   });
   if (!target) return {};
@@ -84,9 +84,9 @@ async function resolveTargetContext(entityId: string): Promise<ContextMap> {
   };
 }
 
-async function resolveInitiativeContext(entityId: string): Promise<ContextMap> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: entityId },
+async function resolveInitiativeContext(entityId: string, tenantId: string): Promise<ContextMap> {
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: entityId, tenantId },
     select: { title: true, summary: true, owner: true, status: true, progress: true, dueDate: true },
   });
   if (!initiative) return {};
@@ -114,17 +114,18 @@ async function resolveInitiativeContext(entityId: string): Promise<ContextMap> {
 export async function resolveContext(
   moduleKey: string,
   entityId: string,
+  tenantId: string,
 ): Promise<ContextMap> {
   switch (moduleKey) {
     case "meetings":
     case "meeting":
-      return resolveMeetingContext(entityId);
+      return resolveMeetingContext(entityId, tenantId);
     case "targets":
     case "target":
-      return resolveTargetContext(entityId);
+      return resolveTargetContext(entityId, tenantId);
     case "initiatives":
     case "initiative":
-      return resolveInitiativeContext(entityId);
+      return resolveInitiativeContext(entityId, tenantId);
     default:
       return {};
   }

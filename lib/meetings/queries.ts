@@ -41,8 +41,14 @@ const MEETING_LIST_SELECT = {
 } as const;
 
 export async function getMeetings(actor: ActorContext) {
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["meetings.view", "meetings.manage"].includes(key),
+    )
+  ) return [];
   const rows = await prisma.meeting.findMany({
-    where: buildVisibilityWhere(actor),
+    where: { tenantId: actor.tenantId, ...buildVisibilityWhere(actor) },
     orderBy: { meetingDate: "desc" },
     select: MEETING_LIST_SELECT,
   });
@@ -58,8 +64,14 @@ const MEETING_DETAIL_SELECT = {
 } as const;
 
 export async function getMeetingBySlug(slug: string, actor: ActorContext) {
-  const meeting = await prisma.meeting.findUnique({
-    where: { slug },
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["meetings.view", "meetings.manage"].includes(key),
+    )
+  ) return null;
+  const meeting = await prisma.meeting.findFirst({
+    where: { slug, tenantId: actor.tenantId },
     select: MEETING_DETAIL_SELECT,
   });
   if (!meeting) return null;
@@ -69,8 +81,14 @@ export async function getMeetingBySlug(slug: string, actor: ActorContext) {
 }
 
 export async function getMeetingById(id: string, actor: ActorContext) {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id },
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["meetings.view", "meetings.manage"].includes(key),
+    )
+  ) return null;
+  const meeting = await prisma.meeting.findFirst({
+    where: { id, tenantId: actor.tenantId },
     select: MEETING_DETAIL_SELECT,
   });
   if (!meeting) return null;

@@ -31,9 +31,10 @@ export type InitiativeDeletionResult = {
  */
 export async function getInitiativeDeletionImpact(
   initiativeId: string,
+  tenantId: string,
 ): Promise<InitiativeDeletionImpact | null> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: initiativeId },
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: initiativeId, tenantId },
     select: { id: true },
   });
 
@@ -48,15 +49,16 @@ export async function getInitiativeDeletionImpact(
  */
 export async function deleteInitiativePermanently(
   initiativeId: string,
+  tenantId: string,
 ): Promise<InitiativeDeletionResult | null> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: initiativeId },
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: initiativeId, tenantId },
     select: { title: true },
   });
 
   if (!initiative) return null;
 
-  await prisma.initiative.delete({ where: { id: initiativeId } });
+  await prisma.initiative.delete({ where: { id: initiativeId, tenantId } });
 
   return {
     initiativeId,

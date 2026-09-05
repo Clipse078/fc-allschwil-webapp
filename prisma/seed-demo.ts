@@ -519,11 +519,14 @@ Demo FC Aktive`,
 
   // ─── Demo Targets ─────────────────────────────────────────────────────────────
 
-  const demoTargetCount = await prisma.target.count({ where: { moduleKey: "demo" } });
+  const demoTargetCount = await prisma.target.count({
+    where: { tenantId: fcAllschwilTenant.id, moduleKey: "demo" },
+  });
 
   if (demoTargetCount === 0) {
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Frauenfussball ausbauen",
         description: "Anzahl Spielerinnen und aktive Frauenteams gezielt steigern.",
         category: TargetCategory.MITGLIEDERWACHSTUM,
@@ -560,6 +563,7 @@ Demo FC Aktive`,
 
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Sponsoring-Einnahmen steigern",
         description: "Gesamte Sponsoring-Einnahmen gegenüber Vorjahr erhöhen.",
         category: TargetCategory.FINANZEN,
@@ -585,6 +589,7 @@ Demo FC Aktive`,
 
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Junioren Techniktraining steigern",
         description: "Anteil technischer Trainingseinheiten bei Junioren erhöhen.",
         category: TargetCategory.SPORTLICHE_ENTWICKLUNG,

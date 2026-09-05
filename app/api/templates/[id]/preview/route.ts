@@ -44,8 +44,12 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
   let entityContext: Record<string, string> = {};
   const resolveModuleKey = body?.moduleKey ?? template.moduleKey;
   const resolveEntityId = body?.entityId;
-  if (resolveModuleKey && resolveEntityId) {
-    entityContext = await resolveContext(resolveModuleKey, resolveEntityId);
+  if (resolveModuleKey && resolveEntityId && actor.tenantId) {
+    entityContext = await resolveContext(
+      resolveModuleKey,
+      resolveEntityId,
+      actor.tenantId,
+    );
   }
 
   const context: Record<string, string> = {

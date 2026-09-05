@@ -1,39 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import { MeetingStatus, VisibilityScope } from "@prisma/client";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getMeetings } from "@/lib/meetings/queries";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
 
 export async function GET() {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  const meetings = await getMeetings(actor);
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.MEETINGS_VIEW,
+    PERMISSIONS.MEETINGS_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
+  const meetings = await getMeetings(access.context.actor);
   return NextResponse.json({ meetings });
 }
 
 export async function POST(request: NextRequest) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  if (!actor.permissionKeys.includes("meetings.manage")) {
-    return NextResponse.json({ error: "meetings.manage Berechtigung erforderlich." }, { status: 403 });
-  }
+  const access = await requireStrategicApiContext([PERMISSIONS.MEETINGS_MANAGE]);
+  if (!access.ok) return access.response;
+  const { actor, tenantId } = access.context;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -56,7 +41,10 @@ export async function POST(request: NextRequest) {
     const rawSlug = (body?.slug ?? "").trim();
     const slug = rawSlug || title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-    const existing = await prisma.meeting.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await prisma.meeting.findFirst({
+      where: { slug, tenantId },
+      select: { id: true },
+    });
     if (existing) {
       return NextResponse.json({ error: `Slug "${slug}" ist bereits vergeben.` }, { status: 409 });
     }
@@ -73,6 +61,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.meeting.create({
       data: {
+        tenantId,
         slug,
         title,
         description: body?.description?.trim() || null,

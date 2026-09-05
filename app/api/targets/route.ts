@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import {
   TargetCategory,
   TargetStatus,
@@ -9,38 +8,24 @@ import {
   TargetDirection,
   VisibilityScope,
 } from "@prisma/client";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getTargets } from "@/lib/targets/queries";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
 
 export async function GET() {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  const targets = await getTargets(actor);
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.TARGETS_VIEW,
+    PERMISSIONS.TARGETS_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
+  const targets = await getTargets(access.context.actor);
   return NextResponse.json({ targets });
 }
 
 export async function POST(request: NextRequest) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  if (!actor.permissionKeys.includes("targets.manage")) {
-    return NextResponse.json({ error: "targets.manage Berechtigung erforderlich." }, { status: 403 });
-  }
+  const access = await requireStrategicApiContext([PERMISSIONS.TARGETS_MANAGE]);
+  if (!access.ok) return access.response;
+  const { actor, tenantId } = access.context;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -86,6 +71,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.target.create({
       data: {
+        tenantId,
         title,
         description: body?.description?.trim() || null,
         category,

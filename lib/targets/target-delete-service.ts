@@ -32,9 +32,10 @@ export type TargetDeletionResult = {
  */
 export async function getTargetDeletionImpact(
   targetId: string,
+  tenantId: string,
 ): Promise<TargetDeletionImpact | null> {
-  const target = await prisma.target.findUnique({
-    where: { id: targetId },
+  const target = await prisma.target.findFirst({
+    where: { id: targetId, tenantId },
     select: {
       _count: { select: { metrics: true } },
     },
@@ -63,9 +64,10 @@ export async function getTargetDeletionImpact(
  */
 export async function deleteTargetPermanently(
   targetId: string,
+  tenantId: string,
 ): Promise<TargetDeletionResult | null> {
-  const target = await prisma.target.findUnique({
-    where: { id: targetId },
+  const target = await prisma.target.findFirst({
+    where: { id: targetId, tenantId },
     select: {
       title: true,
       _count: { select: { metrics: true } },
@@ -83,7 +85,7 @@ export async function deleteTargetPermanently(
     dataPoints: dataPointCount,
   };
 
-  await prisma.target.delete({ where: { id: targetId } });
+  await prisma.target.delete({ where: { id: targetId, tenantId } });
 
   return { targetId, title: target.title, impact };
 }

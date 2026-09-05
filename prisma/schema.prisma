@@ -687,6 +687,9 @@ model Tenant {
   competitions                     Competition[]
   // TRAINING-CORE-01: canonical recurring training series
   trainingSeries                   TrainingSeries[]
+  meetings                         Meeting[]
+  initiatives                      Initiative[]
+  targets                          Target[]
   // TRAINING-PLANS-01: tenant-defined training plans and assignments
   trainingPlans                    TrainingPlan[]
   trainingPlanAssignments          TrainingPlanAssignment[]
@@ -2064,7 +2067,8 @@ model AuditLog {
 // ---------------------------------------------------------------------------
 model Initiative {
   id          String           @id @default(cuid())
-  slug        String           @unique
+  tenantId    String
+  slug        String
   title       String
   summary     String?
   description String?
@@ -2093,6 +2097,10 @@ model Initiative {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@index([tenantId])
+  @@unique([tenantId, slug])
   @@index([status])
   @@index([reviewStage])
   @@index([dueDate])
@@ -2113,7 +2121,8 @@ model Initiative {
 // ---------------------------------------------------------------------------
 model Meeting {
   id            String        @id @default(cuid())
-  slug          String        @unique
+  tenantId      String
+  slug          String
   title         String
   description   String?
   meetingDate   DateTime
@@ -2146,7 +2155,10 @@ model Meeting {
   decisions    MeetingDecision[]
   actions      MeetingAction[]
   participants MeetingParticipant[]
+  tenant       Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@index([tenantId])
+  @@unique([tenantId, slug])
   @@index([meetingDate])
   @@index([status])
   @@index([reviewStage])
@@ -2638,6 +2650,7 @@ model MeetingParticipant {
 
 model Target {
   id            String         @id @default(cuid())
+  tenantId      String
   title         String
   description   String?
   category      TargetCategory @default(SPORTLICHE_ENTWICKLUNG)
@@ -2677,7 +2690,9 @@ model Target {
   updatedAt DateTime @updatedAt
 
   metrics TargetMetric[]
+  tenant  Tenant         @relation(fields: [tenantId], references: [id], onDelete: Restrict, onUpdate: Cascade)
 
+  @@index([tenantId])
   @@index([category])
   @@index([status])
   @@index([period])
