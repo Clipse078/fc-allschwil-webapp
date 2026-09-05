@@ -15,6 +15,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant context required" }, { status: 403 });
+  }
+
   const formData = await req.formData();
   const file = formData.get("file");
 
@@ -53,6 +58,7 @@ export async function POST(req: NextRequest) {
     const teamSeasons = await prisma.teamSeason.findMany({
       where: {
         seasonId: activeSeason.id,
+        team: { tenantId },
       },
       include: {
         team: {

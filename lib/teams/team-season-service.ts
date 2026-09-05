@@ -132,7 +132,7 @@ export async function createCanonicalTeamSeason(
     };
   }
 
-  if (team.tenantId && team.tenantId !== input.tenantId) {
+  if (team.tenantId !== input.tenantId) {
     return {
       ok: false,
       code: "TEAM_TENANT_MISMATCH",
@@ -173,7 +173,7 @@ export async function createCanonicalTeamSeason(
 
   for (const orgUnit of orgUnits) {
     // Tenant isolation: OrgUnit must belong to the same tenant
-    if (orgUnit.tenantId && orgUnit.tenantId !== input.tenantId) {
+    if (orgUnit.tenantId !== input.tenantId) {
       return {
         ok: false,
         code: "ORG_UNIT_TENANT_MISMATCH",
@@ -416,8 +416,12 @@ export type SetTeamSeasonCompetitionErrorCode =
 export async function setTeamSeasonCompetition(
   input: SetTeamSeasonCompetitionInput,
 ): Promise<SetTeamSeasonCompetitionResult> {
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: input.teamSeasonId },
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: input.teamSeasonId,
+      teamId: input.teamId,
+      team: { tenantId: input.tenantId },
+    },
     select: {
       id: true,
       teamId: true,
@@ -426,19 +430,11 @@ export async function setTeamSeasonCompetition(
     },
   });
 
-  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+  if (!teamSeason) {
     return {
       ok: false,
       code: "TEAM_SEASON_NOT_FOUND",
       message: "Team-Saison nicht gefunden.",
-    };
-  }
-
-  if (teamSeason.team.tenantId && teamSeason.team.tenantId !== input.tenantId) {
-    return {
-      ok: false,
-      code: "TEAM_SEASON_TENANT_MISMATCH",
-      message: "Die Team-Saison gehört nicht zum Mandanten.",
     };
   }
 
@@ -461,18 +457,11 @@ export async function setTeamSeasonCompetition(
     });
 
     if (!found) {
-      const anyCompetition = await prisma.competition.findUnique({
-        where: { id: competitionId },
-        select: { id: true },
-      });
-
-      return anyCompetition
-        ? {
-            ok: false,
-            code: "COMPETITION_TENANT_MISMATCH",
-            message: "Der Wettkampf gehört nicht zum aktiven Mandanten.",
-          }
-        : { ok: false, code: "COMPETITION_NOT_FOUND", message: "Wettkampf nicht gefunden." };
+      return {
+        ok: false,
+        code: "COMPETITION_NOT_FOUND",
+        message: "Wettkampf nicht gefunden.",
+      };
     }
 
     if (found.isArchived) {
@@ -578,8 +567,12 @@ export type SetTeamSeasonOrgUnitErrorCode =
 export async function setTeamSeasonOrgUnit(
   input: SetTeamSeasonOrgUnitInput,
 ): Promise<SetTeamSeasonOrgUnitResult> {
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: input.teamSeasonId },
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: input.teamSeasonId,
+      teamId: input.teamId,
+      team: { tenantId: input.tenantId },
+    },
     select: {
       id: true,
       teamId: true,
@@ -587,19 +580,11 @@ export async function setTeamSeasonOrgUnit(
     },
   });
 
-  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+  if (!teamSeason) {
     return {
       ok: false,
       code: "TEAM_SEASON_NOT_FOUND",
       message: "Team-Saison nicht gefunden.",
-    };
-  }
-
-  if (teamSeason.team.tenantId && teamSeason.team.tenantId !== input.tenantId) {
-    return {
-      ok: false,
-      code: "TEAM_SEASON_TENANT_MISMATCH",
-      message: "Die Team-Saison gehört nicht zum Mandanten.",
     };
   }
 
@@ -614,18 +599,11 @@ export async function setTeamSeasonOrgUnit(
     });
 
     if (!found) {
-      const anyOrgUnit = await prisma.orgUnit.findUnique({
-        where: { id: orgUnitId },
-        select: { id: true },
-      });
-
-      return anyOrgUnit
-        ? {
-            ok: false,
-            code: "ORG_UNIT_TENANT_MISMATCH",
-            message: "Die Organisationseinheit gehört nicht zum aktiven Mandanten.",
-          }
-        : { ok: false, code: "ORG_UNIT_NOT_FOUND", message: "Organisationseinheit nicht gefunden." };
+      return {
+        ok: false,
+        code: "ORG_UNIT_NOT_FOUND",
+        message: "Organisationseinheit nicht gefunden.",
+      };
     }
 
     if (!ACTIVE_ORG_UNIT_STATUSES.includes(found.status as OrgUnitStatus)) {
@@ -739,8 +717,12 @@ export type UpdateTeamSeasonPublicationResult =
 export async function updateTeamSeasonPublication(
   input: UpdateTeamSeasonPublicationInput,
 ): Promise<UpdateTeamSeasonPublicationResult> {
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: input.teamSeasonId },
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: input.teamSeasonId,
+      teamId: input.teamId,
+      team: { tenantId: input.tenantId },
+    },
     select: {
       teamId: true,
       showNextMatch: true,
@@ -752,19 +734,11 @@ export async function updateTeamSeasonPublication(
     },
   });
 
-  if (!teamSeason || teamSeason.teamId !== input.teamId) {
+  if (!teamSeason) {
     return {
       ok: false,
       code: "TEAM_SEASON_NOT_FOUND",
       message: "Team-Saison nicht gefunden.",
-    };
-  }
-
-  if (teamSeason.team.tenantId !== input.tenantId) {
-    return {
-      ok: false,
-      code: "TEAM_SEASON_TENANT_MISMATCH",
-      message: "Die Team-Saison gehört nicht zum aktiven Mandanten.",
     };
   }
 
@@ -802,7 +776,11 @@ export async function updateTeamSeasonPublication(
 
   try {
     const publication = await prisma.teamSeason.update({
-      where: { id: input.teamSeasonId },
+      where: {
+        id: input.teamSeasonId,
+        teamId: input.teamId,
+        team: { tenantId: input.tenantId },
+      },
       data,
       select: {
         showNextMatch: true,
@@ -857,24 +835,17 @@ export async function validateMappingTeamSeasonConsistency(input: {
     return null; // null is valid — no consistency check needed
   }
 
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: input.teamSeasonId },
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: {
+      id: input.teamSeasonId,
+      teamId: input.teamId,
+      team: { tenantId: input.tenantId },
+    },
     select: { teamId: true, team: { select: { tenantId: true } } },
   });
 
   if (!teamSeason) {
     return "TeamSeason nicht gefunden.";
-  }
-
-  if (teamSeason.teamId !== input.teamId) {
-    return "Die TeamSeason gehört nicht zu diesem Team.";
-  }
-
-  if (
-    teamSeason.team.tenantId &&
-    teamSeason.team.tenantId !== input.tenantId
-  ) {
-    return "Die TeamSeason gehört nicht zum Mandanten.";
   }
 
   return undefined; // valid

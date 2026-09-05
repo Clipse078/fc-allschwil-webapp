@@ -21,7 +21,7 @@ const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   canCreateForTeam: vi.fn(),
   seasonFindUnique: vi.fn(),
-  teamFindUnique: vi.fn(),
+  teamFindFirst: vi.fn(),
   teamSeasonFindMany: vi.fn(),
   externalClubFindFirst: vi.fn(),
   eventCreate: vi.fn(),
@@ -54,7 +54,7 @@ vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     season: { findUnique: mocks.seasonFindUnique },
-    team: { findUnique: mocks.teamFindUnique },
+    team: { findFirst: mocks.teamFindFirst },
     teamSeason: { findMany: mocks.teamSeasonFindMany },
     externalClub: { findFirst: mocks.externalClubFindFirst },
     event: { create: mocks.eventCreate },
@@ -117,7 +117,7 @@ describe("POST /api/events", () => {
       isScoped: false,
     });
     mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
-    mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
+    mocks.teamFindFirst.mockResolvedValue({ id: "team-1" });
     mocks.teamSeasonFindMany.mockResolvedValue([{ id: "team-season-1" }]);
     mocks.tenantFindUnique.mockResolvedValue({ timezone: "Europe/Zurich" });
     mocks.eventCreate.mockResolvedValue({
@@ -254,7 +254,7 @@ describe("POST /api/events — MATCHCENTER-CANONICAL-OPPONENT-01B", () => {
       isScoped: false,
     });
     mocks.seasonFindUnique.mockResolvedValue({ id: "season-1", key: "2026-27", name: "2026/27" });
-    mocks.teamFindUnique.mockResolvedValue({ id: "team-1" });
+    mocks.teamFindFirst.mockResolvedValue({ id: "team-1" });
     mocks.eventCreate.mockResolvedValue({
       id: "event-match-1",
       title: "Match",

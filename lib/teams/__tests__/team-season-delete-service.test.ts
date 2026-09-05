@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
-    teamSeason: { findUnique: vi.fn(), delete: vi.fn() },
+    teamSeason: { findFirst: vi.fn(), delete: vi.fn() },
     trainingSession: { findMany: vi.fn() },
     weekplannerPlanAllocation: { count: vi.fn(), deleteMany: vi.fn() },
     weekplannerPlanActivityOverride: { count: vi.fn(), deleteMany: vi.fn() },
@@ -27,7 +27,7 @@ import {
 } from "@/lib/teams/team-season-delete-service";
 
 const mockPrisma = prisma as unknown as {
-  teamSeason: { findUnique: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
+  teamSeason: { findFirst: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
   trainingSession: { findMany: ReturnType<typeof vi.fn> };
   weekplannerPlanAllocation: { count: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> };
   weekplannerPlanActivityOverride: { count: ReturnType<typeof vi.fn>; deleteMany: ReturnType<typeof vi.fn> };
@@ -40,12 +40,12 @@ describe("ADMIN-HARD-DELETE-UI — team-season-delete-service", () => {
   });
 
   it("TS-01: returns null for non-existent TeamSeason", async () => {
-    mockPrisma.teamSeason.findUnique.mockResolvedValueOnce(null);
-    expect(await getTeamSeasonDeletionImpact("no-ts")).toBeNull();
+    mockPrisma.teamSeason.findFirst.mockResolvedValueOnce(null);
+    expect(await getTeamSeasonDeletionImpact("tenant-1", "no-ts")).toBeNull();
   });
 
   it("TS-02: returns correct impact counts including weekplanner non-FK rows", async () => {
-    mockPrisma.teamSeason.findUnique.mockResolvedValueOnce({
+    mockPrisma.teamSeason.findFirst.mockResolvedValueOnce({
       displayName: "FC Allschwil 1 | U14 | 2026/27",
       season: { name: "2026/27" },
       team: { tenantId: "tenant-1" },
@@ -64,7 +64,7 @@ describe("ADMIN-HARD-DELETE-UI — team-season-delete-service", () => {
     mockPrisma.weekplannerPlanAllocation.count.mockResolvedValueOnce(5);
     mockPrisma.weekplannerPlanActivityOverride.count.mockResolvedValueOnce(3);
 
-    const result = await getTeamSeasonDeletionImpact("ts-1");
+    const result = await getTeamSeasonDeletionImpact("tenant-1", "ts-1");
     expect(result).toMatchObject({
       squadMembers: 18,
       trainerMembers: 3,
@@ -79,13 +79,13 @@ describe("ADMIN-HARD-DELETE-UI — team-season-delete-service", () => {
   });
 
   it("TS-03: returns null from delete for non-existent TeamSeason", async () => {
-    mockPrisma.teamSeason.findUnique.mockResolvedValueOnce(null);
-    expect(await deleteTeamSeasonPermanently("no-ts")).toBeNull();
+    mockPrisma.teamSeason.findFirst.mockResolvedValueOnce(null);
+    expect(await deleteTeamSeasonPermanently("tenant-1", "no-ts")).toBeNull();
   });
 
   it("TS-04: runs weekplanner cleanup + teamSeason.delete inside transaction", async () => {
     // For getTeamSeasonDeletionImpact (called inside delete)
-    mockPrisma.teamSeason.findUnique.mockResolvedValueOnce({
+    mockPrisma.teamSeason.findFirst.mockResolvedValueOnce({
       displayName: "TestSeason",
       season: { name: "2026/27" },
       team: { tenantId: "tenant-1" },
@@ -115,10 +115,12 @@ describe("ADMIN-HARD-DELETE-UI — team-season-delete-service", () => {
       expect(tx.weekplannerPlanAllocation.deleteMany).toHaveBeenCalledWith({
         where: { tenantId: "tenant-1", activityType: "TRAINING", activityId: { in: ["s1", "s2"] } },
       });
-      expect(tx.teamSeason.delete).toHaveBeenCalledWith({ where: { id: "ts-2" } });
+      expect(tx.teamSeason.delete).toHaveBeenCalledWith({
+        where: { id: "ts-2", team: { tenantId: "tenant-1" } },
+      });
     });
 
-    await deleteTeamSeasonPermanently("ts-2");
+    await deleteTeamSeasonPermanently("tenant-1", "ts-2");
     expect(mockPrisma.$transaction).toHaveBeenCalledOnce();
   });
 });

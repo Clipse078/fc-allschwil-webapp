@@ -72,7 +72,19 @@ export async function GET() {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Tenant context required" }, { status: 403 });
+  }
+
   const events = await prisma.event.findMany({
+    where: {
+      tenantId,
+      OR: [
+        { teamId: null },
+        { team: { tenantId } },
+      ],
+    },
     orderBy: [
       { startAt: "asc" },
       { sortOrder: "asc" },
@@ -379,8 +391,8 @@ export async function POST(request: NextRequest) {
         seasonId,
       );
     } else if (teamId) {
-      const team = await prisma.team.findUnique({
-        where: { id: teamId },
+      const team = await prisma.team.findFirst({
+        where: { id: teamId, tenantId: actorTenantId },
         select: { id: true },
       });
 

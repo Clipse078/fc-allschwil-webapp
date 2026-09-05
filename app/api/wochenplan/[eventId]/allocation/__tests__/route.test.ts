@@ -24,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   requireApiAnyPermission: vi.fn(),
-  eventFindUnique: vi.fn(),
+  eventFindFirst: vi.fn(),
   eventUpdate: vi.fn(),
   getActiveFacilityResourcesByCodesForTenant: vi.fn(),
 }));
@@ -36,7 +36,7 @@ vi.mock("@/lib/permissions/require-api-any-permission", () => ({
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     event: {
-      findUnique: mocks.eventFindUnique,
+      findFirst: mocks.eventFindFirst,
       update: mocks.eventUpdate,
     },
   },
@@ -90,7 +90,7 @@ function makeEvent(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.eventFindUnique.mockResolvedValue(makeEvent());
+  mocks.eventFindFirst.mockResolvedValue(makeEvent());
   mocks.eventUpdate.mockResolvedValue({
     id: EVENT_ID,
     pitchCode: null,
@@ -107,27 +107,27 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — permissions", () => {
     const res = await callPatch({ pitchCode: null, homeDressingRoomCode: null, awayDressingRoomCode: null });
 
     expect(res.status).toBe(401);
-    expect(mocks.eventFindUnique).not.toHaveBeenCalled();
+    expect(mocks.eventFindFirst).not.toHaveBeenCalled();
   });
 });
 
 describe("PATCH /api/wochenplan/[eventId]/allocation — event lookup", () => {
   it("returns 404 when the event does not exist", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk());
-    mocks.eventFindUnique.mockResolvedValue(null);
+    mocks.eventFindFirst.mockResolvedValue(null);
 
     const res = await callPatch({ pitchCode: null, homeDressingRoomCode: null, awayDressingRoomCode: null });
 
     expect(res.status).toBe(404);
   });
 
-  it("returns 403 when the event belongs to a different tenant", async () => {
+  it("returns 404 when the event belongs to a different tenant", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue({ id: EVENT_ID, tenantId: TENANT_B });
+    mocks.eventFindFirst.mockResolvedValue(null);
 
     const res = await callPatch({ pitchCode: null, homeDressingRoomCode: null, awayDressingRoomCode: null });
 
-    expect(res.status).toBe(403);
+    expect(res.status).toBe(404);
   });
 });
 
@@ -246,7 +246,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — canonical resource vali
 
   it("derives the tenant used for validation from the trusted Event row, not from client input", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue({ id: EVENT_ID, tenantId: TENANT_A });
+    mocks.eventFindFirst.mockResolvedValue({ id: EVENT_ID, tenantId: TENANT_A });
     mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
       new Map([["E1", { name: "Garderobe E1", type: "DRESSING_ROOM" }]]),
     );
@@ -273,7 +273,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
   it("allows an unchanged historical archived code to survive an update to a different field", async () => {
     // Existing event: homeRoom = archived E9, awayRoom = active E2.
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(
+    mocks.eventFindFirst.mockResolvedValue(
       makeEvent({ homeDressingRoomCode: "E9", awayDressingRoomCode: "E2" }),
     );
     // E9 is archived — never resolved by the active-only query. Only the
@@ -298,7 +298,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
   it("rejects newly assigning an archived code even when another field's historical archived code is unchanged", async () => {
     // Existing event: homeRoom = archived E9, awayRoom = active E2.
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(
+    mocks.eventFindFirst.mockResolvedValue(
       makeEvent({ homeDressingRoomCode: "E9", awayDressingRoomCode: "E2" }),
     );
     // Neither the unchanged E9 nor the newly-attempted archived E8 resolve
@@ -317,7 +317,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
 
   it("an unchanged historical archived pitchCode survives while a room field is updated", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(
+    mocks.eventFindFirst.mockResolvedValue(
       makeEvent({ pitchCode: "ARCHIVED_PITCH", homeDressingRoomCode: null, awayDressingRoomCode: null }),
     );
     mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
@@ -336,7 +336,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
 
   it("still rejects a brand-new archived code when there is no prior value at all", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(makeEvent());
+    mocks.eventFindFirst.mockResolvedValue(makeEvent());
     mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(new Map());
 
     const res = await callPatch({ pitchCode: null, homeDressingRoomCode: "E9", awayDressingRoomCode: null });
@@ -346,7 +346,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
 
   it("a genuinely active new assignment still succeeds", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(makeEvent());
+    mocks.eventFindFirst.mockResolvedValue(makeEvent());
     mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(
       new Map([["E1", { name: "Garderobe E1", type: "DRESSING_ROOM" }]]),
     );
@@ -358,7 +358,7 @@ describe("PATCH /api/wochenplan/[eventId]/allocation — unchanged historical ar
 
   it("cross-tenant validation remains rejected even for a resent value that differs from the current one", async () => {
     mocks.requireApiAnyPermission.mockResolvedValue(makeAuthOk(TENANT_A));
-    mocks.eventFindUnique.mockResolvedValue(makeEvent({ homeDressingRoomCode: "E1" }));
+    mocks.eventFindFirst.mockResolvedValue(makeEvent({ homeDressingRoomCode: "E1" }));
     // Tenant-scoped lookup never returns a tenant-B-only code when queried for tenant A.
     mocks.getActiveFacilityResourcesByCodesForTenant.mockResolvedValue(new Map());
 

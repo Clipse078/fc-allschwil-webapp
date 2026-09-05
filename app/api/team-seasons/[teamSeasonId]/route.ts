@@ -18,12 +18,17 @@ export async function PATCH(request: NextRequest, context: Context) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   try {
     const { teamSeasonId } = await context.params;
     const body = await request.json();
 
-    const existing = await prisma.teamSeason.findUnique({
-      where: { id: teamSeasonId },
+    const existing = await prisma.teamSeason.findFirst({
+      where: { id: teamSeasonId, team: { tenantId } },
       include: {
         season: true,
         team: true,
@@ -61,7 +66,7 @@ export async function PATCH(request: NextRequest, context: Context) {
     }
 
     const updated = await prisma.teamSeason.update({
-      where: { id: teamSeasonId },
+      where: { id: teamSeasonId, team: { tenantId } },
       data: {
         displayName,
         shortName,

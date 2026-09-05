@@ -2,13 +2,18 @@ import { prisma } from "@/lib/db/prisma";
 
 export type EventListFilter = "ALL" | "MATCH" | "TOURNAMENT" | "TRAINING" | "OTHER";
 
-export async function getEventsListData(filter: EventListFilter = "ALL") {
-  const where =
-    filter === "ALL"
-      ? {}
-      : {
-          type: filter,
-        };
+export async function getEventsListData(
+  tenantId: string,
+  filter: EventListFilter = "ALL",
+) {
+  const where = {
+    tenantId,
+    OR: [
+      { teamId: null },
+      { team: { tenantId } },
+    ],
+    ...(filter === "ALL" ? {} : { type: filter }),
+  };
 
   const events = await prisma.event.findMany({
     where,

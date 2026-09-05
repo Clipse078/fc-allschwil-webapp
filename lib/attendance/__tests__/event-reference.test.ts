@@ -28,6 +28,7 @@ describe("TEAM-COCKPIT-02B — resolveAttendanceEventContext", () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
       id: "ts-01",
       teamId: "team-01",
+      seasonId: "season-01",
     } as never);
     vi.mocked(prisma.trainingSession.findFirst).mockResolvedValue({
       id: "session-01",
@@ -59,6 +60,7 @@ describe("TEAM-COCKPIT-02B — resolveAttendanceEventContext", () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
       id: "ts-01",
       teamId: "team-01",
+      seasonId: "season-01",
     } as never);
     vi.mocked(prisma.event.findFirst).mockResolvedValue({
       id: "event-01",
@@ -75,15 +77,21 @@ describe("TEAM-COCKPIT-02B — resolveAttendanceEventContext", () => {
     expect(context.eventId).toBe("event-01");
     expect(prisma.event.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ type: "MATCH" }),
+        where: expect.objectContaining({
+          tenantId: "tenant-a",
+          teamId: "team-01",
+          seasonId: "season-01",
+          type: "MATCH",
+        }),
       }),
     );
   });
 
-  it("rejects missing events", async () => {
+  it("binds tournament events to the selected team season", async () => {
     vi.mocked(prisma.teamSeason.findFirst).mockResolvedValue({
       id: "ts-01",
       teamId: "team-01",
+      seasonId: "season-01",
     } as never);
     vi.mocked(prisma.event.findFirst).mockResolvedValue(null);
 
@@ -93,5 +101,16 @@ describe("TEAM-COCKPIT-02B — resolveAttendanceEventContext", () => {
         eventId: "event-01",
       }),
     ).rejects.toBeInstanceOf(AttendanceEventNotFoundError);
+
+    expect(prisma.event.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          tenantId: "tenant-a",
+          teamId: "team-01",
+          teamSeasonId: "ts-01",
+          type: "TOURNAMENT",
+        }),
+      }),
+    );
   });
 });

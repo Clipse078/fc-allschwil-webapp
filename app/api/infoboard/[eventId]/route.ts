@@ -20,6 +20,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   ]);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   const { eventId } = await params;
   const body = await req.json().catch(() => ({}));
 
@@ -30,8 +35,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     );
   }
 
-  const event = await prisma.event.findUnique({
-    where: { id: eventId },
+  const event = await prisma.event.findFirst({
+    where: { id: eventId, tenantId },
     select: { id: true },
   });
   if (!event) {
@@ -39,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   }
 
   const updated = await prisma.event.update({
-    where: { id: eventId },
+    where: { id: eventId, tenantId },
     data: { infoboardVisible: body.infoboardVisible },
     select: {
       id: true,

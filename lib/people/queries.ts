@@ -364,9 +364,13 @@ export async function getPersonProfileByUserId(
  * persisted historical chain. Each squad membership record is its own row and
  * does NOT disappear when the current season changes.
  */
-export async function getPersonSquadMemberships(personId: string) {
+export async function getPersonSquadMemberships(personId: string, tenantId: string) {
   return prisma.playerSquadMember.findMany({
-    where: { personId },
+    where: {
+      personId,
+      person: { tenantId },
+      teamSeason: { team: { tenantId } },
+    },
     orderBy: [{ teamSeason: { season: { startDate: "desc" } } }],
     select: {
       id: true,
@@ -394,9 +398,13 @@ export async function getPersonSquadMemberships(personId: string) {
  * PERSON-UX-01: Returns all TrainerTeamMember records for this person,
  * ordered by season start date desc (most recent first).
  */
-export async function getPersonTrainerMemberships(personId: string) {
+export async function getPersonTrainerMemberships(personId: string, tenantId: string) {
   return prisma.trainerTeamMember.findMany({
-    where: { personId },
+    where: {
+      personId,
+      person: { tenantId },
+      teamSeason: { team: { tenantId } },
+    },
     orderBy: [{ teamSeason: { season: { startDate: "desc" } } }],
     select: {
       id: true,

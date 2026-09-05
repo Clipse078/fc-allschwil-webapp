@@ -34,11 +34,16 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const activeTenantId = session.user.activeTenantId;
+  if (!activeTenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   const { teamId, teamSeasonId } = await params;
 
-  // Resolve tenant server-side via TeamSeason → Team → tenantId.
-  const teamSeason = await prisma.teamSeason.findUnique({
-    where: { id: teamSeasonId },
+  // TeamSeason ownership is Team → tenantId and must match the active tenant.
+  const teamSeason = await prisma.teamSeason.findFirst({
+    where: { id: teamSeasonId, teamId, team: { tenantId: activeTenantId } },
     select: {
       id: true,
       teamId: true,
@@ -47,20 +52,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     },
   });
 
-  if (!teamSeason || teamSeason.teamId !== teamId) {
+  if (!teamSeason) {
     return NextResponse.json({ error: "TeamSaison nicht gefunden." }, { status: 404 });
-  }
-
-  const tenantId = teamSeason.team.tenantId;
-  if (!tenantId) {
-    return NextResponse.json({ error: "Team hat keinen Mandanten." }, { status: 400 });
   }
 
   const resolver = createEffectivePermissionResolver(prisma);
   const authorized = await resolver.hasTenantDeletionAuthority({
-    userId: session.user.id,
+    userId: session.user.effectiveUserId ?? session.user.id,
     permission: PERMISSIONS.TEAMS_DELETE,
-    tenantId,
+    tenantId: activeTenantId,
   });
 
   if (!authorized) {
@@ -70,14 +70,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const confirmed = request.nextUrl.searchParams.get("confirm") === "true";
 
   if (!confirmed) {
-    const impact = await getTeamSeasonDeletionImpact(teamSeasonId);
+    const impact = await getTeamSeasonDeletionImpact(activeTenantId, teamSeasonId);
     if (impact === null) {
       return NextResponse.json({ error: "TeamSaison nicht gefunden." }, { status: 404 });
     }
     return NextResponse.json({ impact, requiresConfirmation: true });
   }
 
-  const result = await deleteTeamSeasonPermanently(teamSeasonId);
+  const result = await deleteTeamSeasonPermanently(activeTenantId, teamSeasonId);
   if (!result) {
     return NextResponse.json({ error: "TeamSaison nicht gefunden." }, { status: 404 });
   }

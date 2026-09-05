@@ -28,7 +28,7 @@ import {
   getPersonDocuments,
   getTenantActiveCriteria,
 } from "@/lib/people/queries";
-import { getActiveTenantId } from "@/lib/tenants/active-tenant";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { prisma } from "@/lib/db/prisma";
 import { PageShell } from "@/components/ui/page";
@@ -41,7 +41,7 @@ import PersonDeleteButton from "@/components/admin/persons/PersonDeleteButton";
 import { TENANT_ROLES_ASSIGN, TENANT_ROLES_VIEW } from "@/lib/roles/access";
 import { getTenantRoleAssignmentForUser, getTenantRolesOverview } from "@/lib/roles/tenant-queries";
 import { getPersonFunctionLabel } from "@/lib/people/functions";
-import { resolvePersonDomainPermissions, DOMAIN_PERMISSIONS_DENIED } from "@/lib/people/person-domain-auth";
+import { resolvePersonDomainPermissions } from "@/lib/people/person-domain-auth";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -68,29 +68,31 @@ export default async function PersonDetailPage({ params }: PageProps) {
   const person = await getPersonById(id);
   if (!person) notFound();
 
-  const tenantId = await getActiveTenantId();
+  const tenantId = await requireActiveTenantId();
 
   // Tenant isolation
-  if (person.tenantId && tenantId && person.tenantId !== tenantId) {
+  if (person.tenantId !== tenantId) {
     notFound();
   }
 
   const [assignments, orgUnits, teams, activeSeason, squadMemberships, trainerMemberships, personMemberships] =
     await Promise.all([
       getPersonAssignments(id),
-      tenantId ? getOrgUnitsForTenant(tenantId) : Promise.resolve([]),
-      tenantId ? getTeamsForTenant(tenantId) : Promise.resolve([]),
-      tenantId ? getActiveSeasonForTenant(tenantId) : Promise.resolve(null),
-      getPersonSquadMemberships(id),
-      getPersonTrainerMemberships(id),
+      getOrgUnitsForTenant(tenantId),
+      getTeamsForTenant(tenantId),
+      getActiveSeasonForTenant(tenantId),
+      getPersonSquadMemberships(id, tenantId),
+      getPersonTrainerMemberships(id, tenantId),
       getPersonMemberships(id),
     ]);
 
   // PERSON-UX-03/05: Resolve sensitive domain permissions.
   // domainPermissions is resolved below — assessment data is fetched only when authorized.
-  const domainPermissions = tenantId
-    ? await resolvePersonDomainPermissions(prisma, session.user.id, tenantId)
-    : DOMAIN_PERMISSIONS_DENIED;
+  const domainPermissions = await resolvePersonDomainPermissions(
+    prisma,
+    session.user.id,
+    tenantId,
+  );
 
   // PERSON-UX-05: Fetch assessment data only when viewer is authorized.
   const [personAssessments, tenantCriteria] = domainPermissions.canViewAssessments && tenantId

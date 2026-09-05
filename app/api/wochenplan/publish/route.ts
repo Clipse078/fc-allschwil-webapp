@@ -34,6 +34,9 @@ export async function POST(req: NextRequest) {
 
   const actorTenantId = access.session?.user?.activeTenantId ?? null;
   const actorUserId = access.session?.user?.id ?? null;
+  if (!actorTenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
   const { eventIds, wochenplanVisible, weekId, variantLabel } = body;
@@ -45,21 +48,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "wochenplanVisible muss ein Boolean sein." }, { status: 400 });
   }
 
-  // Tenant isolation: restrict updateMany to events owned by this tenant.
-  // When actor has no tenantId (legacy/bootstrap), fall through to all provided IDs.
-  const tenantFilter = actorTenantId
-    ? { id: { in: eventIds }, tenantId: actorTenantId }
-    : { id: { in: eventIds } };
-
   const { count } = await prisma.event.updateMany({
-    where: tenantFilter,
+    where: { id: { in: eventIds }, tenantId: actorTenantId },
     data: { wochenplanVisible },
   });
 
   // Upsert the publication record when weekId and variantLabel are provided.
   // This powers the "KW N | Variantname aktiv" display on the public site and InfoBoard.
   let publication = null;
-  if (actorTenantId && typeof weekId === "string" && weekId.trim()) {
+  if (typeof weekId === "string" && weekId.trim()) {
     const label =
       typeof variantLabel === "string" && variantLabel.trim()
         ? variantLabel.trim()

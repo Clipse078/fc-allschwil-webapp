@@ -53,6 +53,7 @@ export async function resolveAttendanceEventContext(
     select: {
       id: true,
       teamId: true,
+      seasonId: true,
     },
   });
 
@@ -94,12 +95,17 @@ export async function resolveAttendanceEventContext(
   }
 
   const expectedType = EVENT_KIND_TO_EVENT_TYPE[event.eventKind];
+  const teamSeasonConstraint =
+    event.eventKind === "MATCH"
+      ? { seasonId: teamSeason.seasonId }
+      : { teamSeasonId };
   const calendarEvent = await prisma.event.findFirst({
     where: {
       id: event.eventId,
       tenantId,
       type: expectedType,
       teamId: teamSeason.teamId,
+      ...teamSeasonConstraint,
     },
     select: {
       id: true,

@@ -21,11 +21,21 @@ export async function DELETE(_: NextRequest, context: Context) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
+  const tenantId = access.session.user.activeTenantId;
+  if (!tenantId) {
+    return NextResponse.json({ error: "Kein Mandanten-Kontext." }, { status: 403 });
+  }
+
   try {
     const { teamId, teamSeasonId, squadMemberId } = await context.params;
 
-    const existing = await prisma.playerSquadMember.findUnique({
-      where: { id: squadMemberId },
+    const existing = await prisma.playerSquadMember.findFirst({
+      where: {
+        id: squadMemberId,
+        teamSeasonId,
+        teamSeason: { teamId, team: { tenantId } },
+        person: { tenantId },
+      },
       include: {
         teamSeason: {
           include: {
@@ -58,11 +68,7 @@ export async function DELETE(_: NextRequest, context: Context) {
       },
     });
 
-    if (
-      !existing ||
-      existing.teamSeasonId !== teamSeasonId ||
-      existing.teamSeason.teamId !== teamId
-    ) {
+    if (!existing) {
       return NextResponse.json(
         { error: "Kader-Eintrag nicht gefunden." },
         { status: 404 }
@@ -70,7 +76,11 @@ export async function DELETE(_: NextRequest, context: Context) {
     }
 
     await prisma.playerSquadMember.delete({
-      where: { id: squadMemberId },
+      where: {
+        id: squadMemberId,
+        teamSeason: { teamId, team: { tenantId } },
+        person: { tenantId },
+      },
     });
 
     await logAction({

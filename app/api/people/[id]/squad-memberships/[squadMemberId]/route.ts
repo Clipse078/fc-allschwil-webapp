@@ -51,7 +51,11 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
 
   // Verify squad membership belongs to this person
   const squadMember = await prisma.playerSquadMember.findFirst({
-    where: { id: squadMemberId, personId },
+    where: {
+      id: squadMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
     select: {
       id: true,
       personId: true,
@@ -78,7 +82,13 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
   const actorUserId =
     access.session?.user?.effectiveUserId ?? access.session?.user?.id ?? null;
 
-  await prisma.playerSquadMember.delete({ where: { id: squadMemberId } });
+  await prisma.playerSquadMember.delete({
+    where: {
+      id: squadMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
+  });
 
   const personName =
     person.displayName ?? `${person.firstName} ${person.lastName}`;

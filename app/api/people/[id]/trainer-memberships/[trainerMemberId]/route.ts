@@ -51,7 +51,11 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
 
   // Verify trainer membership belongs to this person
   const trainerMember = await prisma.trainerTeamMember.findFirst({
-    where: { id: trainerMemberId, personId },
+    where: {
+      id: trainerMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
     select: {
       id: true,
       personId: true,
@@ -78,7 +82,13 @@ export async function DELETE(_request: NextRequest, { params }: Context) {
   const actorUserId =
     access.session?.user?.effectiveUserId ?? access.session?.user?.id ?? null;
 
-  await prisma.trainerTeamMember.delete({ where: { id: trainerMemberId } });
+  await prisma.trainerTeamMember.delete({
+    where: {
+      id: trainerMemberId,
+      personId,
+      teamSeason: { team: { tenantId } },
+    },
+  });
 
   const personName =
     person.displayName ?? `${person.firstName} ${person.lastName}`;

@@ -263,7 +263,7 @@ export async function registerTeamSeason(
   }
 
   for (const orgUnit of orgUnits) {
-    if (orgUnit.tenantId && orgUnit.tenantId !== input.tenantId) {
+    if (orgUnit.tenantId !== input.tenantId) {
       return {
         ok: false,
         code: "ORG_UNIT_TENANT_MISMATCH",
@@ -372,7 +372,7 @@ export async function registerTeamSeason(
         message: "Bestehendes Team nicht gefunden.",
       };
     }
-    if (existingTeam.tenantId && existingTeam.tenantId !== input.tenantId) {
+    if (existingTeam.tenantId !== input.tenantId) {
       return {
         ok: false,
         code: "TEAM_TENANT_MISMATCH",
