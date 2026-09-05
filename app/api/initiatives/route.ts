@@ -1,39 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import { InitiativeStatus, VisibilityScope } from "@prisma/client";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getInitiatives } from "@/lib/initiatives/queries";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
 
 export async function GET() {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  const initiatives = await getInitiatives(actor);
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.INITIATIVES_VIEW,
+    PERMISSIONS.INITIATIVES_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
+  const initiatives = await getInitiatives(access.context.actor);
   return NextResponse.json({ initiatives });
 }
 
 export async function POST(request: NextRequest) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
-
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  if (!actor.permissionKeys.includes("initiatives.manage")) {
-    return NextResponse.json({ error: "initiatives.manage Berechtigung erforderlich." }, { status: 403 });
-  }
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.INITIATIVES_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
+  const { actor, tenantId } = access.context;
 
   try {
     const body = await request.json().catch(() => ({}));
@@ -51,7 +38,10 @@ export async function POST(request: NextRequest) {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-|-$/g, "");
 
-    const existing = await prisma.initiative.findUnique({ where: { slug }, select: { id: true } });
+    const existing = await prisma.initiative.findFirst({
+      where: { slug, tenantId },
+      select: { id: true },
+    });
     if (existing) {
       return NextResponse.json(
         { error: `Slug "${slug}" ist bereits vergeben.` },
@@ -72,6 +62,7 @@ export async function POST(request: NextRequest) {
 
     const created = await prisma.initiative.create({
       data: {
+        tenantId,
         slug,
         title,
         summary: body?.summary?.trim() || null,

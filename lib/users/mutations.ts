@@ -7,6 +7,7 @@ import { hashResetToken } from "@/lib/auth/password-reset";
 import { hashPassword } from "@/lib/auth/password";
 import { setTenantUserRoles } from "@/lib/roles/mutations";
 import { assignScopedRoleToUser } from "@/lib/roles/scoped-mutations";
+import { assertTenantDelegationAllowed } from "@/lib/roles/delegation";
 
 // ── Error types ───────────────────────────────────────────────────────────────
 
@@ -279,6 +280,21 @@ export type OnboardPersonOptions = {
   scopedRoles?: OnboardScopedRoleInput[];
 };
 
+async function assertOnboardRoleDelegation(
+  tenantId: string,
+  actorUserId: string,
+  options?: Pick<OnboardPersonOptions, "roleIds" | "scopedRoles">,
+): Promise<void> {
+  await assertTenantDelegationAllowed({
+    tenantId,
+    actorUserId,
+    roleIds: [
+      ...(options?.roleIds ?? []),
+      ...(options?.scopedRoles ?? []).map((role) => role.roleId),
+    ],
+  });
+}
+
 /** Assign tenant-wide and scoped roles after person/user onboarding. */
 export async function applyOnboardRoleAssignments(
   tenantId: string,
@@ -335,6 +351,7 @@ export async function invitePersonToTenant(
   options?: OnboardPersonOptions,
 ): Promise<InvitePersonResult> {
   const sendInvitation = options?.sendInvitation ?? true;
+  await assertOnboardRoleDelegation(tenantId, actorUserId, options);
   // 1. Load the Person — must belong to this tenant.
   const person = await prisma.person.findUnique({
     where: { id: personId },
@@ -495,6 +512,7 @@ export async function createPersonAndInvite(
   options?: OnboardPersonOptions,
 ): Promise<InvitePersonResult & { personId: string }> {
   const sendInvitation = options?.sendInvitation ?? true;
+  await assertOnboardRoleDelegation(tenantId, actorUserId, options);
   const { firstName, lastName, email } = personData;
   const normalizedEmail = email.toLowerCase().trim();
 
@@ -627,6 +645,20 @@ export async function resendTenantInvitation(
     select: { isActive: true },
   });
   if (!membership) throw new InvitationDomainError("USER_NOT_FOUND");
+
+  const currentRoleIds = await prisma.userRole.findMany({
+    where: {
+      tenantId,
+      userId,
+      role: { scope: "TENANT", tenantId, isArchived: false },
+    },
+    select: { roleId: true },
+  });
+  await assertTenantDelegationAllowed({
+    tenantId,
+    actorUserId,
+    roleIds: currentRoleIds.map((assignment) => assignment.roleId),
+  });
 
   const rawToken = await _createInvitationToken(userId, tenantId);
 

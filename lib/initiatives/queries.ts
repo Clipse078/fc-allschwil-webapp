@@ -35,8 +35,14 @@ const INITIATIVE_LIST_SELECT = {
 } as const;
 
 export async function getInitiatives(actor: ActorContext) {
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["initiatives.view", "initiatives.manage"].includes(key),
+    )
+  ) return [];
   const rows = await prisma.initiative.findMany({
-    where: buildVisibilityWhere(actor),
+    where: { tenantId: actor.tenantId, ...buildVisibilityWhere(actor) },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     select: INITIATIVE_LIST_SELECT,
   });
@@ -53,8 +59,14 @@ const INITIATIVE_DETAIL_SELECT = {
 } as const;
 
 export async function getInitiativeBySlug(slug: string, actor: ActorContext) {
-  const initiative = await prisma.initiative.findUnique({
-    where: { slug },
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["initiatives.view", "initiatives.manage"].includes(key),
+    )
+  ) return null;
+  const initiative = await prisma.initiative.findFirst({
+    where: { slug, tenantId: actor.tenantId },
     select: INITIATIVE_DETAIL_SELECT,
   });
   if (!initiative) return null;
@@ -63,8 +75,14 @@ export async function getInitiativeBySlug(slug: string, actor: ActorContext) {
 }
 
 export async function getInitiativeById(id: string, actor: ActorContext) {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id },
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["initiatives.view", "initiatives.manage"].includes(key),
+    )
+  ) return null;
+  const initiative = await prisma.initiative.findFirst({
+    where: { id, tenantId: actor.tenantId },
     select: INITIATIVE_DETAIL_SELECT,
   });
   if (!initiative) return null;

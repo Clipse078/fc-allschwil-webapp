@@ -34,6 +34,7 @@ import {
 import { sendMail, MailConfigurationError } from "@/lib/email/mailer";
 import { buildInvitationEmail } from "@/lib/email/templates/invitation";
 import { prisma } from "@/lib/db/prisma";
+import { RoleDomainError } from "@/lib/roles/errors";
 import {
   buildPasswordResetLink,
   resolveSecurityLinkBaseUrl,
@@ -94,6 +95,12 @@ export async function POST(_req: NextRequest, { params }: RouteContext) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    if (error instanceof RoleDomainError) {
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status: error.status },
+      );
+    }
     if (error instanceof SecurityLinkConfigurationError) {
       console.error(
         "[resend-invite] invalid security link configuration",

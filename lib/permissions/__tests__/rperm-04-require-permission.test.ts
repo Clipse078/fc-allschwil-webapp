@@ -34,11 +34,18 @@ const mocks = vi.hoisted(() => ({
     throw new Error(`REDIRECT:${path}`);
   }),
   getEffectivePermissions: vi.fn(),
+  userFindUnique: vi.fn(),
+  membershipFindFirst: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
-vi.mock("@/lib/db/prisma", () => ({ prisma: {} }));
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    user: { findUnique: mocks.userFindUnique },
+    tenantMembership: { findFirst: mocks.membershipFindFirst },
+  },
+}));
 vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
   createEffectivePermissionResolver: () => ({
     getEffectivePermissions: mocks.getEffectivePermissions,
@@ -56,6 +63,8 @@ function sessionWithTenant(userId: string, activeTenantId: string | null) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.userFindUnique.mockResolvedValue({ isActive: true });
+  mocks.membershipFindFirst.mockResolvedValue({ id: "membership-1" });
   mocks.redirect.mockImplementation((path: string) => {
     throw new Error(`REDIRECT:${path}`);
   });
@@ -200,6 +209,26 @@ describe("requireApiPermission", () => {
     }
   });
 
+  it("API-02M: rejects a revoked tenant membership before permission resolution", async () => {
+    mocks.auth.mockResolvedValue(sessionWithTenant("user-1", "tenant-1"));
+    mocks.membershipFindFirst.mockResolvedValueOnce(null);
+
+    const result = await requireApiPermission("teams.manage" as never);
+
+    expect(result).toMatchObject({ ok: false, status: 403, error: "Forbidden" });
+    expect(mocks.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
+  it("API-02U: rejects an inactive effective user before permission resolution", async () => {
+    mocks.auth.mockResolvedValue(sessionWithTenant("user-1", "tenant-1"));
+    mocks.userFindUnique.mockResolvedValueOnce({ isActive: false });
+
+    const result = await requireApiPermission("teams.manage" as never);
+
+    expect(result).toMatchObject({ ok: false, status: 403, error: "Forbidden" });
+    expect(mocks.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
   it("API-03: returns 200 with the session when the resolver grants", async () => {
     mocks.auth.mockResolvedValue(sessionWithTenant("user-1", "tenant-1"));
     mocks.getEffectivePermissions.mockResolvedValue({
@@ -255,6 +284,19 @@ describe("requireApiAnyPermission", () => {
     if (!result.ok) {
       expect(result.status).toBe(403);
     }
+  });
+
+  it("API-04M: rejects a revoked tenant membership", async () => {
+    mocks.auth.mockResolvedValue(sessionWithTenant("user-1", "tenant-1"));
+    mocks.membershipFindFirst.mockResolvedValueOnce(null);
+
+    const result = await requireApiAnyPermission([
+      "teams.manage" as never,
+      "events.manage" as never,
+    ]);
+
+    expect(result).toMatchObject({ ok: false, status: 403, error: "Forbidden" });
+    expect(mocks.getEffectivePermissions).not.toHaveBeenCalled();
   });
 
   it("grants when any requested permission is present", async () => {

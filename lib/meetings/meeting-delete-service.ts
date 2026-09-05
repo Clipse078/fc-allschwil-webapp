@@ -7,8 +7,7 @@
  *   • Impact preview never mutates — counts cascade children only.
  *   • All sub-entities (agendaItems, decisions, actions, participants)
  *     cascade automatically on Meeting delete (onDelete: Cascade in schema).
- *   • No tenantId on Meeting — authorization is caller-resolved via
- *     hasTenantDeletionAuthority() using the actor's active tenant.
+ *   • Canonical tenant ownership is checked before impact reads and deletion.
  *   • A single prisma.meeting.delete() is sufficient; no pre-cleanup needed.
  */
 
@@ -38,9 +37,10 @@ export type MeetingDeletionResult = {
  */
 export async function getMeetingDeletionImpact(
   meetingId: string,
+  tenantId: string,
 ): Promise<MeetingDeletionImpact | null> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: meetingId },
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, tenantId },
     select: {
       _count: {
         select: {
@@ -73,9 +73,10 @@ export async function getMeetingDeletionImpact(
  */
 export async function deleteMeetingPermanently(
   meetingId: string,
+  tenantId: string,
 ): Promise<MeetingDeletionResult | null> {
-  const meeting = await prisma.meeting.findUnique({
-    where: { id: meetingId },
+  const meeting = await prisma.meeting.findFirst({
+    where: { id: meetingId, tenantId },
     select: {
       title: true,
       _count: {
@@ -98,7 +99,7 @@ export async function deleteMeetingPermanently(
     participants: meeting._count.participants,
   };
 
-  await prisma.meeting.delete({ where: { id: meetingId } });
+  await prisma.meeting.delete({ where: { id: meetingId, tenantId } });
 
   return { meetingId, title: meeting.title, impact };
 }

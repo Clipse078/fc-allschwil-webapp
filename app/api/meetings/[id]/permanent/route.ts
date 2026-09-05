@@ -23,7 +23,7 @@ import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { createEffectivePermissionResolver } from "@/lib/permissions/services/effective-permission-resolver";
 import { canSeeEntity } from "@/lib/visibility/visibility-filter";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { resolveLiveTenantActor } from "@/lib/permissions/require-strategic-api-context";
 import { logAction } from "@/lib/audit/log-action";
 import {
   getMeetingDeletionImpact,
@@ -39,9 +39,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   }
 
   const { id } = await params;
+  const tenantId = session.user.activeTenantId;
+  const actorUserId = session.user.effectiveUserId ?? session.user.id;
+  if (!tenantId || !actorUserId) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
-  const meeting = await prisma.meeting.findUnique({
-    where: { id },
+  const meeting = await prisma.meeting.findFirst({
+    where: { id, tenantId },
     select: {
       id: true,
       title: true,
@@ -61,23 +66,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Sitzung nicht gefunden." }, { status: 404 });
   }
 
-  const actor = await getActorContext(session.user, session.user?.activeTenantId ?? undefined);
+  const actor = await resolveLiveTenantActor(tenantId, actorUserId);
 
-  if (!canSeeEntity(meeting, actor)) {
+  if (!actor || !canSeeEntity(meeting, actor)) {
     return NextResponse.json({ error: "Sitzung nicht gefunden." }, { status: 404 });
-  }
-
-  const tenantId = session.user.activeTenantId;
-  if (!tenantId) {
-    return NextResponse.json(
-      { error: "Kein aktiver Mandant. Bitte Mandant wechseln." },
-      { status: 403 },
-    );
   }
 
   const resolver = createEffectivePermissionResolver(prisma);
   const authorized = await resolver.hasTenantDeletionAuthority({
-    userId: session.user.id,
+    userId: actorUserId,
     permission: PERMISSIONS.MEETINGS_DELETE,
     tenantId,
   });
@@ -89,14 +86,14 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const confirmed = request.nextUrl.searchParams.get("confirm") === "true";
 
   if (!confirmed) {
-    const impact = await getMeetingDeletionImpact(id);
+    const impact = await getMeetingDeletionImpact(id, tenantId);
     if (impact === null) {
       return NextResponse.json({ error: "Sitzung nicht gefunden." }, { status: 404 });
     }
     return NextResponse.json({ impact, requiresConfirmation: true });
   }
 
-  const result = await deleteMeetingPermanently(id);
+  const result = await deleteMeetingPermanently(id, tenantId);
   if (!result) {
     return NextResponse.json({ error: "Sitzung nicht gefunden." }, { status: 404 });
   }

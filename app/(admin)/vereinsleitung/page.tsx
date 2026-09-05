@@ -12,30 +12,13 @@ import {
   getOverdueActions,
   type GovernanceOverviewData,
 } from "@/lib/dashboard/governance-overview";
-import { prisma } from "@/lib/db/prisma";
 import type { KpiItem } from "@/components/admin/vereinsleitung/VereinsleitungKpiCard";
+import type { ActorContext } from "@/lib/visibility/actor-context";
+import { getOperativeStrategicCounts } from "@/lib/dashboard/strategic-summary";
 
-async function getOperativeKpis(actorUserId: string): Promise<KpiItem[]> {
-  const now = new Date();
-
-  const [activeTargetCount, plannedMeetingCount, overdueActionCount] = await Promise.all([
-    prisma.target.count({ where: { status: "ACTIVE" } }),
-    prisma.meeting.count({
-      where: {
-        status: "PLANNED",
-        OR: [{ visibilityScope: "ORGANISATION" }, { createdByUserId: actorUserId }],
-      },
-    }),
-    prisma.meetingAction.count({
-      where: {
-        status: "OPEN",
-        dueDate: { lt: now },
-        meeting: {
-          OR: [{ visibilityScope: "ORGANISATION" }, { createdByUserId: actorUserId }],
-        },
-      },
-    }),
-  ]);
+async function getOperativeKpis(actor: ActorContext): Promise<KpiItem[]> {
+  const { activeTargetCount, plannedMeetingCount, overdueActionCount } =
+    await getOperativeStrategicCounts(actor);
 
   return [
     {
@@ -73,7 +56,7 @@ export default async function VereinsleitungPage() {
     getTargets(actor),
     getMeetings(actor),
     getInitiatives(actor),
-    getOperativeKpis(actor.userId),
+    getOperativeKpis(actor),
     Promise.all([
       getPendingApprovals(actor),
       getStaleTargets(actor),

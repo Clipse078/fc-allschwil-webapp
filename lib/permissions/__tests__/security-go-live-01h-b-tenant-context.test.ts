@@ -4,6 +4,7 @@ import { PERMISSIONS } from "@/lib/permissions/permissions";
 const mocks = vi.hoisted(() => ({
   auth: vi.fn(),
   membershipFindFirst: vi.fn(),
+  userRoleFindMany: vi.fn(),
   getEffectivePermissions: vi.fn(),
 }));
 
@@ -11,6 +12,7 @@ vi.mock("@/auth", () => ({ auth: mocks.auth }));
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     tenantMembership: { findFirst: mocks.membershipFindFirst },
+    userRole: { findMany: mocks.userRoleFindMany },
   },
 }));
 vi.mock("@/lib/permissions/services/effective-permission-resolver", () => ({
@@ -31,6 +33,7 @@ beforeEach(() => {
     },
   });
   mocks.membershipFindFirst.mockResolvedValue({ id: "membership-a" });
+  mocks.userRoleFindMany.mockResolvedValue([]);
   mocks.getEffectivePermissions.mockResolvedValue({
     platform: [],
     tenant: [PERMISSIONS.PEOPLE_VIEW],
@@ -43,7 +46,12 @@ describe("SECURITY-GO-LIVE-01H-B tenant permission context", () => {
 
     expect(result).toEqual({
       ok: true,
-      context: { tenantId: "tenant-a", actorUserId: "effective-user" },
+      context: {
+        tenantId: "tenant-a",
+        actorUserId: "effective-user",
+        permissionKeys: [PERMISSIONS.PEOPLE_VIEW],
+        roleKeys: [],
+      },
     });
     expect(mocks.membershipFindFirst).toHaveBeenCalledWith({
       where: {

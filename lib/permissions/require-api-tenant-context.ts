@@ -6,6 +6,8 @@ import { createEffectivePermissionResolver } from "@/lib/permissions/services/ef
 export type ApiTenantPermissionContext = {
   tenantId: string;
   actorUserId: string;
+  permissionKeys: string[];
+  roleKeys: string[];
 };
 
 export type ApiTenantPermissionContextResult =
@@ -46,10 +48,20 @@ export async function requireApiTenantPermissionContext(
   }
 
   const resolver = createEffectivePermissionResolver(prisma);
-  const { platform, tenant } = await resolver.getEffectivePermissions({
-    userId: actorUserId,
-    tenantId,
-  });
+  const [{ platform, tenant }, roleAssignments] = await Promise.all([
+    resolver.getEffectivePermissions({
+      userId: actorUserId,
+      tenantId,
+    }),
+    prisma.userRole.findMany({
+      where: {
+        userId: actorUserId,
+        tenantId,
+        role: { scope: "TENANT", tenantId, isArchived: false },
+      },
+      select: { role: { select: { key: true } } },
+    }),
+  ]);
   const allowed = permissionKeys.some(
     (permission) => platform.includes(permission) || tenant.includes(permission),
   );
@@ -57,5 +69,15 @@ export async function requireApiTenantPermissionContext(
     return { ok: false, status: 403, error: "Forbidden" };
   }
 
-  return { ok: true, context: { tenantId, actorUserId } };
+  return {
+    ok: true,
+    context: {
+      tenantId,
+      actorUserId,
+      permissionKeys: Array.from(new Set([...platform, ...tenant])).sort(),
+      roleKeys: Array.from(
+        new Set(roleAssignments.map((assignment) => assignment.role.key)),
+      ).sort(),
+    },
+  };
 }

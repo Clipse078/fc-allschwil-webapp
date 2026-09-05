@@ -16,7 +16,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import { ReviewWorkflowStage } from "@prisma/client";
 import {
   canTransitionTo,
@@ -24,28 +23,21 @@ import {
   getReviewStageInfo,
 } from "@/lib/governance/review-stage";
 import { assertFourEyeAllowed } from "@/lib/governance/four-eye";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.MEETINGS_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
+  const { actor } = access.context;
 
   // Step 1+2: visibility (404-mask) + permission (403)
   const guard = await requireMeetingAccess({ actor, id, access: "stage" });
@@ -87,7 +79,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const needsStamp = requiresReviewerStamp(toStage);
 
     const updated = await prisma.meeting.update({
-      where: { id },
+      where: { id, tenantId: actor.tenantId },
       data: {
         reviewStage: toStage,
         reviewedByUserId: needsStamp ? actor.userId : undefined,

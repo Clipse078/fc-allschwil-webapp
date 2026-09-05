@@ -519,11 +519,14 @@ Demo FC Aktive`,
 
   // ─── Demo Targets ─────────────────────────────────────────────────────────────
 
-  const demoTargetCount = await prisma.target.count({ where: { moduleKey: "demo" } });
+  const demoTargetCount = await prisma.target.count({
+    where: { tenantId: fcAllschwilTenant.id, moduleKey: "demo" },
+  });
 
   if (demoTargetCount === 0) {
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Frauenfussball ausbauen",
         description: "Anzahl Spielerinnen und aktive Frauenteams gezielt steigern.",
         category: TargetCategory.MITGLIEDERWACHSTUM,
@@ -560,6 +563,7 @@ Demo FC Aktive`,
 
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Sponsoring-Einnahmen steigern",
         description: "Gesamte Sponsoring-Einnahmen gegenüber Vorjahr erhöhen.",
         category: TargetCategory.FINANZEN,
@@ -585,6 +589,7 @@ Demo FC Aktive`,
 
     await prisma.target.create({
       data: {
+        tenantId: fcAllschwilTenant.id,
         title: "Junioren Techniktraining steigern",
         description: "Anteil technischer Trainingseinheiten bei Junioren erhöhen.",
         category: TargetCategory.SPORTLICHE_ENTWICKLUNG,
@@ -645,7 +650,12 @@ Demo FC Aktive`,
 
   for (const meetingData of meetingsData) {
     await prisma.meeting.upsert({
-      where: { slug: meetingData.slug },
+      where: {
+        tenantId_slug: {
+          tenantId: fcAllschwilTenant.id,
+          slug: meetingData.slug,
+        },
+      },
       update: {
         title: meetingData.title,
         description: meetingData.description,
@@ -655,6 +665,7 @@ Demo FC Aktive`,
         status: meetingData.status,
       },
       create: {
+        tenantId: fcAllschwilTenant.id,
         slug: meetingData.slug,
         title: meetingData.title,
         description: meetingData.description,
@@ -697,7 +708,12 @@ Demo FC Aktive`,
 
   for (const initiativeData of initiativesData) {
     await prisma.initiative.upsert({
-      where: { slug: initiativeData.slug },
+      where: {
+        tenantId_slug: {
+          tenantId: fcAllschwilTenant.id,
+          slug: initiativeData.slug,
+        },
+      },
       update: {
         title: initiativeData.title,
         summary: initiativeData.summary,
@@ -706,6 +722,7 @@ Demo FC Aktive`,
         progress: initiativeData.progress,
       },
       create: {
+        tenantId: fcAllschwilTenant.id,
         slug: initiativeData.slug,
         title: initiativeData.title,
         summary: initiativeData.summary,

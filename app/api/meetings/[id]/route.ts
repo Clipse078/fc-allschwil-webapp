@@ -1,31 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import { MeetingStatus, VisibilityScope } from "@prisma/client";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { getMeetingById } from "@/lib/meetings/queries";
 import { requireMeetingAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
+  const access = await requireStrategicApiContext([
+    PERMISSIONS.MEETINGS_VIEW,
+    PERMISSIONS.MEETINGS_MANAGE,
+  ]);
+  if (!access.ok) return access.response;
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
-  const meeting = await getMeetingById(id, actor);
+  const meeting = await getMeetingById(id, access.context.actor);
 
   if (!meeting) {
     return NextResponse.json({ error: "Meeting nicht gefunden." }, { status: 404 });
@@ -35,13 +27,11 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 }
 
 export async function PUT(request: NextRequest, { params }: RouteContext) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
+  const access = await requireStrategicApiContext([PERMISSIONS.MEETINGS_MANAGE]);
+  if (!access.ok) return access.response;
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
+  const { actor, tenantId } = access.context;
 
   const guard = await requireMeetingAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
@@ -52,7 +42,7 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     const validScopes = Object.values(VisibilityScope);
 
     const updated = await prisma.meeting.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         title: body?.title?.trim() || undefined,
         description: body?.description?.trim() || null,
@@ -95,19 +85,17 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, { params }: RouteContext) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
+  const access = await requireStrategicApiContext([PERMISSIONS.MEETINGS_MANAGE]);
+  if (!access.ok) return access.response;
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
+  const { actor, tenantId } = access.context;
 
   const guard = await requireMeetingAccess({ actor, id, access: "delete" });
   if (!guard.ok) return guard.response;
 
   try {
-    await prisma.meeting.delete({ where: { id } });
+    await prisma.meeting.delete({ where: { id, tenantId } });
 
     void logAuditEvent({
       actorUserId: actor.userId,

@@ -10,13 +10,12 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PrismaClient } from "@prisma/client";
 
 // Mock the prisma module before importing the service
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     meeting: {
-      findUnique: vi.fn(),
+      findFirst: vi.fn(),
       delete: vi.fn(),
     },
     targetDataPoint: {
@@ -33,7 +32,7 @@ import {
 
 const mockPrisma = prisma as unknown as {
   meeting: {
-    findUnique: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
   };
 };
@@ -45,13 +44,13 @@ describe("ADMIN-HARD-DELETE-UI — meeting-delete-service", () => {
 
   describe("getMeetingDeletionImpact", () => {
     it("MS-01: returns null when meeting does not exist", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce(null);
-      const result = await getMeetingDeletionImpact("nonexistent");
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce(null);
+      const result = await getMeetingDeletionImpact("nonexistent", "tenant-a");
       expect(result).toBeNull();
     });
 
     it("MS-02: returns correct counts for meeting with sub-entities", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce({
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce({
         _count: {
           agendaItems: 3,
           decisions: 2,
@@ -60,7 +59,7 @@ describe("ADMIN-HARD-DELETE-UI — meeting-delete-service", () => {
         },
       });
 
-      const result = await getMeetingDeletionImpact("meeting-1");
+      const result = await getMeetingDeletionImpact("meeting-1", "tenant-a");
       expect(result).toEqual({
         agendaItems: 3,
         decisions: 2,
@@ -70,7 +69,7 @@ describe("ADMIN-HARD-DELETE-UI — meeting-delete-service", () => {
     });
 
     it("MS-02b: returns zero counts for empty meeting", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce({
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce({
         _count: {
           agendaItems: 0,
           decisions: 0,
@@ -79,7 +78,7 @@ describe("ADMIN-HARD-DELETE-UI — meeting-delete-service", () => {
         },
       });
 
-      const result = await getMeetingDeletionImpact("meeting-empty");
+      const result = await getMeetingDeletionImpact("meeting-empty", "tenant-a");
       expect(result).toEqual({
         agendaItems: 0,
         decisions: 0,
@@ -91,34 +90,34 @@ describe("ADMIN-HARD-DELETE-UI — meeting-delete-service", () => {
 
   describe("deleteMeetingPermanently", () => {
     it("MS-03: returns null when meeting does not exist", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce(null);
-      const result = await deleteMeetingPermanently("nonexistent");
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce(null);
+      const result = await deleteMeetingPermanently("nonexistent", "tenant-a");
       expect(result).toBeNull();
       expect(mockPrisma.meeting.delete).not.toHaveBeenCalled();
     });
 
     it("MS-04: calls prisma.meeting.delete when meeting exists", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce({
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce({
         title: "Vorstandssitzung Q1",
         _count: { agendaItems: 2, decisions: 1, actions: 3, participants: 5 },
       });
       mockPrisma.meeting.delete.mockResolvedValueOnce({});
 
-      await deleteMeetingPermanently("meeting-1");
+      await deleteMeetingPermanently("meeting-1", "tenant-a");
 
       expect(mockPrisma.meeting.delete).toHaveBeenCalledWith({
-        where: { id: "meeting-1" },
+        where: { id: "meeting-1", tenantId: "tenant-a" },
       });
     });
 
     it("MS-05: returns correct title and impact on success", async () => {
-      mockPrisma.meeting.findUnique.mockResolvedValueOnce({
+      mockPrisma.meeting.findFirst.mockResolvedValueOnce({
         title: "Jahreshauptversammlung",
         _count: { agendaItems: 5, decisions: 3, actions: 7, participants: 12 },
       });
       mockPrisma.meeting.delete.mockResolvedValueOnce({});
 
-      const result = await deleteMeetingPermanently("meeting-2");
+      const result = await deleteMeetingPermanently("meeting-2", "tenant-a");
 
       expect(result).toEqual({
         meetingId: "meeting-2",

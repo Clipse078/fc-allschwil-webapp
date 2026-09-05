@@ -2,26 +2,20 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import type { Session } from "next-auth";
-import { auth } from "@/auth";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireApiTenantPermissionContext } from "@/lib/permissions/require-api-tenant-context";
 import { createSeason, deleteSeason, updateSeasonDetails } from "@/lib/seasons/mutations";
 import { SeasonDomainError } from "@/lib/seasons/errors";
 
 async function requireSeasonManagePermission() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const permissionKeys = session.user.permissionKeys ?? [];
-
-  if (!permissionKeys.includes(PERMISSIONS.SEASONS_MANAGE)) {
+  const access = await requireApiTenantPermissionContext([
+    PERMISSIONS.SEASONS_MANAGE,
+  ]);
+  if (!access.ok) {
+    if (access.status === 401) redirect("/login");
     redirect("/dashboard/seasons?status=forbidden");
   }
-
-  return session;
+  return access.context;
 }
 
 /**
@@ -30,23 +24,14 @@ async function requireSeasonManagePermission() {
  * PERMISSIONS.SEASONS_DELETE doc comment in lib/permissions/permissions.ts).
  */
 async function requireSeasonDeletePermission() {
-  const session = await auth();
-
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  const permissionKeys = session.user.permissionKeys ?? [];
-
-  if (!permissionKeys.includes(PERMISSIONS.SEASONS_DELETE)) {
+  const access = await requireApiTenantPermissionContext([
+    PERMISSIONS.SEASONS_DELETE,
+  ]);
+  if (!access.ok) {
+    if (access.status === 401) redirect("/login");
     redirect("/dashboard/seasons?status=forbidden");
   }
-
-  return session;
-}
-
-function actorUserIdFromSession(session: Session | null): string | null {
-  return session?.user?.effectiveUserId ?? session?.user?.id ?? null;
+  return access.context;
 }
 
 function revalidateSeasonSurfaces() {
@@ -64,7 +49,7 @@ function revalidateSeasonSurfaces() {
  * lib/seasons/mutations.ts#createSeason().
  */
 export async function createSeasonAction(formData: FormData) {
-  const session = await requireSeasonManagePermission();
+  const context = await requireSeasonManagePermission();
 
   const rawStartYear = formData.get("startYear");
   const startYear = typeof rawStartYear === "string" ? Number(rawStartYear.trim()) : NaN;
@@ -74,7 +59,7 @@ export async function createSeasonAction(formData: FormData) {
   }
 
   try {
-    await createSeason({ startYear }, actorUserIdFromSession(session));
+    await createSeason({ startYear }, context.actorUserId);
   } catch (error) {
     if (error instanceof SeasonDomainError && error.code === "DUPLICATE_SEASON") {
       redirect("/dashboard/seasons?status=create-exists");
@@ -92,7 +77,7 @@ export async function createSeasonAction(formData: FormData) {
  * (ActivateSeasonButton → POST /api/seasons/[seasonId]/activate).
  */
 export async function updateSeasonDetailsAction(formData: FormData) {
-  const session = await requireSeasonManagePermission();
+  const context = await requireSeasonManagePermission();
 
   const seasonId = String(formData.get("seasonId") ?? "").trim();
   const name = String(formData.get("name") ?? "").trim();
@@ -114,7 +99,7 @@ export async function updateSeasonDetailsAction(formData: FormData) {
     await updateSeasonDetails(
       seasonId,
       { name: name || undefined, startDate, endDate },
-      actorUserIdFromSession(session),
+      context.actorUserId,
     );
   } catch (error) {
     if (error instanceof SeasonDomainError && error.code === "SEASON_NOT_FOUND") {
@@ -135,7 +120,7 @@ export async function updateSeasonDetailsAction(formData: FormData) {
  * deliberately separate from seasons.manage.
  */
 export async function deleteSeasonAction(formData: FormData) {
-  const session = await requireSeasonDeletePermission();
+  const context = await requireSeasonDeletePermission();
 
   const seasonIdValue = formData.get("seasonId");
   const seasonId = typeof seasonIdValue === "string" ? seasonIdValue.trim() : "";
@@ -145,7 +130,7 @@ export async function deleteSeasonAction(formData: FormData) {
   }
 
   try {
-    await deleteSeason(seasonId, actorUserIdFromSession(session));
+    await deleteSeason(seasonId, context.actorUserId);
   } catch (error) {
     if (error instanceof SeasonDomainError && error.code === "SEASON_NOT_FOUND") {
       redirect("/dashboard/seasons?status=delete-not-found");

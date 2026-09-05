@@ -6,8 +6,7 @@
  * Design principles:
  *   • Impact preview never mutates.
  *   • Initiative has no child sub-entities (no cascade relations in schema).
- *   • No tenantId on Initiative — authorization is caller-resolved via
- *     hasTenantDeletionAuthority() using the actor's active tenant.
+ *   • Canonical tenant ownership is checked before impact reads and deletion.
  *   • A single prisma.initiative.delete() is sufficient.
  */
 
@@ -31,9 +30,10 @@ export type InitiativeDeletionResult = {
  */
 export async function getInitiativeDeletionImpact(
   initiativeId: string,
+  tenantId: string,
 ): Promise<InitiativeDeletionImpact | null> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: initiativeId },
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: initiativeId, tenantId },
     select: { id: true },
   });
 
@@ -48,15 +48,16 @@ export async function getInitiativeDeletionImpact(
  */
 export async function deleteInitiativePermanently(
   initiativeId: string,
+  tenantId: string,
 ): Promise<InitiativeDeletionResult | null> {
-  const initiative = await prisma.initiative.findUnique({
-    where: { id: initiativeId },
+  const initiative = await prisma.initiative.findFirst({
+    where: { id: initiativeId, tenantId },
     select: { title: true },
   });
 
   if (!initiative) return null;
 
-  await prisma.initiative.delete({ where: { id: initiativeId } });
+  await prisma.initiative.delete({ where: { id: initiativeId, tenantId } });
 
   return {
     initiativeId,

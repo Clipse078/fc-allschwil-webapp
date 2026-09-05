@@ -23,10 +23,45 @@ export async function requireApiAnyPermission(permissionKeys: PermissionKey[], t
   }
 
   const effectiveTenantId = tenantId ?? session.user.activeTenantId ?? undefined;
+  const effectiveUserId = session.user.effectiveUserId ?? session.user.id;
+  if (!effectiveUserId) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Forbidden",
+      session,
+    };
+  }
+
+  const [liveSubject, liveMembership] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: effectiveUserId },
+      select: { isActive: true },
+    }),
+    effectiveTenantId
+      ? prisma.tenantMembership.findFirst({
+          where: {
+            tenantId: effectiveTenantId,
+            userId: effectiveUserId,
+            isActive: true,
+            tenant: { status: "ACTIVE" },
+          },
+          select: { id: true },
+        })
+      : Promise.resolve(null),
+  ]);
+  if (!liveSubject?.isActive || (effectiveTenantId && !liveMembership)) {
+    return {
+      ok: false as const,
+      status: 403,
+      error: "Forbidden",
+      session,
+    };
+  }
 
   const resolver = createEffectivePermissionResolver(prisma);
   const { platform, tenant } = await resolver.getEffectivePermissions({
-    userId: session.user.id,
+    userId: effectiveUserId,
     tenantId: effectiveTenantId,
   });
 

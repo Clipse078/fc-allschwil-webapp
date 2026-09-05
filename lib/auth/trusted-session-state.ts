@@ -86,6 +86,28 @@ async function loadActorSecurityState(
   });
 }
 
+async function isCurrentEffectiveUserEligible(
+  prisma: PrismaClient,
+  effectiveUserId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const user = await prisma.user.findFirst({
+    where: {
+      id: effectiveUserId,
+      isActive: true,
+      tenantMemberships: {
+        some: {
+          tenantId,
+          isActive: true,
+          tenant: { status: "ACTIVE" },
+        },
+      },
+    },
+    select: { id: true },
+  });
+  return Boolean(user);
+}
+
 function removeExpiredIntents(now = Date.now()) {
   for (const [capability, pending] of pendingIntents) {
     if (pending.expiresAt <= now) pendingIntents.delete(capability);
@@ -301,6 +323,24 @@ export async function applyTrustedJwtState(
     token.authorizationContextVersion = AUTHORIZATION_CONTEXT_VERSION;
   }
 
+  if (token.isImpersonating) {
+    const effectiveUserId =
+      typeof token.effectiveUserId === "string" ? token.effectiveUserId : "";
+    const activeTenantId =
+      typeof token.activeTenantId === "string" ? token.activeTenantId : "";
+    if (
+      !effectiveUserId ||
+      !activeTenantId ||
+      !(await isCurrentEffectiveUserEligible(
+        prisma,
+        effectiveUserId,
+        activeTenantId,
+      ))
+    ) {
+      return null;
+    }
+  }
+
   if (trigger !== "update" || !canonicalActorUserId) return token;
 
   const intent = consumeTrustedSessionUpdateIntent(
@@ -315,7 +355,17 @@ export async function applyTrustedJwtState(
   if (intent.kind === "start-impersonation") {
     if (token.isImpersonating) return token;
     const target = await loadLiveSessionUser(prisma, intent.targetUserId);
-    if (!target) return token;
+    if (
+      !target?.activeTenantId ||
+      !target.activeMembershipId ||
+      !(await isCurrentEffectiveUserEligible(
+        prisma,
+        target.id,
+        target.activeTenantId,
+      ))
+    ) {
+      return token;
+    }
     applyEffectiveUserState(token, target, true);
     return token;
   }

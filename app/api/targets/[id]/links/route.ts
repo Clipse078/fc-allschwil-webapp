@@ -13,37 +13,27 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
 import { validateLinkPayload } from "@/lib/linking/helpers";
-import { getActorContext } from "@/lib/visibility/get-actor-context";
 import { requireTargetAccess } from "@/lib/visibility/visibility-guards";
 import { logAuditEvent } from "@/lib/audit/audit-log";
-
-async function requireSession() {
-  const session = await auth();
-  if (!session?.user) {
-    return { ok: false as const, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true as const, session };
-}
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireStrategicApiContext } from "@/lib/permissions/require-strategic-api-context";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
-  const check = await requireSession();
-  if (!check.ok) {
-    return NextResponse.json({ error: check.error }, { status: check.status });
-  }
+  const access = await requireStrategicApiContext([PERMISSIONS.TARGETS_MANAGE]);
+  if (!access.ok) return access.response;
 
   const { id } = await params;
-  const actor = await getActorContext(check.session.user, check.session.user?.activeTenantId ?? undefined);
+  const { actor, tenantId } = access.context;
 
   const guard = await requireTargetAccess({ actor, id, access: "write" });
   if (!guard.ok) return guard.response;
 
   // Fetch current link state before mutation for audit trail
-  const beforeLinks = await prisma.target.findUnique({
-    where: { id },
+  const beforeLinks = await prisma.target.findFirst({
+    where: { id, tenantId },
     select: { linkedInitiativeRefs: true, linkedMeetingRefs: true },
   });
 
@@ -59,7 +49,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (validation.initiativeRefs.length > 0) {
     const requestedSlugs = validation.initiativeRefs.map((r) => r.slug);
     const found = await prisma.initiative.findMany({
-      where: { slug: { in: requestedSlugs } },
+      where: { tenantId, slug: { in: requestedSlugs } },
       select: { slug: true },
     });
     const foundSlugs = new Set(found.map((r) => r.slug));
@@ -75,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
   if (validation.meetingRefs.length > 0) {
     const requestedSlugs = validation.meetingRefs.map((r) => r.slug);
     const found = await prisma.meeting.findMany({
-      where: { slug: { in: requestedSlugs } },
+      where: { tenantId, slug: { in: requestedSlugs } },
       select: { slug: true },
     });
     const foundSlugs = new Set(found.map((r) => r.slug));
@@ -90,7 +80,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
 
   try {
     const updated = await prisma.target.update({
-      where: { id },
+      where: { id, tenantId },
       data: {
         linkedInitiativeRefs: validation.initiativeRefs,
         linkedMeetingRefs: validation.meetingRefs,

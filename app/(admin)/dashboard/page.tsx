@@ -15,6 +15,8 @@ import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { formatTime } from "@/lib/tenant-runtime/formatters";
 import { getPersonalizedGreeting, resolveDashboardFirstName } from "@/lib/dashboard/greeting";
 import { getPersonFirstNameByUserId } from "@/lib/people/queries";
+import { getActorContext } from "@/lib/visibility/get-actor-context";
+import { getDashboardMeetingSummary } from "@/lib/dashboard/strategic-summary";
 import {
   DashboardHero,
   DashboardMetricStrip,
@@ -26,12 +28,6 @@ import {
   DashboardEmptyState,
 } from "@/components/ui/dashboard";
 import { getCurrentSwissFootballSeason } from "@/lib/seasons/season-logic";
-
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type DashboardPageProps = {
-  searchParams?: Promise<{ season?: string }>;
-};
 
 // ── Activity helpers ──────────────────────────────────────────────────────────
 
@@ -48,7 +44,10 @@ function timeAgo(date: Date): string {
 
 // ── Data ──────────────────────────────────────────────────────────────────────
 
-async function getDashboardData(tenantId: string | null) {
+async function getDashboardData(
+  tenantId: string | null,
+  actor: Parameters<typeof getDashboardMeetingSummary>[0],
+) {
   const today = new Date();
   const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
@@ -72,8 +71,7 @@ async function getDashboardData(tenantId: string | null) {
     recentNews,
     recentRegistrations,
     recentEvents,
-    recentMeetings,
-    upcomingMeetings,
+    meetingSummary,
     upcomingEvents,
   ] = await Promise.all([
     prisma.registration.count({ where: { ...tWhere, status: { in: ["NEW", "REVIEWING"] } } }),
@@ -101,19 +99,7 @@ async function getDashboardData(tenantId: string | null) {
       take: 1,
       select: { id: true, title: true, updatedAt: true, type: true },
     }),
-    prisma.meeting.findMany({
-      orderBy: { createdAt: "desc" },
-      take: 1,
-      select: { id: true, title: true, createdAt: true, slug: true },
-    }),
-
-    // Right sidebar — upcoming meetings
-    prisma.meeting.findMany({
-      where: { meetingDate: { gte: today }, status: "PLANNED" },
-      orderBy: { meetingDate: "asc" },
-      take: 3,
-      select: { id: true, slug: true, title: true, meetingDate: true, location: true },
-    }),
+    getDashboardMeetingSummary(actor, today),
 
     // Right sidebar — upcoming sport events
     prisma.event.findMany({
@@ -133,8 +119,8 @@ async function getDashboardData(tenantId: string | null) {
     recentNews,
     recentRegistrations,
     recentEvents,
-    recentMeetings,
-    upcomingMeetings,
+    recentMeetings: meetingSummary.recentMeetings,
+    upcomingMeetings: meetingSummary.upcomingMeetings,
     upcomingEvents,
   };
 }
@@ -198,9 +184,13 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function DashboardPage({ searchParams: _sp }: DashboardPageProps) {
+export default async function DashboardPage() {
   const session = await auth();
   const ctx = await getActiveTenant();
+  const actor =
+    session?.user && ctx
+      ? await getActorContext(session.user, ctx.id)
+      : null;
 
   // DASHBOARD-SHELL-UX-01-C1: prefer the canonically linked Person's first
   // name over session.user.firstName (the raw User.firstName column), which
@@ -215,7 +205,10 @@ export default async function DashboardPage({ searchParams: _sp }: DashboardPage
     tenantName: ctx?.name,
   });
 
-  const dash = await getDashboardData(ctx?.id ?? null);
+  const dash = await getDashboardData(
+    ctx?.id ?? null,
+    actor,
+  );
 
   const fmtCfg = { locale: ctx?.locale ?? "de-CH", timezone: ctx?.timezone ?? undefined };
 

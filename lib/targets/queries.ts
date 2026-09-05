@@ -27,8 +27,14 @@ const TARGET_VISIBILITY_SELECT = {
 } as const;
 
 export async function getTargets(actor: ActorContext) {
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["targets.view", "targets.manage"].includes(key),
+    )
+  ) return [];
   const rows = await prisma.target.findMany({
-    where: buildVisibilityWhere(actor),
+    where: { tenantId: actor.tenantId, ...buildVisibilityWhere(actor) },
     orderBy: [{ status: "asc" }, { createdAt: "desc" }],
     select: {
       id: true,
@@ -62,8 +68,14 @@ export async function getTargets(actor: ActorContext) {
 }
 
 export async function getTargetById(id: string, actor: ActorContext) {
-  const target = await prisma.target.findUnique({
-    where: { id },
+  if (
+    !actor.tenantId ||
+    !actor.permissionKeys.some((key) =>
+      ["targets.view", "targets.manage"].includes(key),
+    )
+  ) return null;
+  const target = await prisma.target.findFirst({
+    where: { id, tenantId: actor.tenantId },
     select: {
       id: true,
       title: true,
