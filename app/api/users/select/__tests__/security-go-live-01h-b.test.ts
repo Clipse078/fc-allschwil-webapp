@@ -17,31 +17,114 @@ vi.mock("@/lib/db/prisma", () => ({
 
 import { GET } from "@/app/api/users/select/route";
 
+const selectorPermissions = [
+  PERMISSIONS.USERS_VIEW,
+  PERMISSIONS.USERS_MANAGE,
+  PERMISSIONS.ORG_MANAGE,
+  PERMISSIONS.MEETINGS_MANAGE,
+  PERMISSIONS.TARGETS_MANAGE,
+  PERMISSIONS.INITIATIVES_MANAGE,
+] as const;
+
+type MockMembership = {
+  tenantId: string;
+  isActive: boolean;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    isActive: boolean;
+  };
+};
+
+let heldPermissions = new Set<string>();
+let memberships: MockMembership[] = [];
+
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireContext.mockResolvedValue({
-    ok: true,
-    context: { tenantId: "tenant-a", actorUserId: "actor-a" },
-  });
+  heldPermissions = new Set([PERMISSIONS.USERS_VIEW]);
+  memberships = [];
+  mocks.requireContext.mockImplementation(async (requested: readonly string[]) =>
+    requested.some((permission) => heldPermissions.has(permission))
+      ? {
+          ok: true,
+          context: { tenantId: "tenant-a", actorUserId: "actor-a" },
+        }
+      : { ok: false, status: 403, error: "Forbidden" },
+  );
+  mocks.membershipFindMany.mockImplementation(
+    async (args: {
+      where: {
+        tenantId: string;
+        isActive: boolean;
+        user: { isActive: boolean };
+      };
+    }) =>
+      memberships
+        .filter(
+          (membership) =>
+            membership.tenantId === args.where.tenantId &&
+            membership.isActive === args.where.isActive &&
+            membership.user.isActive === args.where.user.isActive,
+        )
+        .map(({ user }) => ({ user })),
+  );
 });
 
 describe("SECURITY-GO-LIVE-01H-B GET /api/users/select", () => {
-  it("6/7. lists only active users eligible through Tenant A membership", async () => {
-    mocks.membershipFindMany.mockImplementation(
-      async (args: { where: { tenantId: string; isActive: boolean } }) =>
-        args.where.tenantId === "tenant-a" && args.where.isActive
-          ? [
-              {
-                user: {
-                  id: "user-a",
-                  firstName: "Alice",
-                  lastName: "A",
-                  email: "alice@a.test",
-                },
-              },
-            ]
-          : [],
-    );
+  it.each(selectorPermissions)("%s is accepted", async (permission) => {
+    heldPermissions = new Set([permission]);
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(mocks.requireContext).toHaveBeenCalledWith(selectorPermissions);
+  });
+
+  it("rejects an unrelated permission", async () => {
+    heldPermissions = new Set([PERMISSIONS.TEAMS_VIEW]);
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(mocks.membershipFindMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects an authenticated caller without a required permission", async () => {
+    heldPermissions = new Set();
+
+    const response = await GET();
+
+    expect(response.status).toBe(403);
+    expect(mocks.membershipFindMany).not.toHaveBeenCalled();
+  });
+
+  it("keeps Tenant A results tenant-scoped with the intended response fields", async () => {
+    memberships = [
+      {
+        tenantId: "tenant-a",
+        isActive: true,
+        user: {
+          id: "user-a",
+          firstName: "Alice",
+          lastName: "A",
+          email: "alice@a.test",
+          isActive: true,
+        },
+      },
+      {
+        tenantId: "tenant-b",
+        isActive: true,
+        user: {
+          id: "user-b",
+          firstName: "Bob",
+          lastName: "B",
+          email: "bob@b.test",
+          isActive: true,
+        },
+      },
+    ];
 
     const response = await GET();
 
@@ -59,51 +142,54 @@ describe("SECURITY-GO-LIVE-01H-B GET /api/users/select", () => {
     );
   });
 
-  it("8. returns a global A+B User once based on the A membership", async () => {
-    mocks.membershipFindMany.mockResolvedValue([
+  it("excludes a Tenant B-only User", async () => {
+    memberships = [
       {
+        tenantId: "tenant-b",
+        isActive: true,
         user: {
-          id: "global-user-ab",
-          firstName: "Global",
-          lastName: "Member",
-          email: "global@example.test",
+          id: "user-b",
+          firstName: "Bob",
+          lastName: "B",
+          email: "bob@b.test",
+          isActive: true,
         },
       },
-    ]);
-
-    const response = await GET();
-    const body = await response.json();
-
-    expect(body).toHaveLength(1);
-    expect(body[0].id).toBe("global-user-ab");
-  });
-
-  it("9. requires the existing users.view/users.manage permission set", async () => {
-    mocks.requireContext.mockResolvedValue({ ok: false, status: 403, error: "Forbidden" });
-
-    const response = await GET();
-
-    expect(response.status).toBe(403);
-    expect(mocks.requireContext).toHaveBeenCalledWith([
-      PERMISSIONS.USERS_VIEW,
-      PERMISSIONS.USERS_MANAGE,
-    ]);
-    expect(mocks.membershipFindMany).not.toHaveBeenCalled();
-  });
-
-  it("10. excludes inactive TenantMembership and inactive User rows at query level", async () => {
-    mocks.membershipFindMany.mockResolvedValue([]);
+    ];
 
     const response = await GET();
 
     expect(await response.json()).toEqual([]);
-    expect(mocks.membershipFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
+  });
+
+  it("excludes inactive TenantMembership and inactive User rows", async () => {
+    memberships = [
+      {
+        tenantId: "tenant-a",
+        isActive: false,
+        user: {
+          id: "inactive-membership",
+          firstName: "Inactive",
+          lastName: "Membership",
+          email: "inactive-membership@a.test",
           isActive: true,
-          user: { isActive: true },
-        }),
-      }),
-    );
+        },
+      },
+      {
+        tenantId: "tenant-a",
+        isActive: true,
+        user: {
+          id: "inactive-user",
+          firstName: "Inactive",
+          lastName: "User",
+          email: "inactive-user@a.test",
+          isActive: false,
+        },
+      },
+    ];
+
+    const response = await GET();
+
+    expect(await response.json()).toEqual([]);
   });
 });
