@@ -6,7 +6,10 @@ export type OperationalMutationGuardInput = {
   operationId: string;
   databaseUrl: string | undefined;
   explicitIntent: boolean;
-  allowedRemoteEnvironments?: readonly Extract<AppEnv, "stage" | "prod">[];
+  allowedRemoteEnvironments?: readonly Extract<
+    AppEnv,
+    "acceptance" | "stage" | "prod"
+  >[];
   /**
    * An existing, operation-specific authorization can be supplied by tightly
    * scoped deployment code (for example APPLY_DATABASE_MIGRATIONS=true).
@@ -103,6 +106,7 @@ export function evaluateOperationalMutationGuard(
 
   const allowedRemoteEnvironments = input.allowedRemoteEnvironments ?? [];
   if (
+    runtime.appEnv !== "acceptance" &&
     runtime.appEnv !== "stage" &&
     runtime.appEnv !== "prod" ||
     !allowedRemoteEnvironments.includes(runtime.appEnv)

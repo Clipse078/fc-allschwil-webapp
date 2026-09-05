@@ -1,4 +1,6 @@
 import { spawnSync } from "node:child_process";
+import { assertAcceptanceDatabaseTarget } from "@/lib/acceptance/bootstrap";
+import { getRuntimeEnvironment } from "@/lib/env";
 import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 import { shouldApplyDatabaseMigrations } from "@/lib/server/database-migration-policy";
 
@@ -13,12 +15,23 @@ if (!enabled) {
 
 const databaseUrl =
   process.env.DIRECT_URL?.trim() || process.env.DATABASE_URL?.trim();
+const runtime = getRuntimeEnvironment({
+  ...process.env,
+  NODE_ENV: process.env.NODE_ENV ?? "development",
+});
+
+if (runtime.isAcceptance && databaseUrl) {
+  assertAcceptanceDatabaseTarget(databaseUrl, [
+    process.env.ACCEPTANCE_DATABASE_HOST,
+    process.env.ACCEPTANCE_DIRECT_DATABASE_HOST,
+  ]);
+}
 
 assertOperationalMutationAllowed({
   operationId: "deploy-migrations",
   databaseUrl,
   explicitIntent: enabled,
-  allowedRemoteEnvironments: ["stage", "prod"],
+  allowedRemoteEnvironments: ["acceptance", "stage", "prod"],
   operationSpecificAuthorization: enabled,
 });
 
