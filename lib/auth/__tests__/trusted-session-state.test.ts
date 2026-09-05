@@ -328,6 +328,37 @@ describe("trusted impersonation lifecycle", () => {
     expect(mocks.userFindUnique).not.toHaveBeenCalled();
   });
 
+  it("consumes a trusted capability exactly once", async () => {
+    const capability = issueTrustedSessionUpdateIntent({
+      kind: "start-impersonation",
+      actorUserId: "actor-1",
+      targetUserId: "target-1",
+    });
+    const firstToken = cloneToken();
+    const replayToken = cloneToken();
+
+    await applyTrustedJwtState(
+      {
+        token: firstToken,
+        trigger: "update",
+        session: trustedUpdatePayload(capability),
+      },
+      prisma,
+    );
+    await applyTrustedJwtState(
+      {
+        token: replayToken,
+        trigger: "update",
+        session: trustedUpdatePayload(capability),
+      },
+      prisma,
+    );
+
+    expect(firstToken.effectiveUserId).toBe("target-1");
+    expect(replayToken).toEqual(actorToken);
+    expect(mocks.userFindUnique).toHaveBeenCalledTimes(1);
+  });
+
   it("fails closed when the target user is inactive", async () => {
     mocks.userFindUnique.mockResolvedValueOnce(liveUser("target-1", { isActive: false }));
     const token = cloneToken();
