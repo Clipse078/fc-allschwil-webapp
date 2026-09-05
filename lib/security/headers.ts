@@ -1,4 +1,4 @@
-import { isAcceptanceEnvironment } from "@/lib/env";
+import { isAcceptanceEnvironment } from "../env";
 
 export type SecurityHeader = {
   key: string;
