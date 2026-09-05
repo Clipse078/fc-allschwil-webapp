@@ -49,6 +49,7 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const isDryRun = process.argv.includes("--dry-run");
 const forceOverrides = process.argv.includes("--force-overrides");
@@ -100,6 +101,15 @@ async function main() {
       "🛡️   Safety mode: potential manual edits will be SKIPPED.\n" +
       "    Use --force-overrides to include them.\n",
     );
+  }
+
+  if (!isDryRun) {
+    assertOperationalMutationAllowed({
+      operationId: "backfill-sfv-publication-defaults-fca",
+      databaseUrl: process.env.DATABASE_URL,
+      explicitIntent: true,
+      allowedRemoteEnvironments: ["stage"],
+    });
   }
 
   const pool = new Pool({ connectionString: process.env.DATABASE_URL });

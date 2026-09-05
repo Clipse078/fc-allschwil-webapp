@@ -32,6 +32,7 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const ADMIN_EMAIL = "admin@fcallschwil.ch";
 
@@ -50,6 +51,13 @@ if (process.env.ALLOW_PASSWORD_CHANGE !== "true") {
   );
   process.exit(1);
 }
+
+assertOperationalMutationAllowed({
+  operationId: "restore-admin-hash",
+  databaseUrl: connectionString,
+  explicitIntent: process.env.ALLOW_PASSWORD_CHANGE === "true",
+  allowedRemoteEnvironments: ["stage", "prod"],
+});
 
 const rawHash = process.env.ADMIN_PASSWORD_HASH;
 if (!rawHash) {

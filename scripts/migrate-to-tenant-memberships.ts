@@ -17,12 +17,20 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set.");
 }
+
+assertOperationalMutationAllowed({
+  operationId: "migrate-to-tenant-memberships",
+  databaseUrl: connectionString,
+  explicitIntent: true,
+  allowedRemoteEnvironments: ["stage"],
+});
 
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);

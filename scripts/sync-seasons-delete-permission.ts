@@ -40,6 +40,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import { reconcileSeasonsDeletePermission } from "@/lib/permissions/seasons-delete-permission-reconciliation";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const DRY_RUN = process.env.APPLY_PERMISSION_SYNC !== "true";
 
@@ -49,6 +50,15 @@ if (!connectionString) {
     "[sync-seasons-delete-permission] ERROR: Neither DIRECT_DATABASE_URL nor DATABASE_URL is set.",
   );
   process.exit(1);
+}
+
+if (!DRY_RUN) {
+  assertOperationalMutationAllowed({
+    operationId: "sync-seasons-delete-permission",
+    databaseUrl: connectionString,
+    explicitIntent: process.env.APPLY_PERMISSION_SYNC === "true",
+    allowedRemoteEnvironments: ["stage"],
+  });
 }
 
 const pool = new Pool({ connectionString });

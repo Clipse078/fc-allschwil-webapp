@@ -21,12 +21,26 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL is not set.");
+}
 
 const DRY_RUN = process.argv.includes("--dry-run");
+if (!DRY_RUN) {
+  assertOperationalMutationAllowed({
+    operationId: "team-season-orgunit-01-fca-backfill",
+    databaseUrl: connectionString,
+    explicitIntent: true,
+    allowedRemoteEnvironments: ["stage"],
+  });
+}
+
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log(DRY_RUN ? "\n=== DRY RUN (no writes) ===" : "\n=== LIVE RUN ===");
