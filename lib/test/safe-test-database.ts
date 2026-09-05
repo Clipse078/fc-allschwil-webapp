@@ -184,6 +184,12 @@ export function assertSafeTestDatabase(url?: string): string {
     );
   }
 
+  if (!target.hostname || target.database === "(default)") {
+    throw new UnsafeTestDatabaseError(
+      `Refusing DB-mutating test: TEST_DATABASE_URL is malformed. Target: ${maskDatabaseUrl(candidate)}`,
+    );
+  }
+
   if (target.protocol !== "postgresql:" && target.protocol !== "postgres:") {
     throw new UnsafeTestDatabaseError(
       `Refusing DB-mutating test: TEST_DATABASE_URL must use PostgreSQL. Target: ${maskDatabaseUrl(candidate)}`,

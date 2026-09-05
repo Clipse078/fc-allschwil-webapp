@@ -171,6 +171,22 @@ describe("requireApiPermission", () => {
     expect(mocks.getEffectivePermissions).not.toHaveBeenCalled();
   });
 
+  it("API-01I: cannot authorize a password-revoked session", async () => {
+    // Auth.js represents a rejected JWT (including password revocation) as no
+    // session, after clearing the invalid session cookie.
+    mocks.auth.mockResolvedValue(null);
+
+    const result = await requireApiPermission("users.manage" as never);
+
+    expect(result).toEqual({
+      ok: false,
+      status: 401,
+      error: "Unauthorized",
+      session: null,
+    });
+    expect(mocks.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
   it("API-02: returns 403 when the resolver denies", async () => {
     mocks.auth.mockResolvedValue(sessionWithTenant("user-1", "tenant-1"));
     mocks.getEffectivePermissions.mockResolvedValue({ platform: [], tenant: [] });

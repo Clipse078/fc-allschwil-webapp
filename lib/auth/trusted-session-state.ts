@@ -265,7 +265,12 @@ export async function applyTrustedJwtState(
     prisma,
     canonicalActorUserId,
   );
-  if (!isActorSessionCurrent(actorSecurityState, authenticatedAt)) return null;
+  if (
+    authenticatedAt === null ||
+    !isActorSessionCurrent(actorSecurityState, authenticatedAt)
+  ) {
+    return null;
+  }
 
   // Migration compatibility for encrypted tokens issued before this field
   // existed. This is derived only from the signed token, never update data.

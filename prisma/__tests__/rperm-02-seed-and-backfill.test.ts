@@ -2,8 +2,8 @@
  * RPERM-02 — Seed and Backfill Integration Tests
  *
  * Requires a disposable local PostgreSQL database (TEST_DATABASE_URL env var).
- * Run after `prisma db push` and `tsx prisma/seed.ts`.
- * DATABASE_URL is loaded from .env via dotenv/config.
+ * Run only after explicitly provisioning the disposable local schema/fixtures.
+ * The suite never falls back to ambient DATABASE_URL.
  *
  * Tests covering:
  *

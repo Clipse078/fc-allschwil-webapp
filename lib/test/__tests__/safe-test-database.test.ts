@@ -91,7 +91,7 @@ describe("safe-test-database guard", () => {
   });
 
   it("does not treat NODE_ENV=test alone as sufficient", () => {
-    process.env.NODE_ENV = "test";
+    (process.env as Record<string, string | undefined>).NODE_ENV = "test";
     delete process.env.TEST_DATABASE_URL;
 
     expect(canRunDbMutatingIntegrationTests()).toBe(false);
