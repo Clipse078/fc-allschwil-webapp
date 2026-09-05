@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { connection } from "next/server";
 import {
   ArrowRight,
   Building2,
@@ -135,6 +136,9 @@ function QuickLinkItem({
 }
 
 export default async function AdminPage() {
+  // Runtime-only data: credential-poor Preview builds must not attempt a
+  // database query while prerendering this page.
+  await connection();
   const data = await getAdminOverviewData();
 
   const onboardingSteps = [
