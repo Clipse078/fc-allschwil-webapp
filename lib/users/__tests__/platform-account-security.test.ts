@@ -73,7 +73,7 @@ describe("platform account lifecycle safety", () => {
         isActive: false,
         actorUserId: "actor",
       }),
-    ).rejects.toMatchObject<Partial<PlatformAccountDomainError>>({
+    ).rejects.toMatchObject({
       code: "LAST_SUPER_ADMIN",
     });
 
@@ -85,7 +85,6 @@ describe("platform account lifecycle safety", () => {
     mocks.userFindUnique.mockResolvedValue(target("admin-a"));
     mocks.userRoleCount.mockResolvedValue(1);
     mocks.userUpdate.mockImplementation(({ data }) => ({
-      id: "admin-a",
       ...target("admin-a"),
       ...data,
     }));
@@ -112,7 +111,6 @@ describe("platform account lifecycle safety", () => {
   it("normalizes a safe email change and revokes prior sessions", async () => {
     mocks.userFindUnique.mockResolvedValue(target("admin-a"));
     mocks.userUpdate.mockImplementation(({ data }) => ({
-      id: "admin-a",
       ...target("admin-a"),
       ...data,
     }));

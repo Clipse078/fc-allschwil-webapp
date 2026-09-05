@@ -28,9 +28,6 @@ vi.mock("@/lib/db/prisma", () => ({
 vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
 
 import {
-  InvitationDomainError,
-  MembershipDomainError,
-  RemoveMembershipDomainError,
   removeTenantMembership,
   resendTenantInvitation,
   setTenantMembershipActive,
@@ -49,7 +46,7 @@ describe("tenant account management cannot mutate platform accounts", () => {
   it("blocks tenant deactivation of a platform Superadmin", async () => {
     await expect(
       setTenantMembershipActive("tenant-a", "platform-admin", false, "tenant-admin"),
-    ).rejects.toMatchObject<Partial<MembershipDomainError>>({
+    ).rejects.toMatchObject({
       code: "PLATFORM_ACCOUNT_PROTECTED",
     });
     expect(mocks.membershipUpdate).not.toHaveBeenCalled();
@@ -58,7 +55,7 @@ describe("tenant account management cannot mutate platform accounts", () => {
   it("blocks tenant removal of a platform Superadmin", async () => {
     await expect(
       removeTenantMembership("tenant-a", "platform-admin", "tenant-admin"),
-    ).rejects.toMatchObject<Partial<RemoveMembershipDomainError>>({
+    ).rejects.toMatchObject({
       code: "PLATFORM_ACCOUNT_PROTECTED",
     });
     expect(mocks.transaction).not.toHaveBeenCalled();
@@ -67,7 +64,7 @@ describe("tenant account management cannot mutate platform accounts", () => {
   it("blocks tenant invitation/reset issuance for a platform Superadmin", async () => {
     await expect(
       resendTenantInvitation("tenant-a", "platform-admin", "tenant-admin"),
-    ).rejects.toMatchObject<Partial<InvitationDomainError>>({
+    ).rejects.toMatchObject({
       code: "PLATFORM_ACCOUNT_PROTECTED",
     });
     expect(mocks.passwordResetDeleteMany).not.toHaveBeenCalled();
@@ -79,7 +76,7 @@ describe("tenant account management cannot mutate platform accounts", () => {
 
     await expect(
       setTenantMembershipActive("tenant-a", "tenant-b-user", false, "tenant-admin"),
-    ).rejects.toMatchObject<Partial<MembershipDomainError>>({
+    ).rejects.toMatchObject({
       code: "MEMBERSHIP_NOT_FOUND",
     });
     expect(mocks.userRoleFindFirst).not.toHaveBeenCalled();
