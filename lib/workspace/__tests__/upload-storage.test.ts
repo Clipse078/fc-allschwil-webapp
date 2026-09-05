@@ -601,7 +601,8 @@ describe("Workspace upload storage", () => {
         downloadUrl:
           "https://blob.example.test/file.pdf?download=1",
         pathname: "workspace/file.pdf",
-        contentDisposition: 'attachment; filename="file.pdf"',
+        contentDisposition:
+          'inline; filename="provider-controlled.html"',
         cacheControl: "public, max-age=31536000",
         uploadedAt: new Date("2026-07-17T12:00:00.000Z"),
         etag: "test-etag",
@@ -632,7 +633,8 @@ describe("Workspace upload storage", () => {
       stream,
       filename: "file.pdf",
       contentType: "application/pdf",
-      contentDisposition: 'attachment; filename="file.pdf"',
+      contentDisposition:
+        `attachment; filename="file.pdf"; filename*=UTF-8''file.pdf`,
       sizeBytes: 3,
       etag: "test-etag",
     });

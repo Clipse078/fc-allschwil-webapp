@@ -154,6 +154,17 @@ export function sanitizeWorkspaceFilename(filename: string): string {
   return sanitized || "file";
 }
 
+export function getWorkspaceAttachmentContentDisposition(
+  filename: string,
+): string {
+  const sanitized = sanitizeWorkspaceFilename(filename);
+  const ascii = sanitized
+    .replace(/[^\x20-\x7e]/g, "_")
+    .replace(/["\\]/g, "_");
+
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(sanitized)}`;
+}
+
 export function validateWorkspaceUploadFile(
   file: File,
 ): WorkspaceUploadValidationResult {

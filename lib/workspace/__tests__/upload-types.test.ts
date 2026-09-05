@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   ALLOWED_WORKSPACE_MIME_TYPES,
   MAX_WORKSPACE_FILE_SIZE_BYTES,
+  getWorkspaceAttachmentContentDisposition,
   isAllowedWorkspaceMimeType,
   sanitizeWorkspaceFilename,
   validateWorkspaceUploadFile,
@@ -76,6 +77,16 @@ describe("Workspace upload policy", () => {
   it("uses a safe fallback filename", () => {
     expect(sanitizeWorkspaceFilename("...")).toBe("file");
     expect(sanitizeWorkspaceFilename("")).toBe("file");
+  });
+
+  it("builds attachment headers without trusting provider metadata", () => {
+    expect(
+      getWorkspaceAttachmentContentDisposition(
+        '../"Privatäkte".pdf',
+      ),
+    ).toBe(
+      `attachment; filename="-Privat_kte-.pdf"; filename*=UTF-8''-Privat%C3%A4kte-.pdf`,
+    );
   });
 
   it("accepts a valid file", () => {

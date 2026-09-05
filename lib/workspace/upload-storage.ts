@@ -46,7 +46,10 @@ import type {
   WorkspaceStorageUploadResult,
   WorkspaceUploadErrorCode,
 } from "@/lib/workspace/upload-types";
-import { sanitizeWorkspaceFilename } from "@/lib/workspace/upload-types";
+import {
+  getWorkspaceAttachmentContentDisposition,
+  sanitizeWorkspaceFilename,
+} from "@/lib/workspace/upload-types";
 
 function isStorageConfigurationError(error: unknown): boolean {
   return (
@@ -475,7 +478,10 @@ export class VercelBlobWorkspaceStorage
           result.blob.contentType ||
           input.mimeType ||
           "application/octet-stream",
-        contentDisposition: result.blob.contentDisposition,
+        contentDisposition:
+          getWorkspaceAttachmentContentDisposition(
+            input.filename,
+          ),
         sizeBytes: result.blob.size,
         etag: result.blob.etag,
       };
