@@ -67,7 +67,7 @@ const ORIGINAL_ENV = { ...process.env };
 
 const ROUTE_PATH = "http://x/api/ops/club-directory-02c-sfv-consolidation-execute";
 const TENANT_KEY = "fc-allschwil";
-const CRON_SECRET = "test-cron-secret";
+const OPERATOR_SECRET = "test-consolidation-operator-secret";
 const CONFIRMATION = "CONSOLIDATE-CLUB-DIRECTORY";
 
 const TENANT_CONTEXT = {
@@ -151,7 +151,7 @@ function makeRawRequest(rawBody: string, headers: Record<string, string> = {}): 
   });
 }
 
-function authHeaders(secret = CRON_SECRET): Record<string, string> {
+function authHeaders(secret = OPERATOR_SECRET): Record<string, string> {
   return { authorization: `Bearer ${secret}` };
 }
 
@@ -160,8 +160,11 @@ function validBody(overrides: Record<string, unknown> = {}) {
 }
 
 function setStageEnvironment(): void {
+  process.env.NODE_ENV = "production";
   process.env.APP_ENV = "stage";
-  process.env.CRON_SECRET = CRON_SECRET;
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "production";
+  process.env.FCA_CONSOLIDATION_OPERATOR_SECRET = OPERATOR_SECRET;
 }
 
 function setupHappyPathMocks(): void {
@@ -280,7 +283,7 @@ describe("POST — STAGE-only guard", () => {
   it("does not leak whether auth/confirmation would have succeeded when blocked by the STAGE guard", async () => {
     process.env.APP_ENV = "prod";
 
-    const response = await POST(makeRequest(validBody(), authHeaders(CRON_SECRET)));
+    const response = await POST(makeRequest(validBody(), authHeaders(OPERATOR_SECRET)));
 
     expect(response.status).toBe(403);
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
@@ -292,8 +295,8 @@ describe("POST — STAGE-only guard", () => {
 // ---------------------------------------------------------------------------
 
 describe("POST — authentication", () => {
-  it("rejects with 401 when CRON_SECRET is not configured (fail closed)", async () => {
-    delete process.env.CRON_SECRET;
+  it("rejects with 401 when the operator capability is not configured", async () => {
+    delete process.env.FCA_CONSOLIDATION_OPERATOR_SECRET;
 
     const response = await POST(makeRequest(validBody(), authHeaders("anything")));
 
@@ -309,6 +312,30 @@ describe("POST — authentication", () => {
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
   });
 
+  it("does not accept the routine CRON_SECRET", async () => {
+    process.env.CRON_SECRET = "routine-cron-secret";
+
+    const response = await POST(
+      makeRequest(validBody(), authHeaders("routine-cron-secret")),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+    expect(mockConsolidateExternalClubsByProviderIdentity).not.toHaveBeenCalled();
+  });
+
+  it("does not accept ordinary tenant Club Admin session material", async () => {
+    const response = await POST(
+      makeRequest(validBody(), {
+        cookie: "authjs.session-token=club-admin-session",
+      }),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+    expect(mockConsolidateExternalClubsByProviderIdentity).not.toHaveBeenCalled();
+  });
+
   it("rejects with 401 when the bearer token is wrong", async () => {
     const response = await POST(makeRequest(validBody(), authHeaders("wrong-secret")));
 
@@ -317,7 +344,7 @@ describe("POST — authentication", () => {
   });
 
   it("rejects a request with no 'Bearer ' prefix even if the raw value matches", async () => {
-    const response = await POST(makeRequest(validBody(), { authorization: CRON_SECRET }));
+    const response = await POST(makeRequest(validBody(), { authorization: OPERATOR_SECRET }));
 
     expect(response.status).toBe(401);
   });
@@ -696,7 +723,7 @@ describe("POST — no credential leakage", () => {
     const response = await POST(makeRequest(validBody(), authHeaders()));
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(OPERATOR_SECRET);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -714,7 +741,7 @@ describe("POST — no credential leakage", () => {
 
     for (const response of responses) {
       const json = JSON.stringify(await response.json());
-      expect(json).not.toContain(CRON_SECRET);
+      expect(json).not.toContain(OPERATOR_SECRET);
       expect(json).not.toContain("super-secret-app-key");
       expect(json).not.toContain("super-secret-app-pass");
       expect(json).not.toContain("super-secret-blob-token");
@@ -746,7 +773,7 @@ describe("POST — no credential leakage", () => {
     expect(response.status).toBe(500);
     expect(json).not.toContain("supersecret");
     expect(json).not.toContain("postgresql://");
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(OPERATOR_SECRET);
     expect(json).not.toContain("super-secret-blob-token");
   });
 });

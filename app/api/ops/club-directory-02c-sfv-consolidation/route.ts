@@ -50,11 +50,9 @@
  *     imported, read, or accepted from this route in any form.
  *
  * AUTHENTICATION
- *   Reuses the existing `CRON_SECRET` operator secret (see
- *   app/api/cron/sfv-sync/route.ts) via the identical
- *   `Authorization: Bearer <CRON_SECRET>` contract — no new permanent
- *   secret is introduced. Fails closed (401) if CRON_SECRET is not
- *   configured server-side.
+ *   Requires the dedicated, temporary
+ *   `FCA_CONSOLIDATION_OPERATOR_SECRET` bearer capability. Routine
+ *   `CRON_SECRET` scheduler authority is deliberately not accepted.
  *
  * ENVIRONMENT GUARD — STAGE ONLY
  *   Rejects with 403 on every environment except STAGE (`APP_ENV=stage`,
@@ -104,6 +102,7 @@ import {
   type TenantInventory,
 } from "@/scripts/club-directory-02c-sfv-consolidation";
 import { computePlanFingerprint } from "@/lib/club-directory/plan-fingerprint";
+import { hasFcaConsolidationCapability } from "@/lib/server/operator-capability";
 
 export const dynamic = "force-dynamic";
 
@@ -119,17 +118,6 @@ type AllowedMode = (typeof ALLOWED_MODES)[number];
 
 function isAllowedMode(value: string | null): value is AllowedMode {
   return value !== null && (ALLOWED_MODES as readonly string[]).includes(value);
-}
-
-function isAuthorized(request: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET?.trim();
-  if (!secret) {
-    // Fail closed: never allow an unauthenticated trigger of this endpoint.
-    return false;
-  }
-
-  const authHeader = request.headers.get("authorization");
-  return authHeader === `Bearer ${secret}`;
 }
 
 /** Strips this down to exactly the fields the task requires — no raw provider data. */
@@ -151,8 +139,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // ── 2. Authentication — same operator secret as the SFV cron route ────────
-  if (!isAuthorized(request)) {
+  // ── 2. Dedicated temporary operator capability ────────────────────────────
+  if (!hasFcaConsolidationCapability(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

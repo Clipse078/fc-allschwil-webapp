@@ -44,7 +44,7 @@ const ORIGINAL_ENV = { ...process.env };
 
 const ROUTE_PATH = "http://x/api/ops/club-directory-02c-sfv-consolidation";
 const TENANT_KEY = "fc-allschwil";
-const CRON_SECRET = "test-cron-secret";
+const OPERATOR_SECRET = "test-consolidation-operator-secret";
 
 const TENANT_CONTEXT = {
   tenantId: "tenant-fc-allschwil-id",
@@ -91,13 +91,16 @@ function makeRequest(
   return new NextRequest(url.toString(), { method: "GET", headers });
 }
 
-function authHeaders(secret = CRON_SECRET): Record<string, string> {
+function authHeaders(secret = OPERATOR_SECRET): Record<string, string> {
   return { authorization: `Bearer ${secret}` };
 }
 
 function setStageEnvironment(): void {
+  process.env.NODE_ENV = "production";
   process.env.APP_ENV = "stage";
-  process.env.CRON_SECRET = CRON_SECRET;
+  process.env.VERCEL = "1";
+  process.env.VERCEL_ENV = "production";
+  process.env.FCA_CONSOLIDATION_OPERATOR_SECRET = OPERATOR_SECRET;
 }
 
 beforeEach(() => {
@@ -198,7 +201,7 @@ describe("GET — STAGE-only guard", () => {
 
     // Even a correct secret must not bypass the STAGE guard.
     const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders(CRON_SECRET)),
+      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders(OPERATOR_SECRET)),
     );
 
     expect(response.status).toBe(403);
@@ -219,8 +222,8 @@ describe("GET — STAGE-only guard", () => {
 // ---------------------------------------------------------------------------
 
 describe("GET — authentication", () => {
-  it("rejects with 401 when CRON_SECRET is not configured (fail closed)", async () => {
-    delete process.env.CRON_SECRET;
+  it("rejects with 401 when the operator capability is not configured", async () => {
+    delete process.env.FCA_CONSOLIDATION_OPERATOR_SECRET;
 
     const response = await GET(
       makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders("anything")),
@@ -237,6 +240,32 @@ describe("GET — authentication", () => {
     expect(mockResolveTenantContexts).not.toHaveBeenCalled();
   });
 
+  it("does not accept the routine CRON_SECRET", async () => {
+    process.env.CRON_SECRET = "routine-cron-secret";
+
+    const response = await GET(
+      makeRequest(
+        { tenant: TENANT_KEY, mode: "inventory" },
+        authHeaders("routine-cron-secret"),
+      ),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+  });
+
+  it("does not accept tenant Club Admin session material", async () => {
+    const response = await GET(
+      makeRequest(
+        { tenant: TENANT_KEY, mode: "inventory" },
+        { cookie: "authjs.session-token=club-admin-session" },
+      ),
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockResolveTenantContexts).not.toHaveBeenCalled();
+  });
+
   it("rejects with 401 when the bearer token is wrong", async () => {
     const response = await GET(
       makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders("wrong-secret")),
@@ -248,13 +277,13 @@ describe("GET — authentication", () => {
 
   it("rejects a request with no 'Bearer ' prefix even if the raw value matches", async () => {
     const response = await GET(
-      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, { authorization: CRON_SECRET }),
+      makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, { authorization: OPERATOR_SECRET }),
     );
 
     expect(response.status).toBe(401);
   });
 
-  it("accepts the correct Authorization: Bearer <CRON_SECRET> header", async () => {
+  it("accepts the dedicated operator bearer capability", async () => {
     const response = await GET(
       makeRequest({ tenant: TENANT_KEY, mode: "inventory" }, authHeaders()),
     );
@@ -511,7 +540,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
     );
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(OPERATOR_SECRET);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -526,7 +555,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
     );
     const json = JSON.stringify(await response.json());
 
-    expect(json).not.toContain(CRON_SECRET);
+    expect(json).not.toContain(OPERATOR_SECRET);
     expect(json).not.toContain("super-secret-app-key");
     expect(json).not.toContain("super-secret-app-pass");
     expect(json).not.toContain("sfv.example");
@@ -542,7 +571,7 @@ describe("GET — response never leaks credentials/tokens/raw payloads", () => {
 
     for (const response of responses) {
       const json = JSON.stringify(await response.json());
-      expect(json).not.toContain(CRON_SECRET);
+      expect(json).not.toContain(OPERATOR_SECRET);
       expect(json).not.toContain("super-secret-app-key");
       expect(json).not.toContain("super-secret-app-pass");
     }
