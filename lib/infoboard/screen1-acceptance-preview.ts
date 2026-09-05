@@ -5,16 +5,18 @@
  *
  * Allowed environments:
  *   - Local development (NODE_ENV === "development")
- *   - Vercel Preview deployments (VERCEL_ENV === "preview")
+ *   - Ordinary Vercel Preview deployments
  *
- * Blocked in production so the acceptance fixture never becomes a public
- * kiosk feature.
+ * Blocked in persistent environments, including the authenticated Acceptance
+ * target, so the fixture never becomes a public kiosk feature.
  */
+
+import { getRuntimeEnvironment } from "@/lib/env";
 
 export function isScreen1AcceptancePreviewAllowed(): boolean {
   if (process.env.NODE_ENV === "development") {
     return true;
   }
 
-  return process.env.VERCEL_ENV === "preview";
+  return getRuntimeEnvironment().isPreview;
 }

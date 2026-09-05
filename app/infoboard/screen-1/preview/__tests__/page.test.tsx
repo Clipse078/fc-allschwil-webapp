@@ -54,6 +54,7 @@ vi.mock("@/components/infoboard/screen1/Screen1AcceptancePreviewNav", () => ({
 
 const originalNodeEnv = process.env.NODE_ENV;
 const originalVercelEnv = process.env.VERCEL_ENV;
+const originalVercelTargetEnv = process.env.VERCEL_TARGET_ENV;
 
 function allowPreviewEnv(): void {
   vi.stubEnv("NODE_ENV", "development");
@@ -70,6 +71,7 @@ describe("isScreen1AcceptancePreviewAllowed", () => {
     vi.unstubAllEnvs();
     process.env.NODE_ENV = originalNodeEnv;
     process.env.VERCEL_ENV = originalVercelEnv;
+    process.env.VERCEL_TARGET_ENV = originalVercelTargetEnv;
   });
 
   it("allows local development", () => {
@@ -89,6 +91,14 @@ describe("isScreen1AcceptancePreviewAllowed", () => {
     vi.stubEnv("VERCEL_ENV", "production");
     expect(isScreen1AcceptancePreviewAllowed()).toBe(false);
   });
+
+  it("blocks the authenticated Acceptance target even when VERCEL_ENV is preview", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("VERCEL_ENV", "preview");
+    vi.stubEnv("VERCEL_TARGET_ENV", "acceptance");
+
+    expect(isScreen1AcceptancePreviewAllowed()).toBe(false);
+  });
 });
 
 describe("Screen 1 acceptance preview routes", () => {
@@ -104,6 +114,7 @@ describe("Screen 1 acceptance preview routes", () => {
     vi.unstubAllEnvs();
     process.env.NODE_ENV = originalNodeEnv;
     process.env.VERCEL_ENV = originalVercelEnv;
+    process.env.VERCEL_TARGET_ENV = originalVercelTargetEnv;
   });
 
   describe("production guard", () => {

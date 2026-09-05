@@ -29,6 +29,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
+import { getRuntimeEnvironment } from "@/lib/env";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
 import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
@@ -39,10 +40,15 @@ if (!connectionString) {
 }
 
 // ── Environment safety check ──────────────────────────────────────────────────
-// Detect STAGE / PROD by APP_ENV.  When running in a protected environment,
-// the script must be explicitly opted-in to password mutation.
-const appEnv = (process.env.APP_ENV ?? "local").trim().toLowerCase();
-const isProtectedEnv = appEnv === "stage" || appEnv === "prod";
+// Resolve persistent environments through the canonical classifier so a
+// Vercel Custom Environment cannot inherit local password behavior.
+const runtime = getRuntimeEnvironment({
+  ...process.env,
+  NODE_ENV: process.env.NODE_ENV ?? "development",
+});
+const appEnv = runtime.appEnv;
+const isProtectedEnv =
+  runtime.isStage || runtime.isProd || runtime.isAcceptance;
 const allowPasswordChange = process.env.ALLOW_PASSWORD_CHANGE === "true";
 
 if (isProtectedEnv && !allowPasswordChange) {
