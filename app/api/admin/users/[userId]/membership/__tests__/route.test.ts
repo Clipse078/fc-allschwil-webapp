@@ -26,6 +26,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 vi.mock("@/lib/permissions/require-any-api-permission", () => ({
   requireAnyApiPermission: vi.fn(),
 }));
+vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
 
 vi.mock("@/lib/users/mutations", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/users/mutations")>();
