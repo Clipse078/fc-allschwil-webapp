@@ -3,6 +3,15 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("@/lib/db/prisma", () => ({
+  prisma: {
+    tenant: {
+      findFirst: vi.fn(),
+    },
+  },
+}));
+
 import {
   buildPublicCacheTag,
   buildPublicCacheTags,
