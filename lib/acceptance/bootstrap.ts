@@ -135,15 +135,15 @@ export type AcceptancePermissionDefinition = {
 export function getAcceptancePermissionDefinitions(): AcceptancePermissionDefinition[] {
   return Object.values(PERMISSIONS).map((key) => {
     const prefix = key.split(".")[0];
-    const module = PERMISSION_MODULES[prefix];
-    if (!module) {
+    const permissionModule = PERMISSION_MODULES[prefix];
+    if (!permissionModule) {
       throw new Error(`No canonical PermissionModule mapping for ${key}.`);
     }
     const isPlatform = PLATFORM_PERMISSION_KEYS.has(key);
     return {
       key,
       name: key,
-      module,
+      module: permissionModule,
       scope: isPlatform ? "PLATFORM" : "TENANT",
       grantableByAdmin: !isPlatform,
     };
@@ -435,6 +435,33 @@ async function ensureUserRole(
   }
 }
 
+async function ensureOrgUnit(
+  tx: BootstrapTransaction,
+  input: {
+    id: string;
+    tenantId: string;
+    key: string;
+    name: string;
+  },
+) {
+  const existing = await tx.orgUnit.findUnique({
+    where: { tenantId_key: { tenantId: input.tenantId, key: input.key } },
+  });
+  if (existing) {
+    if (existing.id !== input.id || existing.tenantId !== input.tenantId) {
+      throw new Error(`Existing OrgUnit ${input.key} is not the Acceptance fixture.`);
+    }
+    return existing;
+  }
+  return tx.orgUnit.create({
+    data: {
+      ...input,
+      type: "CLUB",
+      status: "ACTIVE",
+    },
+  });
+}
+
 async function ensurePersonAndAssignment(
   tx: BootstrapTransaction,
   input: {
@@ -488,6 +515,14 @@ async function ensurePersonAndAssignment(
         status: "ACTIVE",
       },
     });
+  } else if (
+    existingAssignment.tenantId !== input.tenantId ||
+    existingAssignment.personId !== personId ||
+    existingAssignment.orgUnitId !== input.orgUnitId
+  ) {
+    throw new Error(
+      `Existing PersonAssignment ${assignmentId} is not the Acceptance fixture.`,
+    );
   }
 
   const personMembershipId = `${FIXTURE_PREFIX}person-membership-${input.suffix}`;
@@ -505,6 +540,13 @@ async function ensurePersonAndAssignment(
         startsAt: new Date("2026-01-01T00:00:00.000Z"),
       },
     });
+  } else if (
+    existingMembership.tenantId !== input.tenantId ||
+    existingMembership.personId !== personId
+  ) {
+    throw new Error(
+      `Existing PersonMembership ${personMembershipId} is not the Acceptance fixture.`,
+    );
   }
 }
 
@@ -597,29 +639,17 @@ export async function bootstrapAcceptanceData(
   }
 
   const orgUnits = {
-    alpha: await tx.orgUnit.upsert({
-      where: { tenantId_key: { tenantId: tenants.alpha.id, key: "club" } },
-      update: {},
-      create: {
-        id: `${FIXTURE_PREFIX}org-alpha-club`,
-        tenantId: tenants.alpha.id,
-        key: "club",
-        name: "SCE Acceptance Club Alpha",
-        type: "CLUB",
-        status: "ACTIVE",
-      },
+    alpha: await ensureOrgUnit(tx, {
+      id: `${FIXTURE_PREFIX}org-alpha-club`,
+      tenantId: tenants.alpha.id,
+      key: "club",
+      name: "SCE Acceptance Club Alpha",
     }),
-    beta: await tx.orgUnit.upsert({
-      where: { tenantId_key: { tenantId: tenants.beta.id, key: "club" } },
-      update: {},
-      create: {
-        id: `${FIXTURE_PREFIX}org-beta-club`,
-        tenantId: tenants.beta.id,
-        key: "club",
-        name: "SCE Acceptance Club Beta",
-        type: "CLUB",
-        status: "ACTIVE",
-      },
+    beta: await ensureOrgUnit(tx, {
+      id: `${FIXTURE_PREFIX}org-beta-club`,
+      tenantId: tenants.beta.id,
+      key: "club",
+      name: "SCE Acceptance Club Beta",
     }),
   };
 

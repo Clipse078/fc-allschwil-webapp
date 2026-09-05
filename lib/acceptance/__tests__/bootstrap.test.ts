@@ -178,23 +178,21 @@ function createMemoryTransaction() {
       }),
     },
     orgUnit: {
-      upsert: vi.fn(
+      findUnique: vi.fn(
         async ({
           where,
-          create,
         }: {
           where: { tenantId_key: { tenantId: string; key: string } };
-          create: Record<string, unknown>;
         }) => {
           const compound = where.tenantId_key;
-          const key = `${compound.tenantId}:${compound.key}`;
-          const existing = state.orgUnits.get(key);
-          if (existing) return existing;
-          const row = withId(create);
-          state.orgUnits.set(key, row);
-          return row;
+          return state.orgUnits.get(`${compound.tenantId}:${compound.key}`) ?? null;
         },
       ),
+      create: vi.fn(async ({ data }: { data: Record<string, unknown> }) => {
+        const row = withId(data);
+        state.orgUnits.set(`${data.tenantId}:${data.key}`, row);
+        return row;
+      }),
     },
     person: {
       findUnique: vi.fn(async ({ where }: { where: { id: string } }) =>
