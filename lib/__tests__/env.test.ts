@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { getRuntimeEnvironment } from "../env";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("runtime environment classification", () => {
   it("keeps local developer ergonomics when APP_ENV is missing", () => {
@@ -71,5 +75,25 @@ describe("runtime environment classification", () => {
 
     expect(runtime.appEnv).toBe("unknown");
     expect(runtime.isLocal).toBe(false);
+  });
+
+  it("logs malformed URL configuration without exposing its raw value", () => {
+    const rawValue = "https://operator:credential@[hostile-fragment";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const runtime = getRuntimeEnvironment({
+      NODE_ENV: "production",
+      APP_ENV: "stage",
+      VERCEL: "1",
+      VERCEL_ENV: "production",
+      APP_BASE_URL: rawValue,
+    });
+
+    expect(runtime.appBaseUrl).toBeNull();
+    expect(warn).toHaveBeenCalledWith(
+      "[env] Invalid APP_BASE_URL URL configuration",
+    );
+    expect(JSON.stringify(warn.mock.calls)).not.toContain(rawValue);
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("credential");
   });
 });

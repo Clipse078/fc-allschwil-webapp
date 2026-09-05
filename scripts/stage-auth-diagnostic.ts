@@ -15,7 +15,7 @@
  *   1. DATABASE_URL — which DB is targeted (host/db printed, password masked)
  *   2. admin@fcallschwil.ch — user row existence
  *   3. User isActive flag
- *   4. passwordHash present and non-empty (value NOT printed, only bcrypt prefix)
+ *   4. passwordHash present and has a recognized bcrypt format (value NOT printed)
  *   5. Tenant membership — tenantId + fc-allschwil key + tenant status
  *   6. Role assignment — at least one UserRole row
  *   7. NEXTAUTH_SECRET — env var presence (value NOT printed)
@@ -230,7 +230,7 @@ async function main(): Promise<void> {
   try {
     // ── Check 2–6: single query ───────────────────────────────────────────────
     // Joins users → tenants + counts roles.
-    // passwordHash is fetched only for length/prefix check; value never printed.
+    // passwordHash is fetched only for presence/format checks; value never printed.
 
     // RPERM-04: tenant membership is checked via the canonical TenantMembership
     // table (an active row for TARGET_TENANT_KEY), never via the legacy
@@ -317,16 +317,14 @@ async function main(): Promise<void> {
       const hashPresent = hash.length > 0;
       const hashBcrypt =
         hash.startsWith("$2b$") || hash.startsWith("$2a$") || hash.startsWith("$2y$");
-      const hashPrefix = hashPresent ? hash.slice(0, 7) + "…" : "(empty)";
-
       results.push({
         id: "4",
         description: "passwordHash set",
         status: hashPresent ? (hashBcrypt ? "PASS" : "WARN") : "FAIL",
         detail: hashPresent
           ? hashBcrypt
-            ? `bcrypt hash present  |  prefix: ${hashPrefix}  |  length: ${hash.length}`
-            : `Hash present but unexpected format: ${hashPrefix} (expected $2b$…)`
+            ? "bcrypt hash present"
+            : "Hash present but has an unexpected format"
           : "passwordHash is empty/null — authentication will fail",
       });
 

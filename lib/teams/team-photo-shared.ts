@@ -225,7 +225,12 @@ export async function removeTeamPhoto({
       try {
         await del(currentPhotoUrl, { token });
       } catch (err) {
-        console.warn("[team-photo-shared] blob cleanup failed after remove:", err);
+        console.warn("[team-photo-shared] blob cleanup failed after remove", {
+          operation: "delete",
+          teamId,
+          errorCategory:
+            err instanceof Error && err.name ? err.name : "UnknownError",
+        });
       }
     }
 

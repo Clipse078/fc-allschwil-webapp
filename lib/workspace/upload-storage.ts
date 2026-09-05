@@ -509,10 +509,10 @@ export class VercelBlobWorkspaceStorage
       });
     } catch (error) {
       const details = getErrorDetails(error);
-      console.warn(
-        "[workspace-storage] cleanup failed",
-        { storageReference: normalizedReference, errorClass: details.class, errorMessage: details.message },
-      );
+      console.warn("[workspace-storage] cleanup failed", {
+        operation: "delete",
+        errorCategory: details.class,
+      });
     }
   }
 }

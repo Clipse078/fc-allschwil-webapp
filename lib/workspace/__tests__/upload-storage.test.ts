@@ -793,9 +793,12 @@ describe("Workspace upload storage", () => {
 
   it("handles cleanup failures without throwing", async () => {
     setWorkspaceBlobEnv();
+    const storageReference =
+      "https://store.public.blob.vercel-storage.com/private/object.pdf";
+    const providerSecret = "provider-secret-bearing-error";
 
     blobMocks.del.mockRejectedValue(
-      new Error("Simulated cleanup failure"),
+      new Error(`${providerSecret}: failed deleting ${storageReference}`),
     );
 
     const consoleWarning = vi
@@ -805,10 +808,14 @@ describe("Workspace upload storage", () => {
     const storage = new VercelBlobWorkspaceStorage();
 
     await expect(
-      storage.delete("workspace/file.pdf"),
+      storage.delete(storageReference),
     ).resolves.toBeUndefined();
 
     expect(consoleWarning).toHaveBeenCalled();
+    const serializedLogs = JSON.stringify(consoleWarning.mock.calls);
+    expect(serializedLogs).not.toContain(storageReference);
+    expect(serializedLogs).not.toContain(providerSecret);
+    expect(serializedLogs).toContain("Error");
 
     consoleWarning.mockRestore();
   });

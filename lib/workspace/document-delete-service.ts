@@ -197,11 +197,12 @@ export async function deleteWorkspaceDocumentPermanently(
     try {
       await workspaceStorageProvider.delete(ref);
     } catch (err) {
-      console.warn(
-        "[workspace-document-delete] best-effort storage cleanup failed for",
-        ref,
-        err,
-      );
+      console.warn("[workspace-document-delete] storage cleanup failed", {
+        operation: "delete",
+        documentId: cleanDocumentId,
+        errorCategory:
+          err instanceof Error && err.name ? err.name : "UnknownError",
+      });
     }
   }
 

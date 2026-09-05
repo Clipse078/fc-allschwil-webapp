@@ -52,8 +52,10 @@ function parseRevalidationConfig(): RevalidationConfig {
     }
 
     return config;
-  } catch (error) {
-    console.error("[public-cache-notification] Invalid PUBLIC_WEBSITE_REVALIDATION_CONFIG:", error);
+  } catch {
+    console.error(
+      "[public-cache-notification] Invalid PUBLIC_WEBSITE_REVALIDATION_CONFIG JSON",
+    );
     return {};
   }
 }

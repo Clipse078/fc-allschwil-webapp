@@ -125,4 +125,21 @@ describe("public-cache-notification", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("does not log malformed configuration source or secret fragments", () => {
+    const secretFragment = "hmac-secret-must-not-be-logged";
+    process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG =
+      `{"tenant":{"secret":"${secretFragment}"`;
+    resetPublicCacheNotificationConfigForTests();
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    expect(getTenantRevalidationEndpoint("tenant")).toBeNull();
+    expect(error).toHaveBeenCalledWith(
+      "[public-cache-notification] Invalid PUBLIC_WEBSITE_REVALIDATION_CONFIG JSON",
+    );
+    expect(JSON.stringify(error.mock.calls)).not.toContain(secretFragment);
+    expect(JSON.stringify(error.mock.calls)).not.toContain(
+      process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG,
+    );
+  });
 });
