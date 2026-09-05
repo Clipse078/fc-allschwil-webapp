@@ -104,4 +104,16 @@ describe("public-cache-notification", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("cannot emit an unsigned notification when HMAC config is missing", async () => {
+    delete process.env.PUBLIC_WEBSITE_REVALIDATION_CONFIG;
+    resetPublicCacheNotificationConfigForTests();
+
+    await notifyTenantPublicWebsiteCache({
+      tenantSlug: "fc-allschwil",
+      domains: [PUBLIC_CACHE_DOMAINS.WEEKPLAN],
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

@@ -15,6 +15,7 @@
 import "dotenv/config";
 
 import { assertDemoSeedAllowed } from "@/lib/demo/seed-guard";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 import { PrismaPg } from "@prisma/adapter-pg";
 import {
@@ -46,6 +47,14 @@ if (!connectionString) {
   throw new Error("DATABASE_URL is not set.");
 }
 
+assertDemoSeedAllowed();
+assertOperationalMutationAllowed({
+  operationId: "demo-seed",
+  databaseUrl: connectionString,
+  explicitIntent: true,
+  allowedRemoteEnvironments: ["stage"],
+});
+
 const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
@@ -63,8 +72,6 @@ type RegistrationSeedRecord = {
 };
 
 async function main() {
-  assertDemoSeedAllowed();
-
   const fcAllschwilTenant = await prisma.tenant.findUnique({
     where: { key: "fc-allschwil" },
   });

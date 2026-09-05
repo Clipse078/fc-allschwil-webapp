@@ -7,6 +7,8 @@
  * Mirrors the ALLOW_PASSWORD_CHANGE pattern used by prisma/bootstrap-admin.ts.
  */
 
+import { getRuntimeEnvironment } from "@/lib/env";
+
 export type DemoSeedGuardResult =
   | { allowed: true }
   | { allowed: false; reason: string };
@@ -14,15 +16,27 @@ export type DemoSeedGuardResult =
 /**
  * Returns whether a demo seed script may run in the current environment.
  *
- * Local / unknown APP_ENV: allowed (developer workstations).
+ * Local APP_ENV on a non-deployed machine: allowed (developer workstations).
  * STAGE / PROD: blocked unless ALLOW_DEMO_SEED=true is set explicitly.
+ * Preview and unknown deployed environments: always blocked.
  */
 export function evaluateDemoSeedGuard(env: NodeJS.ProcessEnv = process.env): DemoSeedGuardResult {
-  const appEnv = (env.APP_ENV ?? "local").trim().toLowerCase();
-  const isProtectedEnv = appEnv === "stage" || appEnv === "prod";
+  const runtime = getRuntimeEnvironment({
+    ...env,
+    NODE_ENV: env.NODE_ENV ?? "development",
+  });
 
-  if (!isProtectedEnv) {
+  if ((runtime.isLocal || runtime.isTest) && !runtime.isDeployed) {
     return { allowed: true };
+  }
+
+  if (runtime.isPreview || runtime.isUnknown) {
+    return {
+      allowed: false,
+      reason:
+        `Demo seed is blocked for environment=${runtime.appEnv}. ` +
+        "Preview and unclassified deployed runtimes never permit seeding.",
+    };
   }
 
   if (env.ALLOW_DEMO_SEED === "true") {
@@ -32,7 +46,7 @@ export function evaluateDemoSeedGuard(env: NodeJS.ProcessEnv = process.env): Dem
   return {
     allowed: false,
     reason:
-      `Demo seed is blocked for APP_ENV=${appEnv}. ` +
+      `Demo seed is blocked for APP_ENV=${runtime.appEnv}. ` +
       "Persistent environments must not silently repopulate demo teams, registrations, or events. " +
       "To run intentionally, set ALLOW_DEMO_SEED=true.",
   };

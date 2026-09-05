@@ -35,4 +35,31 @@ describe("evaluateDemoSeedGuard", () => {
       reason: expect.stringContaining("APP_ENV=stage"),
     });
   });
+
+  it("always blocks Preview even when seed flags are copied", () => {
+    expect(
+      evaluateDemoSeedGuard({
+        NODE_ENV: "production",
+        APP_ENV: "stage",
+        VERCEL: "1",
+        VERCEL_ENV: "preview",
+        ALLOW_DEMO_SEED: "true",
+      }),
+    ).toEqual({
+      allowed: false,
+      reason: expect.stringContaining("environment=preview"),
+    });
+  });
+
+  it("blocks malformed APP_ENV in a deployed runtime", () => {
+    expect(
+      evaluateDemoSeedGuard({
+        NODE_ENV: "production",
+        APP_ENV: "stgae",
+        VERCEL: "1",
+        VERCEL_ENV: "production",
+        ALLOW_DEMO_SEED: "true",
+      }).allowed,
+    ).toBe(false);
+  });
 });

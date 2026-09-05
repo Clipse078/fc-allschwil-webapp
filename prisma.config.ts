@@ -1,14 +1,14 @@
 import "dotenv/config";
 import { defineConfig, env } from "prisma/config";
+import { resolvePrismaDatasourceUrlForCommand } from "./lib/server/prisma-datasource";
 
-const POSTGRES_URL_SCHEME_RE = /^postgres(ql)?:\/\//i;
-
-function resolvePrismaDatasourceUrl(): string {
-  const directUrl = process.env.DIRECT_URL?.trim();
-  if (directUrl && POSTGRES_URL_SCHEME_RE.test(directUrl)) {
-    return directUrl;
-  }
-  return env("DATABASE_URL");
+export function resolvePrismaDatasourceUrl(
+  processEnv: NodeJS.ProcessEnv = process.env,
+  argv: readonly string[] = process.argv,
+): string {
+  return (
+    resolvePrismaDatasourceUrlForCommand(processEnv, argv) ?? env("DATABASE_URL")
+  );
 }
 
 export default defineConfig({

@@ -1,5 +1,7 @@
-﻿export type DeploymentMetadata = {
-  environment: "LOCAL" | "STAGE" | "PROD";
+﻿import { getPublicEnvironmentLabel, getRuntimeEnvironment } from "@/lib/env";
+
+export type DeploymentMetadata = {
+  environment: "LOCAL" | "TEST" | "PREVIEW" | "STAGE" | "PROD" | "UNKNOWN";
   vercelEnv: string | null;
   commitSha: string | null;
   deploymentId: string | null;
@@ -7,21 +9,11 @@
 };
 
 export function getDeploymentMetadata(): DeploymentMetadata {
-  const appEnv = process.env.APP_ENV;
-
-  let environment: "LOCAL" | "STAGE" | "PROD" = "LOCAL";
-
-  if (appEnv === "stage") {
-    environment = "STAGE";
-  }
-
-  if (appEnv === "prod") {
-    environment = "PROD";
-  }
+  const runtime = getRuntimeEnvironment();
 
   return {
-    environment,
-    vercelEnv: process.env.VERCEL_ENV ?? null,
+    environment: getPublicEnvironmentLabel(runtime.appEnv),
+    vercelEnv: runtime.vercelEnv,
     commitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
     deploymentId: process.env.VERCEL_DEPLOYMENT_ID ?? null,
     buildTime: new Date().toISOString(),

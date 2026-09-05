@@ -30,6 +30,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { Pool } from "pg";
 import { getTenantClubAdminRoleKey } from "@/lib/roles/tenant-role-keys";
+import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 const connectionString = process.env.DATABASE_URL;
 
@@ -57,6 +58,13 @@ if (isProtectedEnv && !allowPasswordChange) {
   );
   process.exit(1);
 }
+
+assertOperationalMutationAllowed({
+  operationId: "bootstrap-admin",
+  databaseUrl: connectionString,
+  explicitIntent: allowPasswordChange || !isProtectedEnv,
+  allowedRemoteEnvironments: ["stage", "prod"],
+});
 
 const rawTemporaryPassword = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 
