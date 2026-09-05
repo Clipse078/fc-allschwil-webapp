@@ -773,10 +773,21 @@ export async function activateInvitationMembership(
   userId: string,
   tenantId: string,
 ): Promise<void> {
-  await prisma.tenantMembership.updateMany({
+  const activated = await prisma.tenantMembership.updateMany({
     where: { userId, tenantId, isActive: false },
     data: { isActive: true },
   });
+  if (activated.count > 0) {
+    await logAction({
+      tenantId,
+      actorUserId: userId,
+      moduleKey: "users",
+      entityType: "TenantMembership",
+      entityId: `${tenantId}:${userId}`,
+      action: "MEMBERSHIP_ACTIVATED_BY_INVITATION",
+      metadataJson: { targetUserId: userId },
+    });
+  }
 }
 
 /**

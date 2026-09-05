@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requirePermission } from "@/lib/permissions/require-permission";
+import { logAction } from "@/lib/audit/log-action";
 import { normalizeWorkspaceFolderName } from "@/lib/workspace/folder-service";
 import {
   deleteWorkspaceFolderPermanently,
@@ -890,6 +891,16 @@ export async function moveWorkspaceFolderAction(
       };
     }
 
+    await logAction({
+      tenantId,
+      actorUserId: userId,
+      moduleKey: "workspace",
+      entityType: "WorkspaceFolder",
+      entityId: folder.id,
+      action: "PRIVATE_DOCUMENT_CONTAINER_MOVED",
+      beforeJson: { parentId: folder.parentId },
+      afterJson: { parentId: newParentId },
+    });
     revalidatePath("/dashboard/workspace");
     return { ok: true, data: undefined };
   } catch (error) {
@@ -991,8 +1002,9 @@ export async function deleteWorkspaceFolderPermanentlyAction(
   }
 
   const tenantId = session.user?.activeTenantId;
+  const userId = session.user?.effectiveUserId ?? session.user?.id;
 
-  if (!tenantId) {
+  if (!tenantId || !userId) {
     return {
       ok: false,
       code: "WORKSPACE_FORBIDDEN",
@@ -1012,6 +1024,14 @@ export async function deleteWorkspaceFolderPermanentlyAction(
 
   try {
     await deleteWorkspaceFolderPermanently(tenantId, folderId);
+    await logAction({
+      tenantId,
+      actorUserId: userId,
+      moduleKey: "workspace",
+      entityType: "WorkspaceFolder",
+      entityId: folderId,
+      action: "PRIVATE_DOCUMENT_CONTAINER_DELETED",
+    });
 
     revalidatePath("/dashboard/workspace");
     return { ok: true, data: undefined };

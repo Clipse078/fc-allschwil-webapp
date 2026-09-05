@@ -53,6 +53,7 @@ vi.mock("@/lib/audit/log-action", () => ({
 
 // Import after mocks
 import { prisma } from "@/lib/db/prisma";
+import { logAction } from "@/lib/audit/log-action";
 import {
   invitePersonToTenant,
   createPersonAndInvite,
@@ -743,6 +744,15 @@ describe("Exact tenant activation — activateInvitationMembership", () => {
     // Must target exactly tenantId — NOT a timestamp filter.
     const whereArg = mockMembershipUpdateMany.mock.calls[0]?.[0]?.where;
     expect(whereArg).not.toHaveProperty("joinedAt");
+    expect(vi.mocked(logAction)).toHaveBeenCalledWith({
+      tenantId: TENANT_B,
+      actorUserId: USER_ID,
+      moduleKey: "users",
+      entityType: "TenantMembership",
+      entityId: `${TENANT_B}:${USER_ID}`,
+      action: "MEMBERSHIP_ACTIVATED_BY_INVITATION",
+      metadataJson: { targetUserId: USER_ID },
+    });
   });
 
   it("EXACT-2. activateInvitationMembership for TenantB does NOT touch TenantC membership", async () => {

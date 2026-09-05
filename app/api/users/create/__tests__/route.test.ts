@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userCreate: vi.fn(),
   tenantMembershipCreate: vi.fn(),
+  auditLogCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
@@ -38,10 +39,12 @@ vi.mock("@/lib/db/prisma", () => ({
     tenantMembership: {
       create: mocks.tenantMembershipCreate,
     },
+    auditLog: { create: mocks.auditLogCreate },
     $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
       callback({
         user: { create: mocks.userCreate },
         tenantMembership: { create: mocks.tenantMembershipCreate },
+        auditLog: { create: mocks.auditLogCreate },
       }),
     ),
   },
@@ -122,6 +125,22 @@ describe("POST /api/users/create", () => {
         isActive: true,
       },
     });
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: null,
+        actorUserId: "admin-1",
+        entityId: "user-new-1",
+        action: "PLATFORM_USER_CREATED",
+        afterJson: {
+          isActive: true,
+          tenantMembershipProvisioned: true,
+          tenantId: "tenant-1",
+        },
+      }),
+    });
+    expect(JSON.stringify(mocks.auditLogCreate.mock.calls[0])).not.toContain(
+      "supersecret",
+    );
   });
 
   it("does not create a TenantMembership when the creating admin has no active tenant", async () => {

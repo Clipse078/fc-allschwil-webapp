@@ -124,12 +124,13 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     );
 
     await logAction({
+      tenantId: documentTenantId,
       actorUserId: session.user.effectiveUserId ?? session.user.id ?? null,
       moduleKey: "workspace",
       entityType: "WorkspaceDocument",
       entityId: documentId,
       action: "DELETE",
-      beforeJson: { id: documentId, name: result.documentName, impact: result.impact },
+      beforeJson: { id: documentId, impact: result.impact },
     });
 
     revalidatePath("/dashboard/workspace");

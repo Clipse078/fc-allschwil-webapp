@@ -1,6 +1,7 @@
 ﻿import { WorkspaceDocumentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 
 export type WorkspaceDocumentArchiveServiceErrorCode =
   | "INVALID_INPUT"
@@ -114,27 +115,38 @@ export async function archiveWorkspaceDocument(
 
   const archivedAt = new Date();
 
-  return prisma.workspaceDocument.update({
-    where: {
-      id: documentId,
-    },
-    data: {
-      status: WorkspaceDocumentStatus.ARCHIVED,
-      archivedAt,
-      updatedByUserId: actorUserId,
-    },
-    select: {
-      id: true,
-      status: true,
-      archivedAt: true,
-      updatedByUserId: true,
-    },
-  }).then((document) => {
+  return prisma.$transaction(async (tx) => {
+    const document = await tx.workspaceDocument.update({
+      where: {
+        id: documentId,
+      },
+      data: {
+        status: WorkspaceDocumentStatus.ARCHIVED,
+        archivedAt,
+        updatedByUserId: actorUserId,
+      },
+      select: {
+        id: true,
+        status: true,
+        archivedAt: true,
+        updatedByUserId: true,
+      },
+    });
     if (!document.archivedAt || !document.updatedByUserId) {
       throw new Error(
         "Archived document did not return the required archive metadata.",
       );
     }
+    await writeAuditRecord(tx, {
+      tenantId,
+      actorUserId,
+      moduleKey: "workspace",
+      entityType: "WorkspaceDocument",
+      entityId: document.id,
+      action: "PRIVATE_DOCUMENT_ARCHIVED",
+      beforeJson: { status: existingDocument.status },
+      afterJson: { status: document.status },
+    });
 
     return {
       documentId: document.id,

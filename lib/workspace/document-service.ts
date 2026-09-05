@@ -4,6 +4,7 @@ import {
 } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 import type {
   CreateWorkspaceDocumentInput,
   GetWorkspaceDocumentForDownloadInput,
@@ -156,7 +157,7 @@ export async function createWorkspaceDocumentWithInitialVersion(
       },
     });
 
-    return transaction.workspaceDocument.update({
+    const completedDocument = await transaction.workspaceDocument.update({
       where: {
         id: document.id,
       },
@@ -194,6 +195,21 @@ export async function createWorkspaceDocumentWithInitialVersion(
         },
       },
     });
+    await writeAuditRecord(transaction, {
+      tenantId,
+      actorUserId,
+      moduleKey: "workspace",
+      entityType: "WorkspaceDocument",
+      entityId: document.id,
+      action: "PRIVATE_DOCUMENT_UPLOADED",
+      afterJson: {
+        folderId,
+        versionId: version.id,
+        mimeType,
+        sizeBytes,
+      },
+    });
+    return completedDocument;
   });
 }
 export async function listWorkspaceDocuments(
