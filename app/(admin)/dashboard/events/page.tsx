@@ -11,6 +11,7 @@ import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getAvailableTeamSeasons } from "@/lib/teams/queries";
 import { getEventsListData } from "@/lib/events/queries";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
 import SeasonContextSelector from "@/components/admin/shared/SeasonContextSelector";
 
@@ -107,8 +108,9 @@ export default async function EventsPage({ searchParams }: EventsPageProps) {
   ]);
 
   const params = (await searchParams) ?? {};
+  const tenantId = await requireActiveTenantId();
   const availableSeasons = (await getAvailableTeamSeasons()) as SeasonOption[];
-  const allEvents = (await getEventsListData()) as EventItem[];
+  const allEvents = (await getEventsListData(tenantId)) as EventItem[];
 
   const fallbackSeason =
     availableSeasons.find((s) => s.isActive)?.key ??
