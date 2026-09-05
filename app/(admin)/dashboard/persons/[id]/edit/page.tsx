@@ -1,16 +1,18 @@
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/permissions/require-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getPersonById } from "@/lib/people/queries";
+import { getPersonByIdForTenant } from "@/lib/people/queries";
+import { requireActiveTenantId } from "@/lib/tenants/active-tenant";
 import PersonForm from "@/components/admin/persons/PersonForm";
 
 type PageProps = { params: Promise<{ id: string }> };
 
 export default async function EditPersonPage({ params }: PageProps) {
   await requirePermission(PERMISSIONS.PEOPLE_MANAGE);
+  const tenantId = await requireActiveTenantId();
 
   const { id } = await params;
-  const person = await getPersonById(id);
+  const person = await getPersonByIdForTenant(id, tenantId);
   if (!person) notFound();
 
   return (

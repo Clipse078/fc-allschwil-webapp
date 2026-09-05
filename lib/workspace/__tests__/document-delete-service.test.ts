@@ -145,7 +145,7 @@ describe("deleteWorkspaceDocumentPermanently", () => {
     expect(mocks.workspaceDocumentDelete).not.toHaveBeenCalled();
   });
 
-  it("7 — storage delete called for all version blobs (storageUrl preferred over storageKey)", async () => {
+  it("7 — storage delete uses owned keys and never persisted URLs", async () => {
     mocks.workspaceDocumentFindUnique.mockResolvedValueOnce(
       makeDocumentWithVersions([
         { id: "v1", storageKey: "workspace/key1", storageUrl: "https://blob.example/url1" },
@@ -156,7 +156,7 @@ describe("deleteWorkspaceDocumentPermanently", () => {
     await deleteWorkspaceDocumentPermanently(TENANT_A, DOC_ID);
 
     expect(mocks.storageDelete).toHaveBeenCalledTimes(2);
-    expect(mocks.storageDelete).toHaveBeenNthCalledWith(1, "https://blob.example/url1");
+    expect(mocks.storageDelete).toHaveBeenNthCalledWith(1, "workspace/key1");
     expect(mocks.storageDelete).toHaveBeenNthCalledWith(2, "workspace/key2");
   });
 

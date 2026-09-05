@@ -111,7 +111,7 @@ export async function GET(
     }
 
     const headers = new Headers({
-      "Cache-Control": "private, max-age=60",
+      "Cache-Control": "private, no-store",
       "Content-Disposition": `inline; filename="${safeFilename(document.filename)}"`,
       "Content-Type": downloadResult.contentType,
       "X-Content-Type-Options": "nosniff",

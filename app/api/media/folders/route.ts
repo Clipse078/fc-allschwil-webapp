@@ -8,7 +8,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { listMediaFolders, buildFolderTree, createMediaFolder } from "@/lib/media/queries";
+import {
+  listMediaFolders,
+  buildFolderTree,
+  createMediaFolder,
+  validateMediaReferencesForTenant,
+} from "@/lib/media/queries";
 
 const MEDIA_PERMISSIONS = [PERMISSIONS.NEWS_MANAGE, PERMISSIONS.WEBSITE_MANAGE];
 
@@ -54,6 +59,17 @@ export async function POST(request: NextRequest) {
 
   const parentId =
     typeof body.parentId === "string" ? body.parentId : null;
+
+  if (
+    !(await validateMediaReferencesForTenant(tenantId, {
+      folderId: parentId,
+    }))
+  ) {
+    return NextResponse.json(
+      { error: "Übergeordneter Medienordner nicht gefunden." },
+      { status: 404 },
+    );
+  }
 
   const folder = await createMediaFolder({ tenantId, name, parentId });
 

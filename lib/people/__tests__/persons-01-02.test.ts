@@ -41,6 +41,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   personFindMany: vi.fn(),
+  personFindFirst: vi.fn(),
   personFindUnique: vi.fn(),
   personCreate: vi.fn(),
   personAssignmentCreate: vi.fn(),
@@ -64,6 +65,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     person: {
       findMany: mocks.personFindMany,
+      findFirst: mocks.personFindFirst,
       findUnique: mocks.personFindUnique,
       create: mocks.personCreate,
     },
@@ -90,6 +92,7 @@ vi.mock("@/lib/db/prisma", () => ({
 import {
   getPersonsForDirectory,
   findDuplicateCandidates,
+  getPersonByIdForTenant,
   getPersonAssignments,
 } from "../queries";
 
@@ -138,6 +141,28 @@ function makeAssignment(overrides: Record<string, unknown> = {}) {
 }
 
 // ── TENANCY ───────────────────────────────────────────────────────────────────
+
+describe("getPersonByIdForTenant — strict tenant isolation", () => {
+  beforeEach(() => { vi.clearAllMocks(); });
+
+  it("queries the person ID together with the session tenant", async () => {
+    mocks.personFindFirst.mockResolvedValue(null);
+
+    await expect(
+      getPersonByIdForTenant("person-b", "tenant-a"),
+    ).resolves.toBeNull();
+
+    expect(mocks.personFindFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "person-b",
+          tenantId: "tenant-a",
+        },
+      }),
+    );
+    expect(mocks.personFindUnique).not.toHaveBeenCalled();
+  });
+});
 
 describe("getPersonsForDirectory — strict tenant isolation", () => {
   beforeEach(() => { vi.clearAllMocks(); });

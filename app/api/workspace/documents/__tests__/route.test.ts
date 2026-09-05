@@ -170,7 +170,7 @@ function makeMultipartRequest(
 
 function makePdfFile(
   name = "Trainer Handbuch.pdf",
-  content = "document-content",
+  content = "%PDF-1.4\n%workspace-test\n",
 ): File {
   return new File([content], name, {
     type: "application/pdf",
@@ -679,6 +679,21 @@ describe("POST /api/workspace/documents", () => {
     expect(mocks.upload).not.toHaveBeenCalled();
   });
 
+  it("rejects executable content disguised as an allowed PDF", async () => {
+    const response = await POST(
+      makeMultipartRequest({
+        file: makePdfFile(
+          "report.pdf",
+          "<script>location='https://attacker.invalid'</script>",
+        ),
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.createDocument).not.toHaveBeenCalled();
+  });
+
   it("uploads privately and creates the initial document version", async () => {
     const response = await POST(
       makeMultipartRequest({
@@ -695,6 +710,13 @@ describe("POST /api/workspace/documents", () => {
 
     expect(body.document.id).toBe(DOCUMENT_ID);
     expect(body.document.name).toBe("Trainer-Handbuch");
+    expect(body.document).not.toHaveProperty("tenantId");
+    expect(body.document.currentVersion).not.toHaveProperty(
+      "storageKey",
+    );
+    expect(body.document.currentVersion).not.toHaveProperty(
+      "storageUrl",
+    );
 
     expect(mocks.randomUUID).toHaveBeenCalledTimes(1);
 
@@ -882,7 +904,7 @@ describe("POST /api/workspace/documents", () => {
       });
 
       expect(mocks.delete).toHaveBeenCalledWith(
-        uploadedBlob.storageUrl,
+        uploadedBlob.storageKey,
       );
     },
   );
@@ -933,7 +955,7 @@ describe("POST /api/workspace/documents", () => {
     });
 
     expect(mocks.delete).toHaveBeenCalledWith(
-      uploadedBlob.storageUrl,
+      uploadedBlob.storageKey,
     );
 
     expect(consoleError).toHaveBeenCalled();

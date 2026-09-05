@@ -16,6 +16,12 @@ import { getTeamPhotoKey } from "@/lib/assets/tenant-paths";
 import { deleteOrphanedLogo, isVercelBlobUrl } from "@/lib/assets/storage";
 import { logAction } from "@/lib/audit/log-action";
 
+function getSafeErrorCategory(error: unknown): string {
+  return error instanceof Error && error.name
+    ? error.name
+    : "UnknownError";
+}
+
 export const ALLOWED_TEAM_PHOTO_MIMES = new Set([
   "image/jpeg",
   "image/png",
@@ -188,7 +194,10 @@ export async function uploadTeamPhoto({
         // Best-effort cleanup after failed DB update
       }
     }
-    console.error("[team-photo-shared] upload failed:", error);
+    console.error("[team-photo-shared] operation failed", {
+      operation: "upload",
+      errorCategory: getSafeErrorCategory(error),
+    });
     return { ok: false, status: 500, error: "Teamfoto konnte nicht hochgeladen werden." };
   }
 }
@@ -246,7 +255,10 @@ export async function removeTeamPhoto({
 
     return { ok: true, message: "Teamfoto entfernt." };
   } catch (error) {
-    console.error("[team-photo-shared] remove failed:", error);
+    console.error("[team-photo-shared] operation failed", {
+      operation: "remove",
+      errorCategory: getSafeErrorCategory(error),
+    });
     return { ok: false, status: 500, error: "Teamfoto konnte nicht entfernt werden." };
   }
 }

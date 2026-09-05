@@ -16,6 +16,12 @@ import { prisma } from "@/lib/db/prisma";
 import { isVercelBlobUrl } from "@/lib/media/upload";
 import { logAction } from "@/lib/audit/log-action";
 
+function getSafeErrorCategory(error: unknown): string {
+  return error instanceof Error && error.name
+    ? error.name
+    : "UnknownError";
+}
+
 export const ALLOWED_IMAGE_MIMES = new Set(["image/jpeg", "image/png", "image/webp"]);
 export const MIME_TO_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
@@ -134,7 +140,10 @@ export async function uploadPersonProfileImage({
 
     return { ok: true, imageUrl: blob.url };
   } catch (error) {
-    console.error("[profile-image-shared] upload failed:", error);
+    console.error("[profile-image-shared] operation failed", {
+      operation: "upload",
+      errorCategory: getSafeErrorCategory(error),
+    });
     return { ok: false, status: 500, error: "Bild konnte nicht hochgeladen werden." };
   }
 }
@@ -186,7 +195,10 @@ export async function removePersonProfileImage({
 
     return { ok: true, message: "Profilbild entfernt." };
   } catch (error) {
-    console.error("[profile-image-shared] remove failed:", error);
+    console.error("[profile-image-shared] operation failed", {
+      operation: "remove",
+      errorCategory: getSafeErrorCategory(error),
+    });
     return { ok: false, status: 500, error: "Profilbild konnte nicht entfernt werden." };
   }
 }

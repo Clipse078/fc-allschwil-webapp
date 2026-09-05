@@ -46,6 +46,12 @@
 
 import { put } from "@vercel/blob";
 
+function getSafeErrorCategory(error: unknown): string {
+  return error instanceof Error && error.name
+    ? error.name
+    : "UnknownError";
+}
+
 export type PersistBackupSnapshotResult =
   | { ok: true; url: string; pathname: string }
   | { ok: false; status: number; error: string };
@@ -86,10 +92,10 @@ export async function persistConsolidationBackupSnapshot(
 
     return { ok: true, url: blob.url, pathname: blob.pathname ?? key };
   } catch (err) {
-    console.error(
-      "[ops-backup-storage] Failed to persist pre-mutation backup snapshot:",
-      err instanceof Error ? err.message : "unknown",
-    );
+    console.error("[ops-backup-storage] backup persistence failed", {
+      operation: "put",
+      errorCategory: getSafeErrorCategory(err),
+    });
     return {
       ok: false,
       status: 500,
