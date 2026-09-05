@@ -18,7 +18,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth, unstable_update } from "@/auth";
+import { auth, refreshEffectiveUserSession } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
 
@@ -187,7 +187,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     await logAction({
-      actorUserId: session.user.id,
+      actorUserId: session.user.actorUserId ?? session.user.id,
       moduleKey: "account",
       entityType: "User",
       entityId: session.user.id,
@@ -199,14 +199,11 @@ export async function PATCH(request: NextRequest) {
       },
     });
 
-    // Refresh the JWT so topnav / sidebar names update without re-login.
-    await unstable_update({
-      user: {
-        ...session.user,
-        firstName,
-        lastName,
-      },
-    });
+    // Refresh from live server state; no browser/session object fields are
+    // copied into the JWT.
+    await refreshEffectiveUserSession(
+      session.user.actorUserId ?? session.user.id,
+    );
 
     return NextResponse.json({
       message: "Profil aktualisiert.",

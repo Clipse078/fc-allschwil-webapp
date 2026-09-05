@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth, unstable_update } from "@/auth";
+import { auth, stopImpersonationSession } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-import {
-  resolveSessionPermissionKeys,
-  resolveTenantMembershipContext,
-} from "@/lib/auth/session-context";
+import { logAction } from "@/lib/audit/log-action";
 
 export async function POST(_: NextRequest) {
   const session = await auth();
@@ -18,11 +15,7 @@ export async function POST(_: NextRequest) {
 
   const actorUser = await prisma.user.findUnique({
     where: { id: session.user.actorUserId },
-    include: {
-      userRoles: {
-        select: { role: { select: { key: true } } },
-      },
-    },
+    select: { id: true, isActive: true },
   });
 
   if (!actorUser || !actorUser.isActive) {
@@ -32,33 +25,30 @@ export async function POST(_: NextRequest) {
     );
   }
 
-  const roleKeys = Array.from(new Set(actorUser.userRoles.map((userRole) => userRole.role.key)));
+  const updatedSession = await stopImpersonationSession(actorUser.id);
 
-  // RPERM-04: rebuild the restored session through the same tenant-resolution
-  // model used at login — see lib/auth/session-context.ts.
-  const tenantContext = await resolveTenantMembershipContext(prisma, actorUser.id);
-  const permissionKeys = await resolveSessionPermissionKeys(
-    prisma,
-    actorUser.id,
-    tenantContext.activeTenantId,
-  );
+  if (
+    !updatedSession?.user ||
+    updatedSession.user.isImpersonating ||
+    updatedSession.user.actorUserId !== actorUser.id ||
+    updatedSession.user.effectiveUserId !== actorUser.id
+  ) {
+    return NextResponse.json(
+      { error: "Impersonation konnte nicht sicher beendet werden." },
+      { status: 409 },
+    );
+  }
 
-  await unstable_update({
-    user: {
-      id: actorUser.id,
-      email: actorUser.email,
-      firstName: actorUser.firstName,
-      lastName: actorUser.lastName,
-      roleKeys,
-      permissionKeys,
-      isImpersonating: false,
-      actorUserId: undefined,
-      actorEmail: undefined,
-      actorName: undefined,
-      effectiveUserId: actorUser.id,
-      activeTenantId: tenantContext.activeTenantId,
-      activeMembershipId: tenantContext.activeMembershipId,
-      availableTenants: tenantContext.availableTenants,
+  await logAction({
+    actorUserId: actorUser.id,
+    tenantId: updatedSession.user.activeTenantId,
+    moduleKey: "users",
+    entityType: "User",
+    entityId: session.user.effectiveUserId ?? session.user.id,
+    action: "impersonation_stopped",
+    metadataJson: {
+      actorUserId: actorUser.id,
+      effectiveUserId: session.user.effectiveUserId ?? session.user.id,
     },
   });
 

@@ -24,10 +24,11 @@ export async function requireApiPermission(permissionKey: PermissionKey, tenantI
   }
 
   const effectiveTenantId = tenantId ?? session.user.activeTenantId ?? undefined;
+  const effectiveUserId = session.user.effectiveUserId ?? session.user.id;
 
   const resolver = createEffectivePermissionResolver(prisma);
   const { platform, tenant } = await resolver.getEffectivePermissions({
-    userId: session.user.id,
+    userId: effectiveUserId,
     tenantId: effectiveTenantId,
   });
 

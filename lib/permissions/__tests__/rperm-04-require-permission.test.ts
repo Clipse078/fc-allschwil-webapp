@@ -199,6 +199,30 @@ describe("requireApiPermission", () => {
       expect(result.session.user.id).toBe("user-1");
     }
   });
+
+  it("API-05: authorizes the effective user during trusted impersonation", async () => {
+    mocks.auth.mockResolvedValue({
+      user: {
+        id: "effective-user",
+        effectiveUserId: "effective-user",
+        actorUserId: "canonical-actor",
+        activeTenantId: "tenant-1",
+        isImpersonating: true,
+      },
+    });
+    mocks.getEffectivePermissions.mockResolvedValue({
+      platform: [],
+      tenant: ["teams.manage"],
+    });
+
+    const result = await requireApiPermission("teams.manage" as never);
+
+    expect(result.ok).toBe(true);
+    expect(mocks.getEffectivePermissions).toHaveBeenCalledWith({
+      userId: "effective-user",
+      tenantId: "tenant-1",
+    });
+  });
 });
 
 describe("requireApiAnyPermission", () => {

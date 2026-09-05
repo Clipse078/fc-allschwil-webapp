@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth, unstable_update } from "@/auth";
+import { startImpersonationSession } from "@/auth";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requireApiPermission } from "@/lib/permissions/require-api-permission";
-import {
-  resolveSessionPermissionKeys,
-  resolveTenantMembershipContext,
-} from "@/lib/auth/session-context";
+import { logAction } from "@/lib/audit/log-action";
 
 type RouteContext = {
   params: Promise<{
@@ -21,15 +18,18 @@ export async function POST(_: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const session = await auth();
-
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const session = access.session;
 
   const { userId } = await context.params;
 
-  if (session.user.effectiveUserId === userId) {
+  if (session.user.isImpersonating) {
+    return NextResponse.json(
+      { error: "Eine aktive Impersonation muss zuerst beendet werden." },
+      { status: 400 },
+    );
+  }
+
+  if ((session.user.effectiveUserId ?? session.user.id) === userId) {
     return NextResponse.json(
       { error: "Dieser Benutzer ist bereits aktiv." },
       { status: 400 }
@@ -38,11 +38,7 @@ export async function POST(_: NextRequest, context: RouteContext) {
 
   const targetUser = await prisma.user.findUnique({
     where: { id: userId },
-    include: {
-      userRoles: {
-        select: { role: { select: { key: true } } },
-      },
-    },
+    select: { id: true, isActive: true },
   });
 
   if (!targetUser || !targetUser.isActive) {
@@ -52,38 +48,30 @@ export async function POST(_: NextRequest, context: RouteContext) {
     );
   }
 
-  const roleKeys = Array.from(new Set(targetUser.userRoles.map((userRole) => userRole.role.key)));
+  const actorUserId = session.user.actorUserId ?? session.user.id;
+  const updatedSession = await startImpersonationSession(actorUserId, targetUser.id);
 
-  // RPERM-04: the impersonated session must be built through the exact same
-  // tenant-resolution model as a real login — TenantMembership-derived tenant
-  // context and resolver-derived permission keys, never a flatten of every
-  // role's permissions regardless of scope/tenant ownership.
-  const tenantContext = await resolveTenantMembershipContext(prisma, targetUser.id);
-  const permissionKeys = await resolveSessionPermissionKeys(
-    prisma,
-    targetUser.id,
-    tenantContext.activeTenantId,
-  );
+  if (
+    !updatedSession?.user.isImpersonating ||
+    updatedSession.user.actorUserId !== actorUserId ||
+    updatedSession.user.effectiveUserId !== targetUser.id
+  ) {
+    return NextResponse.json(
+      { error: "Impersonation konnte nicht sicher hergestellt werden." },
+      { status: 409 },
+    );
+  }
 
-  const actorName =
-    (session.user.firstName + " " + session.user.lastName).trim() || session.user.email;
-
-  await unstable_update({
-    user: {
-      id: targetUser.id,
-      email: targetUser.email,
-      firstName: targetUser.firstName,
-      lastName: targetUser.lastName,
-      roleKeys,
-      permissionKeys,
-      isImpersonating: true,
-      actorUserId: session.user.actorUserId ?? session.user.id,
-      actorEmail: session.user.actorEmail ?? session.user.email,
-      actorName: session.user.actorName ?? actorName,
+  await logAction({
+    actorUserId,
+    tenantId: updatedSession.user.activeTenantId,
+    moduleKey: "users",
+    entityType: "User",
+    entityId: targetUser.id,
+    action: "impersonation_started",
+    metadataJson: {
+      actorUserId,
       effectiveUserId: targetUser.id,
-      activeTenantId: tenantContext.activeTenantId,
-      activeMembershipId: tenantContext.activeMembershipId,
-      availableTenants: tenantContext.availableTenants,
     },
   });
 
