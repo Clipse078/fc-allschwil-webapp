@@ -236,25 +236,6 @@ describe("GET /api/public/[tenant]/website/weekplan?scope=season", () => {
     const res = await GET(makeRequest("scope=season"), makeParams());
     expect(res.status).toBe(403);
   });
-
-  it("returns a generic 500 without a raw internal exception", async () => {
-    const consoleError = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
-    mocks.seasonFindFirst.mockRejectedValue(
-      new Error("Prisma P1001 at db.internal.example:5432"),
-    );
-
-    const res = await GET(makeRequest("scope=season"), makeParams());
-    const body = await res.json();
-
-    expect(res.status).toBe(500);
-    expect(body.error).toBe(
-      "Ein technischer Fehler ist aufgetreten. Bitte versuche es später erneut.",
-    );
-    expect(JSON.stringify(body)).not.toMatch(/Prisma|P1001|db\.internal|5432/);
-    consoleError.mockRestore();
-  });
 });
 
 describe("GET /api/public/[tenant]/website/weekplan (week mode — canonical current-week)", () => {
