@@ -2,17 +2,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
-  hashPassword: vi.fn(),
-  userUpdate: vi.fn(),
+  requirePlatformApiPermission: vi.fn(),
+  resetPlatformAccountPassword: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
+  requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
-vi.mock("@/lib/auth/password", () => ({ hashPassword: mocks.hashPassword }));
-vi.mock("@/lib/db/prisma", () => ({
-  prisma: { user: { update: mocks.userUpdate } },
+vi.mock("@/lib/users/platform-account-service", () => ({
+  resetPlatformAccountPassword: mocks.resetPlatformAccountPassword,
+  PlatformAccountDomainError: class PlatformAccountDomainError extends Error {},
 }));
 
 import { POST } from "../route";
@@ -29,18 +28,18 @@ const context = { params: Promise.resolve({ userId: "user-2" }) };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireApiPermission.mockResolvedValue({
+  mocks.requirePlatformApiPermission.mockResolvedValue({
     ok: true,
     status: 200,
     error: null,
+    actorUserId: "platform-admin",
   });
-  mocks.hashPassword.mockResolvedValue("new-password-hash");
-  mocks.userUpdate.mockResolvedValue({ id: "user-2" });
+  mocks.resetPlatformAccountPassword.mockResolvedValue(undefined);
 });
 
 describe("POST /api/users/[userId]/reset-password", () => {
   it("preserves the permission gate", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requirePlatformApiPermission.mockResolvedValue({
       ok: false,
       status: 401,
       error: "Unauthorized",
@@ -49,33 +48,24 @@ describe("POST /api/users/[userId]/reset-password", () => {
     const response = await POST(request("SecurePassword123!"), context);
 
     expect(response.status).toBe(401);
-    expect(mocks.hashPassword).not.toHaveBeenCalled();
-    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    expect(mocks.resetPlatformAccountPassword).not.toHaveBeenCalled();
   });
 
   it("rejects an invalid password without writing", async () => {
     const response = await POST(request("short"), context);
 
     expect(response.status).toBe(400);
-    expect(mocks.userUpdate).not.toHaveBeenCalled();
+    expect(mocks.resetPlatformAccountPassword).not.toHaveBeenCalled();
   });
 
   it("sets passwordChangedAt with the new hash so existing sessions revoke", async () => {
-    const before = Date.now();
-
     const response = await POST(request("SecurePassword123!"), context);
 
     expect(response.status).toBe(200);
-    expect(mocks.userUpdate).toHaveBeenCalledWith({
-      where: { id: "user-2" },
-      data: {
-        passwordHash: "new-password-hash",
-        passwordChangedAt: expect.any(Date),
-      },
+    expect(mocks.resetPlatformAccountPassword).toHaveBeenCalledWith({
+      userId: "user-2",
+      password: "SecurePassword123!",
+      actorUserId: "platform-admin",
     });
-    const changedAt = mocks.userUpdate.mock.calls[0][0].data
-      .passwordChangedAt as Date;
-    expect(changedAt.getTime()).toBeGreaterThanOrEqual(before);
-    expect(changedAt.getTime()).toBeLessThanOrEqual(Date.now());
   });
 });

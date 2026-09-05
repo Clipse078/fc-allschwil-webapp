@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
+import {
+  PlatformAccountDomainError,
+  updatePlatformAccount,
+} from "@/lib/users/platform-account-service";
 
 type RouteContext = {
   params: Promise<{
@@ -10,7 +14,7 @@ type RouteContext = {
 };
 
 export async function GET(_: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
@@ -48,7 +52,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
@@ -58,42 +62,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const { userId } = await context.params;
     const body = await request.json();
 
-    const firstName = String(body.firstName ?? "").trim();
-    const lastName = String(body.lastName ?? "").trim();
-    const email = String(body.email ?? "").trim().toLowerCase();
-    const isActive = Boolean(body.isActive);
-
-    if (!firstName || !lastName || !email) {
+    if (typeof body.isActive !== "boolean") {
       return NextResponse.json(
-        { error: "Vorname, Nachname und E-Mail sind erforderlich." },
+        { error: "isActive (boolean) ist erforderlich." },
         { status: 400 }
       );
     }
 
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        email,
-        NOT: {
-          id: userId,
-        },
-      },
-    });
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: "Diese E-Mail ist bereits vergeben." },
-        { status: 409 }
-      );
-    }
-
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        firstName,
-        lastName,
-        email,
-        isActive,
-      },
+    const updatedUser = await updatePlatformAccount({
+      userId,
+      firstName: String(body.firstName ?? ""),
+      lastName: String(body.lastName ?? ""),
+      email: String(body.email ?? ""),
+      isActive: body.isActive,
+      actorUserId: access.actorUserId,
     });
 
     return NextResponse.json({
@@ -101,6 +83,20 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       message: "Benutzer erfolgreich aktualisiert.",
     });
   } catch (error) {
+    if (error instanceof PlatformAccountDomainError) {
+      const status =
+        error.code === "USER_NOT_FOUND"
+          ? 404
+          : error.code === "EMAIL_TAKEN"
+            ? 409
+            : error.code === "LAST_SUPER_ADMIN"
+              ? 409
+              : 400;
+      return NextResponse.json(
+        { error: error.message, code: error.code },
+        { status },
+      );
+    }
     console.error("Update user failed:", error);
 
     return NextResponse.json(

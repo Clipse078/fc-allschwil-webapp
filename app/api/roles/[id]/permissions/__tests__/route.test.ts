@@ -12,15 +12,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
+  requirePlatformApiPermission: vi.fn(),
   role: { findFirst: vi.fn() },
-  rolePermission: { count: vi.fn(), deleteMany: vi.fn(), createMany: vi.fn() },
+  rolePermission: {
+    findMany: vi.fn(),
+    deleteMany: vi.fn(),
+    createMany: vi.fn(),
+  },
   permission: { findMany: vi.fn() },
   transaction: vi.fn(),
+  queryRaw: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
+  requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -35,7 +40,7 @@ vi.mock("@/lib/db/prisma", () => ({
 import { PUT } from "@/app/api/roles/[id]/permissions/route";
 
 function mockAuthorized() {
-  mocks.requireApiPermission.mockResolvedValue({
+  mocks.requirePlatformApiPermission.mockResolvedValue({
     ok: true,
     status: 200,
     error: null,
@@ -55,8 +60,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockAuthorized();
   mocks.role.findFirst.mockResolvedValue({ id: "role-1", key: "match_coordinator" });
-  mocks.rolePermission.count.mockResolvedValue(1);
-  mocks.transaction.mockResolvedValue(undefined);
+  mocks.rolePermission.findMany.mockResolvedValue([]);
+  mocks.transaction.mockImplementation(
+    async (callback: (tx: unknown) => unknown) =>
+      callback({
+        $queryRawUnsafe: mocks.queryRaw,
+        rolePermission: mocks.rolePermission,
+      }),
+  );
 });
 
 describe("PUT /api/roles/[id]/permissions — RPERM-05-C1 scope validation", () => {
@@ -115,5 +126,27 @@ describe("PUT /api/roles/[id]/permissions — RPERM-05-C1 scope validation", () 
 
     expect(res.status).toBe(404);
     expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("cannot remove existing authority from the canonical super_admin role", async () => {
+    mocks.role.findFirst.mockResolvedValue({
+      id: "role-super",
+      key: "super_admin",
+    });
+    mocks.rolePermission.findMany.mockResolvedValue([
+      { permission: { key: "users.manage" } },
+      { permission: { key: "users.delete" } },
+    ]);
+    mocks.permission.findMany.mockResolvedValue([
+      { id: "perm-manage", key: "users.manage", scope: "PLATFORM" },
+    ]);
+
+    const res = await PUT(makeRequest(["users.manage"]) as never, {
+      params: Promise.resolve({ id: "role-super" }),
+    });
+
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("PROTECTED_ROLE");
+    expect(mocks.rolePermission.deleteMany).not.toHaveBeenCalled();
   });
 });

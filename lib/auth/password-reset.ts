@@ -25,6 +25,10 @@
 import crypto from "crypto";
 import type { PrismaClient } from "@prisma/client";
 import { hashPassword } from "@/lib/auth/password";
+import {
+  acquirePlatformSuperAdminMutationLock,
+  platformSuperAdminAssignmentWhere,
+} from "@/lib/security/platform-superadmin";
 
 export const TOKEN_EXPIRY_MS = 60 * 60 * 1000; // 60 minutes
 export const TOKEN_BYTES = 32; // 256 bits of entropy
@@ -104,7 +108,19 @@ export async function validatePasswordResetToken(
   const record = await prisma.passwordResetToken.findUnique({
     where: { tokenHash },
     include: {
-      user: { select: { id: true, email: true, isActive: true, lastLoginAt: true } },
+      user: {
+        select: {
+          id: true,
+          email: true,
+          isActive: true,
+          lastLoginAt: true,
+          userRoles: {
+            where: platformSuperAdminAssignmentWhere,
+            select: { id: true },
+            take: 1,
+          },
+        },
+      },
     },
   });
 
@@ -112,6 +128,9 @@ export async function validatePasswordResetToken(
   if (record.usedAt !== null) return null;
   if (record.expiresAt < new Date()) return null;
   if (!record.user.isActive) return null;
+  // Privileged accounts use authenticated self-service, another authorized
+  // platform administrator, or the explicit operator break-glass path.
+  if (record.user.userRoles.length > 0) return null;
 
   return {
     tokenId: record.id,
@@ -141,38 +160,149 @@ export async function validatePasswordResetToken(
  * Never touches: roles, memberships, permissions, isActive, email,
  * tenantId, or any other user field.
  *
- * Returns true on success, false if the token is invalid/expired/used.
+ * Returns the consumed token context on success, null otherwise.
  */
 export async function consumePasswordResetToken(
   prisma: PrismaClient,
   rawToken: string,
   newPassword: string,
-): Promise<boolean> {
+): Promise<ValidatedToken | null> {
   const validated = await validatePasswordResetToken(prisma, rawToken);
-  if (!validated) return false;
+  if (!validated) return null;
 
   const newPasswordHash = await hashPassword(newPassword);
-  const now = new Date();
+  const tokenHash = hashResetToken(rawToken);
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: validated.userId },
+  return prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
+    const current = await tx.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            isActive: true,
+            lastLoginAt: true,
+            userRoles: {
+              where: platformSuperAdminAssignmentWhere,
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const now = new Date();
+    if (
+      !current ||
+      current.usedAt !== null ||
+      current.expiresAt <= now ||
+      !current.user.isActive ||
+      current.user.userRoles.length > 0
+    ) {
+      return null;
+    }
+
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: {
+        id: current.id,
+        usedAt: null,
+        expiresAt: { gt: now },
+        user: { isActive: true },
+      },
+      data: { usedAt: now },
+    });
+    if (claimed.count !== 1) return null;
+
+    await tx.user.update({
+      where: { id: current.user.id },
       data: {
         passwordHash: newPasswordHash,
         passwordChangedAt: now,
       },
-    }),
-    prisma.passwordResetToken.update({
-      where: { id: validated.tokenId },
-      data: { usedAt: now },
-    }),
-    prisma.passwordResetToken.deleteMany({
+    });
+    await tx.passwordResetToken.deleteMany({
       where: {
-        userId: validated.userId,
-        id: { not: validated.tokenId },
+        userId: current.user.id,
+        id: { not: current.id },
       },
-    }),
-  ]);
+    });
 
-  return true;
+    return {
+      tokenId: current.id,
+      userId: current.user.id,
+      userEmail: current.user.email,
+      isInvitation: current.isInvitation,
+      isExistingUser: current.user.lastLoginAt !== null,
+      invitationTenantId: current.invitationTenantId ?? null,
+    };
+  });
+}
+
+/**
+ * Atomically consumes an invitation token without changing a password.
+ * Existing-user invitation acceptance shares the same one-winner claim as
+ * password reset consumption.
+ */
+export async function consumeExistingUserInvitationToken(
+  prisma: PrismaClient,
+  rawToken: string,
+): Promise<ValidatedToken | null> {
+  if (!rawToken) return null;
+  const tokenHash = hashResetToken(rawToken);
+
+  return prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
+    const current = await tx.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            isActive: true,
+            lastLoginAt: true,
+            userRoles: {
+              where: platformSuperAdminAssignmentWhere,
+              select: { id: true },
+              take: 1,
+            },
+          },
+        },
+      },
+    });
+    const now = new Date();
+    if (
+      !current ||
+      !current.isInvitation ||
+      current.user.lastLoginAt === null ||
+      current.usedAt !== null ||
+      current.expiresAt <= now ||
+      !current.user.isActive ||
+      current.user.userRoles.length > 0
+    ) {
+      return null;
+    }
+
+    const claimed = await tx.passwordResetToken.updateMany({
+      where: {
+        id: current.id,
+        usedAt: null,
+        expiresAt: { gt: now },
+        user: { isActive: true },
+      },
+      data: { usedAt: now },
+    });
+    if (claimed.count !== 1) return null;
+
+    return {
+      tokenId: current.id,
+      userId: current.user.id,
+      userEmail: current.user.email,
+      isInvitation: true,
+      isExistingUser: true,
+      invitationTenantId: current.invitationTenantId ?? null,
+    };
+  });
 }

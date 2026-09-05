@@ -1,7 +1,7 @@
 /**
  * scripts/stage-auth-password-check.ts
  *
- * READ-ONLY password-match check for admin@fcallschwil.ch.
+ * READ-ONLY password-match check for an operator-selected platform Superadmin.
  *
  * SAFETY INVARIANT:
  *   This script executes ONLY a SELECT statement.
@@ -15,6 +15,7 @@
  *
  * Required env vars:
  *   DATABASE_URL          — connection string for the target DB
+ *   TARGET_SUPERADMIN_EMAIL — exact platform Superadmin email
  *   STAGE_LOGIN_PASSWORD  — plaintext password to test (value never printed)
  *
  * Output (three lines only):
@@ -25,7 +26,7 @@
  * Exit code: always 0.
  *
  * Usage:
- *   DATABASE_URL=<url> STAGE_LOGIN_PASSWORD=<pw> npx tsx scripts/stage-auth-password-check.ts
+ *   DATABASE_URL=<url> TARGET_SUPERADMIN_EMAIL=<email> STAGE_LOGIN_PASSWORD=<pw> npx tsx scripts/stage-auth-password-check.ts
  *
  * With .env / .env.local (auto-loaded):
  *   npx tsx scripts/stage-auth-password-check.ts
@@ -35,17 +36,16 @@ import "dotenv/config";
 import { Client } from "pg";
 import bcrypt from "bcryptjs";
 
-const TARGET_EMAIL = "admin@fcallschwil.ch";
-
 async function main(): Promise<void> {
   let userFound = false;
   let hashPresent = false;
   let passwordMatch = false;
 
   const dbUrl = process.env.DATABASE_URL?.trim();
+  const targetEmail = process.env.TARGET_SUPERADMIN_EMAIL?.trim().toLowerCase();
   const candidatePassword = process.env.STAGE_LOGIN_PASSWORD ?? "";
 
-  if (dbUrl) {
+  if (dbUrl && targetEmail) {
     const client = new Client({
       connectionString: dbUrl,
       connectionTimeoutMillis: 8000,
@@ -56,8 +56,23 @@ async function main(): Promise<void> {
       await client.connect();
 
       const { rows } = await client.query<{ password_hash: string | null }>(
-        `SELECT "passwordHash" AS password_hash FROM "User" WHERE email = $1 LIMIT 1`,
-        [TARGET_EMAIL],
+        `SELECT u."passwordHash" AS password_hash
+           FROM "User" u
+          WHERE u.email = $1
+            AND u."isActive" = true
+            AND EXISTS (
+              SELECT 1
+                FROM "UserRole" ur
+                JOIN "Role" r ON r.id = ur."roleId"
+               WHERE ur."userId" = u.id
+                 AND ur."tenantId" IS NULL
+                 AND r.key = 'super_admin'
+                 AND r.scope = 'PLATFORM'
+                 AND r."tenantId" IS NULL
+                 AND r."isArchived" = false
+            )
+          LIMIT 1`,
+        [targetEmail],
       );
 
       if (rows.length > 0) {

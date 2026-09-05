@@ -31,7 +31,11 @@ import {
   RoleUserNotFoundError,
   ScopeMismatchError,
 } from "@/lib/roles/errors";
-import { PERMISSIONS } from "@/lib/permissions/permissions";
+import {
+  acquirePlatformSuperAdminMutationLock,
+  PLATFORM_SUPERADMIN_ROLE_KEY,
+  usablePlatformSuperAdminWhere,
+} from "@/lib/security/platform-superadmin";
 
 async function loadPlatformRole(roleId: string): Promise<{ id: string; key: string }> {
   const role = await prisma.role.findFirst({
@@ -87,37 +91,44 @@ export type SetPlatformRolePermissionsResult = {
  * Bulk-replaces a PLATFORM role's permission set. Every requested key is
  * re-validated as `scope === "PLATFORM"`; a TENANT key anywhere in the
  * request rejects the whole batch before any write (no partial persist).
- * Preserves the pre-existing `super_admin` / `users.manage` lockout
- * safeguard (never let the last role holding `users.manage` lose it).
+ * The canonical `super_admin` system role may gain permissions but may not
+ * lose existing authority through ordinary administration.
  */
 export async function setPlatformRolePermissions(
   input: SetPlatformRolePermissionsInput,
 ): Promise<SetPlatformRolePermissionsResult> {
   const role = await loadPlatformRole(input.roleId);
 
-  if (role.key === "super_admin" && !input.permissionKeys.includes(PERMISSIONS.USERS_MANAGE)) {
-    const otherRolesWithManage = await prisma.rolePermission.count({
-      where: {
-        permission: { key: PERMISSIONS.USERS_MANAGE },
-        role: { key: { not: "super_admin" } },
-      },
-    });
-    if (otherRolesWithManage === 0) {
-      throw new ProtectedRoleError(
-        `${PERMISSIONS.USERS_MANAGE} kann nicht von super_admin entfernt werden — es wäre kein Benutzer mehr mit dieser Berechtigung vorhanden.`,
-      );
-    }
-  }
-
   const permissions = await resolvePlatformPermissions(input.permissionKeys);
 
-  await prisma.$transaction([
-    prisma.rolePermission.deleteMany({ where: { roleId: role.id } }),
-    prisma.rolePermission.createMany({
-      data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
+  await prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
+
+    if (role.key === PLATFORM_SUPERADMIN_ROLE_KEY) {
+      const current = await tx.rolePermission.findMany({
+        where: { roleId: role.id },
+        select: { permission: { select: { key: true } } },
+      });
+      const requested = new Set(permissions.map((permission) => permission.key));
+      const removed = current
+        .map((assignment) => assignment.permission.key)
+        .filter((key) => !requested.has(key));
+      if (removed.length > 0) {
+        throw new ProtectedRoleError(
+          `Der systemgeschützten Rolle super_admin können keine Berechtigungen entzogen werden: ${removed.join(", ")}.`,
+        );
+      }
+    }
+
+    await tx.rolePermission.deleteMany({ where: { roleId: role.id } });
+    await tx.rolePermission.createMany({
+      data: permissions.map((permission) => ({
+        roleId: role.id,
+        permissionId: permission.id,
+      })),
       skipDuplicates: true,
-    }),
-  ]);
+    });
+  });
 
   return { permissionKeys: permissions.map((p) => p.key) };
 }
@@ -161,9 +172,6 @@ export type SetPlatformUserRolesResult = {
 export async function setPlatformUserRoles(
   input: SetPlatformUserRolesInput,
 ): Promise<SetPlatformUserRolesResult> {
-  const user = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } });
-  if (!user) throw new RoleUserNotFoundError();
-
   const uniqueRequestedIds = Array.from(new Set(input.roleIds));
 
   const foundRoles = uniqueRequestedIds.length
@@ -198,39 +206,65 @@ export async function setPlatformUserRoles(
 
   const requestedRoleIds = new Set(foundRoles.map((r) => r.id));
 
-  // Scope guard: only ever read/touch PLATFORM-scoped UserRole rows for
-  // this user — TENANT-scoped assignments (tenantId IS NOT NULL) are never
-  // part of this query and therefore can never be deleted or altered here.
-  const currentPlatformUserRoles = await prisma.userRole.findMany({
-    where: { userId: input.userId, role: { scope: "PLATFORM" } },
-    select: { id: true, roleId: true, role: { select: { key: true, isSystem: true } } },
-  });
-  const currentPlatformRoleIds = new Set(currentPlatformUserRoles.map((ur) => ur.roleId));
+  const mutation = await prisma.$transaction(async (tx) => {
+    await acquirePlatformSuperAdminMutationLock(tx);
 
-  const toRemove = currentPlatformUserRoles.filter((ur) => !requestedRoleIds.has(ur.roleId));
-  const toAdd = foundRoles.filter((r) => !currentPlatformRoleIds.has(r.id));
-
-  // Last-required-admin safeguard, platform equivalent: never let a
-  // request remove the last platform-wide holder of an isSystem PLATFORM
-  // role (e.g. the last super_admin) — never weakens recovery access.
-  for (const ur of toRemove) {
-    if (!ur.role.isSystem) continue;
-    const otherHolders = await prisma.userRole.count({
-      where: { roleId: ur.roleId, userId: { not: input.userId } },
+    const user = await tx.user.findUnique({
+      where: { id: input.userId },
+      select: { id: true, isActive: true },
     });
-    if (otherHolders === 0) {
-      throw new LastRequiredAdminError(
-        `"${ur.role.key}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte Träger dieser systemkritischen Plattform-Rolle.`,
-      );
+    if (!user) throw new RoleUserNotFoundError();
+
+    // Scope guard: only ever read/touch canonical PLATFORM assignments.
+    const currentPlatformUserRoles = await tx.userRole.findMany({
+      where: {
+        userId: input.userId,
+        tenantId: null,
+        role: { scope: "PLATFORM", tenantId: null },
+      },
+      select: {
+        id: true,
+        roleId: true,
+        role: { select: { key: true, isSystem: true } },
+      },
+    });
+    const currentPlatformRoleIds = new Set(
+      currentPlatformUserRoles.map((ur) => ur.roleId),
+    );
+    const toRemove = currentPlatformUserRoles.filter(
+      (ur) => !requestedRoleIds.has(ur.roleId),
+    );
+    const toAdd = foundRoles.filter(
+      (role) => !currentPlatformRoleIds.has(role.id),
+    );
+
+    for (const ur of toRemove) {
+      if (!ur.role.isSystem) continue;
+
+      const otherHolders =
+        ur.role.key === PLATFORM_SUPERADMIN_ROLE_KEY && user.isActive
+          ? await tx.userRole.count({
+              where: {
+                ...usablePlatformSuperAdminWhere,
+                roleId: ur.roleId,
+                userId: { not: input.userId },
+              },
+            })
+          : await tx.userRole.count({
+              where: {
+                roleId: ur.roleId,
+                tenantId: null,
+                userId: { not: input.userId },
+              },
+            });
+
+      if (otherHolders === 0) {
+        throw new LastRequiredAdminError(
+          `"${ur.role.key}" kann diesem Benutzer nicht entzogen werden — er/sie ist der letzte aktive Träger dieser systemkritischen Plattform-Rolle.`,
+        );
+      }
     }
-  }
 
-  if (toRemove.length === 0 && toAdd.length === 0) {
-    // Idempotent no-op — nothing to change, no transaction needed.
-    return { roleIds: Array.from(requestedRoleIds) };
-  }
-
-  await prisma.$transaction(async (tx) => {
     if (toRemove.length > 0) {
       await tx.userRole.deleteMany({ where: { id: { in: toRemove.map((ur) => ur.id) } } });
     }
@@ -239,16 +273,20 @@ export async function setPlatformUserRoles(
       // tenant id, and this function never creates a TenantMembership.
       await tx.userRole.create({ data: { userId: input.userId, roleId: role.id, tenantId: null } });
     }
+    return {
+      beforeRoleIds: Array.from(currentPlatformRoleIds),
+      changed: toRemove.length > 0 || toAdd.length > 0,
+    };
   });
 
-  if (input.actorUserId) {
+  if (input.actorUserId && mutation.changed) {
     await logAction({
       actorUserId: input.actorUserId,
       moduleKey: "users",
       entityType: "UserRole",
       entityId: input.userId,
       action: "PLATFORM_ROLES_CHANGE",
-      beforeJson: { roleIds: Array.from(currentPlatformRoleIds) },
+      beforeJson: { roleIds: mutation.beforeRoleIds },
       afterJson: { roleIds: Array.from(requestedRoleIds) },
     });
   }

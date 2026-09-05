@@ -14,7 +14,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/lib/db/prisma", () => ({
-  prisma: {
+  prisma: (() => {
+    const client = {
     user: {
       findUnique: vi.fn(),
       delete: vi.fn(),
@@ -22,7 +23,15 @@ vi.mock("@/lib/db/prisma", () => ({
     userRole: {
       count: vi.fn(),
     },
-  },
+    $queryRawUnsafe: vi.fn(),
+    };
+    return {
+      ...client,
+      $transaction: vi.fn(async (callback: (tx: typeof client) => unknown) =>
+        callback(client),
+      ),
+    };
+  })(),
 }));
 
 import { prisma } from "@/lib/db/prisma";
@@ -34,6 +43,7 @@ import {
 const mockPrisma = prisma as unknown as {
   user: { findUnique: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
   userRole: { count: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
 };
 
 describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
@@ -52,9 +62,10 @@ describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
         email: "admin@example.com",
         firstName: "Super",
         lastName: "Admin",
+        isActive: true,
         _count: { userRoles: 1, tenantMemberships: 0 },
         person: null,
-        userRoles: [{ role: { key: "super_admin", scope: "PLATFORM" } }],
+        userRoles: [{ id: "ur-super" }],
       });
       // Only 1 remaining super_admin
       mockPrisma.userRole.count.mockResolvedValueOnce(1);
@@ -71,9 +82,10 @@ describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
         email: "admin1@example.com",
         firstName: "Admin",
         lastName: "One",
+        isActive: true,
         _count: { userRoles: 1, tenantMemberships: 2 },
         person: null,
-        userRoles: [{ role: { key: "super_admin", scope: "PLATFORM" } }],
+        userRoles: [{ id: "ur-super" }],
       });
       // 2 remaining super_admins → not last
       mockPrisma.userRole.count.mockResolvedValueOnce(2);
@@ -96,9 +108,10 @@ describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
         email: "user@example.com",
         firstName: "Max",
         lastName: "Muster",
+        isActive: true,
         _count: { userRoles: 2, tenantMemberships: 1 },
         person: { id: "person-1", firstName: "Max", lastName: "Muster" },
-        userRoles: [{ role: { key: "club_admin", scope: "TENANT" } }, { role: { key: "trainer", scope: "TENANT" } }],
+        userRoles: [],
       });
 
       const result = await getUserDeletionImpact("user-3");
@@ -129,9 +142,10 @@ describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
         email: "admin@example.com",
         firstName: "Super",
         lastName: "Admin",
+        isActive: true,
         _count: { userRoles: 1, tenantMemberships: 0 },
         person: null,
-        userRoles: [{ role: { key: "super_admin", scope: "PLATFORM" } }],
+        userRoles: [{ id: "ur-super" }],
       });
       mockPrisma.userRole.count.mockResolvedValueOnce(1);
 
@@ -145,9 +159,10 @@ describe("ADMIN-HARD-DELETE-UI — user-delete-service", () => {
         email: "user@example.com",
         firstName: "Jane",
         lastName: "Doe",
+        isActive: true,
         _count: { userRoles: 1, tenantMemberships: 1 },
         person: null,
-        userRoles: [{ role: { key: "trainer", scope: "TENANT" } }],
+        userRoles: [],
       });
       mockPrisma.user.delete.mockResolvedValueOnce({});
 

@@ -14,15 +14,15 @@ import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiPermission: vi.fn(),
+  requirePlatformApiPermission: vi.fn(),
   hashPassword: vi.fn(),
   userFindUnique: vi.fn(),
   userCreate: vi.fn(),
   tenantMembershipCreate: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-permission", () => ({
-  requireApiPermission: mocks.requireApiPermission,
+vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
+  requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
 
 vi.mock("@/lib/auth/password", () => ({
@@ -62,6 +62,7 @@ function accessOk(activeTenantId: string | null) {
     ok: true as const,
     status: 200,
     error: null,
+    actorUserId: "admin-1",
     session: { user: { id: "admin-1", activeTenantId } },
   };
 }
@@ -75,7 +76,7 @@ const VALID_BODY = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.requireApiPermission.mockResolvedValue(accessOk("tenant-1"));
+  mocks.requirePlatformApiPermission.mockResolvedValue(accessOk("tenant-1"));
   mocks.hashPassword.mockResolvedValue("hashed-password");
   mocks.userFindUnique.mockResolvedValue(null);
   mocks.userCreate.mockResolvedValue({ id: "user-new-1" });
@@ -84,7 +85,7 @@ beforeEach(() => {
 
 describe("POST /api/users/create", () => {
   it("returns 403 (via requireApiPermission) when unauthorized", async () => {
-    mocks.requireApiPermission.mockResolvedValue({
+    mocks.requirePlatformApiPermission.mockResolvedValue({
       ok: false,
       status: 403,
       error: "Forbidden",
@@ -124,7 +125,7 @@ describe("POST /api/users/create", () => {
   });
 
   it("does not create a TenantMembership when the creating admin has no active tenant", async () => {
-    mocks.requireApiPermission.mockResolvedValue(accessOk(null));
+    mocks.requirePlatformApiPermission.mockResolvedValue(accessOk(null));
 
     const response = await POST(makeRequest(VALID_BODY));
 

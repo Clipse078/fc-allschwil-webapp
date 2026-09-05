@@ -1071,7 +1071,10 @@ export async function runExecute(
       if (options.resetPlatformPassword) {
         await tx.user.update({
           where: { id: platformUser.id },
-          data: { passwordHash: platformPasswordHash },
+          data: {
+            passwordHash: platformPasswordHash,
+            passwordChangedAt: new Date(),
+          },
         });
       }
       if (!platformUser.isActive) {
@@ -1137,7 +1140,10 @@ export async function runExecute(
       if (options.resetClubAdminPassword) {
         await tx.user.update({
           where: { id: clubAdminUser.id },
-          data: { passwordHash: clubAdminPasswordHash },
+          data: {
+            passwordHash: clubAdminPasswordHash,
+            passwordChangedAt: new Date(),
+          },
         });
       }
       if (!clubAdminUser.isActive) {

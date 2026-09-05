@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { validatePasswordResetToken, hashResetToken } from "@/lib/auth/password-reset";
+import { consumeExistingUserInvitationToken } from "@/lib/auth/password-reset";
 import { activateInvitationMembership } from "@/lib/users/mutations";
 
 export async function POST(req: NextRequest) {
@@ -35,48 +35,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Token fehlt." }, { status: 400 });
   }
 
-  const validated = await validatePasswordResetToken(prisma, token).catch(() => null);
-  if (!validated) {
+  let consumed: Awaited<
+    ReturnType<typeof consumeExistingUserInvitationToken>
+  > = null;
+  try {
+    consumed = await consumeExistingUserInvitationToken(prisma, token);
+  } catch (err) {
+    console.error("[invitation/accept]", err);
+    return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
+  }
+  if (!consumed) {
     return NextResponse.json(
       { error: "Einladungslink ist ungültig, abgelaufen oder bereits verwendet." },
       { status: 400 },
     );
   }
 
-  if (!validated.isInvitation) {
-    return NextResponse.json(
-      { error: "Dieser Link ist kein Einladungslink." },
-      { status: 400 },
-    );
-  }
-
-  if (!validated.isExistingUser) {
-    // New users must go through the password-setup path.
-    return NextResponse.json(
-      { error: "Bitte richte dein Passwort über den Einladungslink ein." },
-      { status: 400 },
-    );
-  }
-
-  // Mark the token as used (consume without changing the password).
-  const tokenHash = hashResetToken(token);
-  const now = new Date();
-  try {
-    await prisma.$transaction([
-      prisma.passwordResetToken.updateMany({
-        where: { tokenHash, usedAt: null },
-        data: { usedAt: now },
-      }),
-    ]);
-  } catch (err) {
-    console.error("[invitation/accept]", err);
-    return NextResponse.json({ error: "Interner Serverfehler." }, { status: 500 });
-  }
-
   // Activate exactly the membership for the invitation's tenant.
   // Non-fatal — token is already consumed; activation failure can be retried.
-  if (validated.invitationTenantId) {
-    await activateInvitationMembership(validated.userId, validated.invitationTenantId).catch(
+  if (consumed.invitationTenantId) {
+    await activateInvitationMembership(consumed.userId, consumed.invitationTenantId).catch(
       (err) => {
         console.error("[invitation/accept] Failed to activate invitation membership:", err);
       },

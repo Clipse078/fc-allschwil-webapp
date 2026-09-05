@@ -28,7 +28,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { setPlatformUserRoles } from "@/lib/roles/platform-mutations";
 import { toRoleApiErrorResponse } from "@/lib/roles/errors";
 
@@ -39,7 +39,7 @@ type RouteContext = {
 };
 
 export async function GET(_: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
@@ -71,7 +71,7 @@ export async function GET(_: NextRequest, context: RouteContext) {
 }
 
 export async function PUT(request: NextRequest, context: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.USERS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });

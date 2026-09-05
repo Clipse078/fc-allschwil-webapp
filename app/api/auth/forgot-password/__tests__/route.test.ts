@@ -59,6 +59,7 @@ beforeEach(() => {
     id: "user-1",
     email: "user@example.test",
     isActive: true,
+    userRoles: [],
   });
   mocks.createPasswordResetToken.mockResolvedValue("reset+a/b?c=d%e");
   mocks.sendMail.mockResolvedValue(undefined);
@@ -99,6 +100,25 @@ describe("POST /api/auth/forgot-password security link generation", () => {
     expect(response.status).toBe(200);
     expect(mocks.createPasswordResetToken).not.toHaveBeenCalled();
     expect(mocks.buildPasswordResetEmail).not.toHaveBeenCalled();
+    expect(mocks.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("returns the opaque response without issuing recovery for a platform Superadmin", async () => {
+    mocks.userFindUnique.mockResolvedValue({
+      id: "platform-admin",
+      email: "user@example.test",
+      isActive: true,
+      userRoles: [{ id: "superadmin-assignment" }],
+    });
+
+    const response = await POST(makeRequest() as never);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      message:
+        "Falls ein Konto mit dieser E-Mail-Adresse existiert, haben wir dir einen Link zum Zurücksetzen des Passworts gesendet.",
+    });
+    expect(mocks.createPasswordResetToken).not.toHaveBeenCalled();
     expect(mocks.sendMail).not.toHaveBeenCalled();
   });
 });
