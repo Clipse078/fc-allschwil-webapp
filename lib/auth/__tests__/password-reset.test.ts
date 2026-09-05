@@ -50,15 +50,6 @@ type MockPasswordResetToken = {
   user: { id: string; email: string; isActive: boolean };
 };
 
-type MockUser = {
-  id: string;
-  email: string;
-  firstName: string;
-  isActive: boolean;
-  passwordHash: string;
-  passwordChangedAt: Date | null;
-};
-
 function makeMockPrisma(overrides: {
   passwordResetTokenFindUnique?: ReturnType<typeof vi.fn>;
   passwordResetTokenDeleteMany?: ReturnType<typeof vi.fn>;

@@ -132,7 +132,7 @@ function normalizeUrl(url: string | null, variableName: string): string | null {
       return parsed.toString().replace(/\/$/, "");
     } catch {
       // URL is unparseable in any form — return null and log via warnings
-      console.warn("[env] Invalid " + variableName + " URL configuration");
+      console.warn("[env] Invalid " + variableName + " configuration");
       return null;
     }
   }

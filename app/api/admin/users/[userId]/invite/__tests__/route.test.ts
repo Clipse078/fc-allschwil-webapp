@@ -16,7 +16,7 @@ const mockRevokeTenantInvitation = vi.fn();
 const mockPrismaUserFindUnique = vi.fn();
 const mockPrismaTenantFindUnique = vi.fn();
 const mockSendMail = vi.fn();
-const mockBuildInvitationEmail = vi.fn((_input: unknown) => ({
+const mockBuildInvitationEmail = vi.fn(() => ({
   subject: "Test",
   html: "<p>Test</p>",
   text: "Test",
@@ -27,10 +27,15 @@ vi.mock("@/lib/permissions/require-api-permission", () => ({
   requireApiPermission: mockRequireApiPermission,
 }));
 
-vi.mock("@/lib/users/mutations", async () => {
-  const actual = await vi.importActual<typeof import("@/lib/users/mutations")>("@/lib/users/mutations");
+vi.mock("@/lib/users/mutations", () => {
+  class InvitationDomainError extends Error {
+    constructor(public readonly code: string) {
+      super(code);
+    }
+  }
   return {
-    ...actual,
+    InvitationDomainError,
+    INVITATION_EXPIRY_HOURS: 48,
     resendTenantInvitation: mockResendTenantInvitation,
     revokeTenantInvitation: mockRevokeTenantInvitation,
   };
@@ -168,7 +173,7 @@ describe("POST /invite — success", () => {
 
     await POST(makeRequest() as never, makeParams());
 
-    const input = mockBuildInvitationEmail.mock.calls[0]?.[0] as {
+    const input = (mockBuildInvitationEmail.mock.calls as unknown[][])[0]?.[0] as {
       inviteUrl: string;
     };
     const inviteUrl = new URL(input.inviteUrl);

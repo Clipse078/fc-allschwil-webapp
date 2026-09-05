@@ -15,7 +15,7 @@ const DEPLOYED_ENV: NodeJS.ProcessEnv = {
   VERCEL_ENV: "production",
 };
 
-function deployedEnv(overrides: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+function deployedEnv(overrides: Partial<NodeJS.ProcessEnv>): NodeJS.ProcessEnv {
   return { ...DEPLOYED_ENV, ...overrides };
 }
 
@@ -80,7 +80,7 @@ describe("resolveSecurityLinkBaseUrl", () => {
     ["test", "test", "http://127.0.0.1:3000"],
   ])("allows an HTTP loopback URL for %s execution", (appEnv, nodeEnv, url) => {
     const result = resolveSecurityLinkBaseUrl({
-      NODE_ENV: nodeEnv,
+      NODE_ENV: nodeEnv as NodeJS.ProcessEnv["NODE_ENV"],
       APP_ENV: appEnv,
       APP_BASE_URL: url,
     });

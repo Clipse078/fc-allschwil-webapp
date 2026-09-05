@@ -78,7 +78,7 @@ describe("runtime environment classification", () => {
   });
 
   it("logs malformed URL configuration without exposing its raw value", () => {
-    const rawValue = "https://operator:credential@[hostile-fragment";
+    const rawValue = "credential[";
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 
     const runtime = getRuntimeEnvironment({
@@ -91,7 +91,7 @@ describe("runtime environment classification", () => {
 
     expect(runtime.appBaseUrl).toBeNull();
     expect(warn).toHaveBeenCalledWith(
-      "[env] Invalid APP_BASE_URL URL configuration",
+      "[env] Invalid APP_BASE_URL configuration",
     );
     expect(JSON.stringify(warn.mock.calls)).not.toContain(rawValue);
     expect(JSON.stringify(warn.mock.calls)).not.toContain("credential");

@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   createPasswordResetToken: vi.fn(),
   checkRateLimit: vi.fn(),
   sendMail: vi.fn(),
-  buildPasswordResetEmail: vi.fn((_input: unknown) => ({
+  buildPasswordResetEmail: vi.fn(() => ({
     subject: "Reset",
     html: "<p>Reset</p>",
     text: "Reset",
@@ -77,7 +77,9 @@ describe("POST /api/auth/forgot-password security link generation", () => {
     const response = await POST(makeRequest() as never);
 
     expect(response.status).toBe(200);
-    const input = mocks.buildPasswordResetEmail.mock.calls[0]?.[0] as {
+    const input = (
+      mocks.buildPasswordResetEmail.mock.calls as unknown[][]
+    )[0]?.[0] as {
       resetUrl: string;
     };
     const resetUrl = new URL(input.resetUrl);
