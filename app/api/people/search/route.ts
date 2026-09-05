@@ -1,15 +1,16 @@
 ﻿import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requireApiTenantPermissionContext } from "@/lib/permissions/require-api-tenant-context";
 import { ROUTE_PERMISSION_SETS } from "@/lib/permissions/route-permission-sets";
 import { getAllowedBirthYearsForSeason } from "@/lib/teams/jahrgang-rules";
 
 export async function GET(request: NextRequest) {
-  const access = await requireApiAnyPermission(ROUTE_PERMISSION_SETS.PEOPLE_SEARCH);
+  const access = await requireApiTenantPermissionContext(ROUTE_PERMISSION_SETS.PEOPLE_SEARCH);
 
   if (!access.ok) {
     return NextResponse.json({ error: access.error }, { status: access.status });
   }
+  const { tenantId } = access.context;
 
   try {
     const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
@@ -28,8 +29,8 @@ export async function GET(request: NextRequest) {
     let excludedPersonIds = new Set<string>();
 
     if (teamSeasonId && mode === "player") {
-      const teamSeason = await prisma.teamSeason.findUnique({
-        where: { id: teamSeasonId },
+      const teamSeason = await prisma.teamSeason.findFirst({
+        where: { id: teamSeasonId, team: { tenantId } },
         select: {
           season: {
             select: {
@@ -64,8 +65,8 @@ export async function GET(request: NextRequest) {
     }
 
     if (teamSeasonId && mode === "trainer") {
-      const teamSeason = await prisma.teamSeason.findUnique({
-        where: { id: teamSeasonId },
+      const teamSeason = await prisma.teamSeason.findFirst({
+        where: { id: teamSeasonId, team: { tenantId } },
         select: {
           trainerTeamMembers: {
             select: {
@@ -86,6 +87,7 @@ export async function GET(request: NextRequest) {
 
     const people = await prisma.person.findMany({
       where: {
+        tenantId,
         isActive: true,
         ...(mode === "player" ? { isPlayer: true } : {}),
         ...(mode === "trainer" ? { isTrainer: true } : {}),

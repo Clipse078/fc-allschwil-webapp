@@ -57,6 +57,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteContext) {
   try {
     const result = await unlinkPersonFromUser({
       personId: id,
+      tenantId: guard.context.tenantId,
       actorUserId: guard.context.actorUserId,
     });
     return NextResponse.json(result);

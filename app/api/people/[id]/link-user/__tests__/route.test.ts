@@ -10,13 +10,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
-  requireApiAnyPermission: vi.fn(),
+  requireTenantRoleApiContext: vi.fn(),
   linkPersonToUser: vi.fn(),
   unlinkPersonFromUser: vi.fn(),
 }));
 
-vi.mock("@/lib/permissions/require-api-any-permission", () => ({
-  requireApiAnyPermission: mocks.requireApiAnyPermission,
+vi.mock("@/lib/roles/api-context", () => ({
+  requireTenantRoleApiContext: mocks.requireTenantRoleApiContext,
 }));
 
 vi.mock("@/lib/people/mutations", () => ({
@@ -33,11 +33,9 @@ const ACTOR_USER_ID = "actor-1";
 const PERSON_ID = "person-1";
 
 function mockAuthorized() {
-  mocks.requireApiAnyPermission.mockResolvedValue({
+  mocks.requireTenantRoleApiContext.mockResolvedValue({
     ok: true,
-    status: 200,
-    error: null,
-    session: { user: { id: ACTOR_USER_ID, activeTenantId: SESSION_TENANT_ID } },
+    context: { actorUserId: ACTOR_USER_ID, tenantId: SESSION_TENANT_ID },
   });
 }
 
@@ -73,7 +71,10 @@ describe("POST /api/people/[id]/link-user", () => {
   });
 
   it("8. returns 403 and never calls linkPersonToUser when the caller lacks roles.manage/roles.assign", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+    mocks.requireTenantRoleApiContext.mockResolvedValue({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
 
     const req = new NextRequest("http://localhost/api/people/person-1/link-user", {
       method: "POST",
@@ -128,7 +129,7 @@ describe("POST /api/people/[id]/link-user", () => {
 });
 
 describe("DELETE /api/people/[id]/link-user", () => {
-  it("delegates unlinking with the session-derived actor id", async () => {
+  it("delegates unlinking with the session-derived tenant and actor ids", async () => {
     mockAuthorized();
     mocks.unlinkPersonFromUser.mockResolvedValue({ unlinked: true });
 
@@ -136,12 +137,19 @@ describe("DELETE /api/people/[id]/link-user", () => {
     const res = await DELETE(req, ctx());
     const body = await res.json();
 
-    expect(mocks.unlinkPersonFromUser).toHaveBeenCalledWith({ personId: PERSON_ID, actorUserId: ACTOR_USER_ID });
+    expect(mocks.unlinkPersonFromUser).toHaveBeenCalledWith({
+      personId: PERSON_ID,
+      tenantId: SESSION_TENANT_ID,
+      actorUserId: ACTOR_USER_ID,
+    });
     expect(body.unlinked).toBe(true);
   });
 
   it("8. returns 403 and never calls unlinkPersonFromUser when the caller lacks roles.manage/roles.assign", async () => {
-    mocks.requireApiAnyPermission.mockResolvedValue({ ok: false, status: 403, error: "Forbidden", session: null });
+    mocks.requireTenantRoleApiContext.mockResolvedValue({
+      ok: false,
+      response: new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 }),
+    });
 
     const req = new NextRequest("http://localhost/api/people/person-1/link-user", { method: "DELETE" });
     const res = await DELETE(req, ctx());

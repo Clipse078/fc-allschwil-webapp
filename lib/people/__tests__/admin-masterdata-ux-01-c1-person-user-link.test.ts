@@ -23,7 +23,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { linkPersonToUser, unlinkPersonFromUser } from "@/lib/people/mutations";
 import {
-  LinkUserNotFoundError,
   PersonAlreadyLinkedError,
   PersonNotFoundError,
   UserAlreadyLinkedError,
@@ -63,10 +62,10 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
     await prisma.$disconnect();
   });
 
-  async function createUnlinkedPerson(label: string) {
+  async function createUnlinkedPerson(label: string, tenantId = tenantA.id) {
     const suffix = uniqueSuffix();
     const person = await prisma.person.create({
-      data: { firstName: "Test", lastName: `Person-${label}-${suffix}` },
+      data: { firstName: "Test", lastName: `Person-${label}-${suffix}`, tenantId },
       select: { id: true },
     });
     createdPersonIds.push(person.id);
@@ -135,11 +134,11 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
     expect(linkable.find((u) => u.userId === user.id)).toBeUndefined();
   });
 
-  it("linking a non-existent userId is rejected distinctly (USER_NOT_FOUND)", async () => {
+  it("linking a non-existent userId uses the same fail-closed response as an ineligible user", async () => {
     const person = await createUnlinkedPerson("nonexistent-user");
     await expect(
       linkPersonToUser({ personId: person.id, userId: "does-not-exist", tenantId: tenantA.id }),
-    ).rejects.toBeInstanceOf(LinkUserNotFoundError);
+    ).rejects.toBeInstanceOf(UserNotEligibleError);
   });
 
   it("linking to a non-existent Person is rejected (PERSON_NOT_FOUND)", async () => {
@@ -206,7 +205,7 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
       where: { userId: user.id, roleId: role.id, orgUnitId: null },
     });
 
-    const result = await unlinkPersonFromUser({ personId: person.id });
+    const result = await unlinkPersonFromUser({ personId: person.id, tenantId: tenantA.id });
     expect(result.unlinked).toBe(true);
 
     const loaded = await getPersonById(person.id);
@@ -235,12 +234,14 @@ describe("ADMIN-MASTERDATA-UX-01-C1 — Person <-> User linking (live DB)", () =
 
   it("unlinking an already-unlinked Person is an idempotent no-op", async () => {
     const person = await createUnlinkedPerson("idempotent-unlink");
-    const result = await unlinkPersonFromUser({ personId: person.id });
+    const result = await unlinkPersonFromUser({ personId: person.id, tenantId: tenantA.id });
     expect(result.unlinked).toBe(false);
   });
 
   it("unlinking a non-existent Person is rejected (PERSON_NOT_FOUND)", async () => {
-    await expect(unlinkPersonFromUser({ personId: "does-not-exist" })).rejects.toBeInstanceOf(PersonNotFoundError);
+    await expect(
+      unlinkPersonFromUser({ personId: "does-not-exist", tenantId: tenantA.id }),
+    ).rejects.toBeInstanceOf(PersonNotFoundError);
   });
 
   it("an inactive-membership User cannot be linked (same eligibility rule as tenant role assignment)", async () => {
