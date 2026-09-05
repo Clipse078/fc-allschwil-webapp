@@ -2,44 +2,48 @@
  * GET /api/users/select
  *
  * Lightweight user list for allowlist pickers (VisibleUsersSelect).
- * Returns only { id, name, email } for active users — no sensitive fields.
+ * Returns only { id, name, email } for active users with an active membership
+ * in the caller's active tenant.
  *
- * Auth: session only (any authenticated user may see the user directory
- * in a small-club context). This is intentionally lower than the full
- * /api/users endpoint which requires USERS_MANAGE.
- *
- * TODO: Phase B — org-unit scoping
- *   When OrgUnit exists, filter to users within the actor's org unit(s)
- *   so actors can only grant visibility to users they are aware of.
- *
- * TODO: Phase B — permission gate option
- *   If user directory exposure must be restricted (multi-tenant), gate with
- *   a dedicated permission key (e.g. users.select) seeded for relevant roles.
+ * Auth: users.view OR users.manage in the active tenant. This matches the
+ * existing tenant user-directory authorization contract.
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { auth } from "@/auth";
+import { PERMISSIONS } from "@/lib/permissions/permissions";
+import { requireApiTenantPermissionContext } from "@/lib/permissions/require-api-tenant-context";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const access = await requireApiTenantPermissionContext([
+    PERMISSIONS.USERS_VIEW,
+    PERMISSIONS.USERS_MANAGE,
+  ]);
+  if (!access.ok) {
+    return NextResponse.json({ error: access.error }, { status: access.status });
   }
 
-  const users = await prisma.user.findMany({
-    where: { isActive: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+  const memberships = await prisma.tenantMembership.findMany({
+    where: {
+      tenantId: access.context.tenantId,
+      isActive: true,
+      user: { isActive: true },
+    },
+    orderBy: [{ user: { lastName: "asc" } }, { user: { firstName: "asc" } }],
     select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      email: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
     },
   });
 
   return NextResponse.json(
-    users.map((u) => ({
+    memberships.map(({ user: u }) => ({
       id: u.id,
       name: `${u.firstName} ${u.lastName}`,
       email: u.email,

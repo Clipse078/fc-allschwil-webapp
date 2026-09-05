@@ -10,7 +10,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requireApiTenantPermissionContext } from "@/lib/permissions/require-api-tenant-context";
 import type { PermissionKey } from "@/lib/permissions/permissions";
 
 export type TenantRoleApiContext = {
@@ -35,7 +35,7 @@ export type TenantRoleApiGuardResult =
 export async function requireTenantRoleApiContext(
   permissionKeys: PermissionKey[],
 ): Promise<TenantRoleApiGuardResult> {
-  const access = await requireApiAnyPermission(permissionKeys);
+  const access = await requireApiTenantPermissionContext(permissionKeys);
 
   if (!access.ok) {
     return {
@@ -44,21 +44,5 @@ export async function requireTenantRoleApiContext(
     };
   }
 
-  const tenantId = access.session.user?.activeTenantId;
-  if (!tenantId) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Kein Mandanten-Kontext in der Sitzung." }, { status: 403 }),
-    };
-  }
-
-  const actorUserId = access.session.user?.id;
-  if (!actorUserId) {
-    return {
-      ok: false,
-      response: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
-    };
-  }
-
-  return { ok: true, context: { tenantId, actorUserId } };
+  return { ok: true, context: access.context };
 }

@@ -21,7 +21,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { logAction } from "@/lib/audit/log-action";
 import {
-  LinkUserNotFoundError,
   PersonAlreadyLinkedError,
   PersonNotFoundError,
   UserAlreadyLinkedError,
@@ -48,8 +47,8 @@ export type LinkPersonToUserResult = { personId: string; userId: string };
  * Person (Person.userId is @unique — at most one Person per User).
  */
 export async function linkPersonToUser(input: LinkPersonToUserInput): Promise<LinkPersonToUserResult> {
-  const person = await prisma.person.findUnique({
-    where: { id: input.personId },
+  const person = await prisma.person.findFirst({
+    where: { id: input.personId, tenantId: input.tenantId },
     select: { id: true, userId: true },
   });
   if (!person) throw new PersonNotFoundError();
@@ -63,10 +62,6 @@ export async function linkPersonToUser(input: LinkPersonToUserInput): Promise<Li
     },
   });
   if (!membership) {
-    // Distinguish "user doesn't exist at all" from "not eligible for this tenant"
-    // only for a clearer error — the mutation guard is the same either way.
-    const userExists = await prisma.user.findUnique({ where: { id: input.userId }, select: { id: true } });
-    if (!userExists) throw new LinkUserNotFoundError();
     throw new UserNotEligibleError();
   }
   if (!membership.isActive || !membership.user.isActive) {
@@ -80,22 +75,26 @@ export async function linkPersonToUser(input: LinkPersonToUserInput): Promise<Li
   if (alreadyLinkedTo) throw new UserAlreadyLinkedError();
 
   try {
-    const updated = await prisma.person.update({
-      where: { id: input.personId },
+    const updated = await prisma.person.updateMany({
+      where: {
+        id: input.personId,
+        tenantId: input.tenantId,
+        userId: null,
+      },
       data: { userId: input.userId },
-      select: { id: true, userId: true },
     });
+    if (updated.count !== 1) throw new PersonAlreadyLinkedError();
 
     await logAction({
       actorUserId: input.actorUserId ?? null,
       moduleKey: AUDIT_MODULE_KEY,
       entityType: "Person",
-      entityId: updated.id,
+      entityId: person.id,
       action: "LINK_USER",
-      afterJson: { personId: updated.id, userId: input.userId, tenantId: input.tenantId },
+      afterJson: { personId: person.id, userId: input.userId, tenantId: input.tenantId },
     });
 
-    return { personId: updated.id, userId: updated.userId! };
+    return { personId: person.id, userId: input.userId };
   } catch (error) {
     // TOCTOU race on the @unique Person.userId constraint.
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -107,6 +106,7 @@ export async function linkPersonToUser(input: LinkPersonToUserInput): Promise<Li
 
 export type UnlinkPersonFromUserInput = {
   personId: string;
+  tenantId: string;
   actorUserId?: string | null;
 };
 
@@ -118,8 +118,8 @@ export type UnlinkPersonFromUserResult = { unlinked: boolean };
  * TenantMembership, or any UserRole — those are untouched by design.
  */
 export async function unlinkPersonFromUser(input: UnlinkPersonFromUserInput): Promise<UnlinkPersonFromUserResult> {
-  const person = await prisma.person.findUnique({
-    where: { id: input.personId },
+  const person = await prisma.person.findFirst({
+    where: { id: input.personId, tenantId: input.tenantId },
     select: { id: true, userId: true },
   });
   if (!person) throw new PersonNotFoundError();
@@ -127,10 +127,15 @@ export async function unlinkPersonFromUser(input: UnlinkPersonFromUserInput): Pr
 
   const previousUserId = person.userId;
 
-  await prisma.person.update({
-    where: { id: input.personId },
+  const updated = await prisma.person.updateMany({
+    where: {
+      id: input.personId,
+      tenantId: input.tenantId,
+      userId: previousUserId,
+    },
     data: { userId: null },
   });
+  if (updated.count !== 1) return { unlinked: false };
 
   await logAction({
     actorUserId: input.actorUserId ?? null,
@@ -138,7 +143,7 @@ export async function unlinkPersonFromUser(input: UnlinkPersonFromUserInput): Pr
     entityType: "Person",
     entityId: person.id,
     action: "UNLINK_USER",
-    beforeJson: { personId: person.id, userId: previousUserId },
+    beforeJson: { personId: person.id, userId: previousUserId, tenantId: input.tenantId },
   });
 
   return { unlinked: true };
