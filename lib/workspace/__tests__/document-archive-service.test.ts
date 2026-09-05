@@ -10,6 +10,8 @@ import {
 const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
+  auditLogCreate: vi.fn(),
+  transaction: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -18,6 +20,7 @@ vi.mock("@/lib/db/prisma", () => ({
       findUnique: mocks.findUnique,
       update: mocks.update,
     },
+    $transaction: mocks.transaction,
   },
 }));
 
@@ -57,6 +60,13 @@ describe("archiveWorkspaceDocument", () => {
         updatedByUserId: data.updatedByUserId,
       }),
     );
+    mocks.transaction.mockImplementation(
+      async (callback: (tx: unknown) => Promise<unknown>) =>
+        callback({
+          workspaceDocument: { update: mocks.update },
+          auditLog: { create: mocks.auditLogCreate },
+        }),
+    );
   });
 
   it("archives an active tenant document", async () => {
@@ -75,6 +85,14 @@ describe("archiveWorkspaceDocument", () => {
     });
 
     expect(mocks.update).toHaveBeenCalledOnce();
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant-1",
+        actorUserId: "user-1",
+        entityId: "document-1",
+        action: "PRIVATE_DOCUMENT_ARCHIVED",
+      }),
+    });
 
     expect(mocks.update).toHaveBeenCalledWith({
       where: {

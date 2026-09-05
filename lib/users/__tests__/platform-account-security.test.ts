@@ -4,9 +4,9 @@ const mocks = vi.hoisted(() => ({
   userFindUnique: vi.fn(),
   userUpdate: vi.fn(),
   userRoleCount: vi.fn(),
+  auditLogCreate: vi.fn(),
   queryRaw: vi.fn(),
   transaction: vi.fn(),
-  logAction: vi.fn(),
 }));
 
 vi.mock("@/lib/db/prisma", () => ({
@@ -16,10 +16,10 @@ vi.mock("@/lib/db/prisma", () => ({
       update: mocks.userUpdate,
     },
     userRole: { count: mocks.userRoleCount },
+    auditLog: { create: mocks.auditLogCreate },
     $transaction: mocks.transaction,
   },
 }));
-vi.mock("@/lib/audit/log-action", () => ({ logAction: mocks.logAction }));
 
 import {
   PlatformAccountDomainError,
@@ -48,6 +48,7 @@ function installTransaction() {
           update: mocks.userUpdate,
         },
         userRole: { count: mocks.userRoleCount },
+        auditLog: { create: mocks.auditLogCreate },
       }),
   );
 }
@@ -56,7 +57,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   installTransaction();
   mocks.queryRaw.mockResolvedValue([{ pg_advisory_xact_lock: null }]);
-  mocks.logAction.mockResolvedValue(undefined);
+  mocks.auditLogCreate.mockResolvedValue({});
 });
 
 describe("platform account lifecycle safety", () => {
@@ -106,6 +107,15 @@ describe("platform account lifecycle safety", () => {
         }),
       }),
     );
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "actor",
+        tenantId: null,
+        entityId: "admin-a",
+        action: "PLATFORM_ACCOUNT_UPDATE",
+        metadataJson: { outcome: "SUCCESS" },
+      }),
+    });
   });
 
   it("normalizes a safe email change and revokes prior sessions", async () => {
@@ -170,6 +180,7 @@ describe("platform account lifecycle safety", () => {
                 ).length,
               ),
             },
+            auditLog: { create: mocks.auditLogCreate },
           }),
         );
         queue = run.then(

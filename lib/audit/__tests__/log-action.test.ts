@@ -10,7 +10,11 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: { auditLog: { create: mocks.auditLogCreate } },
 }));
 
-import { logAction } from "@/lib/audit/log-action";
+import {
+  buildAuditData,
+  logAction,
+  logSecurityAction,
+} from "@/lib/audit/log-action";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -43,9 +47,11 @@ describe("logAction impersonation accountability", () => {
         actorUserId: "canonical-actor",
         metadataJson: {
           source: "route",
+          outcome: "SUCCESS",
           actorUserId: "canonical-actor",
           effectiveUserId: "effective-user",
         },
+        tenantId: "tenant-1",
       }),
     });
   });
@@ -70,7 +76,7 @@ describe("logAction impersonation accountability", () => {
     expect(mocks.auditLogCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({
         actorUserId: "user-1",
-        metadataJson: undefined,
+        metadataJson: { outcome: "SUCCESS" },
       }),
     });
   });
@@ -103,6 +109,119 @@ describe("logAction impersonation accountability", () => {
     expect(mocks.auth).not.toHaveBeenCalled();
     expect(mocks.auditLogCreate).toHaveBeenCalledWith({
       data: expect.objectContaining({ actorUserId: null }),
+    });
+  });
+
+  it("derives tenant scope from the trusted request session", async () => {
+    mocks.auth.mockResolvedValue({
+      user: {
+        id: "user-1",
+        actorUserId: "user-1",
+        effectiveUserId: "user-1",
+        activeTenantId: "tenant-session",
+        isImpersonating: false,
+      },
+    });
+
+    await logAction({
+      actorUserId: "user-1",
+      moduleKey: "roles",
+      entityType: "Role",
+      entityId: "role-1",
+      action: "CREATE",
+    });
+
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({ tenantId: "tenant-session" }),
+    });
+  });
+
+  it("rejects an explicit cross-tenant audit scope", async () => {
+    mocks.auth.mockResolvedValue({
+      user: {
+        id: "user-1",
+        effectiveUserId: "user-1",
+        activeTenantId: "tenant-session",
+        isImpersonating: false,
+      },
+    });
+
+    await expect(
+      logSecurityAction({
+        actorUserId: "user-1",
+        tenantId: "tenant-attacker",
+        moduleKey: "roles",
+        entityType: "Role",
+        entityId: "role-1",
+        action: "CREATE",
+      }),
+    ).rejects.toThrow("Audit tenant does not match the active tenant");
+    expect(mocks.auditLogCreate).not.toHaveBeenCalled();
+  });
+});
+
+describe("audit payload safety", () => {
+  it("removes credentials, hashes, reset/invite tokens, capabilities, and URLs", () => {
+    const data = buildAuditData({
+      actorUserId: "actor-1",
+      effectiveUserId: "effective-1",
+      tenantId: "tenant-1",
+      moduleKey: "security",
+      entityType: "User",
+      entityId: "user-1",
+      action: "PASSWORD_RESET_COMPLETED",
+      beforeJson: {
+        passwordHash: "bcrypt-secret",
+        nested: { apiKey: "api-secret", keep: "safe" },
+      },
+      afterJson: {
+        resetToken: "raw-reset-token",
+        inviteToken: "raw-invite-token",
+        signedUrl: "https://blob.example/private?token=secret",
+      },
+      metadataJson: {
+        capability: "signed-capability",
+        targetUserId: "user-1",
+      },
+    });
+
+    expect(JSON.stringify(data)).not.toContain("bcrypt-secret");
+    expect(JSON.stringify(data)).not.toContain("raw-reset-token");
+    expect(JSON.stringify(data)).not.toContain("raw-invite-token");
+    expect(JSON.stringify(data)).not.toContain("signed-capability");
+    expect(JSON.stringify(data)).not.toContain("blob.example");
+    expect(data).toMatchObject({
+      tenantId: "tenant-1",
+      actorUserId: "actor-1",
+      beforeJson: { nested: { keep: "safe" } },
+      afterJson: {},
+      metadataJson: {
+        targetUserId: "user-1",
+        outcome: "SUCCESS",
+        actorUserId: "actor-1",
+        effectiveUserId: "effective-1",
+      },
+    });
+  });
+
+  it("records explicit denied outcomes without copying rejected secrets", () => {
+    const data = buildAuditData({
+      actorUserId: "actor-1",
+      tenantId: null,
+      moduleKey: "security",
+      entityType: "Role",
+      entityId: "role-1",
+      action: "PLATFORM_PERMISSION_CHANGE_REJECTED",
+      outcome: "DENIED",
+      metadataJson: {
+        reasonCode: "INVALID_PERMISSION_SCOPE",
+        submittedToken: "must-not-persist",
+      },
+    });
+
+    expect(data.metadataJson).toEqual({
+      reasonCode: "INVALID_PERMISSION_SCOPE",
+      outcome: "DENIED",
     });
   });
 });

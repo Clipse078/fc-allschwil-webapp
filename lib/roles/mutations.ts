@@ -191,6 +191,7 @@ export async function createTenantRole(
   });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "Role",
@@ -276,6 +277,7 @@ export async function updateTenantRoleDetails(
   });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "Role",
@@ -350,6 +352,7 @@ export async function setTenantRolePermissions(
   ]);
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "Role",
@@ -422,6 +425,7 @@ export async function assignTenantRoleToUser(
   });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "UserRole",
@@ -483,6 +487,7 @@ export async function removeTenantRoleAssignment(
   await prisma.userRole.delete({ where: { id: existing.id } });
 
   await logAction({
+    tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "UserRole",
@@ -637,6 +642,7 @@ export async function setTenantUserRoles(
   const addedRoles = validRoles.filter((r) => toAdd.includes(r.id));
   for (const role of addedRoles) {
     await logAction({
+      tenantId,
       actorUserId,
       moduleKey: AUDIT_MODULE_KEY,
       entityType: "UserRole",
@@ -648,6 +654,7 @@ export async function setTenantUserRoles(
 
   for (const ur of toRemove) {
     await logAction({
+      tenantId,
       actorUserId,
       moduleKey: AUDIT_MODULE_KEY,
       entityType: "UserRole",

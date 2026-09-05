@@ -276,8 +276,6 @@ export async function createTeamDocument(
       action: "team_document_uploaded",
       afterJson: {
         teamId: input.teamId,
-        title,
-        originalFilename: validated.sanitizedFilename,
         mimeType: validated.contentType,
         sizeBytes: uploaded.sizeBytes,
       },
@@ -334,8 +332,7 @@ export async function renameTeamDocument(
     action: "team_document_renamed",
     afterJson: {
       teamId: input.teamId,
-      title: doc.title,
-      originalFilename: doc.originalFilename,
+        titleChanged: true,
     },
   });
 
@@ -371,8 +368,6 @@ export async function deleteTeamDocument(
     action: "team_document_deleted",
     beforeJson: {
       teamId: input.teamId,
-      title: doc.title,
-      originalFilename: doc.originalFilename,
     },
   });
 

@@ -19,6 +19,7 @@ import { TENANT_ROLES_MANAGE, TENANT_ROLES_VIEW } from "@/lib/roles/access";
 import { getTenantPermissionCatalog, getTenantRoleDetail } from "@/lib/roles/tenant-queries";
 import { setTenantRolePermissions } from "@/lib/roles/mutations";
 import { toRoleApiErrorResponse } from "@/lib/roles/errors";
+import { auditRejectedPrivilegedAction } from "@/lib/audit/security-events";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -65,6 +66,19 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json(result);
   } catch (error) {
     const { status, body: errorBody } = toRoleApiErrorResponse(error);
+    if (status >= 400 && status < 500) {
+      await auditRejectedPrivilegedAction({
+        actorUserId: guard.context.actorUserId,
+        tenantId: guard.context.tenantId,
+        action: "TENANT_PERMISSION_CHANGE_REJECTED",
+        entityType: "Role",
+        entityId: id,
+        reasonCode:
+          "code" in errorBody && typeof errorBody.code === "string"
+            ? errorBody.code
+            : "REJECTED",
+      });
+    }
     return NextResponse.json(errorBody, { status });
   }
 }

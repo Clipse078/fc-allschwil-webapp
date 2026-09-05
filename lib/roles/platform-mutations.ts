@@ -21,7 +21,7 @@
  */
 
 import { prisma } from "@/lib/db/prisma";
-import { logAction } from "@/lib/audit/log-action";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 import {
   ArchivedRoleError,
   InvalidPermissionScopeError,
@@ -81,6 +81,7 @@ async function resolvePlatformPermissions(
 export type SetPlatformRolePermissionsInput = {
   roleId: string;
   permissionKeys: readonly string[];
+  actorUserId: string | null;
 };
 
 export type SetPlatformRolePermissionsResult = {
@@ -104,11 +105,12 @@ export async function setPlatformRolePermissions(
   await prisma.$transaction(async (tx) => {
     await acquirePlatformSuperAdminMutationLock(tx);
 
+    const current = await tx.rolePermission.findMany({
+      where: { roleId: role.id },
+      select: { permission: { select: { key: true } } },
+    });
+
     if (role.key === PLATFORM_SUPERADMIN_ROLE_KEY) {
-      const current = await tx.rolePermission.findMany({
-        where: { roleId: role.id },
-        select: { permission: { select: { key: true } } },
-      });
       const requested = new Set(permissions.map((permission) => permission.key));
       const removed = current
         .map((assignment) => assignment.permission.key)
@@ -128,6 +130,18 @@ export async function setPlatformRolePermissions(
       })),
       skipDuplicates: true,
     });
+    await writeAuditRecord(tx, {
+      tenantId: null,
+      actorUserId: input.actorUserId,
+      moduleKey: "roles",
+      entityType: "Role",
+      entityId: role.id,
+      action: "PLATFORM_PERMISSIONS_CHANGE",
+      beforeJson: {
+        permissionKeys: current.map((assignment) => assignment.permission.key),
+      },
+      afterJson: { permissionKeys: permissions.map((permission) => permission.key) },
+    });
   });
 
   return { permissionKeys: permissions.map((p) => p.key) };
@@ -140,7 +154,7 @@ export async function setPlatformRolePermissions(
 export type SetPlatformUserRolesInput = {
   userId: string;
   roleIds: readonly string[];
-  actorUserId?: string;
+  actorUserId: string;
 };
 
 export type SetPlatformUserRolesResult = {
@@ -206,7 +220,7 @@ export async function setPlatformUserRoles(
 
   const requestedRoleIds = new Set(foundRoles.map((r) => r.id));
 
-  const mutation = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await acquirePlatformSuperAdminMutationLock(tx);
 
     const user = await tx.user.findUnique({
@@ -273,23 +287,25 @@ export async function setPlatformUserRoles(
       // tenant id, and this function never creates a TenantMembership.
       await tx.userRole.create({ data: { userId: input.userId, roleId: role.id, tenantId: null } });
     }
+    const changed = toRemove.length > 0 || toAdd.length > 0;
+    if (changed) {
+      await writeAuditRecord(tx, {
+        tenantId: null,
+        actorUserId: input.actorUserId,
+        moduleKey: "users",
+        entityType: "UserRole",
+        entityId: input.userId,
+        action: "PLATFORM_ROLES_CHANGE",
+        beforeJson: { roleIds: Array.from(currentPlatformRoleIds) },
+        afterJson: { roleIds: Array.from(requestedRoleIds) },
+      });
+    }
+
     return {
       beforeRoleIds: Array.from(currentPlatformRoleIds),
-      changed: toRemove.length > 0 || toAdd.length > 0,
+      changed,
     };
   });
-
-  if (input.actorUserId && mutation.changed) {
-    await logAction({
-      actorUserId: input.actorUserId,
-      moduleKey: "users",
-      entityType: "UserRole",
-      entityId: input.userId,
-      action: "PLATFORM_ROLES_CHANGE",
-      beforeJson: { roleIds: mutation.beforeRoleIds },
-      afterJson: { roleIds: Array.from(requestedRoleIds) },
-    });
-  }
 
   return { roleIds: Array.from(requestedRoleIds) };
 }

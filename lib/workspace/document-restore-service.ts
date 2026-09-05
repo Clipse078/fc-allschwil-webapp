@@ -1,6 +1,7 @@
 import { WorkspaceDocumentStatus } from "@prisma/client";
 
 import { prisma } from "@/lib/db/prisma";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 
 export type WorkspaceDocumentRestoreServiceErrorCode =
   | "INVALID_INPUT"
@@ -105,8 +106,8 @@ export async function restoreWorkspaceDocument(
     );
   }
 
-  const restoredDocument =
-    await prisma.workspaceDocument.update({
+  return prisma.$transaction(async (tx) => {
+    const restoredDocument = await tx.workspaceDocument.update({
       where: {
         id: documentId,
       },
@@ -123,19 +124,30 @@ export async function restoreWorkspaceDocument(
       },
     });
 
-  if (
-    restoredDocument.archivedAt !== null ||
-    !restoredDocument.updatedByUserId
-  ) {
-    throw new Error(
-      "Restored document did not return valid restore metadata.",
-    );
-  }
+    if (
+      restoredDocument.archivedAt !== null ||
+      !restoredDocument.updatedByUserId
+    ) {
+      throw new Error(
+        "Restored document did not return valid restore metadata.",
+      );
+    }
+    await writeAuditRecord(tx, {
+      tenantId,
+      actorUserId,
+      moduleKey: "workspace",
+      entityType: "WorkspaceDocument",
+      entityId: restoredDocument.id,
+      action: "PRIVATE_DOCUMENT_RESTORED",
+      beforeJson: { status: existingDocument.status },
+      afterJson: { status: restoredDocument.status },
+    });
 
-  return {
-    documentId: restoredDocument.id,
-    status: restoredDocument.status,
-    archivedAt: null,
-    updatedByUserId: restoredDocument.updatedByUserId,
-  };
+    return {
+      documentId: restoredDocument.id,
+      status: restoredDocument.status,
+      archivedAt: null,
+      updatedByUserId: restoredDocument.updatedByUserId,
+    };
+  });
 }

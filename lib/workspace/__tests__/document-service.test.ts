@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   workspaceDocumentCreate: vi.fn(),
   workspaceDocumentUpdate: vi.fn(),
   workspaceDocumentVersionCreate: vi.fn(),
+  auditLogCreate: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -104,6 +105,7 @@ describe("createWorkspaceDocumentWithInitialVersion", () => {
           workspaceDocumentVersion: {
             create: typeof mocks.workspaceDocumentVersionCreate;
           };
+          auditLog: { create: typeof mocks.auditLogCreate };
         }) => Promise<unknown>,
       ) =>
         callback({
@@ -114,6 +116,7 @@ describe("createWorkspaceDocumentWithInitialVersion", () => {
           workspaceDocumentVersion: {
             create: mocks.workspaceDocumentVersionCreate,
           },
+          auditLog: { create: mocks.auditLogCreate },
         }),
     );
   });
@@ -149,6 +152,23 @@ describe("createWorkspaceDocumentWithInitialVersion", () => {
     });
 
     expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        tenantId: "tenant-1",
+        actorUserId: "user-1",
+        entityId: "document-1",
+        action: "PRIVATE_DOCUMENT_UPLOADED",
+        afterJson: {
+          folderId: "folder-1",
+          versionId: "version-1",
+          mimeType: "application/pdf",
+          sizeBytes: 2048,
+        },
+      }),
+    });
+    const auditPayload = JSON.stringify(mocks.auditLogCreate.mock.calls[0]);
+    expect(auditPayload).not.toContain(validInput.storageKey);
+    expect(auditPayload).not.toContain(validInput.filename);
 
     expect(mocks.workspaceDocumentCreate).toHaveBeenCalledWith({
       data: {

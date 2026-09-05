@@ -60,7 +60,7 @@ describe("setPlatformUserRoles — platform assignment succeeds", () => {
     userIds.push(user.id);
     const role = await createPlatformRole("rperm05c1-platform-trainer");
 
-    const result = await setPlatformUserRoles({ userId: user.id, roleIds: [role.id] });
+    const result = await setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id });
     expect(result.roleIds).toEqual([role.id]);
 
     const userRole = await prisma.userRole.findFirst({ where: { userId: user.id, roleId: role.id } });
@@ -73,10 +73,10 @@ describe("setPlatformUserRoles — platform assignment succeeds", () => {
     userIds.push(user.id);
     const role = await createPlatformRole("rperm05c1-platform-idempotent-role");
 
-    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id] });
+    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id });
     const before = await prisma.userRole.findFirst({ where: { userId: user.id, roleId: role.id } });
 
-    const result = await setPlatformUserRoles({ userId: user.id, roleIds: [role.id] });
+    const result = await setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id });
     const after = await prisma.userRole.findFirst({ where: { userId: user.id, roleId: role.id } });
 
     expect(result.roleIds).toEqual([role.id]);
@@ -113,7 +113,7 @@ describe("setPlatformUserRoles — tenant role id is rejected, tenant data prese
     });
 
     await expect(
-      setPlatformUserRoles({ userId: user.id, roleIds: [tenantClubAdminRole.id] }),
+      setPlatformUserRoles({ userId: user.id, roleIds: [tenantClubAdminRole.id], actorUserId: user.id }),
     ).rejects.toBeInstanceOf(ScopeMismatchError);
 
     const membershipAfter = await prisma.tenantMembership.findUnique({
@@ -133,7 +133,7 @@ describe("setPlatformUserRoles — tenant role id is rejected, tenant data prese
     userIds.push(user.id);
 
     await expect(
-      setPlatformUserRoles({ userId: user.id, roleIds: ["role-id-that-does-not-exist"] }),
+      setPlatformUserRoles({ userId: user.id, roleIds: ["role-id-that-does-not-exist"], actorUserId: user.id }),
     ).rejects.toBeInstanceOf(RoleNotFoundError);
   });
 
@@ -146,7 +146,7 @@ describe("setPlatformUserRoles — tenant role id is rejected, tenant data prese
     platformRoleIds.push(role.id);
 
     await expect(
-      setPlatformUserRoles({ userId: user.id, roleIds: [role.id] }),
+      setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id }),
     ).rejects.toBeInstanceOf(ArchivedRoleError);
   });
 });
@@ -157,7 +157,7 @@ describe("setPlatformUserRoles — no membership is ever created", () => {
     userIds.push(user.id);
     const role = await createPlatformRole("rperm05c1-no-membership-role");
 
-    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id] });
+    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id });
 
     const membershipCount = await prisma.tenantMembership.count({ where: { userId: user.id } });
     expect(membershipCount).toBe(0);
@@ -180,7 +180,7 @@ describe("setPlatformUserRoles — multi-tenant assignments preserved", () => {
     await prisma.userRole.create({ data: { userId: user.id, roleId: roleB.id, tenantId: tenantB.id } });
 
     const platformRole = await createPlatformRole("rperm05c1-multi-tenant-platform-role");
-    await setPlatformUserRoles({ userId: user.id, roleIds: [platformRole.id] });
+    await setPlatformUserRoles({ userId: user.id, roleIds: [platformRole.id], actorUserId: user.id });
 
     const tenantURoleA = await prisma.userRole.findFirst({ where: { userId: user.id, roleId: roleA.id } });
     const tenantURoleB = await prisma.userRole.findFirst({ where: { userId: user.id, roleId: roleB.id } });
@@ -205,9 +205,9 @@ describe("setPlatformUserRoles — last platform admin safeguard", () => {
     const user = await createTestUser("c1-last-admin");
     userIds.push(user.id);
     const role = await createPlatformRole("rperm05c1-last-admin-role", true);
-    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id] });
+    await setPlatformUserRoles({ userId: user.id, roleIds: [role.id], actorUserId: user.id });
 
-    await expect(setPlatformUserRoles({ userId: user.id, roleIds: [] })).rejects.toBeInstanceOf(
+    await expect(setPlatformUserRoles({ userId: user.id, roleIds: [], actorUserId: user.id })).rejects.toBeInstanceOf(
       LastRequiredAdminError,
     );
 
@@ -221,10 +221,10 @@ describe("setPlatformUserRoles — last platform admin safeguard", () => {
     userIds.push(user1.id, user2.id);
     const role = await createPlatformRole("rperm05c1-shared-admin-role", true);
 
-    await setPlatformUserRoles({ userId: user1.id, roleIds: [role.id] });
-    await setPlatformUserRoles({ userId: user2.id, roleIds: [role.id] });
+    await setPlatformUserRoles({ userId: user1.id, roleIds: [role.id], actorUserId: user1.id });
+    await setPlatformUserRoles({ userId: user2.id, roleIds: [role.id], actorUserId: user2.id });
 
-    await expect(setPlatformUserRoles({ userId: user1.id, roleIds: [] })).resolves.toEqual({ roleIds: [] });
+    await expect(setPlatformUserRoles({ userId: user1.id, roleIds: [], actorUserId: user1.id })).resolves.toEqual({ roleIds: [] });
 
     const user1Assignment = await prisma.userRole.findFirst({ where: { userId: user1.id, roleId: role.id } });
     expect(user1Assignment).toBeNull();

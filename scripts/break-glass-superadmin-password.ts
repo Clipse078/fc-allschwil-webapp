@@ -6,6 +6,7 @@
  *   TARGET_SUPERADMIN_EMAIL=<exact email>
  *   BREAK_GLASS_NEW_PASSWORD=<new password, minimum 12 characters>
  *   BREAK_GLASS_CONFIRM=RESET_EXISTING_ACTIVE_PLATFORM_SUPERADMIN
+ *   BREAK_GLASS_OPERATOR_ID=<ticketed operator identity, no secrets>
  *   SCE_OPERATION_AUTHORIZATION=break-glass-superadmin-password:<stage|prod>
  * Production additionally requires the standard independent approval variable.
  *
@@ -31,9 +32,16 @@ async function main(): Promise<void> {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const targetEmail = process.env.TARGET_SUPERADMIN_EMAIL?.trim().toLowerCase();
   const password = process.env.BREAK_GLASS_NEW_PASSWORD ?? "";
+  const operatorId = process.env.BREAK_GLASS_OPERATOR_ID?.trim() ?? "";
   const confirmed = process.env.BREAK_GLASS_CONFIRM === CONFIRMATION;
 
-  if (!databaseUrl || !targetEmail || password.length < 12 || !confirmed) {
+  if (
+    !databaseUrl ||
+    !targetEmail ||
+    password.length < 12 ||
+    !confirmed ||
+    !/^[a-zA-Z0-9@._:-]{3,160}$/.test(operatorId)
+  ) {
     throw new Error(
       "Required break-glass inputs are missing or invalid. No changes were made.",
     );
@@ -86,6 +94,8 @@ async function main(): Promise<void> {
           action: "BREAK_GLASS_PASSWORD_RESET",
           metadataJson: {
             operationId: OPERATION_ID,
+            operatorId,
+            outcome: "SUCCESS",
             sessionsRevokedAt: changedAt.toISOString(),
           },
         },

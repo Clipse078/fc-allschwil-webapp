@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth, stopImpersonationSession } from "@/auth";
 import { prisma } from "@/lib/db/prisma";
-import { logAction } from "@/lib/audit/log-action";
+import { logSecurityAction } from "@/lib/audit/log-action";
 
 export async function POST() {
   const session = await auth();
@@ -25,6 +25,15 @@ export async function POST() {
     );
   }
 
+  await logSecurityAction({
+    actorUserId: actorUser.id,
+    effectiveUserId: session.user.effectiveUserId ?? session.user.id,
+    tenantId: session.user.activeTenantId,
+    moduleKey: "security",
+    entityType: "User",
+    entityId: session.user.effectiveUserId ?? session.user.id,
+    action: "IMPERSONATION_STOP_REQUESTED",
+  });
   const updatedSession = await stopImpersonationSession(actorUser.id);
 
   if (
@@ -39,7 +48,7 @@ export async function POST() {
     );
   }
 
-  await logAction({
+  await logSecurityAction({
     actorUserId: actorUser.id,
     tenantId: updatedSession.user.activeTenantId,
     moduleKey: "users",

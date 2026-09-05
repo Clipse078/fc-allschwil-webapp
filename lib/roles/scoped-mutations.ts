@@ -315,6 +315,7 @@ export async function assignScopedRoleToUser(
 
   // 6. Audit log.
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "UserRole",
@@ -395,6 +396,7 @@ export async function removeScopedRoleAssignment(
   await prisma.userRole.delete({ where: { id: existing.id } });
 
   await logAction({
+    tenantId,
     actorUserId,
     moduleKey: AUDIT_MODULE_KEY,
     entityType: "UserRole",

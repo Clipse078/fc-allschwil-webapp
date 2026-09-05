@@ -25,6 +25,7 @@ import { requirePlatformApiPermission } from "@/lib/permissions/require-platform
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { setPlatformRolePermissions } from "@/lib/roles/platform-mutations";
 import { toRoleApiErrorResponse } from "@/lib/roles/errors";
+import { auditRejectedPrivilegedAction } from "@/lib/audit/security-events";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -70,10 +71,27 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     .map((k) => k.trim());
 
   try {
-    const result = await setPlatformRolePermissions({ roleId: id, permissionKeys: requestedKeys });
+    const result = await setPlatformRolePermissions({
+      roleId: id,
+      permissionKeys: requestedKeys,
+      actorUserId: access.actorUserId,
+    });
     return NextResponse.json(result);
   } catch (error) {
     const { status, body: errorBody } = toRoleApiErrorResponse(error);
+    if (status >= 400 && status < 500) {
+      await auditRejectedPrivilegedAction({
+        actorUserId: access.actorUserId,
+        tenantId: null,
+        action: "PLATFORM_PERMISSION_CHANGE_REJECTED",
+        entityType: "Role",
+        entityId: id,
+        reasonCode:
+          "code" in errorBody && typeof errorBody.code === "string"
+            ? errorBody.code
+            : "REJECTED",
+      });
+    }
     return NextResponse.json(errorBody, { status });
   }
 }

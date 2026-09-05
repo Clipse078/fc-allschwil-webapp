@@ -31,14 +31,16 @@ const mocks = vi.hoisted(() => ({
   userRoleCreate: vi.fn(),
   transaction: vi.fn(),
   auditLogCreate: vi.fn(),
+  auditRejectedPrivilegedAction: vi.fn(),
   queryRaw: vi.fn(),
 }));
 
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
   requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
-vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
-
+vi.mock("@/lib/audit/security-events", () => ({
+  auditRejectedPrivilegedAction: mocks.auditRejectedPrivilegedAction,
+}));
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     user: { findUnique: mocks.userFindUnique },
@@ -92,6 +94,7 @@ beforeEach(() => {
     ok: true,
     status: 200,
     error: null,
+    actorUserId: "admin-1",
     session: { user: { id: "admin-1", activeTenantId: null } },
   });
   mocks.userFindUnique.mockResolvedValue({ id: "user-1", isActive: true });
@@ -107,6 +110,7 @@ beforeEach(() => {
         deleteMany: mocks.userRoleDeleteMany,
         create: mocks.userRoleCreate,
       },
+      auditLog: { create: mocks.auditLogCreate },
     }),
   );
 });
@@ -155,6 +159,14 @@ describe("PUT /api/users/[userId]/roles — platform assignment succeeds", () =>
     expect(mocks.userRoleCreate).toHaveBeenCalledWith({
       data: { userId: "user-1", roleId: "role-trainer", tenantId: null },
     });
+    expect(mocks.auditLogCreate).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorUserId: "admin-1",
+        tenantId: null,
+        entityId: "user-1",
+        action: "PLATFORM_ROLES_CHANGE",
+      }),
+    });
   });
 
   it("is idempotent: resubmitting the current platform role set makes zero writes", async () => {
@@ -192,6 +204,14 @@ describe("PUT /api/users/[userId]/roles — tenant role id is rejected", () => {
     expect(mocks.transaction).not.toHaveBeenCalled();
     expect(mocks.userRoleCreate).not.toHaveBeenCalled();
     expect(mocks.userRoleDeleteMany).not.toHaveBeenCalled();
+    expect(mocks.auditRejectedPrivilegedAction).toHaveBeenCalledWith({
+      actorUserId: "admin-1",
+      tenantId: null,
+      action: "PLATFORM_ROLE_ASSIGNMENT_REJECTED",
+      entityType: "User",
+      entityId: "user-1",
+      reasonCode: "SCOPE_MISMATCH",
+    });
   });
 
   it("rejects an unknown role id (does not silently drop it)", async () => {

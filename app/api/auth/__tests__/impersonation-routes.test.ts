@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   startImpersonationSession: vi.fn(),
   stopImpersonationSession: vi.fn(),
   userFindUnique: vi.fn(),
-  logAction: vi.fn(),
+  logSecurityAction: vi.fn(),
 }));
 
 vi.mock("@/auth", () => ({
@@ -25,7 +25,7 @@ vi.mock("@/lib/db/prisma", () => ({
 }));
 
 vi.mock("@/lib/audit/log-action", () => ({
-  logAction: mocks.logAction,
+  logSecurityAction: mocks.logSecurityAction,
 }));
 
 import { POST as startImpersonation } from "@/app/api/users/[userId]/impersonate/route";
@@ -98,7 +98,7 @@ describe("POST /api/users/[userId]/impersonate", () => {
       "actor-1",
       "target-1",
     );
-    expect(mocks.logAction).toHaveBeenCalledWith(
+    expect(mocks.logSecurityAction).toHaveBeenCalledWith(
       expect.objectContaining({
         actorUserId: "actor-1",
         entityId: "target-1",
@@ -178,7 +178,7 @@ describe("POST /api/auth/stop-impersonation", () => {
       expect.objectContaining({ where: { id: "actor-1" } }),
     );
     expect(mocks.stopImpersonationSession).toHaveBeenCalledWith("actor-1");
-    expect(mocks.logAction).toHaveBeenCalledWith(
+    expect(mocks.logSecurityAction).toHaveBeenCalledWith(
       expect.objectContaining({
         actorUserId: "actor-1",
         entityId: "target-1",

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
+import { writeAuditRecord } from "@/lib/audit/audit-record";
 
 export async function POST(request: NextRequest) {
   const access = await requirePlatformApiPermission(PERMISSIONS.USERS_MANAGE);
@@ -63,6 +64,20 @@ export async function POST(request: NextRequest) {
           },
         });
       }
+
+      await writeAuditRecord(tx, {
+        tenantId: null,
+        actorUserId: access.actorUserId,
+        moduleKey: "users",
+        entityType: "User",
+        entityId: createdUser.id,
+        action: "PLATFORM_USER_CREATED",
+        afterJson: {
+          isActive: true,
+          tenantMembershipProvisioned: Boolean(activeTenantId),
+          tenantId: activeTenantId,
+        },
+      });
 
       return createdUser;
     });
