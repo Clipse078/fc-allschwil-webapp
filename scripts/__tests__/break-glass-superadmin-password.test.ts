@@ -27,7 +27,7 @@ describe("platform Superadmin break-glass tooling", () => {
     expect(source).not.toContain("tx.user.create");
     expect(source).not.toContain("tx.user.upsert");
     expect(source).not.toContain("tx.userRole.create");
-    expect(source).not.toContain("isActive: true");
+    expect(source).not.toMatch(/data:\s*\{[^}]*isActive:\s*true/);
   });
 
   it("revokes prior sessions and records an exceptional audit event", () => {

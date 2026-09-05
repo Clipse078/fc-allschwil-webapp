@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
   requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
+vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
@@ -225,7 +226,13 @@ describe("PUT /api/users/[userId]/roles — tenant data is never touched", () =>
 
     // The only UserRole query issued is scoped to PLATFORM roles.
     expect(mocks.userRoleFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { userId: "user-1", role: { scope: "PLATFORM" } } }),
+      expect.objectContaining({
+        where: {
+          userId: "user-1",
+          tenantId: null,
+          role: { scope: "PLATFORM", tenantId: null },
+        },
+      }),
     );
   });
 

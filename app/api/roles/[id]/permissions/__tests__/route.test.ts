@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/permissions/require-platform-api-permission", () => ({
   requirePlatformApiPermission: mocks.requirePlatformApiPermission,
 }));
+vi.mock("@/lib/audit/log-action", () => ({ logAction: vi.fn() }));
 
 vi.mock("@/lib/db/prisma", () => ({
   prisma: {
