@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   requireApiPermission: vi.fn(),
@@ -52,7 +53,7 @@ function access(activeTenantId: string | null = TENANT_A) {
 }
 
 function request(personId = PERSON_A) {
-  return new Request("http://localhost/api/teams/roster", {
+  return new NextRequest("http://localhost/api/teams/roster", {
     method: "POST",
     body: JSON.stringify({ personId }),
   });

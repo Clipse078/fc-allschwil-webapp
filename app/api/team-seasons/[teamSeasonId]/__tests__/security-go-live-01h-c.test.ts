@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   requireApiPermission: vi.fn(),
@@ -25,7 +26,7 @@ import { PATCH } from "../route";
 const TENANT_A = "tenant-a";
 
 function request() {
-  return new Request("http://localhost/api/team-seasons/team-season-a", {
+  return new NextRequest("http://localhost/api/team-seasons/team-season-a", {
     method: "PATCH",
     body: JSON.stringify({
       displayName: "Team A 2026/27",

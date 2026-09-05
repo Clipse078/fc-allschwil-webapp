@@ -566,7 +566,7 @@ describe("setTeamSeasonOrgUnit", () => {
 
     // $transaction executes the callback
     vi.mocked(prisma.$transaction).mockImplementation(
-      async (fn: (tx: unknown) => Promise<unknown>) => {
+      (async (fn: (tx: unknown) => Promise<unknown>) => {
         const txMock = {
           teamSeasonOrgUnit: {
             updateMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -576,7 +576,7 @@ describe("setTeamSeasonOrgUnit", () => {
           },
         };
         return fn(txMock);
-      },
+      }) as never,
     );
   });
 

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   requireApiPermission: vi.fn(),
@@ -104,7 +105,7 @@ describe("SECURITY-GO-LIVE-01H-C — roster removal isolation", () => {
 
   it("removes an own-tenant player membership", async () => {
     const response = await removePlayer(
-      new Request("http://localhost"),
+      new NextRequest("http://localhost"),
       playerContext(),
     );
 
@@ -126,7 +127,7 @@ describe("SECURITY-GO-LIVE-01H-C — roster removal isolation", () => {
     mocks.playerFindFirst.mockResolvedValue(null);
 
     const response = await removePlayer(
-      new Request("http://localhost"),
+      new NextRequest("http://localhost"),
       playerContext("player-member-b"),
     );
 
@@ -171,7 +172,7 @@ describe("SECURITY-GO-LIVE-01H-C — roster removal isolation", () => {
     mocks.trainerFindFirst.mockResolvedValue(null);
 
     const [playerResponse, trainerResponse] = await Promise.all([
-      removePlayer(new Request("http://localhost"), playerContext("missing")),
+      removePlayer(new NextRequest("http://localhost"), playerContext("missing")),
       removeTrainer(new Request("http://localhost"), trainerContext("missing")),
     ]);
 

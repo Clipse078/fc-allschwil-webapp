@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { NextRequest } from "next/server";
 
 const mocks = vi.hoisted(() => ({
   requireApiAnyPermission: vi.fn(),
@@ -24,7 +25,7 @@ const TENANT_A = "tenant-a";
 const EVENT_A = "event-a";
 
 function request(visible = true) {
-  return new Request("http://localhost/api/infoboard/" + EVENT_A, {
+  return new NextRequest("http://localhost/api/infoboard/" + EVENT_A, {
     method: "PATCH",
     body: JSON.stringify({ infoboardVisible: visible }),
   });
