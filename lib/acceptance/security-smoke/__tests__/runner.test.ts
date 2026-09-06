@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
+import { createSmokeSessionCacheClient } from "@/lib/acceptance/security-smoke/http-client";
 import { runAcceptanceSecuritySmoke } from "@/lib/acceptance/security-smoke/runner";
 import type {
   AcceptanceSecuritySmokeConfig,
@@ -171,5 +172,104 @@ describe("runAcceptanceSecuritySmoke", () => {
 
     expect(summary.failed).toBe(0);
     expect(summary.passed).toBe(2);
+  });
+
+  it("uses the default session cache client so identity switches do not reauthenticate", async () => {
+    const alphaAdminEmail = ACCEPTANCE_FIXTURE.users.alphaAdmin.email;
+    const betaAdminEmail = ACCEPTANCE_FIXTURE.users.betaAdmin.email;
+    const credentialLogins: string[] = [];
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      const cookieHeader = new Headers(init?.headers).get("cookie") ?? "";
+
+      if (url.endsWith("/api/auth/csrf")) {
+        return new Response(JSON.stringify({ csrfToken: "csrf-token" }), {
+          status: 200,
+          headers: { "set-cookie": "__Host-authjs.csrf-token=csrf-cookie; Path=/" },
+        });
+      }
+
+      if (url.endsWith("/api/auth/callback/credentials")) {
+        const params = new URLSearchParams(String(init?.body ?? ""));
+        const email = params.get("email");
+        if (email) credentialLogins.push(email);
+        return new Response(
+          JSON.stringify({ url: "https://acceptance.example.test/dashboard" }),
+          {
+            status: 200,
+            headers: {
+              "set-cookie": `__Secure-authjs.session-token=${email}; Path=/; HttpOnly; Secure`,
+            },
+          },
+        );
+      }
+
+      if (url.endsWith("/api/auth/session")) {
+        for (const email of [alphaAdminEmail, betaAdminEmail]) {
+          if (cookieHeader.includes(`__Secure-authjs.session-token=${email}`)) {
+            return new Response(JSON.stringify({ user: { email } }), { status: 200 });
+          }
+        }
+        return new Response(JSON.stringify({}), { status: 200 });
+      }
+
+      if (url.endsWith("/api/org-units")) {
+        return new Response(JSON.stringify({ orgUnits: [] }), { status: 200 });
+      }
+
+      throw new Error(`Unexpected fetch URL: ${url}`);
+    });
+
+    const scenarios: SmokeScenario[] = [
+      {
+        id: "alpha-admin-first",
+        name: "Alpha admin first",
+        category: "session-auth",
+        async run({ client }) {
+          await client.loginWithCredentials(alphaAdminEmail, "ignored");
+          return "ok";
+        },
+      },
+      {
+        id: "beta-admin-second",
+        name: "Beta admin second",
+        category: "session-auth",
+        async run({ client }) {
+          await client.loginWithCredentials(betaAdminEmail, "ignored");
+          return "ok";
+        },
+      },
+      {
+        id: "alpha-admin-third",
+        name: "Alpha admin third",
+        category: "session-auth",
+        async run({ client }) {
+          await client.loginWithCredentials(alphaAdminEmail, "ignored");
+          const session = await client.getSession();
+          if ((session?.user as { email?: string } | undefined)?.email !== alphaAdminEmail) {
+            throw new Error("Alpha session was not restored from cache.");
+          }
+          return "ok";
+        },
+      },
+    ];
+
+    const summary = await runAcceptanceSecuritySmoke(
+      {
+        baseUrl: "https://acceptance.example.test",
+        passwords: passwordsFromFixture(),
+      },
+      {
+        scenarios,
+        createClient: (config) =>
+          createSmokeSessionCacheClient(config.baseUrl, fetchImpl as typeof fetch),
+        log: vi.fn(),
+        error: vi.fn(),
+      },
+    );
+
+    expect(summary.failed).toBe(0);
+    expect(credentialLogins).toEqual([alphaAdminEmail, betaAdminEmail]);
   });
 });

@@ -1,4 +1,4 @@
-import { createSmokeHttpClient } from "@/lib/acceptance/security-smoke/http-client";
+import { createSmokeSessionCacheClient } from "@/lib/acceptance/security-smoke/http-client";
 import { redactSmokeSecrets } from "@/lib/acceptance/security-smoke/redact";
 import {
   ACCEPTANCE_SECURITY_SMOKE_SCENARIOS,
@@ -33,7 +33,7 @@ export async function runAcceptanceSecuritySmoke(
 ): Promise<SmokeRunSummary> {
   const client =
     deps.createClient?.(config) ??
-    createSmokeHttpClient(config.baseUrl, deps.fetchImpl ?? fetch);
+    createSmokeSessionCacheClient(config.baseUrl, deps.fetchImpl ?? fetch);
   const scenarios = deps.scenarios ?? ACCEPTANCE_SECURITY_SMOKE_SCENARIOS;
   const results: SmokeScenarioResult[] = [];
 

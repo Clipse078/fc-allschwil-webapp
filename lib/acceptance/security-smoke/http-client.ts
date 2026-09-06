@@ -190,6 +190,47 @@ function parseCredentialsSignInResult(
   };
 }
 
+function normalizeSmokeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export function createSmokeSessionCacheClient(
+  baseUrl: string,
+  fetchImpl: FetchLike = fetch,
+): SmokeHttpClient {
+  const anonymousClient = createSmokeHttpClient(baseUrl, fetchImpl);
+  const clientsByEmail = new Map<string, SmokeHttpClient>();
+  let activeClient: SmokeHttpClient = anonymousClient;
+
+  return {
+    clearCookies() {
+      anonymousClient.clearCookies();
+      activeClient = anonymousClient;
+    },
+    async loginWithCredentials(email: string, password: string) {
+      const normalizedEmail = normalizeSmokeEmail(email);
+      let client = clientsByEmail.get(normalizedEmail);
+      if (!client) {
+        client = createSmokeHttpClient(baseUrl, fetchImpl);
+        clientsByEmail.set(normalizedEmail, client);
+        await client.loginWithCredentials(email, password);
+      } else {
+        await client.loginWithCredentials(email, password);
+      }
+      activeClient = client;
+    },
+    async get(path: string) {
+      return activeClient.get(path);
+    },
+    async post(path: string, body?: unknown) {
+      return activeClient.post(path, body);
+    },
+    async getSession() {
+      return activeClient.getSession();
+    },
+  };
+}
+
 export function createSmokeHttpClient(
   baseUrl: string,
   fetchImpl: FetchLike = fetch,
@@ -208,7 +249,7 @@ export function createSmokeHttpClient(
       return request(fetchImpl, baseUrl, jar, "POST", path, body);
     },
     async loginWithCredentials(email: string, password: string) {
-      const normalizedEmail = email.trim().toLowerCase();
+      const normalizedEmail = normalizeSmokeEmail(email);
       const existingSession = await this.getSession();
       const existingEmail = readSessionEmail(existingSession);
       if (existingEmail === normalizedEmail) {
