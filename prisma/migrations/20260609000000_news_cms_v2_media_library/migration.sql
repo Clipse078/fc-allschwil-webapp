@@ -15,6 +15,9 @@
 
 -- ── 1. Extend NewsArticleStatus enum ─────────────────────────────────────────
 -- ADD VALUE IF NOT EXISTS is idempotent in PostgreSQL ≥ 9.6.
+-- IN_REVIEW may already exist from legacy DBs or 20260608000000; SCHEDULED is
+-- introduced here alongside the V2 media-library foundation.
+ALTER TYPE "NewsArticleStatus" ADD VALUE IF NOT EXISTS 'IN_REVIEW';
 ALTER TYPE "NewsArticleStatus" ADD VALUE IF NOT EXISTS 'SCHEDULED';
 
 -- ── 2. MediaAssetType enum ────────────────────────────────────────────────────
@@ -83,5 +86,75 @@ DO $$ BEGIN
     ADD CONSTRAINT "NewsArticle_heroMediaId_fkey"
     FOREIGN KEY ("heroMediaId") REFERENCES "MediaAsset"("id")
     ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- ── 6. News CMS V2.1 editorial workflow (deferred from 20260606202204) ────────
+-- Prerequisites (NewsArticle, MediaAsset, scheduledAt) now exist on fresh DBs.
+ALTER TABLE "NewsArticle"
+  ADD COLUMN IF NOT EXISTS "authorPersonId" TEXT,
+  ADD COLUMN IF NOT EXISTS "reviewNotes" TEXT;
+
+CREATE TABLE IF NOT EXISTS "NewsArticleMedia" (
+    "id" TEXT NOT NULL,
+    "tenantId" TEXT NOT NULL,
+    "articleId" TEXT NOT NULL,
+    "mediaAssetId" TEXT NOT NULL,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "caption" TEXT,
+    "placement" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "NewsArticleMedia_pkey" PRIMARY KEY ("id")
+);
+
+CREATE INDEX IF NOT EXISTS "NewsArticleMedia_articleId_idx"
+  ON "NewsArticleMedia"("articleId");
+
+CREATE INDEX IF NOT EXISTS "NewsArticleMedia_tenantId_idx"
+  ON "NewsArticleMedia"("tenantId");
+
+CREATE INDEX IF NOT EXISTS "NewsArticleMedia_articleId_sortOrder_idx"
+  ON "NewsArticleMedia"("articleId", "sortOrder");
+
+CREATE UNIQUE INDEX IF NOT EXISTS "NewsArticleMedia_articleId_mediaAssetId_key"
+  ON "NewsArticleMedia"("articleId", "mediaAssetId");
+
+CREATE INDEX IF NOT EXISTS "NewsArticle_tenantId_status_scheduledAt_idx"
+  ON "NewsArticle"("tenantId", "status", "scheduledAt");
+
+CREATE INDEX IF NOT EXISTS "NewsArticle_tenantId_authorPersonId_idx"
+  ON "NewsArticle"("tenantId", "authorPersonId");
+
+DO $$ BEGIN
+  ALTER TABLE "NewsArticle"
+    ADD CONSTRAINT "NewsArticle_authorPersonId_fkey"
+    FOREIGN KEY ("authorPersonId") REFERENCES "Person"("id")
+    ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "NewsArticleMedia"
+    ADD CONSTRAINT "NewsArticleMedia_tenantId_fkey"
+    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "NewsArticleMedia"
+    ADD CONSTRAINT "NewsArticleMedia_articleId_fkey"
+    FOREIGN KEY ("articleId") REFERENCES "NewsArticle"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE "NewsArticleMedia"
+    ADD CONSTRAINT "NewsArticleMedia_mediaAssetId_fkey"
+    FOREIGN KEY ("mediaAssetId") REFERENCES "MediaAsset"("id")
+    ON DELETE CASCADE ON UPDATE CASCADE;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

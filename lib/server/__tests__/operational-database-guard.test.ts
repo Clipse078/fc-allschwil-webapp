@@ -140,6 +140,31 @@ describe("operational database mutation guard", () => {
     });
   });
 
+  it("allows an operation explicitly designed and authorized for Acceptance", () => {
+    const result = evaluateOperationalMutationGuard(
+      {
+        operationId: "deploy-migrations",
+        databaseUrl: REMOTE_DATABASE_URL,
+        explicitIntent: true,
+        allowedRemoteEnvironments: ["acceptance"],
+        operationSpecificAuthorization: true,
+      },
+      {
+        NODE_ENV: "production",
+        APP_ENV: "acceptance",
+        VERCEL: "1",
+        VERCEL_ENV: "preview",
+        VERCEL_TARGET_ENV: "acceptance",
+      },
+    );
+
+    expect(result).toMatchObject({
+      allowed: true,
+      environment: "acceptance",
+      databaseTarget: "remote",
+    });
+  });
+
   it("requires independent approval for production mutation", () => {
     const baseEnv = {
       NODE_ENV: "production",

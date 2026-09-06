@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "target": "ES2018"
+  },
+  "files": [
+    "lib/acceptance/bootstrap.ts",
+    "lib/acceptance/__tests__/bootstrap.test.ts",
+    "lib/server/operational-database-guard.ts",
+    "lib/server/__tests__/operational-database-guard.test.ts",
+    "scripts/bootstrap-acceptance.ts",
+    "scripts/deploy-migrations-if-enabled.ts"
+  ],
+  "include": []
+}
