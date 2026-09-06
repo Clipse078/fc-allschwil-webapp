@@ -20,8 +20,9 @@ externally before creation.
 3. Create separate pooled and direct credentials. Do not copy STAGE data.
 4. Set the protected operator environment inputs listed below.
 5. Run the gated canonical migration deployment once with
-   `APPLY_DATABASE_MIGRATIONS=true`. Prisma uses `DIRECT_URL` when present and
-   executes `prisma migrate deploy`; it does not run a seed.
+   `APPLY_DATABASE_MIGRATIONS=true` and the guarded npm command
+   `npm run db:migrate:deploy-if-enabled`. Prisma uses `DIRECT_URL` when
+   present and executes `prisma migrate deploy`; it does not run a seed.
 6. Return `APPLY_DATABASE_MIGRATIONS=false`.
 7. Run `npm run db:bootstrap-acceptance` once.
 8. Re-run the bootstrap to verify idempotency. Existing hashes are retained.
@@ -34,6 +35,29 @@ externally before creation.
 
 Do not use `prisma db push`, `prisma migrate dev`, the FCA seed, the demo seed,
 or `prisma migrate reset`.
+
+## Windows recovery for gated migration deployment
+
+If Acceptance migration deployment fails on Windows with `spawnSync npx ENOENT`,
+do not run bare `npx prisma migrate deploy`. Use the guarded npm command so
+Acceptance host/database allowlist checks and operational mutation guards still
+run:
+
+```powershell
+$env:APPLY_DATABASE_MIGRATIONS = "true"
+$env:APP_ENV = "acceptance"
+$env:VERCEL_TARGET_ENV = "acceptance"
+$env:NODE_ENV = "production"
+$env:DATABASE_URL = "<acceptance-pooled-url>"
+$env:DIRECT_URL = "<acceptance-direct-url>"
+$env:ACCEPTANCE_DATABASE_HOST = "<acceptance-pooled-host>"
+$env:ACCEPTANCE_DIRECT_DATABASE_HOST = "<acceptance-direct-host>"
+npm run db:migrate:deploy-if-enabled
+```
+
+Both `ACCEPTANCE_DATABASE_HOST` and `ACCEPTANCE_DIRECT_DATABASE_HOST` must
+match the allowlisted remote `sce_acceptance` database identity. After a
+successful run, set `APPLY_DATABASE_MIGRATIONS=false` again.
 
 ## Bootstrap operator inputs
 
