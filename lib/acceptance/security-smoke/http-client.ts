@@ -1,4 +1,8 @@
+import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
+import { getFixturePassword } from "@/lib/acceptance/security-smoke/env";
 import type {
+  AcceptanceSecuritySmokeConfig,
+  SmokeFixtureClients,
   SmokeHttpClient,
   SmokeHttpResponse,
 } from "@/lib/acceptance/security-smoke/types";
@@ -194,43 +198,6 @@ function normalizeSmokeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-export function createSmokeSessionCacheClient(
-  baseUrl: string,
-  fetchImpl: FetchLike = fetch,
-): SmokeHttpClient {
-  const anonymousClient = createSmokeHttpClient(baseUrl, fetchImpl);
-  const clientsByEmail = new Map<string, SmokeHttpClient>();
-  let activeClient: SmokeHttpClient = anonymousClient;
-
-  return {
-    clearCookies() {
-      anonymousClient.clearCookies();
-      activeClient = anonymousClient;
-    },
-    async loginWithCredentials(email: string, password: string) {
-      const normalizedEmail = normalizeSmokeEmail(email);
-      let client = clientsByEmail.get(normalizedEmail);
-      if (!client) {
-        client = createSmokeHttpClient(baseUrl, fetchImpl);
-        clientsByEmail.set(normalizedEmail, client);
-        await client.loginWithCredentials(email, password);
-      } else {
-        await client.loginWithCredentials(email, password);
-      }
-      activeClient = client;
-    },
-    async get(path: string) {
-      return activeClient.get(path);
-    },
-    async post(path: string, body?: unknown) {
-      return activeClient.post(path, body);
-    },
-    async getSession() {
-      return activeClient.getSession();
-    },
-  };
-}
-
 export function createSmokeHttpClient(
   baseUrl: string,
   fetchImpl: FetchLike = fetch,
@@ -306,4 +273,44 @@ export function createSmokeHttpClient(
       return payload as Record<string, unknown>;
     },
   };
+}
+
+export function createSmokeFixtureClients(
+  config: AcceptanceSecuritySmokeConfig,
+  fetchImpl: FetchLike = fetch,
+): SmokeFixtureClients {
+  const baseUrl = config.baseUrl;
+  return {
+    anonymous: createSmokeHttpClient(baseUrl, fetchImpl),
+    superadmin: createSmokeHttpClient(baseUrl, fetchImpl),
+    alphaAdmin: createSmokeHttpClient(baseUrl, fetchImpl),
+    alphaMember: createSmokeHttpClient(baseUrl, fetchImpl),
+    betaAdmin: createSmokeHttpClient(baseUrl, fetchImpl),
+    betaMember: createSmokeHttpClient(baseUrl, fetchImpl),
+  };
+}
+
+const AUTHENTICATED_FIXTURE_CLIENTS = [
+  ["superadmin", "superadmin"],
+  ["alphaAdmin", "alphaAdmin"],
+  ["alphaMember", "alphaMember"],
+  ["betaAdmin", "betaAdmin"],
+  ["betaMember", "betaMember"],
+] as const satisfies ReadonlyArray<
+  [keyof Omit<SmokeFixtureClients, "anonymous">, keyof typeof ACCEPTANCE_FIXTURE.users]
+>;
+
+export async function initializeSmokeFixtureClients(
+  config: AcceptanceSecuritySmokeConfig,
+  fetchImpl: FetchLike = fetch,
+): Promise<SmokeFixtureClients> {
+  const clients = createSmokeFixtureClients(config, fetchImpl);
+
+  for (const [clientKey, userKey] of AUTHENTICATED_FIXTURE_CLIENTS) {
+    const fixture = ACCEPTANCE_FIXTURE.users[userKey];
+    const password = getFixturePassword(config.passwords, fixture.passwordEnv);
+    await clients[clientKey].loginWithCredentials(fixture.email, password);
+  }
+
+  return clients;
 }

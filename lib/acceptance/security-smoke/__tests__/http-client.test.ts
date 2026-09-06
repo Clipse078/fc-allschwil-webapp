@@ -3,7 +3,7 @@ import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
 import {
   createCookieJar,
   createSmokeHttpClient,
-  createSmokeSessionCacheClient,
+  initializeSmokeFixtureClients,
 } from "@/lib/acceptance/security-smoke/http-client";
 
 function headersInclude(
@@ -188,16 +188,29 @@ describe("createSmokeHttpClient", () => {
   });
 });
 
-describe("createSmokeSessionCacheClient", () => {
+describe("initializeSmokeFixtureClients", () => {
+  const baseUrl = "https://acceptance.example.test";
   const alphaAdminEmail = ACCEPTANCE_FIXTURE.users.alphaAdmin.email;
   const betaAdminEmail = ACCEPTANCE_FIXTURE.users.betaAdmin.email;
   const alphaMemberEmail = ACCEPTANCE_FIXTURE.users.alphaMember.email;
-  const baseUrl = "https://acceptance.example.test";
+  const betaMemberEmail = ACCEPTANCE_FIXTURE.users.betaMember.email;
+  const superadminEmail = ACCEPTANCE_FIXTURE.users.superadmin.email;
 
-  function createAuthFetchImpl(sessions: Record<string, Record<string, unknown>>) {
-    const loggedInEmails = new Set<string>();
+  function passwordsFromFixture() {
+    return Object.fromEntries(
+      Object.values(ACCEPTANCE_FIXTURE.users).map((user) => [
+        user.passwordEnv,
+        `test-${user.passwordEnv}`,
+      ]),
+    ) as ReturnType<
+      typeof import("@/lib/acceptance/bootstrap").readAcceptancePasswords
+    >;
+  }
 
-    return vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+  function createAuthFetchImpl() {
+    const credentialLogins: string[] = [];
+
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const cookieHeader = new Headers(init?.headers).get("cookie") ?? "";
 
@@ -209,13 +222,9 @@ describe("createSmokeSessionCacheClient", () => {
       }
 
       if (url.endsWith("/api/auth/callback/credentials")) {
-        const body = String(init?.body ?? "");
-        const params = new URLSearchParams(body);
+        const params = new URLSearchParams(String(init?.body ?? ""));
         const email = params.get("email");
-        if (!email) {
-          throw new Error("Missing email in credentials callback.");
-        }
-        loggedInEmails.add(email.trim().toLowerCase());
+        if (email) credentialLogins.push(email.trim().toLowerCase());
         return new Response(JSON.stringify({ url: `${baseUrl}/dashboard` }), {
           status: 200,
           headers: {
@@ -225,10 +234,15 @@ describe("createSmokeSessionCacheClient", () => {
       }
 
       if (url.endsWith("/api/auth/session")) {
-        for (const [email, user] of Object.entries(sessions)) {
-          const token = `__Secure-authjs.session-token=${email}`;
-          if (cookieHeader.includes(token)) {
-            return new Response(JSON.stringify({ user }), { status: 200 });
+        for (const email of [
+          superadminEmail,
+          alphaAdminEmail,
+          alphaMemberEmail,
+          betaAdminEmail,
+          betaMemberEmail,
+        ]) {
+          if (cookieHeader.includes(`__Secure-authjs.session-token=${email}`)) {
+            return new Response(JSON.stringify({ user: { email } }), { status: 200 });
           }
         }
         return new Response(JSON.stringify({}), { status: 200 });
@@ -241,88 +255,55 @@ describe("createSmokeSessionCacheClient", () => {
         return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      return new Response(JSON.stringify({}), { status: 200 });
     });
+
+    return { fetchImpl, credentialLogins };
   }
 
-  function countCredentialLogins(fetchImpl: ReturnType<typeof vi.fn>): number {
-    return fetchImpl.mock.calls.filter(([input]) =>
-      String(input).endsWith("/api/auth/callback/credentials"),
-    ).length;
-  }
+  it("authenticates exactly five fixture identities at startup", async () => {
+    const { fetchImpl, credentialLogins } = createAuthFetchImpl();
+    await initializeSmokeFixtureClients(
+      { baseUrl, passwords: passwordsFromFixture() },
+      fetchImpl as typeof fetch,
+    );
 
-  it("authenticates the same fixture identity only once across repeated scenarios", async () => {
-    const fetchImpl = createAuthFetchImpl({
-      [alphaAdminEmail]: { email: alphaAdminEmail },
-    });
-    const client = createSmokeSessionCacheClient(baseUrl, fetchImpl as typeof fetch);
-
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-
-    expect(countCredentialLogins(fetchImpl)).toBe(1);
+    expect(credentialLogins).toEqual([
+      superadminEmail,
+      alphaAdminEmail,
+      alphaMemberEmail,
+      betaAdminEmail,
+      betaMemberEmail,
+    ]);
   });
 
-  it("authenticates Alpha and Beta once each when switching Alpha → Beta → Alpha", async () => {
-    const fetchImpl = createAuthFetchImpl({
-      [alphaAdminEmail]: { email: alphaAdminEmail },
-      [betaAdminEmail]: { email: betaAdminEmail },
-    });
-    const client = createSmokeSessionCacheClient(baseUrl, fetchImpl as typeof fetch);
+  it("keeps each authenticated fixture client in an isolated cookie jar", async () => {
+    const { fetchImpl } = createAuthFetchImpl();
+    const clients = await initializeSmokeFixtureClients(
+      { baseUrl, passwords: passwordsFromFixture() },
+      fetchImpl as typeof fetch,
+    );
 
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    await client.loginWithCredentials(betaAdminEmail, "password");
-    await client.loginWithCredentials(alphaAdminEmail, "password");
+    const adminSession = await clients.alphaAdmin.getSession();
+    const memberSession = await clients.alphaMember.getSession();
+    const betaAdminSession = await clients.betaAdmin.getSession();
 
-    expect(countCredentialLogins(fetchImpl)).toBe(2);
+    expect(adminSession?.user).toMatchObject({ email: alphaAdminEmail });
+    expect(memberSession?.user).toMatchObject({ email: alphaMemberEmail });
+    expect(betaAdminSession?.user).toMatchObject({ email: betaAdminEmail });
   });
 
-  it("keeps member and admin sessions isolated in separate cookie jars", async () => {
-    const fetchImpl = createAuthFetchImpl({
-      [alphaAdminEmail]: { email: alphaAdminEmail, role: "admin" },
-      [alphaMemberEmail]: { email: alphaMemberEmail, role: "member" },
-    });
-    const client = createSmokeSessionCacheClient(baseUrl, fetchImpl as typeof fetch);
+  it("leaves the anonymous client unauthenticated", async () => {
+    const { fetchImpl } = createAuthFetchImpl();
+    const clients = await initializeSmokeFixtureClients(
+      { baseUrl, passwords: passwordsFromFixture() },
+      fetchImpl as typeof fetch,
+    );
 
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    const adminSession = await client.getSession();
-    await client.loginWithCredentials(alphaMemberEmail, "password");
-    const memberSession = await client.getSession();
+    const session = await clients.anonymous.getSession();
+    const response = await clients.anonymous.get("/api/org-units");
 
-    expect(adminSession?.user).toMatchObject({ email: alphaAdminEmail, role: "admin" });
-    expect(memberSession?.user).toMatchObject({ email: alphaMemberEmail, role: "member" });
-    expect(countCredentialLogins(fetchImpl)).toBe(2);
-  });
-
-  it("uses an anonymous session after clearCookies without reusing authenticated cookies", async () => {
-    const fetchImpl = createAuthFetchImpl({
-      [alphaAdminEmail]: { email: alphaAdminEmail },
-    });
-    const client = createSmokeSessionCacheClient(baseUrl, fetchImpl as typeof fetch);
-
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    client.clearCookies();
-    const response = await client.get("/api/org-units");
-
+    expect(session?.user).toBeUndefined();
     expect(response.status).toBe(401);
-    expect(countCredentialLogins(fetchImpl)).toBe(1);
-  });
-
-  it("does not leak anonymous clearCookies into cached authenticated identities", async () => {
-    const fetchImpl = createAuthFetchImpl({
-      [alphaAdminEmail]: { email: alphaAdminEmail },
-      [betaAdminEmail]: { email: betaAdminEmail },
-    });
-    const client = createSmokeSessionCacheClient(baseUrl, fetchImpl as typeof fetch);
-
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    await client.loginWithCredentials(betaAdminEmail, "password");
-    client.clearCookies();
-    await client.loginWithCredentials(alphaAdminEmail, "password");
-    const session = await client.getSession();
-
-    expect(session?.user).toMatchObject({ email: alphaAdminEmail });
-    expect(countCredentialLogins(fetchImpl)).toBe(2);
   });
 });

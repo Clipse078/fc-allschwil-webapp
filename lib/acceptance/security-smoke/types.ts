@@ -45,8 +45,18 @@ export type SmokeHttpClient = {
   getSession: () => Promise<Record<string, unknown> | null>;
 };
 
+export type SmokeFixtureClientKey =
+  | "anonymous"
+  | "superadmin"
+  | "alphaAdmin"
+  | "alphaMember"
+  | "betaAdmin"
+  | "betaMember";
+
+export type SmokeFixtureClients = Record<SmokeFixtureClientKey, SmokeHttpClient>;
+
 export type SmokeScenarioContext = {
-  client: SmokeHttpClient;
+  clients: SmokeFixtureClients;
   config: AcceptanceSecuritySmokeConfig;
 };
 

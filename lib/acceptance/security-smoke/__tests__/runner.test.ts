@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
-import { createSmokeSessionCacheClient } from "@/lib/acceptance/security-smoke/http-client";
+import { initializeSmokeFixtureClients } from "@/lib/acceptance/security-smoke/http-client";
 import { runAcceptanceSecuritySmoke } from "@/lib/acceptance/security-smoke/runner";
+import { ACCEPTANCE_SECURITY_SMOKE_SCENARIOS } from "@/lib/acceptance/security-smoke/scenarios";
 import type {
   AcceptanceSecuritySmokeConfig,
+  SmokeFixtureClients,
   SmokeHttpClient,
   SmokeHttpResponse,
   SmokeScenario,
@@ -19,44 +21,6 @@ function response(status: number, body: unknown): SmokeHttpResponse {
   };
 }
 
-function createMockClient(handlers: {
-  login?: (email: string) => void;
-  routes: Record<string, (method: "GET" | "POST") => SmokeHttpResponse>;
-  sessionByEmail?: Record<string, Record<string, unknown>>;
-}): SmokeHttpClient {
-  let currentEmail: string | null = null;
-
-  return {
-    clearCookies() {
-      currentEmail = null;
-    },
-    async loginWithCredentials(email: string) {
-      handlers.login?.(email);
-      currentEmail = email;
-    },
-    async getSession() {
-      if (!currentEmail) return null;
-      const user = handlers.sessionByEmail?.[currentEmail];
-      return user ? { user } : null;
-    },
-    async get(path) {
-      const handler = handlers.routes[`GET ${path}`];
-      if (!handler) {
-        throw new Error(`Unexpected GET ${path}`);
-      }
-      return handler("GET");
-    },
-    async post(path, body) {
-      const handler = handlers.routes[`POST ${path}`];
-      if (!handler) {
-        throw new Error(`Unexpected POST ${path}`);
-      }
-      void body;
-      return handler("POST");
-    },
-  };
-}
-
 function passwordsFromFixture(): AcceptanceSecuritySmokeConfig["passwords"] {
   return Object.fromEntries(
     Object.values(ACCEPTANCE_FIXTURE.users).map((user) => [
@@ -64,6 +28,54 @@ function passwordsFromFixture(): AcceptanceSecuritySmokeConfig["passwords"] {
       `test-${user.passwordEnv}`,
     ]),
   ) as AcceptanceSecuritySmokeConfig["passwords"];
+}
+
+function createMockClients(handlers: {
+  routes: Record<string, (method: "GET" | "POST") => SmokeHttpResponse>;
+  sessions: Partial<
+    Record<
+      keyof Omit<SmokeFixtureClients, "anonymous">,
+      Record<string, unknown>
+    >
+  >;
+}): SmokeFixtureClients {
+  function createClient(
+    sessionUser: Record<string, unknown> | null,
+  ): SmokeHttpClient {
+    return {
+      clearCookies() {},
+      async loginWithCredentials() {
+        throw new Error("Scenario must not call loginWithCredentials.");
+      },
+      async getSession() {
+        return sessionUser ? { user: sessionUser } : null;
+      },
+      async get(path) {
+        const handler = handlers.routes[`GET ${path}`];
+        if (!handler) {
+          throw new Error(`Unexpected GET ${path}`);
+        }
+        return handler("GET");
+      },
+      async post(path, body) {
+        const handler = handlers.routes[`POST ${path}`];
+        if (!handler) {
+          throw new Error(`Unexpected POST ${path}`);
+        }
+        void body;
+        return handler("POST");
+      },
+    };
+  }
+
+  return {
+    anonymous: createClient(null),
+    superadmin: createClient(handlers.sessions.superadmin ?? null),
+    alphaAdmin: createClient(handlers.sessions.alphaAdmin ?? null),
+    alphaMember: createClient(handlers.sessions.alphaMember ?? null),
+    betaAdmin: createClient(handlers.sessions.betaAdmin ?? null),
+    betaMember: createClient(handlers.sessions.betaMember ?? null),
+  };
 }
 
 describe("runAcceptanceSecuritySmoke", () => {
@@ -95,6 +107,8 @@ describe("runAcceptanceSecuritySmoke", () => {
       },
       {
         scenarios,
+        initializeClients: async () =>
+          createMockClients({ routes: {}, sessions: {} }),
         log: (message) => logs.push(message),
         error: (message) => logs.push(message),
       },
@@ -106,13 +120,12 @@ describe("runAcceptanceSecuritySmoke", () => {
     expect(logs.join("\n")).not.toContain("secret-token");
   });
 
-  it("executes representative tenant and role isolation checks via the mock client", async () => {
-    const alphaAdminEmail = ACCEPTANCE_FIXTURE.users.alphaAdmin.email;
+  it("executes representative tenant and role isolation checks via fixture clients", async () => {
     const betaSlug = ACCEPTANCE_FIXTURE.tenants.beta.key;
-    const client = createMockClient({
-      sessionByEmail: {
-        [alphaAdminEmail]: {
-          email: alphaAdminEmail,
+    const clients = createMockClients({
+      sessions: {
+        alphaAdmin: {
+          email: ACCEPTANCE_FIXTURE.users.alphaAdmin.email,
           activeTenantId: ACCEPTANCE_FIXTURE.tenants.alpha.id,
         },
       },
@@ -131,9 +144,8 @@ describe("runAcceptanceSecuritySmoke", () => {
         id: "alpha-admin-accesses-alpha-org-units",
         name: "Alpha admin org units",
         category: "tenant-isolation",
-        async run({ client: smokeClient }) {
-          await smokeClient.loginWithCredentials(alphaAdminEmail, "ignored");
-          const orgUnits = await smokeClient.get("/api/org-units");
+        async run({ clients: fixtureClients }) {
+          const orgUnits = await fixtureClients.alphaAdmin.get("/api/org-units");
           if (orgUnits.status !== 200) {
             throw new Error(`Expected 200, received ${orgUnits.status}`);
           }
@@ -144,9 +156,8 @@ describe("runAcceptanceSecuritySmoke", () => {
         id: "alpha-admin-cannot-access-beta-slug-registrations",
         name: "Alpha admin beta slug denied",
         category: "tenant-isolation",
-        async run({ client: smokeClient }) {
-          await smokeClient.loginWithCredentials(alphaAdminEmail, "ignored");
-          const denied = await smokeClient.get(
+        async run({ clients: fixtureClients }) {
+          const denied = await fixtureClients.alphaAdmin.get(
             `/api/tenants/${betaSlug}/registrations`,
           );
           if (denied.status !== 404) {
@@ -164,7 +175,7 @@ describe("runAcceptanceSecuritySmoke", () => {
       },
       {
         scenarios,
-        createClient: () => client,
+        initializeClients: async () => clients,
         log: vi.fn(),
         error: vi.fn(),
       },
@@ -174,10 +185,18 @@ describe("runAcceptanceSecuritySmoke", () => {
     expect(summary.passed).toBe(2);
   });
 
-  it("uses the default session cache client so identity switches do not reauthenticate", async () => {
-    const alphaAdminEmail = ACCEPTANCE_FIXTURE.users.alphaAdmin.email;
-    const betaAdminEmail = ACCEPTANCE_FIXTURE.users.betaAdmin.email;
+  it("authenticates exactly five fixture identities for the full 25-scenario run", async () => {
+    const baseUrl = "https://acceptance.example.test";
     const credentialLogins: string[] = [];
+    const postInitLoginCalls: string[] = [];
+
+    const {
+      superadmin: superadminEmail,
+      alphaAdmin: alphaAdminEmail,
+      alphaMember: alphaMemberEmail,
+      betaAdmin: betaAdminEmail,
+      betaMember: betaMemberEmail,
+    } = ACCEPTANCE_FIXTURE.users;
 
     const fetchImpl = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -193,83 +212,116 @@ describe("runAcceptanceSecuritySmoke", () => {
       if (url.endsWith("/api/auth/callback/credentials")) {
         const params = new URLSearchParams(String(init?.body ?? ""));
         const email = params.get("email");
-        if (email) credentialLogins.push(email);
-        return new Response(
-          JSON.stringify({ url: "https://acceptance.example.test/dashboard" }),
-          {
-            status: 200,
-            headers: {
-              "set-cookie": `__Secure-authjs.session-token=${email}; Path=/; HttpOnly; Secure`,
-            },
+        if (email) credentialLogins.push(email.trim().toLowerCase());
+        return new Response(JSON.stringify({ url: `${baseUrl}/dashboard` }), {
+          status: 200,
+          headers: {
+            "set-cookie": `__Secure-authjs.session-token=${email}; Path=/; HttpOnly; Secure`,
           },
-        );
+        });
       }
 
       if (url.endsWith("/api/auth/session")) {
-        for (const email of [alphaAdminEmail, betaAdminEmail]) {
+        for (const [email, activeTenantId] of [
+          [superadminEmail.email, ACCEPTANCE_FIXTURE.tenants.alpha.id],
+          [alphaAdminEmail.email, ACCEPTANCE_FIXTURE.tenants.alpha.id],
+          [alphaMemberEmail.email, ACCEPTANCE_FIXTURE.tenants.alpha.id],
+          [betaAdminEmail.email, ACCEPTANCE_FIXTURE.tenants.beta.id],
+          [betaMemberEmail.email, ACCEPTANCE_FIXTURE.tenants.beta.id],
+        ] as const) {
           if (cookieHeader.includes(`__Secure-authjs.session-token=${email}`)) {
-            return new Response(JSON.stringify({ user: { email } }), { status: 200 });
+            return new Response(
+              JSON.stringify({ user: { email, activeTenantId } }),
+              { status: 200 },
+            );
           }
         }
         return new Response(JSON.stringify({}), { status: 200 });
       }
 
       if (url.endsWith("/api/org-units")) {
-        return new Response(JSON.stringify({ orgUnits: [] }), { status: 200 });
+        if (init?.method === "POST") {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+        }
+        if (!cookieHeader.includes("__Secure-authjs.session-token=")) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        }
+        const orgUnits = cookieHeader.includes(betaAdminEmail.email)
+          ? [{ id: "sce-acceptance-org-beta-club" }]
+          : [{ id: "sce-acceptance-org-alpha-club" }];
+        return new Response(JSON.stringify({ orgUnits }), { status: 200 });
       }
 
-      throw new Error(`Unexpected fetch URL: ${url}`);
+      if (url.includes("/registrations")) {
+        return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      }
+
+      if (url.includes("/api/people/")) {
+        return new Response(JSON.stringify({ error: "Not found" }), { status: 404 });
+      }
+
+      if (url.endsWith("/api/admin/users")) {
+        if (!cookieHeader.includes("__Secure-authjs.session-token=")) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        }
+        if (
+          cookieHeader.includes(alphaMemberEmail.email) ||
+          cookieHeader.includes(betaMemberEmail.email)
+        ) {
+          return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403 });
+        }
+        return new Response(JSON.stringify({ users: [] }), { status: 200 });
+      }
+
+      if (url.endsWith("/api/tenants")) {
+        return new Response(
+          JSON.stringify({
+            tenants: [
+              { key: ACCEPTANCE_FIXTURE.tenants.alpha.key },
+              { key: ACCEPTANCE_FIXTURE.tenants.beta.key },
+            ],
+          }),
+          { status: 200 },
+        );
+      }
+
+      return new Response(JSON.stringify({}), { status: 200 });
     });
 
-    const scenarios: SmokeScenario[] = [
-      {
-        id: "alpha-admin-first",
-        name: "Alpha admin first",
-        category: "session-auth",
-        async run({ client }) {
-          await client.loginWithCredentials(alphaAdminEmail, "ignored");
-          return "ok";
-        },
-      },
-      {
-        id: "beta-admin-second",
-        name: "Beta admin second",
-        category: "session-auth",
-        async run({ client }) {
-          await client.loginWithCredentials(betaAdminEmail, "ignored");
-          return "ok";
-        },
-      },
-      {
-        id: "alpha-admin-third",
-        name: "Alpha admin third",
-        category: "session-auth",
-        async run({ client }) {
-          await client.loginWithCredentials(alphaAdminEmail, "ignored");
-          const session = await client.getSession();
-          if ((session?.user as { email?: string } | undefined)?.email !== alphaAdminEmail) {
-            throw new Error("Alpha session was not restored from cache.");
-          }
-          return "ok";
-        },
-      },
-    ];
+    const clients = await initializeSmokeFixtureClients(
+      { baseUrl, passwords: passwordsFromFixture() },
+      fetchImpl as typeof fetch,
+    );
+
+    for (const client of Object.values(clients)) {
+      const originalLogin = client.loginWithCredentials.bind(client);
+      client.loginWithCredentials = async (email, password) => {
+        postInitLoginCalls.push(email);
+        return originalLogin(email, password);
+      };
+    }
 
     const summary = await runAcceptanceSecuritySmoke(
+      { baseUrl, passwords: passwordsFromFixture() },
       {
-        baseUrl: "https://acceptance.example.test",
-        passwords: passwordsFromFixture(),
-      },
-      {
-        scenarios,
-        createClient: (config) =>
-          createSmokeSessionCacheClient(config.baseUrl, fetchImpl as typeof fetch),
+        scenarios: ACCEPTANCE_SECURITY_SMOKE_SCENARIOS,
+        initializeClients: async () => clients,
         log: vi.fn(),
         error: vi.fn(),
       },
     );
 
+    expect(ACCEPTANCE_SECURITY_SMOKE_SCENARIOS).toHaveLength(25);
     expect(summary.failed).toBe(0);
-    expect(credentialLogins).toEqual([alphaAdminEmail, betaAdminEmail]);
+    expect(credentialLogins).toEqual([
+      superadminEmail.email,
+      alphaAdminEmail.email,
+      alphaMemberEmail.email,
+      betaAdminEmail.email,
+      betaMemberEmail.email,
+    ]);
+    expect(credentialLogins.filter((email) => email === betaAdminEmail.email)).toHaveLength(1);
+    expect(credentialLogins.filter((email) => email === alphaAdminEmail.email)).toHaveLength(1);
+    expect(postInitLoginCalls).toEqual([]);
   });
 });

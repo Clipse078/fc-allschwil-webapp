@@ -1,6 +1,4 @@
 import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
-import type { AcceptancePasswords } from "@/lib/acceptance/bootstrap";
-import { getFixturePassword } from "@/lib/acceptance/security-smoke/env";
 import type { SmokeScenario } from "@/lib/acceptance/security-smoke/types";
 
 const FIXTURE_PREFIX = "sce-acceptance-";
@@ -43,18 +41,6 @@ function readSessionUser(session: Record<string, unknown> | null) {
   return user as Record<string, unknown>;
 }
 
-async function loginAs(
-  context: { client: { loginWithCredentials: (email: string, password: string) => Promise<void> }; config: { passwords: AcceptancePasswords } },
-  userKey: keyof typeof ACCEPTANCE_FIXTURE.users,
-) {
-  const fixture = ACCEPTANCE_FIXTURE.users[userKey];
-  const password = getFixturePassword(
-    context.config.passwords,
-    fixture.passwordEnv,
-  );
-  await context.client.loginWithCredentials(fixture.email, password);
-}
-
 function orgUnitsPath(): string {
   return "/api/org-units";
 }
@@ -80,9 +66,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "unauthenticated-org-units-denied",
     name: "Unauthenticated org-units request is denied",
     category: "session-auth",
-    async run({ client }) {
-      client.clearCookies();
-      const response = await client.get(orgUnitsPath());
+    async run({ clients }) {
+      const response = await clients.anonymous.get(orgUnitsPath());
       if (response.status !== 401) {
         throw new Error(`Expected HTTP 401, received ${response.status}.`);
       }
@@ -93,9 +78,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "unauthenticated-admin-users-denied",
     name: "Unauthenticated admin users request is denied",
     category: "session-auth",
-    async run({ client }) {
-      client.clearCookies();
-      const response = await client.get(adminUsersPath());
+    async run({ clients }) {
+      const response = await clients.anonymous.get(adminUsersPath());
       if (response.status !== 401) {
         throw new Error(`Expected HTTP 401, received ${response.status}.`);
       }
@@ -106,9 +90,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-admin-can-authenticate",
     name: "Alpha Club Admin can authenticate",
     category: "session-auth",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.alphaAdmin.getSession();
       const user = readSessionUser(session);
       if (!user?.email) {
         throw new Error("Authenticated session did not include a user email.");
@@ -123,9 +106,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-admin-can-authenticate",
     name: "Beta Club Admin can authenticate",
     category: "session-auth",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.betaAdmin.getSession();
       const user = readSessionUser(session);
       if (user?.email !== ACCEPTANCE_FIXTURE.users.betaAdmin.email) {
         throw new Error("Authenticated session email did not match the Beta Club Admin fixture.");
@@ -137,9 +119,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "session-active-tenant-bound-alpha",
     name: "Alpha Club Admin session remains tenant-bound to Alpha",
     category: "session-auth",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.alphaAdmin.getSession();
       const user = readSessionUser(session);
       if (user?.activeTenantId !== ACCEPTANCE_FIXTURE_IDS.tenants.alpha) {
         throw new Error("Alpha Club Admin active tenant did not resolve to the Alpha fixture tenant.");
@@ -151,9 +132,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "session-active-tenant-bound-beta",
     name: "Beta Club Admin session remains tenant-bound to Beta",
     category: "session-auth",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.betaAdmin.getSession();
       const user = readSessionUser(session);
       if (user?.activeTenantId !== ACCEPTANCE_FIXTURE_IDS.tenants.beta) {
         throw new Error("Beta Club Admin active tenant did not resolve to the Beta fixture tenant.");
@@ -165,9 +145,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-admin-accesses-alpha-org-units",
     name: "Alpha Club Admin can access Alpha tenant org units",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const response = await context.client.get(orgUnitsPath());
+    async run({ clients }) {
+      const response = await clients.alphaAdmin.get(orgUnitsPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }
@@ -186,9 +165,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-admin-cannot-access-beta-slug-registrations",
     name: "Alpha Club Admin cannot access Beta slug registrations",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.alphaAdmin.get(
         tenantRegistrationsPath(ACCEPTANCE_FIXTURE_IDS.tenantSlugs.beta),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -201,9 +179,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-member-cannot-access-beta-slug-registrations",
     name: "Alpha Member cannot access Beta slug registrations",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "alphaMember");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.alphaMember.get(
         tenantRegistrationsPath(ACCEPTANCE_FIXTURE_IDS.tenantSlugs.beta),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -216,9 +193,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-admin-accesses-beta-org-units",
     name: "Beta Club Admin can access Beta tenant org units",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const response = await context.client.get(orgUnitsPath());
+    async run({ clients }) {
+      const response = await clients.betaAdmin.get(orgUnitsPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }
@@ -237,9 +213,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-admin-cannot-access-alpha-slug-registrations",
     name: "Beta Club Admin cannot access Alpha slug registrations",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.betaAdmin.get(
         tenantRegistrationsPath(ACCEPTANCE_FIXTURE_IDS.tenantSlugs.alpha),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -252,9 +227,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-member-cannot-access-alpha-slug-registrations",
     name: "Beta Member cannot access Alpha slug registrations",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "betaMember");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.betaMember.get(
         tenantRegistrationsPath(ACCEPTANCE_FIXTURE_IDS.tenantSlugs.alpha),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -267,9 +241,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-admin-cross-tenant-person-id-denied",
     name: "Alpha Club Admin cannot read Beta person by direct ID",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.alphaAdmin.get(
         personPath(ACCEPTANCE_FIXTURE_IDS.persons.betaAdmin),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -282,9 +255,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-admin-cross-tenant-person-id-denied",
     name: "Beta Club Admin cannot read Alpha person by direct ID",
     category: "tenant-isolation",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.betaAdmin.get(
         personPath(ACCEPTANCE_FIXTURE_IDS.persons.alphaAdmin),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -297,9 +269,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-member-cannot-access-admin-users",
     name: "Alpha Member cannot access Alpha admin users API",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "alphaMember");
-      const response = await context.client.get(adminUsersPath());
+    async run({ clients }) {
+      const response = await clients.alphaMember.get(adminUsersPath());
       if (response.status !== 403) {
         throw new Error(`Expected HTTP 403, received ${response.status}.`);
       }
@@ -310,9 +281,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-member-cannot-create-org-unit",
     name: "Alpha Member cannot create org units",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "alphaMember");
-      const response = await context.client.post(orgUnitsPath(), {
+    async run({ clients }) {
+      const response = await clients.alphaMember.post(orgUnitsPath(), {
         name: "Acceptance Smoke Org Unit",
         key: "acceptance-smoke-org-unit",
       });
@@ -326,9 +296,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-member-cannot-access-admin-users",
     name: "Beta Member cannot access Beta admin users API",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "betaMember");
-      const response = await context.client.get(adminUsersPath());
+    async run({ clients }) {
+      const response = await clients.betaMember.get(adminUsersPath());
       if (response.status !== 403) {
         throw new Error(`Expected HTTP 403, received ${response.status}.`);
       }
@@ -339,9 +308,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-member-cannot-create-org-unit",
     name: "Beta Member cannot create org units",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "betaMember");
-      const response = await context.client.post(orgUnitsPath(), {
+    async run({ clients }) {
+      const response = await clients.betaMember.post(orgUnitsPath(), {
         name: "Acceptance Smoke Org Unit",
         key: "acceptance-smoke-org-unit",
       });
@@ -355,9 +323,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "alpha-admin-can-access-admin-users",
     name: "Alpha Club Admin can access Alpha admin users API",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "alphaAdmin");
-      const response = await context.client.get(adminUsersPath());
+    async run({ clients }) {
+      const response = await clients.alphaAdmin.get(adminUsersPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }
@@ -368,9 +335,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "beta-admin-can-access-admin-users",
     name: "Beta Club Admin can access Beta admin users API",
     category: "role-isolation",
-    async run(context) {
-      await loginAs(context, "betaAdmin");
-      const response = await context.client.get(adminUsersPath());
+    async run({ clients }) {
+      const response = await clients.betaAdmin.get(adminUsersPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }
@@ -381,9 +347,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "superadmin-can-authenticate",
     name: "Super Admin can authenticate",
     category: "super-admin",
-    async run(context) {
-      await loginAs(context, "superadmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.superadmin.getSession();
       const user = readSessionUser(session);
       if (user?.email !== ACCEPTANCE_FIXTURE.users.superadmin.email) {
         throw new Error("Authenticated session email did not match the Super Admin fixture.");
@@ -395,9 +360,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "superadmin-active-tenant-is-alpha",
     name: "Super Admin session active tenant is Alpha",
     category: "super-admin",
-    async run(context) {
-      await loginAs(context, "superadmin");
-      const session = await context.client.getSession();
+    async run({ clients }) {
+      const session = await clients.superadmin.getSession();
       const user = readSessionUser(session);
       if (user?.activeTenantId !== ACCEPTANCE_FIXTURE_IDS.tenants.alpha) {
         throw new Error("Super Admin active tenant is not the Alpha fixture tenant.");
@@ -409,9 +373,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "superadmin-can-access-alpha-org-units",
     name: "Super Admin can access Alpha session-scoped org units",
     category: "super-admin",
-    async run(context) {
-      await loginAs(context, "superadmin");
-      const response = await context.client.get(orgUnitsPath());
+    async run({ clients }) {
+      const response = await clients.superadmin.get(orgUnitsPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }
@@ -422,9 +385,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "superadmin-cannot-access-beta-slug-registrations",
     name: "Super Admin cannot access Beta slug registrations without Beta membership",
     category: "super-admin",
-    async run(context) {
-      await loginAs(context, "superadmin");
-      const response = await context.client.get(
+    async run({ clients }) {
+      const response = await clients.superadmin.get(
         tenantRegistrationsPath(ACCEPTANCE_FIXTURE_IDS.tenantSlugs.beta),
       );
       if (!isSafeDenialStatus(response.status)) {
@@ -437,9 +399,8 @@ export const ACCEPTANCE_SECURITY_SMOKE_SCENARIOS: SmokeScenario[] = [
     id: "superadmin-platform-tenants-list",
     name: "Super Admin can list tenants via platform authorization",
     category: "super-admin",
-    async run(context) {
-      await loginAs(context, "superadmin");
-      const response = await context.client.get(tenantsListPath());
+    async run({ clients }) {
+      const response = await clients.superadmin.get(tenantsListPath());
       if (response.status !== 200) {
         throw new Error(`Expected HTTP 200, received ${response.status}.`);
       }

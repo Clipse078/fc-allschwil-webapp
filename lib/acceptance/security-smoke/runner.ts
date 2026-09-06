@@ -1,4 +1,4 @@
-import { createSmokeSessionCacheClient } from "@/lib/acceptance/security-smoke/http-client";
+import { initializeSmokeFixtureClients } from "@/lib/acceptance/security-smoke/http-client";
 import { redactSmokeSecrets } from "@/lib/acceptance/security-smoke/redact";
 import {
   ACCEPTANCE_SECURITY_SMOKE_SCENARIOS,
@@ -6,7 +6,7 @@ import {
 } from "@/lib/acceptance/security-smoke/scenarios";
 import type {
   AcceptanceSecuritySmokeConfig,
-  SmokeHttpClient,
+  SmokeFixtureClients,
   SmokeRunSummary,
   SmokeScenario,
   SmokeScenarioResult,
@@ -17,7 +17,9 @@ type FetchLike = typeof fetch;
 export type AcceptanceSecuritySmokeRunnerDependencies = {
   fetchImpl?: FetchLike;
   scenarios?: SmokeScenario[];
-  createClient?: (config: AcceptanceSecuritySmokeConfig) => SmokeHttpClient;
+  initializeClients?: (
+    config: AcceptanceSecuritySmokeConfig,
+  ) => Promise<SmokeFixtureClients>;
   log: (message: string) => void;
   error: (message: string) => void;
 };
@@ -31,9 +33,10 @@ export async function runAcceptanceSecuritySmoke(
   config: AcceptanceSecuritySmokeConfig,
   deps: AcceptanceSecuritySmokeRunnerDependencies,
 ): Promise<SmokeRunSummary> {
-  const client =
-    deps.createClient?.(config) ??
-    createSmokeSessionCacheClient(config.baseUrl, deps.fetchImpl ?? fetch);
+  const fetchImpl = deps.fetchImpl ?? fetch;
+  const clients =
+    (await deps.initializeClients?.(config)) ??
+    (await initializeSmokeFixtureClients(config, fetchImpl));
   const scenarios = deps.scenarios ?? ACCEPTANCE_SECURITY_SMOKE_SCENARIOS;
   const results: SmokeScenarioResult[] = [];
 
@@ -41,7 +44,7 @@ export async function runAcceptanceSecuritySmoke(
 
   for (const scenario of scenarios) {
     try {
-      const detail = await scenario.run({ client, config });
+      const detail = await scenario.run({ clients, config });
       const result: SmokeScenarioResult = {
         id: scenario.id,
         name: scenario.name,
