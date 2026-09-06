@@ -24,8 +24,12 @@ externally before creation.
    `npm run db:migrate:deploy-if-enabled`. Prisma uses `DIRECT_URL` when
    present and executes `prisma migrate deploy`; it does not run a seed.
 6. Return `APPLY_DATABASE_MIGRATIONS=false`.
-7. Run `npm run db:bootstrap-acceptance` once.
-8. Re-run the bootstrap to verify idempotency. Existing hashes are retained.
+7. Run `npm run db:bootstrap-acceptance:safe` once. Do not manually compose or
+   paste `DATABASE_URL` into PowerShell. The safe runner validates the pooled
+   `sce_acceptance` target, prints only host/database/role identity, and then
+   invokes the canonical bootstrap script.
+8. Re-run the safe bootstrap command to verify idempotency. Existing hashes are
+   retained.
 9. Validate migration status, fixture counts, tenant isolation, login, and
    runtime identity without printing credentials.
 10. Create the Vercel `acceptance` Custom Environment with no tracked branch.
@@ -63,13 +67,40 @@ successful run, set `APPLY_DATABASE_MIGRATIONS=false` again.
 
 ## Bootstrap operator inputs
 
+Preferred one-command workflow:
+
+```powershell
+$env:NODE_ENV = "production"
+$env:APP_ENV = "acceptance"
+$env:VERCEL_TARGET_ENV = "acceptance"
+$env:ACCEPTANCE_BOOTSTRAP_CONFIRM = "BOOTSTRAP_ISOLATED_ACCEPTANCE"
+$env:SCE_OPERATION_AUTHORIZATION = "bootstrap-acceptance:acceptance"
+$env:ACCEPTANCE_DATABASE_HOST = "<acceptance-pooled-host>"
+$env:ACCEPTANCE_DATABASE_USER = "<acceptance-database-user>"
+$env:ACCEPTANCE_DATABASE_PASSWORD = "<acceptance-database-password>"
+$env:ACCEPTANCE_SUPERADMIN_PASSWORD = "<generated-password>"
+$env:ACCEPTANCE_ALPHA_ADMIN_PASSWORD = "<generated-password>"
+$env:ACCEPTANCE_ALPHA_MEMBER_PASSWORD = "<generated-password>"
+$env:ACCEPTANCE_BETA_ADMIN_PASSWORD = "<generated-password>"
+$env:ACCEPTANCE_BETA_MEMBER_PASSWORD = "<generated-password>"
+npm run db:bootstrap-acceptance:safe
+```
+
+The safe runner either accepts an existing `DATABASE_URL` that passes strict
+Acceptance validation, or builds one from the non-secret host/user/name inputs
+plus the secret `ACCEPTANCE_DATABASE_PASSWORD`. It never prints credentials or
+the full connection string, refuses `/neondb`, refuses the direct Neon host for
+pooled bootstrap, and refuses localhost plus STAGE/PROD targets before invoking
+`scripts/bootstrap-acceptance.ts`.
+
 Names only:
 
 - `NODE_ENV`
 - `APP_ENV`
 - `VERCEL_TARGET_ENV`
-- `DATABASE_URL`
 - `ACCEPTANCE_DATABASE_HOST`
+- `ACCEPTANCE_DATABASE_USER`
+- `ACCEPTANCE_DATABASE_PASSWORD`
 - `ACCEPTANCE_BOOTSTRAP_CONFIRM`
 - `SCE_OPERATION_AUTHORIZATION`
 - `ACCEPTANCE_SUPERADMIN_PASSWORD`
@@ -77,6 +108,11 @@ Names only:
 - `ACCEPTANCE_ALPHA_MEMBER_PASSWORD`
 - `ACCEPTANCE_BETA_ADMIN_PASSWORD`
 - `ACCEPTANCE_BETA_MEMBER_PASSWORD`
+
+Optional when the safe runner should reuse a pre-validated pooled URL instead
+of building one from parts:
+
+- `DATABASE_URL`
 
 For gated migration deployment, also provide:
 
