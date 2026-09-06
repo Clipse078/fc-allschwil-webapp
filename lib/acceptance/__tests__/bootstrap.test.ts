@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
   ACCEPTANCE_CONFIRMATION,
+  ACCEPTANCE_BOOTSTRAP_TRANSACTION_OPTIONS,
   ACCEPTANCE_DATABASE_NAME,
   ACCEPTANCE_FIXTURE,
   ACCEPTANCE_OPERATION_AUTHORIZATION,
@@ -234,6 +235,13 @@ function createMemoryTransaction() {
 }
 
 describe("Acceptance bootstrap environment guard", () => {
+  it("configures the canonical bootstrap transaction with an explicit extended timeout", () => {
+    expect(ACCEPTANCE_BOOTSTRAP_TRANSACTION_OPTIONS).toEqual({
+      maxWait: 10_000,
+      timeout: 30_000,
+    });
+  });
+
   it("accepts only the explicit Acceptance classification and database identity", () => {
     expect(assertAcceptanceBootstrapEnvironment(validEnvironment())).toEqual({
       databaseUrl: DATABASE_URL,
