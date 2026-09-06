@@ -3,6 +3,10 @@ import {
   ACCEPTANCE_FIXTURE,
   readAcceptancePasswords,
 } from "@/lib/acceptance/bootstrap";
+import type {
+  AcceptancePasswordEnvName,
+  AcceptancePasswords,
+} from "@/lib/acceptance/bootstrap";
 import type { AcceptanceSecuritySmokeConfig } from "@/lib/acceptance/security-smoke/types";
 
 export const ACCEPTANCE_SECURITY_SMOKE_CONFIRM = "RUN_ACCEPTANCE_SECURITY_SMOKE";

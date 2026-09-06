@@ -1,4 +1,5 @@
 import { ACCEPTANCE_FIXTURE } from "@/lib/acceptance/bootstrap";
+import type { AcceptancePasswords } from "@/lib/acceptance/bootstrap";
 import { getFixturePassword } from "@/lib/acceptance/security-smoke/env";
 import type { SmokeScenario } from "@/lib/acceptance/security-smoke/types";
 
@@ -43,7 +44,7 @@ function readSessionUser(session: Record<string, unknown> | null) {
 }
 
 async function loginAs(
-  context: { client: { loginWithCredentials: (email: string, password: string) => Promise<void> }; config: { passwords: Record<string, string> } },
+  context: { client: { loginWithCredentials: (email: string, password: string) => Promise<void> }; config: { passwords: AcceptancePasswords } },
   userKey: keyof typeof ACCEPTANCE_FIXTURE.users,
 ) {
   const fixture = ACCEPTANCE_FIXTURE.users[userKey];
