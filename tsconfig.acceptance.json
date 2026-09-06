@@ -7,7 +7,7 @@
   "files": [
     "lib/acceptance/bootstrap.ts",
     "lib/acceptance/__tests__/bootstrap.test.ts",
-    "lib/server/npx-command.ts",
+    "lib/server/prisma-cli.ts",
     "lib/server/deploy-migrations-if-enabled.ts",
     "lib/server/operational-database-guard.ts",
     "lib/server/__tests__/operational-database-guard.test.ts",
