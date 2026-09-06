@@ -16,6 +16,7 @@
     "scripts/bootstrap-acceptance.ts",
     "scripts/bootstrap-acceptance-safe.ts",
     "scripts/__tests__/bootstrap-acceptance-safe.test.ts",
+    "scripts/__tests__/bootstrap-acceptance-transaction.test.ts",
     "scripts/deploy-migrations-if-enabled.ts"
   ],
   "include": []

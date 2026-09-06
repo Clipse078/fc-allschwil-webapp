@@ -15,6 +15,7 @@ import { PrismaClient } from "@prisma/client";
 import { Pool } from "pg";
 import {
   ACCEPTANCE_DATABASE_NAME,
+  ACCEPTANCE_BOOTSTRAP_TRANSACTION_OPTIONS,
   assertAcceptanceBootstrapEnvironment,
   bootstrapAcceptanceData,
   readAcceptancePasswords,
@@ -34,9 +35,12 @@ async function main(): Promise<void> {
       throw new Error("Connected database identity is not the Acceptance database.");
     }
 
-    await prisma.$transaction(async (tx) => {
-      await bootstrapAcceptanceData(tx, passwords);
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await bootstrapAcceptanceData(tx, passwords);
+      },
+      ACCEPTANCE_BOOTSTRAP_TRANSACTION_OPTIONS,
+    );
 
     console.log("[bootstrap-acceptance] Synthetic Acceptance bootstrap complete.");
   } finally {
