@@ -2,7 +2,7 @@ import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import { assertAcceptanceDatabaseTarget } from "@/lib/acceptance/bootstrap";
 import { getRuntimeEnvironment } from "@/lib/env";
 import { shouldApplyDatabaseMigrations } from "@/lib/server/database-migration-policy";
-import { resolveNpxCommand } from "@/lib/server/npx-command";
+import { resolvePrismaCliPath } from "@/lib/server/prisma-cli";
 import { assertOperationalMutationAllowed } from "@/lib/server/operational-database-guard";
 
 export type DeployMigrationsDependencies = {
@@ -13,7 +13,8 @@ export type DeployMigrationsDependencies = {
   ) => SpawnSyncReturns<Buffer>;
   exit: (code?: number | string | null) => never;
   env: NodeJS.ProcessEnv;
-  platform: NodeJS.Platform;
+  execPath: string;
+  resolvePrismaCliPath: () => string;
 };
 
 export function runDeployMigrationsIfEnabled(
@@ -21,7 +22,8 @@ export function runDeployMigrationsIfEnabled(
     spawnSync,
     exit: process.exit,
     env: process.env,
-    platform: process.platform,
+    execPath: process.execPath,
+    resolvePrismaCliPath,
   },
 ): void {
   const enabled = shouldApplyDatabaseMigrations(deps.env);
@@ -59,9 +61,10 @@ export function runDeployMigrationsIfEnabled(
   );
 
   console.log("[migrate] Authorized; running prisma migrate deploy.");
+  const prismaCliPath = deps.resolvePrismaCliPath();
   const result = deps.spawnSync(
-    resolveNpxCommand(deps.platform),
-    ["prisma", "migrate", "deploy"],
+    deps.execPath,
+    [prismaCliPath, "migrate", "deploy"],
     {
       stdio: "inherit",
       env: deps.env,

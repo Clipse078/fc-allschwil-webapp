@@ -7,6 +7,8 @@ import {
 
 const ACCEPTANCE_HOST = "acceptance-db.example.com";
 const ACCEPTANCE_DATABASE_URL = `postgresql://acceptance:secret@${ACCEPTANCE_HOST}:5432/${ACCEPTANCE_DATABASE_NAME}`;
+const RESOLVED_PRISMA_CLI_PATH =
+  "/workspace/node_modules/prisma/build/index.js";
 
 function authorizedAcceptanceEnv(
   overrides: NodeJS.ProcessEnv = {},
@@ -47,7 +49,8 @@ function createDependencies(
     spawnSync,
     exit,
     env,
-    platform: "linux",
+    execPath: "/usr/bin/node",
+    resolvePrismaCliPath: () => RESOLVED_PRISMA_CLI_PATH,
     ...overrides,
   };
 }
@@ -80,8 +83,30 @@ describe("deploy-migrations-if-enabled", () => {
     expect(deps.exit).not.toHaveBeenCalled();
   });
 
+  it("launches Prisma via process.execPath with migrate deploy arguments", () => {
+    const resolvePrismaCliPath = vi.fn(() => RESOLVED_PRISMA_CLI_PATH);
+    const deps = createDependencies(authorizedAcceptanceEnv(), {
+      resolvePrismaCliPath,
+    });
+
+    expect(() => runDeployMigrationsIfEnabled(deps)).toThrow(
+      "process.exit called",
+    );
+    expect(resolvePrismaCliPath).toHaveBeenCalledOnce();
+    expect(deps.spawnSync).toHaveBeenCalledWith(
+      "/usr/bin/node",
+      [RESOLVED_PRISMA_CLI_PATH, "migrate", "deploy"],
+      expect.objectContaining({ env: deps.env }),
+    );
+    expect(deps.spawnSync.mock.calls[0]?.[1]).toEqual([
+      RESOLVED_PRISMA_CLI_PATH,
+      "migrate",
+      "deploy",
+    ]);
+  });
+
   it("throws when prisma cannot be spawned", () => {
-    const spawnError = new Error("spawnSync npx ENOENT");
+    const spawnError = new Error("spawnSync node ENOENT");
     const deps = createDependencies(authorizedAcceptanceEnv(), {
       spawnSync: vi.fn(() => ({
         status: null,
@@ -126,7 +151,7 @@ describe("deploy-migrations-if-enabled", () => {
     expect(deps.exit).toHaveBeenCalledWith(0);
   });
 
-  it("uses npx.cmd on Windows and npx elsewhere", () => {
+  it("does not rely on Windows .cmd shim semantics", () => {
     const spawnSync = vi.fn(() => ({
       status: 0,
       stdout: Buffer.from(""),
@@ -146,30 +171,22 @@ describe("deploy-migrations-if-enabled", () => {
         spawnSync,
         exit,
         env,
-        platform: "win32",
+        execPath: "C:\\Program Files\\nodejs\\node.exe",
+        resolvePrismaCliPath: () =>
+          "C:\\workspace\\node_modules\\prisma\\build\\index.js",
       }),
     ).toThrow("process.exit called");
+
     expect(spawnSync).toHaveBeenCalledWith(
-      "npx.cmd",
-      ["prisma", "migrate", "deploy"],
+      "C:\\Program Files\\nodejs\\node.exe",
+      [
+        "C:\\workspace\\node_modules\\prisma\\build\\index.js",
+        "migrate",
+        "deploy",
+      ],
       expect.objectContaining({ env }),
     );
-
-    spawnSync.mockClear();
-    exit.mockClear();
-
-    expect(() =>
-      runDeployMigrationsIfEnabled({
-        spawnSync,
-        exit,
-        env,
-        platform: "linux",
-      }),
-    ).toThrow("process.exit called");
-    expect(spawnSync).toHaveBeenCalledWith(
-      "npx",
-      ["prisma", "migrate", "deploy"],
-      expect.objectContaining({ env }),
-    );
+    expect(spawnSync.mock.calls[0]?.[0]).not.toMatch(/\.cmd$/i);
+    expect(spawnSync.mock.calls[0]?.[1]?.[0]).not.toMatch(/\.cmd$/i);
   });
 });

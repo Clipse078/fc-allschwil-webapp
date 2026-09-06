@@ -38,10 +38,12 @@ or `prisma migrate reset`.
 
 ## Windows recovery for gated migration deployment
 
-If Acceptance migration deployment fails on Windows with `spawnSync npx ENOENT`,
-do not run bare `npx prisma migrate deploy`. Use the guarded npm command so
-Acceptance host/database allowlist checks and operational mutation guards still
-run:
+If Acceptance migration deployment fails on Windows, do not run bare
+`npx prisma migrate deploy`. Use the guarded npm command so Acceptance
+host/database allowlist checks and operational mutation guards still run. The
+guarded runner resolves the locally installed Prisma CLI JavaScript entry point
+and executes it with `process.execPath`, so it does not depend on `npx`,
+`npx.cmd`, or other shell shims:
 
 ```powershell
 $env:APPLY_DATABASE_MIGRATIONS = "true"
