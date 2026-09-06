@@ -5,6 +5,8 @@ import type {
 
 type FetchLike = typeof fetch;
 
+const AUTH_RETURN_REDIRECT_HEADER = "X-Auth-Return-Redirect";
+
 function parseSetCookieHeader(setCookie: string): { name: string; value: string } | null {
   const [pair] = setCookie.split(";");
   const separator = pair.indexOf("=");
@@ -16,18 +18,23 @@ function parseSetCookieHeader(setCookie: string): { name: string; value: string 
 }
 
 function collectSetCookieHeaders(headers: Headers): string[] {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
+    .getSetCookie;
+  if (typeof getSetCookie === "function") {
+    return getSetCookie.call(headers);
+  }
+
   const values: string[] = [];
   headers.forEach((value, key) => {
     if (key.toLowerCase() === "set-cookie") {
       values.push(value);
     }
   });
-  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] })
-    .getSetCookie;
-  if (typeof getSetCookie === "function") {
-    return getSetCookie.call(headers);
-  }
   return values;
+}
+
+function isAuthSessionCookieName(name: string): boolean {
+  return /^(?:__Secure-|__Host-)?authjs\.session-token(?:\.\d+)?$/.test(name);
 }
 
 export function createCookieJar() {
@@ -48,12 +55,27 @@ export function createCookieJar() {
     clear() {
       cookies.clear();
     },
+    hasAuthSessionCookie(): boolean {
+      for (const name of cookies.keys()) {
+        if (isAuthSessionCookieName(name)) {
+          return true;
+        }
+      }
+      return false;
+    },
     headerValue(): string {
       return Array.from(cookies.entries())
         .map(([name, value]) => `${name}=${value}`)
         .join("; ");
     },
   };
+}
+
+function readSessionEmail(session: Record<string, unknown> | null): string | null {
+  const user = session?.user;
+  if (!user || typeof user !== "object") return null;
+  const email = (user as Record<string, unknown>).email;
+  return typeof email === "string" ? email.trim().toLowerCase() : null;
 }
 
 async function request(
@@ -63,12 +85,18 @@ async function request(
   method: "GET" | "POST",
   path: string,
   body?: unknown,
+  extraHeaders?: Record<string, string>,
 ): Promise<SmokeHttpResponse> {
   const url = new URL(path, `${baseUrl}/`).toString();
   const headers = new Headers();
   const cookieHeader = jar.headerValue();
   if (cookieHeader) {
     headers.set("cookie", cookieHeader);
+  }
+  if (extraHeaders) {
+    for (const [name, value] of Object.entries(extraHeaders)) {
+      headers.set(name, value);
+    }
   }
 
   const init: RequestInit = { method, headers, redirect: "manual" };
@@ -102,11 +130,72 @@ async function request(
   };
 }
 
+function parseCredentialsSignInResult(
+  response: SmokeHttpResponse,
+  baseUrl: string,
+): { ok: true } | { ok: false; message: string } {
+  if (response.status === 429) {
+    return {
+      ok: false,
+      message: "Credentials login failed with HTTP 429.",
+    };
+  }
+
+  if (response.status >= 400) {
+    return {
+      ok: false,
+      message: `Credentials login failed with HTTP ${response.status}.`,
+    };
+  }
+
+  const payload = response.json() as { url?: string } | null;
+  const redirectUrl = payload?.url;
+  if (typeof redirectUrl === "string" && redirectUrl.length > 0) {
+    const parsed = new URL(redirectUrl, `${baseUrl}/`);
+    const error = parsed.searchParams.get("error");
+    if (error) {
+      const code = parsed.searchParams.get("code");
+      if (error === "CredentialsSignin" || code === "credentials") {
+        return {
+          ok: false,
+          message: "Credentials login failed: invalid email or password.",
+        };
+      }
+      return {
+        ok: false,
+        message: `Credentials login failed with auth error ${error}.`,
+      };
+    }
+    return { ok: true };
+  }
+
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get("location");
+    if (location) {
+      const parsed = new URL(location, `${baseUrl}/`);
+      const error = parsed.searchParams.get("error");
+      if (error) {
+        return {
+          ok: false,
+          message: "Credentials login failed: invalid email or password.",
+        };
+      }
+    }
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    message: "Credentials login failed: Auth.js did not return a redirect URL.",
+  };
+}
+
 export function createSmokeHttpClient(
   baseUrl: string,
   fetchImpl: FetchLike = fetch,
 ): SmokeHttpClient {
   const jar = createCookieJar();
+  const callbackUrl = new URL("/dashboard", `${baseUrl}/`).toString();
 
   return {
     clearCookies() {
@@ -119,8 +208,18 @@ export function createSmokeHttpClient(
       return request(fetchImpl, baseUrl, jar, "POST", path, body);
     },
     async loginWithCredentials(email: string, password: string) {
+      const normalizedEmail = email.trim().toLowerCase();
+      const existingSession = await this.getSession();
+      const existingEmail = readSessionEmail(existingSession);
+      if (existingEmail === normalizedEmail) {
+        return;
+      }
+
       jar.clear();
       const csrfResponse = await request(fetchImpl, baseUrl, jar, "GET", "/api/auth/csrf");
+      if (csrfResponse.status === 429) {
+        throw new Error("Credentials login failed: CSRF request returned HTTP 429.");
+      }
       const csrfPayload = csrfResponse.json() as { csrfToken?: string } | null;
       const csrfToken = csrfPayload?.csrfToken;
       if (!csrfToken) {
@@ -135,16 +234,21 @@ export function createSmokeHttpClient(
         "/api/auth/callback/credentials",
         new URLSearchParams({
           csrfToken,
-          email,
+          email: normalizedEmail,
           password,
-          redirect: "false",
-          json: "true",
+          callbackUrl,
         }),
+        { [AUTH_RETURN_REDIRECT_HEADER]: "1" },
       );
 
-      if (signInResponse.status >= 400) {
+      const signInResult = parseCredentialsSignInResult(signInResponse, baseUrl);
+      if (!signInResult.ok) {
+        throw new Error(signInResult.message);
+      }
+
+      if (!jar.hasAuthSessionCookie()) {
         throw new Error(
-          `Credentials login failed with HTTP ${signInResponse.status}.`,
+          "Credentials login failed: Auth.js did not return a session cookie.",
         );
       }
 

@@ -40,7 +40,6 @@ export async function runAcceptanceSecuritySmoke(
   deps.log(`Acceptance security smoke starting against ${config.baseUrl}`);
 
   for (const scenario of scenarios) {
-    client.clearCookies();
     try {
       const detail = await scenario.run({ client, config });
       const result: SmokeScenarioResult = {
