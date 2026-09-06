@@ -21,6 +21,7 @@
     "db:seed-demo": "tsx prisma/seed-demo.ts",
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
     "db:bootstrap-acceptance": "tsx scripts/bootstrap-acceptance.ts",
+    "db:bootstrap-acceptance:safe": "tsx scripts/bootstrap-acceptance-safe.ts",
     "db:break-glass-superadmin": "tsx scripts/break-glass-superadmin-password.ts",
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
     "sync-training-permissions": "tsx scripts/sync-training-permissions.ts",
