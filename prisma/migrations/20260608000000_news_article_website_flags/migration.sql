@@ -4,7 +4,7 @@
 -- Changes:
 --   1. Tenant.websiteEnabled (BOOLEAN, default true)  — gates all /api/public/v1/website/* endpoints.
 --   2. Tenant.approvedDataOnly (BOOLEAN, default false) — future editorial-approval gate.
---   3. NewsArticleStatus enum (DRAFT | PUBLISHED | ARCHIVED).
+--   3. NewsArticleStatus enum (DRAFT | IN_REVIEW | PUBLISHED | ARCHIVED).
 --   4. NewsArticle table — tenant-scoped, slug-unique per tenant, PUBLISHED-gated for public feeds.
 --
 -- Additive only: no destructive changes, no data loss, zero downtime safe.
@@ -28,8 +28,15 @@ UPDATE "Tenant" SET "websiteEnabled" = true WHERE key = 'fc-allschwil' AND "webs
 
 -- 2. NewsArticleStatus enum
 --    Uses DO block for CREATE TYPE to allow idempotent re-runs.
+--    IN_REVIEW is included here so fresh bootstrap does not depend on the
+--    earlier (misordered) 20260606202204 migration.
 DO $$ BEGIN
-  CREATE TYPE "NewsArticleStatus" AS ENUM ('DRAFT', 'PUBLISHED', 'ARCHIVED');
+  CREATE TYPE "NewsArticleStatus" AS ENUM (
+    'DRAFT',
+    'IN_REVIEW',
+    'PUBLISHED',
+    'ARCHIVED'
+  );
 EXCEPTION WHEN duplicate_object THEN
   NULL; -- enum already exists, no-op
 END $$;
