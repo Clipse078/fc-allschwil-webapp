@@ -22,6 +22,7 @@
     "db:bootstrap-admin": "tsx prisma/bootstrap-admin.ts",
     "db:bootstrap-acceptance": "tsx scripts/bootstrap-acceptance.ts",
     "db:bootstrap-acceptance:safe": "tsx scripts/bootstrap-acceptance-safe.ts",
+    "acceptance:alpha-admin-password-check": "tsx scripts/acceptance-alpha-admin-password-check.ts",
     "acceptance:security-smoke": "tsx scripts/acceptance-security-smoke.ts",
     "db:break-glass-superadmin": "tsx scripts/break-glass-superadmin-password.ts",
     "sync-workspace-permissions": "tsx scripts/sync-workspace-permissions.ts",
