@@ -16,6 +16,12 @@ export const ACCEPTANCE_CONFIRMATION = "BOOTSTRAP_ISOLATED_ACCEPTANCE";
 export const ACCEPTANCE_OPERATION_AUTHORIZATION =
   "bootstrap-acceptance:acceptance";
 
+/** Interactive transaction limits for the canonical Acceptance bootstrap only. */
+export const ACCEPTANCE_BOOTSTRAP_TRANSACTION_OPTIONS = {
+  maxWait: 10_000,
+  timeout: 30_000,
+} as const;
+
 const FIXTURE_PREFIX = "sce-acceptance-";
 
 export const ACCEPTANCE_FIXTURE = {
