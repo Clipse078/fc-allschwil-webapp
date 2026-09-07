@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { requireApiPermission } from "@/lib/permissions/require-api-permission";
 import { requireApiAnyPermission } from "@/lib/permissions/require-api-any-permission";
+import { requirePlatformApiPermission } from "@/lib/permissions/require-platform-api-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
 import { getTenantDetail } from "@/lib/tenants/queries";
 import { parseBrandingPatch } from "@/lib/tenant-runtime/branding-patch";
+import {
+  applyTenantLifecycleTransition,
+  TenantLifecycleError,
+} from "@/lib/tenants/platform-ops/lifecycle";
 
 type RouteContext = { params: Promise<{ tenantSlug: string }> };
 
@@ -124,7 +128,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext) {
 }
 
 export async function PUT(req: NextRequest, { params }: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+  const access = await requirePlatformApiPermission(PERMISSIONS.TENANTS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { tenantSlug } = await params;
@@ -187,29 +191,42 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: RouteContext) {
-  const access = await requireApiPermission(PERMISSIONS.TENANTS_MANAGE);
+export async function DELETE(req: NextRequest, { params }: RouteContext) {
+  const access = await requirePlatformApiPermission(PERMISSIONS.TENANTS_MANAGE);
   if (!access.ok) return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { tenantSlug } = await params;
+  const body = await req.json().catch(() => ({}));
+  const reason = typeof body?.reason === "string" ? body.reason : undefined;
+
   const existing = await prisma.tenant.findUnique({
     where: { key: tenantSlug },
-    select: { id: true, status: true },
+    select: { id: true, key: true, name: true, status: true },
   });
   if (!existing) return NextResponse.json({ error: "Tenant nicht gefunden." }, { status: 404 });
   if (existing.status === "ARCHIVED") {
     return NextResponse.json({ error: "Tenant ist bereits archiviert." }, { status: 409 });
   }
 
-  // Guard: do not archive the last ACTIVE tenant — the platform would become inaccessible.
-  const activeCount = await prisma.tenant.count({ where: { status: "ACTIVE" } });
-  if (activeCount <= 1) {
-    return NextResponse.json(
-      { error: "Der letzte aktive Tenant kann nicht archiviert werden." },
-      { status: 409 },
+  try {
+    const result = await applyTenantLifecycleTransition(
+      prisma,
+      existing,
+      "archive",
+      {
+        actorUserId: access.actorUserId!,
+        reason: reason ?? "Archiviert über Tenant-API",
+      },
     );
+    return NextResponse.json({
+      message: "Tenant wurde archiviert.",
+      tenant: result.tenant,
+    });
+  } catch (error) {
+    if (error instanceof TenantLifecycleError) {
+      return NextResponse.json({ error: error.message, code: error.code }, { status: error.status });
+    }
+    console.error(error);
+    return NextResponse.json({ error: "Tenant konnte nicht archiviert werden." }, { status: 500 });
   }
-
-  await prisma.tenant.update({ where: { key: tenantSlug }, data: { status: "ARCHIVED" } });
-  return NextResponse.json({ message: "Tenant wurde archiviert." });
 }

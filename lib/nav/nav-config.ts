@@ -504,6 +504,12 @@ export const NAV_SECTIONS: NavSection[] = [
             permissionKeys: [PERMISSIONS.USERS_MANAGE],
           },
           {
+            key: "admin-command-center",
+            label: "Command Center",
+            href: "/dashboard/admin/command-center",
+            permissionKeys: [PERMISSIONS.TENANTS_VIEW, PERMISSIONS.TENANTS_MANAGE],
+          },
+          {
             key: "admin-tenants",
             label: "Tenants",
             href: "/dashboard/admin/tenants",

@@ -10,7 +10,12 @@ import {
   Users,
 } from "lucide-react";
 import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/prisma";
+import {
+  DEFAULT_POST_LOGIN_DESTINATION,
+  resolvePostLoginDestination,
+} from "@/lib/auth/post-login-destination";
 import { getActiveTenant } from "@/lib/tenants/active-tenant";
 import { formatTime } from "@/lib/tenant-runtime/formatters";
 import { getPersonalizedGreeting, resolveDashboardFirstName } from "@/lib/dashboard/greeting";
@@ -186,6 +191,12 @@ function EventItem({ day, month, title, location, time }: EventItemProps) {
 
 export default async function DashboardPage() {
   const session = await auth();
+  const postLoginDestination = resolvePostLoginDestination(session?.user);
+
+  if (postLoginDestination !== DEFAULT_POST_LOGIN_DESTINATION) {
+    redirect(postLoginDestination);
+  }
+
   const ctx = await getActiveTenant();
   const actor =
     session?.user && ctx

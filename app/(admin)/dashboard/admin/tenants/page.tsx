@@ -3,32 +3,39 @@ import { Plus } from "lucide-react";
 import { requireAnyPermission } from "@/lib/permissions/require-any-permission";
 import { hasPermission } from "@/lib/permissions/has-permission";
 import { PERMISSIONS } from "@/lib/permissions/permissions";
-import { getTenants } from "@/lib/tenants/queries";
+import { getTenantRegistryItems } from "@/lib/tenants/platform-ops/queries";
 import AdminSectionHeader from "@/components/admin/shared/AdminSectionHeader";
-import TenantList from "@/components/admin/tenants/TenantList";
+import TenantRegistryList from "@/components/admin/tenants/TenantRegistryList";
 
-export default async function TenantsPage() {
+type PageProps = {
+  searchParams: Promise<{ filter?: string }>;
+};
+
+export default async function TenantsPage({ searchParams }: PageProps) {
   const session = await requireAnyPermission([
     PERMISSIONS.TENANTS_VIEW,
     PERMISSIONS.TENANTS_MANAGE,
   ]);
   const canManage = hasPermission(session, PERMISSIONS.TENANTS_MANAGE);
+  const params = await searchParams;
 
-  let tenants: Awaited<ReturnType<typeof getTenants>> = [];
+  let tenants: Awaited<ReturnType<typeof getTenantRegistryItems>> = [];
   try {
-    tenants = await getTenants();
+    tenants = await getTenantRegistryItems("all");
   } catch {
     // DB schema drift or connection failure — render page with empty list
     // so the admin can still navigate and diagnose via /dashboard/runtime.
     tenants = [];
   }
 
+  const initialFilter = params.filter;
+
   return (
     <div className="space-y-8">
       <AdminSectionHeader
         eyebrow="Platform"
-        title="Tenants"
-        description="Alle Tenants dieser Instanz. Jeder Tenant repräsentiert eine eigenständige Vereinsinstanz."
+        title="Tenant Registry"
+        description="Operative Tenant-Übersicht mit Lifecycle-Status, Aufmerksamkeitssignalen und Schnellnavigation."
         actions={
           canManage ? (
             <Link href="/dashboard/admin/tenants/new" className="fca-button-primary">
@@ -39,7 +46,11 @@ export default async function TenantsPage() {
         }
       />
 
-      <TenantList tenants={tenants} canManage={canManage} />
+      <TenantRegistryList
+        tenants={tenants}
+        canManage={canManage}
+        initialFilter={initialFilter === "attention" ? "attention" : undefined}
+      />
     </div>
   );
 }
