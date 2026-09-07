@@ -26,6 +26,12 @@ describe("classifyProviderMatchDisposition", () => {
   it("recognises abgesagt as CANCELLED", () => {
     expect(classifyProviderMatchDisposition("abgesagt")).toBe("CANCELLED");
   });
+
+  it('recognises SFV Nullwertung "Null zu Null - Null Punkte" as NOT_PLAYED', () => {
+    expect(
+      classifyProviderMatchDisposition("Null zu Null - Null Punkte"),
+    ).toBe("NOT_PLAYED");
+  });
 });
 
 describe("classifySportingMatchLifecycle", () => {
@@ -96,6 +102,32 @@ describe("classifySportingMatchLifecycle", () => {
         now: NOW,
       }).lifecycle,
     ).toBe("COMPLETED");
+  });
+
+  it("SFV Nullwertung overrides a poisoned COMPLETED event (match 4361827 class)", () => {
+    expect(
+      classifySportingMatchLifecycle({
+        status: "COMPLETED",
+        startAt: new Date("2026-10-25T13:00:00.000Z"),
+        providerMatchStateName: "Null zu Null - Null Punkte",
+        now: new Date("2026-10-26T12:00:00.000Z"),
+      }),
+    ).toEqual({
+      lifecycle: "NEEDS_RECONCILIATION",
+      reconciliationIssue: "PAST_FIXTURE_PROVIDER_NOT_PLAYED",
+    });
+  });
+
+  it("SFV Nullwertung is excluded from Resultate", () => {
+    const { lifecycle } = classifySportingMatchLifecycle({
+      status: "SCHEDULED",
+      startAt: new Date("2026-10-25T13:00:00.000Z"),
+      providerMatchStateName: "Null zu Null - Null Punkte",
+      now: NOW,
+    });
+
+    expect(lifecycle).not.toBe("COMPLETED");
+    expect(isSportingMatchInResultsList(lifecycle)).toBe(false);
   });
 
   it("6. postponed → POSTPONED", () => {

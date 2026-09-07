@@ -70,6 +70,13 @@ export function classifyProviderMatchDisposition(
     return "NOT_PLAYED";
   }
 
+  // SFV Nullwertung — observed on football.ch / regional match centers as
+  // "Null zu Null - Null Punkte" (legend: N=Nullwertung). Administrative void:
+  // 0:0 on the wire, zero ranking points, not a completed sporting result.
+  if (name.includes("null punkte") || name.includes("nullwertung")) {
+    return "NOT_PLAYED";
+  }
+
   if (
     name.includes("ausgetragen") ||
     name.includes("gespielt") ||

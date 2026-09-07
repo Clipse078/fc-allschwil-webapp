@@ -421,6 +421,42 @@ describe("updateMatchRecord — homeAway", () => {
     );
   });
 
+  it("heals SFV Nullwertung from COMPLETED to SCHEDULED, preserves raw 0:0 scores", async () => {
+    await updateMatchRecord(
+      "mapping-1",
+      "event-1",
+      makeEntry({
+        matchId: 4361827,
+        matchStateName: "Null zu Null - Null Punkte",
+        scoreTeamA: 0,
+        scoreTeamB: 0,
+      }),
+      makeContext(),
+      "US Olympia 1963 rot",
+      "team-1",
+      null,
+      "team-1",
+      true,
+      null,
+      null,
+      "COMPLETED",
+    );
+
+    expect(mockEventUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        status: "SCHEDULED",
+        resultLabel: null,
+      }),
+    );
+    expect(mockMappingUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        scoreHome: 0,
+        scoreAway: 0,
+        providerMatchStateName: "Null zu Null - Null Punkte",
+      }),
+    );
+  });
+
   it("protects genuine COMPLETED status when provider disposition is UNKNOWN", async () => {
     await updateMatchRecord(
       "mapping-1",
@@ -781,6 +817,62 @@ describe("processScheduleEntry — lifecycle self-healing", () => {
       expect.objectContaining({
         status: "SCHEDULED",
         resultLabel: null,
+      }),
+    );
+  });
+
+  it("heals match 4361827 class SFV Nullwertung from COMPLETED during schedule sync", async () => {
+    const providerStateName = "Null zu Null - Null Punkte";
+    const existing = new Map([
+      [
+        4361827,
+        {
+          id: "mapping-4361827",
+          eventId: "event-4361827",
+          ...makeExistingMappingSnapshot({
+            providerMatchStateName: providerStateName,
+            scoreHome: 0,
+            scoreAway: 0,
+          }),
+          homeExternalTeamId: null,
+          awayExternalTeamId: null,
+          event: makeExistingEventSnapshot("HOME", {
+            startAt: new Date("2026-10-25T13:00:00.000Z"),
+            status: "COMPLETED",
+          }),
+        },
+      ],
+    ]);
+
+    const result = await processScheduleEntry(
+      makeEntry({
+        matchId: 4361827,
+        matchDate: "2026-10-25T15:00:00",
+        matchStateName: providerStateName,
+        scoreTeamA: 0,
+        scoreTeamB: 0,
+        teamNameA: "US Olympia 1963 rot",
+        teamNameB: "FC Allschwil Junioren D-9 D1",
+      }),
+      makeContext(),
+      "season-1",
+      existing,
+      new Map([[31927, "team-1"]]),
+      new Set([31927]),
+    );
+
+    expect(result.outcome.status).toBe("updated");
+    expect(mockEventUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        status: "SCHEDULED",
+        resultLabel: null,
+      }),
+    );
+    expect(mockMappingUpdate.mock.calls[0][0].data).toEqual(
+      expect.objectContaining({
+        scoreHome: 0,
+        scoreAway: 0,
+        providerMatchStateName: providerStateName,
       }),
     );
   });
