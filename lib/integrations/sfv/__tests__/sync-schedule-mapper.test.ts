@@ -24,6 +24,7 @@ import {
   resolvePersistedEventStatus,
 } from "../sync/schedule-mapper";
 import type { ClubScheduleEntry } from "../client";
+import { classifyProviderMatchDisposition } from "@/lib/sporting-data/provider-state";
 
 // ── Fixtures ───────────────────────────────────────────────────────────────────
 
@@ -197,6 +198,12 @@ describe("mapMatchStateToEventStatus", () => {
   it("is case-insensitive — 'Gespielt' maps to COMPLETED", () => {
     expect(mapMatchStateToEventStatus(1, "Gespielt")).toBe("COMPLETED");
   });
+
+  it('maps SFV Nullwertung "Null zu Null - Null Punkte" to SCHEDULED', () => {
+    expect(
+      mapMatchStateToEventStatus(0, "Null zu Null - Null Punkte"),
+    ).toBe("SCHEDULED");
+  });
 });
 
 // ── resolvePersistedEventStatus ─────────────────────────────────────────────
@@ -211,6 +218,16 @@ describe("resolvePersistedEventStatus", () => {
   it("allows explicit provider NOT_PLAYED to heal COMPLETED to SCHEDULED", () => {
     expect(
       resolvePersistedEventStatus("COMPLETED", "SCHEDULED", "NOT_PLAYED"),
+    ).toBe("SCHEDULED");
+  });
+
+  it('heals COMPLETED to SCHEDULED for SFV Nullwertung "Null zu Null - Null Punkte"', () => {
+    expect(
+      resolvePersistedEventStatus(
+        "COMPLETED",
+        "SCHEDULED",
+        classifyProviderMatchDisposition("Null zu Null - Null Punkte"),
+      ),
     ).toBe("SCHEDULED");
   });
 
@@ -246,6 +263,16 @@ describe("buildResultLabel", () => {
 
   it("returns null for SCHEDULED match (no score yet)", () => {
     expect(buildResultLabel(0, 0, "SCHEDULED")).toBeNull();
+  });
+
+  it("returns null for SFV Nullwertung 0:0 when status is SCHEDULED", () => {
+    expect(
+      buildResultLabel(
+        0,
+        0,
+        mapMatchStateToEventStatus(0, "Null zu Null - Null Punkte"),
+      ),
+    ).toBeNull();
   });
 
   it("returns null for POSTPONED match", () => {
