@@ -170,7 +170,15 @@ export type EventsData = {
 };
 
 export type MatchesData = {
-  matches: PublicWebsiteEventItem[];
+  matches: PublicWebsiteMatchItem[];
+};
+
+/**
+ * SCE-SPORTING-IDENTITY-01 — website match with canonical participant identity.
+ * Extends PublicWebsiteEventItem additively; all legacy fields are preserved.
+ */
+export type PublicWebsiteMatchItem = PublicWebsiteEventItem & {
+  matchIdentity: PublicWochenplanMatchIdentity;
 };
 
 export type ClubEventsData = {

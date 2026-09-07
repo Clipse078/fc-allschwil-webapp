@@ -22,7 +22,7 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { getPublicEvents, MATCH_EVENT_TYPES } from "@/lib/events/public-event-feed";
-import { toPublicWebsiteEvent } from "@/lib/website/public-events-mapper";
+import { enrichPublicMatchesWithIdentity } from "@/lib/website/public-matches-identity";
 import {
   buildWebsiteEnvelope,
   resolveTenantFromParams,
@@ -69,7 +69,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       eventTypes: MATCH_EVENT_TYPES,
     });
 
-    const matches = rawEvents.map(toPublicWebsiteEvent);
+    const matches = await enrichPublicMatchesWithIdentity({
+      tenantId: tenant.id,
+      tenantName: tenant.name,
+      events: rawEvents,
+    });
 
     return NextResponse.json(
       buildWebsiteEnvelope(

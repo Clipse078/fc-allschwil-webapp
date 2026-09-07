@@ -4,6 +4,7 @@
  * TEAM-SFV-02B — public sporting-data module surface.
  */
 
+export * from "./match-participant-identity";
 export * from "./match-reconciliation";
 export * from "./counts";
 export * from "./lifecycle";
