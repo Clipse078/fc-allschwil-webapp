@@ -9,15 +9,10 @@
  * logo tables or filename guessing.
  */
 
-import { resolveExternalClubLogoUrl } from "@/lib/club-directory/logo";
-import {
-  resolveExternalTeamLogoWithCanonicalFallback,
-} from "@/lib/club-directory/canonical-logo-resolution";
-import { resolveClubIdentityLogoUrl } from "@/lib/matchcenter/club-identity";
+import { resolveMatchParticipantIdentity } from "@/lib/sporting-data/match-participant-identity";
 import { resolvePitchDisplay } from "@/lib/publishing/presentation/allocation-display-resolver";
 import type { TournamentDto } from "@/lib/tournaments/types";
 import type {
-  PublicWochenplanClubIdentity,
   PublicWochenplanDressingRoom,
   PublicWochenplanDressingRoomRole,
   PublicWochenplanEventItem,
@@ -223,85 +218,6 @@ export function mapTournamentDressingRooms(
   return rooms.length > 0 ? rooms : null;
 }
 
-function buildOwnClubIdentity(
-  team: CanonicalInfoboardTeamDisplayNameRow | null | undefined,
-  tenantClubName: string,
-  tenantLogoUrl: string | null,
-  fallbackDisplayName: string | null,
-  teamSeasonDisplayName?: string | null,
-): PublicWochenplanClubIdentity {
-  const resolvedTeamName = team
-    ? resolveLongTeamName({
-        teamName: team.name,
-        teamShortName: team.shortName,
-        teamAlternativeName: team.alternativeName,
-        teamSeasonDisplayName,
-      })
-    : null;
-
-  return {
-    displayName:
-      meaningful(resolvedTeamName) ??
-      meaningful(team?.name) ??
-      meaningful(fallbackDisplayName) ??
-      tenantClubName,
-    logoUrl: tenantLogoUrl,
-    teamId: team && "id" in team ? (team as { id: string }).id : null,
-    externalClubId: null,
-  };
-}
-
-type ExternalTeamPolicyRow = NonNullable<
-  NonNullable<CanonicalEventPolicyRow["matchExternalMapping"]>["awayExternalTeam"]
->;
-
-type ExternalClubPolicyRow = NonNullable<CanonicalEventPolicyRow["opponentExternalClub"]>;
-
-function buildExternalClubIdentity(
-  externalClub: ExternalClubPolicyRow,
-  fallbackDisplayName: string | null,
-): PublicWochenplanClubIdentity {
-  return {
-    displayName: meaningful(externalClub.name) ?? meaningful(fallbackDisplayName) ?? "",
-    logoUrl: resolveExternalClubLogoUrl(externalClub),
-    teamId: null,
-    externalClubId: null,
-  };
-}
-
-function buildExternalTeamIdentity(
-  externalTeam: ExternalTeamPolicyRow | null,
-  fallbackDisplayName: string | null,
-  canonicalLogoByProviderClubId: ReadonlyMap<number, string | null>,
-): PublicWochenplanClubIdentity {
-  if (!externalTeam) {
-    return {
-      displayName: meaningful(fallbackDisplayName) ?? "",
-      logoUrl: null,
-      teamId: null,
-      externalClubId: null,
-    };
-  }
-
-  return {
-    displayName:
-      meaningful(externalTeam.name) ??
-      meaningful(externalTeam.externalClub.name) ??
-      meaningful(fallbackDisplayName) ??
-      "",
-    logoUrl: resolveExternalTeamLogoWithCanonicalFallback(
-      {
-        team: externalTeam,
-        directClub: externalTeam.externalClub,
-        providerMappings: externalTeam.providerMappings,
-      },
-      canonicalLogoByProviderClubId,
-    ),
-    teamId: null,
-    externalClubId: null,
-  };
-}
-
 export function buildPublicMatchIdentity(
   policy: CanonicalEventPolicyRow | undefined,
   item: WeekplannerMatchItem,
@@ -309,57 +225,16 @@ export function buildPublicMatchIdentity(
   tenantLogoUrl: string | null,
   canonicalLogoByProviderClubId: ReadonlyMap<number, string | null> = new Map(),
 ): PublicWochenplanMatchIdentity {
-  const mapping = policy?.matchExternalMapping ?? null;
-  const eventTeam = policy?.team ?? null;
-  const homeAway = (policy?.homeAway ?? "HOME").trim().toUpperCase();
-  const ownTeamIsAway = homeAway === "AWAY";
-
-  if (mapping) {
-    return {
-      home: mapping.homeTeam
-        ? buildOwnClubIdentity(
-            mapping.homeTeam,
-            tenantClubName,
-            tenantLogoUrl,
-            ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
-          )
-        : buildExternalTeamIdentity(
-            mapping.homeExternalTeam,
-            ownTeamIsAway ? item.opponentName : item.teamNames[0] ?? null,
-            canonicalLogoByProviderClubId,
-          ),
-      away: mapping.awayTeam
-        ? buildOwnClubIdentity(
-            mapping.awayTeam,
-            tenantClubName,
-            tenantLogoUrl,
-            ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
-          )
-        : buildExternalTeamIdentity(
-            mapping.awayExternalTeam,
-            ownTeamIsAway ? item.teamNames[0] ?? null : item.opponentName,
-            canonicalLogoByProviderClubId,
-          ),
-    };
-  }
-
-  const opponentClub = policy?.opponentExternalClub ?? null;
-
-  if (ownTeamIsAway) {
-    return {
-      home: opponentClub
-        ? buildExternalClubIdentity(opponentClub, item.opponentName)
-        : buildExternalTeamIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
-      away: buildOwnClubIdentity(eventTeam, tenantClubName, tenantLogoUrl, item.teamNames[0] ?? null),
-    };
-  }
-
-  return {
-    home: buildOwnClubIdentity(eventTeam, tenantClubName, tenantLogoUrl, item.teamNames[0] ?? null),
-    away: opponentClub
-      ? buildExternalClubIdentity(opponentClub, item.opponentName)
-      : buildExternalTeamIdentity(null, item.opponentName, canonicalLogoByProviderClubId),
-  };
+  return resolveMatchParticipantIdentity(
+    policy,
+    {
+      opponentName: item.opponentName,
+      ownTeamDisplayName: item.teamNames[0] ?? null,
+    },
+    tenantClubName,
+    tenantLogoUrl,
+    canonicalLogoByProviderClubId,
+  );
 }
 
 function mapTrainingStatus(status: string | undefined): string {
